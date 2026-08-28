@@ -1,0 +1,446 @@
+{
+  "schema": "nimiq-shop.integrity/v1",
+  "target": "backend",
+  "algorithm": "sha256",
+  "rootHashAlgorithm": "sha256 over sorted \"path\\nsha256\\n\" lines",
+  "rootHash": "4ac82d22c1556efe1e6f755a3ac22d0d5304bceb4e2dbd5317001cff4205e0e5",
+  "basePath": "backend",
+  "fileCount": 87,
+  "files": [
+    {
+      "path": ".env.example",
+      "sha256": "efff03a70194ed8ffbf10aeae7477b5510e2b8c81e56951e7891250123a916da",
+      "size": 7712
+    },
+    {
+      "path": "cmd/decode_test_main.go",
+      "sha256": "c5fb7bf3a95748e6351a15a5070970dc3155aca3903cc5a0225b89529c90c0d3",
+      "size": 608
+    },
+    {
+      "path": "cmd/mockstack/main.go",
+      "sha256": "c49d90ebf1133d04085bd903eb5029e1a8bba273a53b7cbd58ce8e0141efc91e",
+      "size": 34766
+    },
+    {
+      "path": "cmd/notif-test/main.go",
+      "sha256": "201b59c7080dc356ca46b97b498e319b7846fe9eae4f45b6a707c8ad8c772993",
+      "size": 2433
+    },
+    {
+      "path": "cmd/server/main.go",
+      "sha256": "6fb7946ee6ce307dd43593061c93b599459012195f11f24ed8dd3064b58b0ec7",
+      "size": 23993
+    },
+    {
+      "path": "cmd/tokengui/main.go",
+      "sha256": "8ff5eb31da2d4998f8d31c3edabec7f18420912e7c5a6e6f4960d3fafec016ac",
+      "size": 478
+    },
+    {
+      "path": "crashtest/crash_test.go",
+      "sha256": "30770eef81108ceca46706479dbd28f6e70e7494459db6c30f5c629dfb8afd98",
+      "size": 45886
+    },
+    {
+      "path": "go.mod",
+      "sha256": "91501dbcd34c13155b418d81ecb0b36f590a9e1d2d462f8348489aaee6dc12d2",
+      "size": 2583
+    },
+    {
+      "path": "go.sum",
+      "sha256": "421a9546a17783052a254e0f705a53048ec6af5f169a4efdc8867d933e91dd99",
+      "size": 29379
+    },
+    {
+      "path": "internal/admin/models.go",
+      "sha256": "70aaacc3f5e49277cf9ba2b8206b8dc138b36aa5b9b811023a0bd570336748fb",
+      "size": 2391
+    },
+    {
+      "path": "internal/auth/admin.go",
+      "sha256": "fe23608fbfe7c324bc0db01452eff8b32e1ababace064afa6b5155b8b044dbea",
+      "size": 5764
+    },
+    {
+      "path": "internal/auth/admin_test.go",
+      "sha256": "b844d5d7a0286c3352c02fa602b3c53daa9c5c6fa2aa98493e3db20ebee572d7",
+      "size": 1104
+    },
+    {
+      "path": "internal/auth/auth.go",
+      "sha256": "6bf5805617ed270786b94033a958917fc873d5ede29862a09dfd912a36bc3432",
+      "size": 2664
+    },
+    {
+      "path": "internal/catalog/filter.go",
+      "sha256": "dabd4f4d03bd85370bd17e2d3072cc0f262dad5d490cd2503c36f0467e2cc466",
+      "size": 10739
+    },
+    {
+      "path": "internal/catalog/fx.go",
+      "sha256": "c993e391b2466dc2b925b770ae707e2843c887e24474f59ecaf162f7e19101c4",
+      "size": 7982
+    },
+    {
+      "path": "internal/catalog/fx_test.go",
+      "sha256": "d7c9f8cb26b6da17eb634f44f4ca8214920519eb9223a15a68f1b0205bfaaa2a",
+      "size": 2536
+    },
+    {
+      "path": "internal/catalog/rules.go",
+      "sha256": "d441ba51952a20162ad7b36ec59efa4338e720c7ffe448ae5362e2e66e055d2f",
+      "size": 8848
+    },
+    {
+      "path": "internal/catalog/rules_test.go",
+      "sha256": "cf1d3fd2533ee7f0293e375500b2cfe1705a821cc768cd3fa33a25395ae8464d",
+      "size": 6381
+    },
+    {
+      "path": "internal/clientip/clientip.go",
+      "sha256": "4421692ec8d95d74255a7df0facb5a151b518d6fca1d2f2f91d5a31cbb463638",
+      "size": 2952
+    },
+    {
+      "path": "internal/clientip/clientip_test.go",
+      "sha256": "7f25192f5fd52d7e545c06d3eede4b117eee54c75b654f620c60a70646942690",
+      "size": 2104
+    },
+    {
+      "path": "internal/config/config.go",
+      "sha256": "63af99a3330026e52e7223b5297f72d0e902969847554660f9024a487fa21605",
+      "size": 14196
+    },
+    {
+      "path": "internal/cryptorefills/client.go",
+      "sha256": "fcab307eaf8104d58cc4d2ae3b0841e5a34c109451bd0be2d6fccb33cdab11a2",
+      "size": 35345
+    },
+    {
+      "path": "internal/cryptorefills/client_test.go",
+      "sha256": "f54953d7286b46e54dab1c9e5c785dd68fc8b8233bb90335524aeff9578726a0",
+      "size": 17606
+    },
+    {
+      "path": "internal/cryptorefills/getcache_test.go",
+      "sha256": "bd555373b5ac9cdee7503ae53f16284ed93d15c27f087c1b3a87f360dc3f7896",
+      "size": 2071
+    },
+    {
+      "path": "internal/cryptorefills/queue.go",
+      "sha256": "3921d1836ae76205d5d4f8ab9753e38397f1f2a51c586668de3c0bdbe77984c9",
+      "size": 17541
+    },
+    {
+      "path": "internal/cryptorefills/status.go",
+      "sha256": "a670b2ceffc76c5be5a0f0ac8a135ea631e22114482c6a8b19e5a73503057ab5",
+      "size": 5772
+    },
+    {
+      "path": "internal/cryptorefills/webhook.go",
+      "sha256": "1a0403cc804db71c5612efca16c09c1290d4562bdeb94fe94751bb557cea5f0f",
+      "size": 1329
+    },
+    {
+      "path": "internal/db/admin.go",
+      "sha256": "71df48949a6330477fe63e003ba335adfd65af328483bbd26c84682f43564b12",
+      "size": 9563
+    },
+    {
+      "path": "internal/db/admin_test.go",
+      "sha256": "154fdcec66f02c2c03838d57d437775bdf2d4b92f75481beb25c6891bdeec6d7",
+      "size": 3005
+    },
+    {
+      "path": "internal/db/admin_views.go",
+      "sha256": "30bdb86e70e52904fd3ff5d585c959bee8d8d2d26802bf4ece55a5e6afdb8944",
+      "size": 3684
+    },
+    {
+      "path": "internal/db/catrules.go",
+      "sha256": "23ea623e2b30dddd72cd2b2753ecb7ff602aee4e08670381107b50b7279919c8",
+      "size": 1663
+    },
+    {
+      "path": "internal/db/db.go",
+      "sha256": "f4463e909ee27715f3569c3b4a87d2a99440463ef19eec09ab37bd2aef139cd5",
+      "size": 6416
+    },
+    {
+      "path": "internal/db/keys.go",
+      "sha256": "00130a22f4bb210484b13c0b11947e3f10d3e4e70695a820e2685f2a69ab1894",
+      "size": 6649
+    },
+    {
+      "path": "internal/db/limits.go",
+      "sha256": "3ede4ba2bfedd67c39e80585b3e9ff7edd15b2699804b385876bed495f9d628a",
+      "size": 1452
+    },
+    {
+      "path": "internal/db/meta.go",
+      "sha256": "e6f7085e63e87c72b72c9ac048b7e21ef898a74b6ce30fe65e47a27db6c67f88",
+      "size": 1021
+    },
+    {
+      "path": "internal/db/notifications.go",
+      "sha256": "79c4891e3b20bb33e90d57d4157d4b4d604a6fc2b1a5aba9d166e0b6781509df",
+      "size": 955
+    },
+    {
+      "path": "internal/db/orders.go",
+      "sha256": "ee197e1efe3869fe4f7b76ff140d67f6bb8fef56468a04f679f8d95cf5bdeaff",
+      "size": 12323
+    },
+    {
+      "path": "internal/db/quotes.go",
+      "sha256": "f174670980091518818f96210414e39e98afd99c26313cca03f959e61b15fc81",
+      "size": 19212
+    },
+    {
+      "path": "internal/db/records.go",
+      "sha256": "01b2c3f6468ba48948965135077df4fd3233db63af754ffdccc24714c57859ac",
+      "size": 10052
+    },
+    {
+      "path": "internal/db/scan.go",
+      "sha256": "82227036593bc079a5e86a904c0691047348c7b9a8ea17b81030056c827f6931",
+      "size": 1206
+    },
+    {
+      "path": "internal/db/snapshots.go",
+      "sha256": "9fee79751815683d04caffecc86aab0041106144ee797f1c36070ab46f577263",
+      "size": 1587
+    },
+    {
+      "path": "internal/db/store_test.go",
+      "sha256": "97f391109312a88534b17dc3b7c0c8aec9d2fd53785b1634f542b872b62faaa3",
+      "size": 11580
+    },
+    {
+      "path": "internal/db/support.go",
+      "sha256": "61d4a0a94250ba0314bed3e33e10c814a3e65b47efb15b768018a55a215ba3f7",
+      "size": 8580
+    },
+    {
+      "path": "internal/db/users.go",
+      "sha256": "608d1f7e8f826dd6085449c18636dd2cc581ed46bd49ec802083866543ce9041",
+      "size": 3076
+    },
+    {
+      "path": "internal/db/users_presence.go",
+      "sha256": "d29bd04bc67863673b28d649aa479c1b010a00284bbb379915c29ed3aeeed87a",
+      "size": 789
+    },
+    {
+      "path": "internal/handlers/activity_handlers.go",
+      "sha256": "9328a9002ea2e74935e486a64d1acc6a6c427e835b6a39ef9d4d86275184f26c",
+      "size": 16722
+    },
+    {
+      "path": "internal/handlers/admin_api_handlers.go",
+      "sha256": "ca207d778469fc853a99317bca3fe38676867e25c9dc6ab4b6c78a814d368cd1",
+      "size": 30079
+    },
+    {
+      "path": "internal/handlers/admin_auth_handlers.go",
+      "sha256": "33376dec669f68db176eb29ccd20761d1cdd0dbb7866392dd36fbe851bf703e5",
+      "size": 12894
+    },
+    {
+      "path": "internal/handlers/auth_handlers.go",
+      "sha256": "c05f34896ab6ec0bcc888dbf94e7e085179db17ca3b5d96d84d689e7ef66b9f5",
+      "size": 4397
+    },
+    {
+      "path": "internal/handlers/cache.go",
+      "sha256": "801c6e2bb2f552093c59a55914d4051365af546e8995a2197f3b79822b405d2b",
+      "size": 6135
+    },
+    {
+      "path": "internal/handlers/cache_test.go",
+      "sha256": "835969c4b1a7c6b86b6cfc6c051c7b69f083f7c7ae1fe4b6593593a03ad26c2c",
+      "size": 3477
+    },
+    {
+      "path": "internal/handlers/catalog_handlers.go",
+      "sha256": "659984ad821871a77a60d4a2bef7f0f327979311c2ddc1e499e95715a2312cc6",
+      "size": 26225
+    },
+    {
+      "path": "internal/handlers/denomination_test.go",
+      "sha256": "d95c91e7cbca37db01f2c57234417314e7f11c18591b2692ceb35f2308557a63",
+      "size": 3677
+    },
+    {
+      "path": "internal/handlers/geo_handlers.go",
+      "sha256": "7ad7aee68ba72f56080872e7905e272349bcf44689f8b4b2aacffa0b8c2cd95a",
+      "size": 750
+    },
+    {
+      "path": "internal/handlers/handlers.go",
+      "sha256": "4f1913e96af6ce50f882b1f97fb0991e5edac6ba89e6c90c5efd230f6bc7b5d0",
+      "size": 7953
+    },
+    {
+      "path": "internal/handlers/integrity_handler.go",
+      "sha256": "3e317b45a2626754f690cfa4bb1890cfd7f7355d002496d4e91cd9e80ae415cb",
+      "size": 461
+    },
+    {
+      "path": "internal/handlers/market_handlers.go",
+      "sha256": "4c5f138f328aa92d76771d770f5f574d96fbea8ec31e6c8dd80a6ed07e1769b2",
+      "size": 1506
+    },
+    {
+      "path": "internal/handlers/market_rates.go",
+      "sha256": "860ecc6ccfd47b43ae5bace01860b472e65b0c049fc45134871a2c975d5609ca",
+      "size": 4142
+    },
+    {
+      "path": "internal/handlers/order_handlers.go",
+      "sha256": "e952f6b975dc2e4c038726efecb8a089446488193e088e7a556926c17c5e2f09",
+      "size": 10553
+    },
+    {
+      "path": "internal/handlers/quote_handlers.go",
+      "sha256": "d8d8996a4404f195e96ec69e5f21f110260bcca0b997ea4b3495c331ddeb3d52",
+      "size": 30337
+    },
+    {
+      "path": "internal/handlers/support_handlers.go",
+      "sha256": "c1b587b75445e1964ba541a18834e4ae00aef6e2f4f7a63f9b8f50781512793d",
+      "size": 6407
+    },
+    {
+      "path": "internal/handlers/test_handlers.go",
+      "sha256": "b075c50da73bb5cd70b2e7e734072fec4072845142cfb0ef4f421e792d8c64d1",
+      "size": 4446
+    },
+    {
+      "path": "internal/handlers/webhook_handlers.go",
+      "sha256": "57fc37c78f021250abf532a5feb1f8e4baeb327c6177558b99c79b964a771918",
+      "size": 5083
+    },
+    {
+      "path": "internal/integrity/integrity.go",
+      "sha256": "851b9e64f48620069bf0900add807f17baabbe43e5bbec9d2dc568750abb600e",
+      "size": 2873
+    },
+    {
+      "path": "internal/middleware/auth.go",
+      "sha256": "aa2518f237fa89a8fa66b78db1b1d41abc1dc568cfc7598c0a0f9f60879226f7",
+      "size": 1024
+    },
+    {
+      "path": "internal/middleware/rate_limit.go",
+      "sha256": "2b4818f5f5aeee50784750a0f9ae539770617bc281fc415c71b673fc0e2e8167",
+      "size": 1939
+    },
+    {
+      "path": "internal/money/money.go",
+      "sha256": "9b458c5d684fce0032b55b2220bfa57c22e6b33d81f46e28bf1d13a464fc33b5",
+      "size": 3296
+    },
+    {
+      "path": "internal/money/quote.go",
+      "sha256": "4105981001a190c2245dd07438756111d5dc1d05c3b7e1f97fbc6dbf166a7bd1",
+      "size": 1104
+    },
+    {
+      "path": "internal/nimiq/address.go",
+      "sha256": "15ac922b3f2189944dd429ba1719a4485145b043cdb23b2ef98a98c892a53774",
+      "size": 3394
+    },
+    {
+      "path": "internal/nimiq/client.go",
+      "sha256": "c4b3ef7bfd1dfaf2e43eb5848e520ea824cc5199d0379b24ca68a9b5cfa63ead",
+      "size": 5130
+    },
+    {
+      "path": "internal/nimiq/oracle.go",
+      "sha256": "627092eb0f71aed64727c06f953c2188e57a06fa740d279c3c851bf44fb977c7",
+      "size": 7874
+    },
+    {
+      "path": "internal/nimiq/price.go",
+      "sha256": "f94ff138fb10529016fada352a898d6fcfe10b1ec3f7212a154ae90899b23c54",
+      "size": 1547
+    },
+    {
+      "path": "internal/nimiq/sign.go",
+      "sha256": "4556ea7a8c844cc52c7f9161a8dad110d9728252bb0cf1e64720c6f59e58fb26",
+      "size": 5048
+    },
+    {
+      "path": "internal/nimiq/signature.go",
+      "sha256": "ec75189fff6195ed084538384778aa809995e873e0c2f5f74c212159eca93c99",
+      "size": 2070
+    },
+    {
+      "path": "internal/nimiq/signature_sha256_test.go",
+      "sha256": "3e22c9910d7410377181a28ef1871bdd077cde961d9ed3ae2212c62d6c372f5f",
+      "size": 1248
+    },
+    {
+      "path": "internal/notification/gift.go",
+      "sha256": "9843ab304708d1d7622133d773d0b2045b70639f8bb3c1aec35d82fcf420eef6",
+      "size": 18932
+    },
+    {
+      "path": "internal/notification/notifier.go",
+      "sha256": "9a78f30177b457c3afd61d13b58d5ad26bad60f618b827f0d66c7e24897aad1a",
+      "size": 3087
+    },
+    {
+      "path": "internal/phone/phone.go",
+      "sha256": "a43bf186e158272994c3962311bb4f54f1b394a1aca1cd1674d40683aeae084f",
+      "size": 7763
+    },
+    {
+      "path": "internal/phone/phone_test.go",
+      "sha256": "7ab253371693f5583b4f68875939b80a92585d9fef6c65bb9f4184a31906fbae",
+      "size": 5075
+    },
+    {
+      "path": "internal/polygon/usdc.go",
+      "sha256": "1e7c4741ade2802cf8e4d61e5c499f98664a6e224848956e8ccef9a18fa66bc8",
+      "size": 6048
+    },
+    {
+      "path": "internal/presence/presence.go",
+      "sha256": "0bc12308d48985163d286309e413bb8bb560cc5806aa25096ec4218b9b30e43f",
+      "size": 1314
+    },
+    {
+      "path": "internal/safe/safe.go",
+      "sha256": "64f11b00752ae1410ffa855a7077623c8430409dc5d2720aa7a383a955ebe992",
+      "size": 4483
+    },
+    {
+      "path": "internal/safe/safe_test.go",
+      "sha256": "2b93c9d71fecb77981a0f65f4ad923795b490721b8ab882a127a27e417b896f2",
+      "size": 1969
+    },
+    {
+      "path": "internal/settlement/cooldown_test.go",
+      "sha256": "dbdcdd3056836f7e101b7730ae330d2b8097c6ee1d9319175dbeb80f8336574e",
+      "size": 4927
+    },
+    {
+      "path": "internal/settlement/schedule_test.go",
+      "sha256": "276da8807a6c212535b1e5276d951447045e098d74bb61a1cd6f95e7927bd661",
+      "size": 6037
+    },
+    {
+      "path": "internal/settlement/track.go",
+      "sha256": "28740d6ab8d342ca0557a072d87d8d41661ac76c1f39f1b3dc8f1ef3950b2890",
+      "size": 27033
+    },
+    {
+      "path": "internal/settlement/track_test.go",
+      "sha256": "95d98ba2e60c247267230542971771aebcd9eabbc5a0ea498932854fe38fecd1",
+      "size": 5145
+    }
+  ]
+}

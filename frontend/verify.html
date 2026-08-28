@@ -1,0 +1,206 @@
+<!doctype html>
+<!--
+  verify.html — open this on the deployed site to prove it matches the
+  open-source build. Example: https://shop.example.com/verify.html
+
+  This page is OPTIONAL to deploy. If you do deploy it, it is covered by
+  integrity.json like every other file — BUT remember the bootstrap rule:
+  a fully compromised server could tamper with this page too. The root hash
+  shown below must be compared against the value published out-of-band
+  (GitHub release / signed git tag). For a zero-trust, fully-automated check,
+  use tools/integrity/verify-in-browser.js (a local snippet with the published
+  root baked in) or the Node verify.mjs.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>nim.shop — build integrity check</title>
+  <link rel="icon" type="image/png" sizes="64x64" href="/img/icon-64.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="/img/icon-512.png">
+  <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+  <meta name="robots" content="noindex" />
+  <style>
+    :root { --ok:#1fbf75; --bad:#ff5b5b; --warn:#e2a62b; --ink:#0c2233; --bg:#f4f8fb; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+           background:var(--bg); color:var(--ink); padding:24px; line-height:1.5; }
+    .wrap { max-width:880px; margin:0 auto; }
+    h1 { font-size:20px; margin:0 0 4px; }
+    .sub { color:#5a7184; font-size:14px; margin-bottom:20px; }
+    .banner { padding:16px 18px; border-radius:12px; color:#fff; font-weight:600;
+              font-size:16px; margin-bottom:18px; background:#8a99a6; }
+    .banner.ok { background:var(--ok); }
+    .banner.bad { background:var(--bad); }
+    .banner.warn { background:var(--warn); color:#0c2233; }
+    .root { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px;
+            word-break:break-all; background:#fff; border:1px solid #d6e1ea;
+            border-radius:10px; padding:12px 14px; margin-bottom:18px; }
+    .root b { display:block; font-size:11px; text-transform:uppercase; letter-spacing:.06em;
+              color:#5a7184; font-weight:700; margin-bottom:4px; }
+    fieldset { border:1px solid #d6e1ea; border-radius:10px; padding:12px 14px; margin-bottom:18px; }
+    legend { font-size:12px; font-weight:700; color:#5a7184; padding:0 6px; }
+    input { width:100%; font-family:ui-monospace,Menlo,monospace; font-size:13px;
+            padding:8px 10px; border:1px solid #d6e1ea; border-radius:8px; }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    td, th { text-align:left; padding:7px 10px; border-bottom:1px solid #e3edf3; }
+    th { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:#5a7184; }
+    td.p { font-family:ui-monospace,Menlo,monospace; }
+    .pill { font-weight:700; }
+    .ok { color:var(--ok); } .bad { color:var(--bad); }
+    .footer { margin-top:18px; color:#5a7184; font-size:12px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>nim.shop — build integrity check</h1>
+    <div class="sub" id="origin"></div>
+
+    <div class="banner" id="banner">Loading manifest…</div>
+
+    <div class="root" id="backendBox" style="display:none"><b>Backend integrity</b><span id="backendStatus">Checking…</span></div>
+
+    <div class="root" id="rootBox" style="display:none">
+      <b>Build root hash (compare to the published value)</b>
+      <span id="rootHash">—</span>
+    </div>
+
+    <fieldset id="anchor" style="display:none">
+      <legend>Published root hash (optional — anchors authenticity)</legend>
+      <input id="publishedRoot" placeholder="paste the root hash from the GitHub release / signed tag" />
+    </fieldset>
+
+    <table id="results"><thead>
+      <tr><th>File</th><th>Result</th><th>SHA-256 (first 24)</th></tr>
+    </thead><tbody></tbody></table>
+
+    <div class="footer">
+      How it works: this page fetches <code>/integrity.json</code>, recomputes the
+      root hash from its file list, then downloads and hashes every file
+      client-side. If the <b>root hash</b> above matches the value published
+      out-of-band (and every file is OK), the live site is cryptographically
+      identical to the open-source build. No data leaves your browser.
+    </div>
+  </div>
+
+<script type="module">
+// Release anchors must be updated only when a signed/published build is released.
+// A verify page served by the same origin is not itself an authenticity anchor.
+const PUBLISHED_FRONTEND_ROOT = '9490481d12746e85f3532fc3933018159d0a39d4c66d313f27fdd7a8314dd37c';
+const PUBLISHED_BACKEND_SOURCE_ROOT = '43fd453ddd59bf3d0453454b1f4af6953c28a15facce41c1f6817e843921c381';
+const PUBLISHED_BACKEND_BINARY_SHA256 = ''; // fill from the signed backend release artifact
+const $ = (id) => document.getElementById(id);
+const sha256Hex = async (buf) => {
+  const h = await crypto.subtle.digest('SHA-256', buf);
+  return [...new Uint8Array(h)].map((b) => b.toString(16).padStart(2, '0')).join('');
+};
+const fetchBytes = async (p, attempts = 3) => {
+  let last;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const r = await fetch(p, { cache: 'no-store' });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return new Uint8Array(await r.arrayBuffer());
+    } catch (e) {
+      last = e;
+      if (i + 1 < attempts) await new Promise(r => setTimeout(r, 250 * 2 ** i));
+    }
+  }
+  throw last;
+};
+
+$('origin').textContent = location.origin;
+
+// Load the release manifest from GitHub, not from the running server. The
+// release workflow publishes it as a signed asset.
+(async () => {
+  const box = $('backendBox'); const out = $('backendStatus'); box.style.display = 'block';
+  try {
+    if (!RELEASE_REPO) throw new Error('release repository is not configured by the build');
+    const rr = await fetch(`https://api.github.com/repos/${RELEASE_REPO}/releases/latest`, { headers: { Accept: 'application/vnd.github+json' }, cache: 'no-store' });
+    if (!rr.ok) throw new Error('GitHub release unavailable (HTTP ' + rr.status + ')');
+    const rel = await rr.json();
+    const asset = (rel.assets || []).find(a => a.name === 'release-manifest.json');
+    if (!asset) throw new Error('latest release has no release-manifest.json');
+    RELEASE_MANIFEST = await (await fetch(asset.browser_download_url, { cache: 'no-store' })).json();
+    if (RELEASE_MANIFEST.schema !== 'nimiq-shop.release-integrity/v1') throw new Error('invalid release manifest');
+    if (RELEASE_MANIFEST.repository !== RELEASE_REPO) throw new Error('release belongs to a different GitHub repository');
+    const api = await fetch('/api/integrity', { cache: 'no-store' });
+    if (!api.ok) throw new Error('backend unavailable (HTTP ' + api.status + ')');
+    const data = await api.json();
+    if (data.binary_sha256 !== RELEASE_MANIFEST.backend_binary_sha256 || data.source_root !== RELEASE_MANIFEST.backend_source_root) throw new Error('running backend does not match the GitHub release');
+    out.textContent = '✓ Running backend matches the GitHub release manifest'; out.className = 'ok';
+  } catch (e) { out.textContent = 'Not verified — ' + e.message; out.className = 'bad'; }
+  render();
+})();
+
+let manifest, recomputedRoot;
+try {
+  manifest = JSON.parse(new TextDecoder().decode(await fetchBytes('/integrity.json')));
+  const canon = manifest.files.map((e) => `${e.path}\n${e.sha256}\n`).join('');
+  recomputedRoot = await sha256Hex(new TextEncoder().encode(canon));
+} catch (e) {
+  $('banner').className = 'banner bad';
+  $('banner').textContent = 'Cannot read /integrity.json — ' + e.message;
+  throw e;
+}
+
+const manifestOk = recomputedRoot === manifest.rootHash && !!RELEASE_MANIFEST && RELEASE_MANIFEST.frontend_root === recomputedRoot;
+$('rootBox').style.display = 'block';
+$('rootHash').textContent = recomputedRoot;
+$('anchor').style.display = 'block';
+
+// allow ?root=… deep link, else let the user paste
+const qp = new URLSearchParams(location.search).get('root');
+if (qp) $('publishedRoot').value = qp;
+
+let fileFail = 0;
+const tbody = $('results').querySelector('tbody');
+for (const { path, sha256: expected } of manifest.files) {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td class="p">${path}</td><td class="pill">…</td><td class="p">—</td>`;
+  tbody.appendChild(tr);
+  try {
+    const buf = await fetchBytes('/' + path);
+    const actual = await sha256Hex(buf);
+    const ok = actual === expected;
+    if (!ok) fileFail++;
+    tr.children[1].textContent = ok ? 'OK' : 'MISMATCH';
+    tr.children[1].className = 'pill ' + (ok ? 'ok' : 'bad');
+    tr.children[2].textContent = actual.slice(0, 24) + '…';
+  } catch (e) {
+    fileFail++;
+    tr.children[1].textContent = 'FETCH FAIL';
+    tr.children[1].className = 'pill bad';
+    tr.children[2].textContent = e.message;
+  }
+}
+
+// live anchor: re-evaluate as the user types the published root
+function render() {
+  const published = $('publishedRoot').value.trim().toLowerCase();
+  const anchored = published ? (manifest.rootHash === published) : null;
+  const b = $('banner');
+  b.className = 'banner';
+  if (!manifestOk) {
+    b.className = 'banner bad';
+    b.textContent = '✗ Frontend root does not match the GitHub release manifest or its file list.';
+  } else if (fileFail > 0) {
+    b.className = 'banner bad';
+    b.textContent = `✗ ${fileFail} file(s) differ from the manifest.`;
+  } else if (anchored === true) {
+    b.className = 'banner ok';
+    b.textContent = '✓ FULLY VERIFIED — live site matches the published build.';
+  } else if (anchored === false) {
+    b.className = 'banner bad';
+    b.textContent = '✗ All files match the manifest, but the root hash differs from the published one.';
+  } else {
+    b.className = 'banner warn';
+    b.textContent = 'All files match the manifest. Paste the published root above to confirm authenticity.';
+  }
+}
+$('publishedRoot').addEventListener('input', render);
+render();
+</script>
+</body>
+</html>

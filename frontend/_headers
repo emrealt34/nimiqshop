@@ -1,0 +1,71 @@
+# Hardened response headers for static hosts that support a _headers file
+# (Netlify / Cloudflare Pages format). For nginx, mirror these in the server
+# block (see frontend/README.md). For hosts with no header support, the <meta>
+# CSP in each HTML page already enforces the same policy in the browser.
+#
+# PRODUCTION SEPARATE DOMAINS:
+# If your API is on a different origin (e.g. https://api.nim.shop), add it to connect-src
+# and set backend ALLOWED_ORIGINS to your frontend origin.
+# Example:
+#   Frontend: https://nim.shop
+#   Backend:  https://api.nim.shop
+#   Frontend config.js: API_BASE='https://api.nim.shop/api'
+#   Backend .env: ALLOWED_ORIGINS=https://nim.shop,https://www.nim.shop
+#   Then update connect-src below to include https://api.nim.shop and remove localhost if you want.
+#
+# SAME-ORIGIN (nginx):
+#   Keep API_BASE='/api' and ALLOWED_ORIGINS empty — no CORS needed.
+#   nginx proxies /api/* to backend, so connect-src 'self' is enough.
+
+/*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: same-origin
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' http://localhost:8080 http://127.0.0.1:8080 https://api.nim.shop https://*.nim.shop https://*.trycloudflare.com https://hub.nimiq.com https://hub.nimiq-testnet.com; frame-src https://hub.nimiq.com https://hub.nimiq-testnet.com https://widget.trustpilot.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+
+# Never let the verification page or release metadata be served stale or
+# mixed across a deployment. Verification must observe one current version.
+/integrity.json
+  Cache-Control: no-store, no-cache, must-revalidate
+  CDN-Cache-Control: no-store
+
+/verify.html
+  Cache-Control: no-store, no-cache, must-revalidate
+  CDN-Cache-Control: no-store
+
+/config.js
+  Cache-Control: no-store, no-cache, must-revalidate
+  CDN-Cache-Control: no-store
+
+/*.html
+  Cache-Control: no-store, no-cache, must-revalidate
+  CDN-Cache-Control: no-store
+
+/js/*
+  Cache-Control: no-store, no-cache, must-revalidate
+  CDN-Cache-Control: no-store
+
+/css/*
+  Cache-Control: no-store, no-cache, must-revalidate
+  CDN-Cache-Control: no-store
+
+# ---- Asset caching (long-lived, content-hashed or immutable dirs) ----
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/vendor/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/img/*
+  Cache-Control: public, max-age=86400
+
+# Bundled pages + hashed chunks: entry files reference hashed chunks, so an
+# hour is safe; chunks themselves are content-hashed (effectively immutable).
+/js/bundle/chunks/*
+  Cache-Control: public, max-age=31536000, immutable
+/js/bundle/*
+  Cache-Control: public, max-age=3600

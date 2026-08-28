@@ -1,0 +1,19 @@
+{
+  "name": "frontend",
+  "version": "1.0.0",
+  "description": "100% client-side, 100% static. **No build step, no server rendering, no framework runtime** \u2014 plain HTML + CSS + ES modules. Every page is a static file you can host anywhere (nginx, S3/CloudFront, Netlify, Cloudflare Pages, GitHub Pages, any CDN).",
+  "main": "config.js",
+  "scripts": {
+    "dev": "node dev/live-proxy.js",
+    "build": "node build.mjs",
+    "integrity": "node ../tools/integrity/generate.mjs frontend",
+    "verify": "node ../tools/integrity/verify.mjs",
+    "test": "node --check build.mjs && node --check config.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

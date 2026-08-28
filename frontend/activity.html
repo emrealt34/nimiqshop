@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <!--
+    Content-Security-Policy: this is the deployment baseline.
+    PRODUCTION: replace connect-src entries with your real API origin if it is
+    not same-origin, and remove the localhost entries. Everything else should
+    stay as-is — the app has no CDN dependencies.
+  -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self';
+                 script-src 'self';
+                 style-src 'self' 'unsafe-inline';
+                 img-src 'self' data: blob: https:;
+                 font-src 'self' data:;
+                 connect-src 'self' http://localhost:8080 http://127.0.0.1:8080 https://api.nim.shop https://*.nim.shop https://*.trycloudflare.com https://hub.nimiq.com https://hub.nimiq-testnet.com;
+                 frame-src https://hub.nimiq.com https://hub.nimiq-testnet.com;
+                 object-src 'none'; base-uri 'self'; form-action 'self';
+                 upgrade-insecure-requests" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#F4F6F9" />
+  <meta name="color-scheme" content="light" />
+  <meta name="description" content="Live, fully-transparent feed of recent nim.shop payments and community star ratings. Nothing hidden." />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <title>Activity — live public payment feed</title>
+  <link rel="icon" type="image/png" sizes="64x64" href="/img/icon-64.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="/img/icon-512.png">
+  <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+  <style>
+/* Nunito — vendored variable font (SIL Open Font License 1.1, see fonts/OFL.txt) */
+@font-face {
+  font-family: "NunitoLocal";
+  font-style: normal;
+  font-weight: 100 1000;
+  font-display: swap;
+  src: url("/fonts/nunito-var.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191,
+    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Fraunces — vendored serif display (SIL Open Font License 1.1, see fonts/FRAUNCES_OFL.txt)
+   Bodega/Kraft theme's display face: headings, brand, prices. */
+@font-face {
+  font-family: "FrauncesLocal";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/fraunces-700.woff2") format("woff2");
+}
+@font-face {
+  font-family: "FrauncesLocal";
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url("/fonts/fraunces-900.woff2") format("woff2");
+}
+
+  </style>
+  <link rel="preconnect" href="https://cdn.cryptorefills.com" crossorigin />
+  <link rel="preload" as="font" type="font/woff2" href="/fonts/nunito-var.woff2" crossorigin />
+  <link rel="preload" as="font" type="font/woff2" href="/fonts/fraunces-900.woff2" crossorigin />
+  <link rel="stylesheet" href="css/app.css" />
+
+<script>
+/* inlined from config.js (render-blocking request removed) — edit & rebuild not needed */
+window.APP_CONFIG = Object.assign({ API_BASE: '/api', FRONTEND_URL: 'https://nim.shop', HUB_URL: 'https://hub.nimiq.com', APP_NAME: 'nim.shop', NETWORK: 'mainnet', TEST_MODE: false, GITHUB_URL: 'https://github.com/nimiqbase/nimiq-shop', RELEASE_REPO: 'nimiqbase/nimiq-shop' }, window.APP_CONFIG || {});
+</script>
+</head>
+<body>
+  <noscript>
+    <div style="padding:40px;text-align:center;font-family:sans-serif;color:#F4F8FB">
+      The activity feed needs JavaScript to load live payments and ratings.
+    </div>
+  </noscript>
+  <main id="main" class="page"></main>
+  <footer class="footer">
+    <div class="container">
+      <span>© nim.shop — powered by Nimiq &amp; CryptoRefills</span>
+    </div>
+  </footer>
+  <script type="module" src="js/bundle/activity.js"></script>
+</body>
+</html>

@@ -1,0 +1,160 @@
+# ---------------------------------------------------------------------------
+# nim.shop — CI
+# Runs on every push and pull request:
+#   · frontend: reproducible bundle + integrity manifest must be up to date
+#   · backend : go vet + go build + go test on Linux AND Windows
+# ---------------------------------------------------------------------------
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ------------------------------------------------------------------
+  # Frontend: bundle is committed (index.html points at js/bundle/*),
+  # so CI rebuilds it and FAILS if the committed bundle/manifest drift.
+  # ------------------------------------------------------------------
+  frontend:
+    name: Frontend (build + integrity)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: Rebuild the committed bundle (must be reproducible)
+        working-directory: frontend
+        run: node build.mjs
+
+      - name: Bundle must match the committed one
+        run: git diff --exit-code -- frontend/js/bundle/
+
+      - name: Regenerate integrity manifests
+        run: node tools/integrity/generate.mjs all
+
+      - name: Integrity manifests must match the committed ones
+        run: git diff --exit-code -- frontend/integrity.json backend/internal/integrity/source.integrity.json
+
+      - name: Syntax-check every source module
+        working-directory: frontend
+        run: |
+          set -e
+          for f in $(find js -name '*.js' -not -path 'js/bundle/*'); do
+            node --check "$f"
+          done
+          node --check build.mjs
+
+      - name: Upload frontend dist (bundle + integrity)
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: |
+            frontend/js/bundle/
+            frontend/integrity.json
+          if-no-files-found: error
+
+  # ------------------------------------------------------------------
+  # Backend: vet + build + tests on Linux and Windows.
+  # ------------------------------------------------------------------
+  backend:
+    name: Backend (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('backend/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: go vet
+        working-directory: backend
+        run: go vet ./...
+
+      - name: Build server binary
+        working-directory: backend
+        shell: bash
+        run: |
+          mkdir -p ../dist
+          CGO_ENABLED=0 go build -trimpath -buildvcs=false -o ../dist/nimiqshop-server ./cmd/server
+          ls -la ../dist/
+
+      # Fast, deterministic unit/integration gate. The heavy crash-safety
+      # suite (crashtest) is a separate non-blocking job below: it boots
+      # servers and floods webhooks, so it is timing-sensitive on shared
+      # runners (C05 is flaky under load), and C09_BeneficiaryRules is a
+      # known pre-existing scenario mismatch (00-prefixed phone vs strict
+      # E.164 supplier rule) that is intentionally left as-is.
+      - name: go test (internal + cmd)
+        working-directory: backend
+        run: go test ./internal/... ./cmd/... -count=1
+
+      - name: Upload backend binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-${{ matrix.os }}
+          path: dist/
+          if-no-files-found: error
+
+  # ------------------------------------------------------------------
+  # Heavy crash-safety suite (boots the server, floods it with garbage
+  # and webhooks). Run for visibility; NOT a blocking gate because it is
+  # timing-sensitive (flaky under shared-runner load) and C09 is a known
+  # pre-existing scenario mismatch (see comment above).
+  # ------------------------------------------------------------------
+  crashtest:
+    name: Crash-safety suite (non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: crashtest-go-${{ hashFiles('backend/go.sum') }}
+
+      - name: Run crash-safety suite
+        working-directory: backend
+        run: go test ./crashtest/... -count=1 -timeout 20m

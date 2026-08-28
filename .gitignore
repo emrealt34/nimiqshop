@@ -1,0 +1,80 @@
+# ---------------------------------------------------------------------------
+# nim.shop — .gitignore
+# Secrets, local data, build output and editor cruft. Keep .env.example files
+# (they are the documented templates) but NEVER commit real .env files.
+# ---------------------------------------------------------------------------
+
+# ---------- Environment & secrets (never commit real values) ----------
+.env
+.env.*
+!.env.example
+*.env.local
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+secrets/
+id_rsa*
+*.secret
+
+# ---------- Node.js ----------
+node_modules/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.eslintcache
+.npm/
+.pnpm-store/
+
+# ---------- Go ----------
+backend/bin/
+backend/dist/
+bin/
+dist/
+*.exe
+*.test
+*.out
+coverage.*
+
+# ---------- Local runtime data (BadgerDB etc.) ----------
+data/
+*.badger
+*.db
+backend/data/
+*.sqlite
+*.sqlite3
+
+# ---------- Frontend build cache (bundle itself IS committed — see README) ----------
+frontend/js/bundle/.cache/
+.esbuild/
+
+# ---------- Integrity tooling output ----------
+# (frontend/integrity.json and backend source.integrity.json ARE committed:
+#  CI regenerates them and fails if they drift.)
+
+# ---------- Logs ----------
+*.log
+logs/
+
+# ---------- OS junk ----------
+.DS_Store
+Thumbs.db
+Desktop.ini
+*~
+*.swp
+*.swo
+
+# ---------- Editors / IDEs ----------
+.idea/
+.vscode/
+*.code-workspace
+*.sublime-project
+*.sublime-workspace
+
+# ---------- Cloudflare tunnel / dev proxies ----------
+*.tunnel.json
+*.tunnel.log
+
+# ---------- CI scratch ----------
+.github/.tmp/
