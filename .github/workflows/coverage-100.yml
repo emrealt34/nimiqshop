@@ -1,0 +1,43 @@
+name: Go 100% coverage audit
+
+# This explicit audit fails until EVERY statement in the complete backend is
+# covered. It never substitutes the baseline regression floor for the target.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coverage-100-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  full-backend:
+    name: Whole backend must reach exactly 100%
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Test all backend packages with the race detector
+        run: go test -race -count=1 -coverpkg=./... -covermode=atomic -coverprofile=coverage.out ./...
+      - name: Require real 100% without exclusions or rounding
+        run: python3 ../scripts/go_coverage.py coverage.out --minimum 100 --json coverage-detail.json --summary "$GITHUB_STEP_SUMMARY"
+      - name: Preserve complete coverage and uncovered block inventory
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: whole-backend-coverage-audit
+          path: |
+            backend/coverage.out
+            backend/coverage-detail.json
+          retention-days: 7

@@ -1,58 +1,90 @@
-# Path-based labels for actions/labeler (PR triage).
-# The `e2e` label is applied separately by .github/workflows/pr-triage.yml
-# because it has to trigger the long Playwright suite in tests.yml.
-'backend/**':
-  - backend
-  - go
-'cli/**':
-  - backend
-  - cli
-'deploy/**':
-  - infra
-'scripts/**':
-  - tooling
-'tests/e2e/**':
-  - e2e
-'src/i18n/**':
-  - i18n
-'src/components/**':
-  - frontend
-  - react
-'src/styles/**':
-  - frontend
-  - css
-'public/**':
-  - frontend
-'src/pages/**':
-  - frontend
-  - astro
-'astro.config.mjs':
-  - frontend
-  - astro
-'package.json':
-  - frontend
-  - deps
-'package-lock.json':
-  - frontend
-  - deps
-'backend/go.mod':
-  - go
-  - deps
-'backend/go.sum':
-  - go
-  - deps
-'.github/workflows/**':
-  - ci
-  - infra
-'.github/dependabot.yml':
-  - deps
-  - ci
-'LICENSE':
-  - meta
-'README.md':
-  - docs
-'SECURITY.md':
-  - docs
-  - security
-'.gitleaksignore':
-  - security
+# actions/labeler v7: label names map to changed-file matchers.
+backend:
+- changed-files:
+  - any-glob-to-any-file:
+    - backend/**
+    - cli/**
+go:
+- changed-files:
+  - any-glob-to-any-file:
+    - backend/**
+    - backend/go.mod
+    - backend/go.sum
+cli:
+- changed-files:
+  - any-glob-to-any-file:
+    - cli/**
+infra:
+- changed-files:
+  - any-glob-to-any-file:
+    - deploy/**
+    - .github/workflows/**
+tooling:
+- changed-files:
+  - any-glob-to-any-file:
+    - scripts/**
+e2e:
+- changed-files:
+  - any-glob-to-any-file:
+    - tests/e2e/**
+    - src/**
+    - public/**
+    - playwright.config.ts
+    - astro.config.mjs
+    - scripts/csp-inline.mjs
+    - scripts/public-url.mjs
+    - scripts/proxy.mjs
+i18n:
+- changed-files:
+  - any-glob-to-any-file:
+    - src/i18n/**
+frontend:
+- changed-files:
+  - any-glob-to-any-file:
+    - src/components/**
+    - src/styles/**
+    - public/**
+    - src/pages/**
+    - astro.config.mjs
+    - package.json
+    - package-lock.json
+react:
+- changed-files:
+  - any-glob-to-any-file:
+    - src/components/**
+css:
+- changed-files:
+  - any-glob-to-any-file:
+    - src/styles/**
+astro:
+- changed-files:
+  - any-glob-to-any-file:
+    - src/pages/**
+    - astro.config.mjs
+deps:
+- changed-files:
+  - any-glob-to-any-file:
+    - package.json
+    - package-lock.json
+    - backend/go.mod
+    - backend/go.sum
+    - .github/dependabot.yml
+ci:
+- changed-files:
+  - any-glob-to-any-file:
+    - .github/workflows/**
+    - .github/dependabot.yml
+meta:
+- changed-files:
+  - any-glob-to-any-file:
+    - LICENSE
+docs:
+- changed-files:
+  - any-glob-to-any-file:
+    - README.md
+    - SECURITY.md
+security:
+- changed-files:
+  - any-glob-to-any-file:
+    - SECURITY.md
+    - .gitleaksignore

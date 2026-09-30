@@ -97,12 +97,16 @@ jobs:
         # -coverpkg=./... attributes statements executed by the API-level tests
         # in cmd/server to the packages they live in (handlers, db, settlement…).
         run: go test -race -count=1 -coverpkg=./... -coverprofile=coverage.out -covermode=atomic ./...
+      - name: Test exact coverage accounting
+        run: python3 -m unittest discover -s ../scripts/tests -p test_go_coverage.py
       - name: Coverage summary
         run: |
           total="$(go tool cover -func=coverage.out | tail -n 1 | awk '{print $3}' | tr -d '%')"
           echo "Go statement coverage: ${total}%"
           echo "### Go coverage: ${total}%" >> "$GITHUB_STEP_SUMMARY"
           echo "$total" > coverage.txt
+          # Baseline regression floor, NOT a claim that the 100% target is met.
+          python3 ../scripts/go_coverage.py coverage.out --minimum 54.3 --json coverage-detail.json --summary "$GITHUB_STEP_SUMMARY"
       - name: Build (static, release flags)
         run: CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /tmp/nimshop-server ./cmd/server
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -111,6 +115,7 @@ jobs:
           path: |
             backend/coverage.out
             backend/coverage.txt
+            backend/coverage-detail.json
           retention-days: 7
 
   workflows:

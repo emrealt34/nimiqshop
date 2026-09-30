@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -139,8 +140,8 @@ func TestErrorClassification(t *testing.T) {
 		kind Kind
 	}{
 		{nil, KindUnknown}, {errors.New("dial failed"), KindUnknown}, {ErrDisabled, KindPermanent}, {ErrNoRecipient, KindPermanent}, {ErrSandboxID, KindPermanent},
-		{&mailtrapsdk.RateLimitError{RetryAfter: time.Second}, KindTemporary},
-		{&mailtrapsdk.ValidationError{}, KindPermanent}, {&mailtrapsdk.UnauthorizedError{}, KindPermanent}, {&mailtrapsdk.ForbiddenError{}, KindPermanent},
+		{&mailtrapsdk.RateLimitError{Err: &mailtrapsdk.Error{StatusCode: 429}, RetryAfter: time.Second}, KindTemporary},
+		{&mailtrapsdk.ValidationError{Err: &mailtrapsdk.Error{StatusCode: 422}}, KindPermanent}, {&mailtrapsdk.UnauthorizedError{Err: &mailtrapsdk.Error{StatusCode: 401}}, KindPermanent}, {&mailtrapsdk.ForbiddenError{Err: &mailtrapsdk.Error{StatusCode: 403}}, KindPermanent},
 		{&mailtrapsdk.Error{StatusCode: 500}, KindTemporary}, {&mailtrapsdk.Error{StatusCode: 400}, KindPermanent},
 	} {
 		if got := Classify(tc.err); got != tc.kind {
@@ -150,7 +151,7 @@ func TestErrorClassification(t *testing.T) {
 			t.Errorf("wrapped %T", tc.err)
 		}
 	}
-	if RateLimitWait(errors.New("other")) != 0 || RateLimitWait(&mailtrapsdk.RateLimitError{RetryAfter: time.Second}) != time.Second {
+	if RateLimitWait(errors.New("other")) != 0 || RateLimitWait(&mailtrapsdk.RateLimitError{Err: &mailtrapsdk.Error{StatusCode: 429}, RetryAfter: time.Second}) != time.Second {
 		t.Fatal("retry delay")
 	}
 	for kind, want := range map[Kind]string{KindUnknown: "unknown", KindTemporary: "temporary", KindPermanent: "permanent", KindDisabled: "disabled", Kind(99): "unknown"} {
@@ -175,9 +176,9 @@ func TestSendHTTPContractAndFailures(t *testing.T) {
 		{"provider failure", 503, `{"message":"unavailable"}`, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			calls := 0
+			var calls atomic.Int32
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				calls++
+				calls.Add(1)
 				if r.Method != http.MethodPost || !strings.Contains(r.URL.Path, "send") || r.Header.Get("Authorization") != "Bearer fixture-token" {
 					t.Errorf("request contract: %s %s", r.Method, r.URL)
 				}
@@ -202,8 +203,8 @@ func TestSendHTTPContractAndFailures(t *testing.T) {
 				t.Fatalf("invalid send: %v", err)
 			}
 			ids, err := c.SendRetried(context.Background(), m, 0)
-			if (err == nil) != tc.ok || calls != 1 {
-				t.Fatalf("send: ids=%v err=%v calls=%d", ids, err, calls)
+			if (err == nil) != tc.ok || calls.Load() != 1 {
+				t.Fatalf("send: ids=%v err=%v calls=%d", ids, err, calls.Load())
 			}
 			if tc.ok && (len(ids) != 1 || ids[0] != "message-1") {
 				t.Fatalf("ids: %v", ids)
@@ -221,13 +222,13 @@ func TestRateLimitedRetryAndCancellation(t *testing.T) {
 		{"retry", "1", 2, 2, false, true}, {"no retry-after", "", 2, 1, false, false}, {"attempt limit", "1", 1, 1, false, false}, {"cancellation", "1", 2, 1, true, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			calls := 0
+			var calls atomic.Int32
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				calls++
+				calls.Add(1)
 				w.Header().Set("Content-Type", "application/json")
-				if calls == 1 {
+				if calls.Load() == 1 {
 					w.Header().Set("Retry-After", tc.delay)
-					w.WriteHeader(429)
+					w.WriteHeader(http.StatusTooManyRequests)
 					_, _ = w.Write([]byte(`{"message":"rate limited"}`))
 					return
 				}
@@ -245,8 +246,8 @@ func TestRateLimitedRetryAndCancellation(t *testing.T) {
 				defer cancel()
 			}
 			_, err = c.SendRetried(ctx, Message{To: []Address{{Email: "to@example.com"}}, Subject: "subject", Text: "body"}, tc.attempts)
-			if (err == nil) != tc.ok || calls != tc.wantCalls {
-				t.Fatalf("retry err=%v calls=%d", err, calls)
+			if (err == nil) != tc.ok || calls.Load() != int32(tc.wantCalls) {
+				t.Fatalf("retry err=%v calls=%d", err, calls.Load())
 			}
 			if tc.cancel && !errors.Is(err, context.DeadlineExceeded) {
 				t.Fatalf("cancellation: %v", err)
