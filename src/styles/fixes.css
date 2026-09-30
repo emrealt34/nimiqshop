@@ -846,7 +846,6 @@ html.in-nimiq-pay #main.page {
 }
 @media (max-width: 480px) {
   .cb-hero-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-  .cb-hero-stats .strong { font-size: 14px; }
   .cb-form-row .cb-primary { width: 100%; }
   .pager { justify-content: flex-start; }
   .pager .btn.pager-prev, .pager .btn.pager-next { flex: 1 1 40%; justify-content: center; }
@@ -1447,7 +1446,6 @@ html.in-nimiq-pay #main.page {
   line-height: 1.4;
 }
 .pt-impact-status > svg { flex: 0 0 auto; margin-top: .1em; color: var(--stamp); }
-.pt-impact-status > span { min-width: 0; overflow-wrap: anywhere; }
 .pt-impact-share-head {
   display: flex;
   align-items: center;
@@ -2599,8 +2597,6 @@ body {
     gap: 22px !important;
   }
   .footer .container > span:first-child { text-align: left; }
-  .footer .container .footer-barcode { justify-self: center; }
-  .footer .container .row { justify-self: end; }
 }
 @media (max-width: 900px) {
   .footer {

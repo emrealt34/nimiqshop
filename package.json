@@ -1,7 +1,7 @@
 {
   "name": "nimiqshop-astro",
   "version": "2.1.0",
-  "description": "nim.shop frontend — Astro + React frontend for the nim.shop gift-card marketplace. Visual/behavioral parity with the original vanilla-JS build.",
+  "description": "nim.shop frontend \u2014 Astro + React frontend for the nim.shop gift-card marketplace. Visual/behavioral parity with the original vanilla-JS build.",
   "type": "module",
   "scripts": {
     "dev": "astro dev --host 0.0.0.0",
@@ -42,7 +42,8 @@
     "lint:js": "eslint .",
     "lint:ts": "oxlint",
     "verify": "npm run check && npm run check:e2e && npm run check:i18n && npm run check:fonts && npm run check:keys && npm run check:i18n:deep && npm run check:api && npm run check:workflows && npm run check:config && npm run lint",
-    "test:pages-proxy": "node --test scripts/test-pages-proxy.mjs"
+    "test:pages-proxy": "node --test scripts/test-pages-proxy.mjs",
+    "css:capture": "node scripts/critical-css.mjs --capture"
   },
   "dependencies": {
     "@astrojs/react": "^7.0.0",

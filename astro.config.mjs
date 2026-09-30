@@ -3,6 +3,7 @@ import react from '@astrojs/react';
 import { proxyApi, proxyOptionsFromEnv } from './scripts/proxy.mjs';
 import { servedConfigSource } from './scripts/public-url.mjs';
 import cspInlineHashes from './integrations/csp-inline-hashes.mjs';
+import criticalCss from './integrations/critical-css.mjs';
 
 // Static output (SSG). No server. The only "server" concerns are the same
 // ones the original static build had: the backend API lives elsewhere and is
@@ -14,7 +15,7 @@ export default defineConfig({
   // the script-src placeholder in every page with real SHA-256 hashes of the
   // inline scripts that were actually emitted. Order does not matter — it is a
   // build:done hook — but it must be present, or the placeholder ships as-is.
-  integrations: [react(), cspInlineHashes()],
+  integrations: [react(), criticalCss(), cspInlineHashes()],
   site: 'https://shop.nimiqbase.com',
   // The floating Astro dev-toolbar badge overlays checkout buttons on phone
   // widths (the shop is used inside Nimiq Pay on mobile). It is a dev-only
