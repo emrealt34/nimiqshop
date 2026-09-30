@@ -1,0 +1,20 @@
+import { chromium, devices } from 'playwright';
+const EXE = '/home/user/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome';
+const browser = await chromium.launch({ executablePath: EXE, args: ['--no-sandbox'] });
+const ctx = await browser.newContext({ viewport: { width: 412, height: 823 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1.75, userAgent: devices['Pixel 5'].userAgent });
+const page = await ctx.newPage();
+await page.addInitScript(() => {
+  window.__events = [];
+  const orig = window.scrollTo.bind(window);
+  window.scrollTo = (...a) => { window.__events.push('scrollTo(' + a.join(',') + ') @' + Math.round(performance.now())); return orig(...a); };
+  addEventListener('scroll', () => { if (window.__events.length < 40) window.__events.push('scroll -> ' + Math.round(scrollY) + ' @' + Math.round(performance.now())); }, { passive: true });
+  new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__events.push('LCP ' + Math.round(e.startTime) + ' size=' + e.size + ' ' + (e.element ? e.element.tagName : e.url)); }).observe({ type: 'largest-contentful-paint', buffered: true });
+});
+page.on('console', (m) => { if (m.type() === 'error') console.error('console:', m.text().slice(0, 100)); });
+await page.goto('https://shop.nimiqbase.com/', { waitUntil: 'load' });
+await page.waitForTimeout(3000);
+const s1 = await page.evaluate(() => ({ scrollY: window.scrollY, docScroll: document.scrollingElement.scrollTop, heroTop: document.querySelector('section.hero')?.offsetTop, hash: location.hash, active: document.activeElement?.tagName + '.' + (document.activeElement?.className || '').slice(0, 30), events: window.__events.slice(0, 25) }));
+console.log(JSON.stringify(s1, null, 1));
+const s2 = await page.evaluate(async () => { window.scrollTo(0, 0); await new Promise((r) => setTimeout(r, 1200)); return { scrollY: window.scrollY, lcp: window.__events.filter((e) => e.startsWith('LCP')) }; });
+console.log('after scrolling to top:', JSON.stringify(s2));
+await browser.close();

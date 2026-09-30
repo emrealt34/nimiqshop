@@ -321,7 +321,17 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
         function onResize() {
           if (ticking) return;
           ticking = true;
-          var wasAtBottom = lastH - (lastY + lastVH) < 160;
+          // "Stay at the bottom" only applies to someone who had actually
+          // scrolled there. Both guards matter on a phone: the first resize
+          // event lands ~200 ms in, while the island is still filling the page
+          // in — at that moment the document is shorter than one screen, so
+          // lastY is 0 and the page looks like it is "at the bottom" even
+          // though nobody moved. Un-guarded, the handler then scrolled a fresh
+          // visitor to the bottom of the grown page: the hero never painted in
+          // view (Lighthouse reported NO_LCP for the mobile home page) and the
+          // page opened mid-content. A page that fits entirely on screen has no
+          // bottom to stick to either.
+          var wasAtBottom = lastY > 0 && lastH > lastVH + 160 && lastH - (lastY + lastVH) < 160;
           var prevH = lastH;
           var prevY = lastY;
           requestAnimationFrame(function () {

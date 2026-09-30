@@ -85,15 +85,28 @@ function alwaysInline(rule) {
   return false;
 }
 
-const LOADER = `/* css-late.js — apply the deferred stylesheet once it has arrived.
+const LOADER = `/* css-late.js — apply the deferred stylesheet after the page has painted.
    Built by integrations/critical-css.mjs; see that file for why this is not an
-   inline onload handler. */
+   inline onload handler.
+
+   Timing matters twice over. Applying the sheet the moment it arrives can put
+   it BACK on the critical path: Chrome will hold the first paint for a
+   stylesheet whose media has just started matching, so a sheet that landed
+   before the first frame delayed LCP by ~500 ms on the deployed site instead of
+   saving it. Waiting for the window load event instead guarantees the first
+   frame is already on screen, while still applying the sheet long before a
+   visitor can open a modal — and before the islands hydrate, so
+   hydration-rendered markup is never styled from the critical half alone. */
 (function () {
   var link = document.getElementById('${LINK_ID}');
   if (!link) return;
   function apply() { link.media = 'all'; }
-  if (link.sheet) apply();
-  else link.addEventListener('load', apply);
+  function when() {
+    if (link.sheet) apply();
+    else link.addEventListener('load', apply);
+  }
+  if (document.readyState === 'complete') when();
+  else window.addEventListener('load', when);
 })();
 `;
 
