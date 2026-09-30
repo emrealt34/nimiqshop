@@ -6,9 +6,19 @@
  * backend domains are configured. We read the browser-injected value first
  * (so /public/config.js still wins) and fall back to safe defaults.
  *
- * NO SSR: every page island is client:only, so components only ever render
- * in the browser — after /config.js has run. There is no server HTML to keep
- * in sync and hydration mismatches are structurally impossible.
+ * Server vs browser: every page island is `client:load`, so the first render
+ * happens TWICE — once here at build time (static HTML) and once in the
+ * browser on hydration. This module's job is to keep those two renders
+ * identical in everything that ends up on screen:
+ *
+ *   • The build has no `window`, so `readAppConfig()` returns DEFAULTS;
+ *     in the browser /config.js has already assigned `window.APP_CONFIG`.
+ *     The two agree for every value the UI renders (hostname, Hub URL, repo),
+ *     so a config value may NOT be read while rendering something whose
+ *     output depends on it — read it in an effect or an event handler, which
+ *     is what consumers of CFG do. (`API_BASE` and `TEST_MODE` do differ
+ *     between the two sources; both are only consumed after user interaction,
+ *     where there is no server markup left to mismatch.)
  */
 
 export type AppConfig = {

@@ -5,10 +5,17 @@ import { useT } from '../../i18n';
 /** Offline / restored-connection strip — failures explained, never a freeze. */
 export function NetBanner() {
   const { t } = useT();
-  const [online, setOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine));
+  // Starts "online" even on a device that is offline: the server render (and
+  // therefore the HTML React hydrates) always assumes online, so reading
+  // navigator.onLine during the FIRST render would make the banner appear
+  // against server markup that does not contain it — a hydration mismatch.
+  // The effect below adopts the real value immediately after hydration and the
+  // online/offline listeners keep it current from then on.
+  const [online, setOnline] = useState(true);
   const [flash, setFlash] = useState(false);
 
   useEffect(() => {
+    setOnline(navigator.onLine);
     const on = () => {
       setOnline(true);
       setFlash(true);

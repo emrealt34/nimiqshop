@@ -376,14 +376,38 @@ export function onLangChange(fn: (lang: LangCode) => void): () => void {
 /* ---------------- Provider ---------------- */
 
 export function I18nProvider({ children, initial }: { children: ReactNode; initial?: LangCode }) {
-  // The requested language is adopted IMMEDIATELY — html lang, the switcher and
-  // every `t()` consumer agree from the first frame — while the dictionary for a
-  // non-English language is still travelling as its own chunk. Until it lands
-  // the strings resolve through the English fallback (buildT), and `dictTick`
-  // re-renders every consumer the moment the real strings exist.
-  const wanted = (): LangCode => (isValidCode(initial) ? initial : detectLang());
-  const [lang, setLangState] = useState<LangCode>(wanted);
+  // The dictionary for a non-English language travels as its own chunk. Until
+  // it lands the strings resolve through the English fallback (buildT), and
+  // `dictTick` re-renders every consumer the moment the real strings exist.
+  //
+  // ORDER MATTERS — FIRST RENDER, THEN DETECT. Every page is server-rendered
+  // (the islands are `client:load`, not `client:only`), and the server does not
+  // know the visitor: it always emits English, because on the server there is no
+  // URL, cookie, localStorage or navigator to read. If this component read
+  // `detectLang()` during its FIRST render, a Turkish visitor would render
+  // Turkish text against English server HTML, React would fail hydration
+  // (minified error #418: "text content does not match"), throw the server
+  // markup away and rebuild the whole island on the client — discarding exactly
+  // the paint we server-rendered for. So the first render is pinned to
+  // DEFAULT_LANG (what the HTML contains) and the visitor's real choice is
+  // adopted in the effect below, immediately after hydration. Switching later
+  // than that costs nothing: a language swap already re-renders through
+  // `buildT` while the dictionary chunk is in flight.
+  //
+  // `initial` stays an explicit override for callers that know the language at
+  // build time (e.g. a future per-locale route); it pins both renders.
+  const pinned = isValidCode(initial) ? initial : null;
+  const [lang, setLangState] = useState<LangCode>(pinned ?? DEFAULT_LANG);
   const [dictTick, setDictTick] = useState(0);
+
+  // Adopt the visitor's requested language once the hydrated tree is committed.
+  // Mount-only by design: every later change goes through setLang().
+  useEffect(() => {
+    if (pinned) return;
+    const detected = detectLang();
+    if (detected !== lang) setLangState(detected);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     let alive = true;
