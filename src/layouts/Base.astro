@@ -1,6 +1,8 @@
 ---
 // Base.astro — the shared page shell. Mirrors the original index.html/orders.html
 // etc. head exactly (CSP, vendored fonts, theme) and mounts the React shell.
+import nunitoVarUrl from '../assets/fonts/nunito-var.woff2';
+import fraunces900Url from '../assets/fonts/fraunces-900.woff2';
 import '../styles/fonts.css';
 import '../styles/app.css';
 import '../styles/fixes.css';
@@ -211,8 +213,12 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
     <link rel="preconnect" href="https://cdn.cryptorefills.com" crossorigin />
     {apiOrigin && <link rel="preconnect" href={apiOrigin} crossorigin />}
     {apiOrigin && <link rel="dns-prefetch" href={apiOrigin} />}
-    <link rel="preload" as="font" type="font/woff2" href={`${assetBase}/fonts/nunito-var.woff2`} crossorigin />
-    <link rel="preload" as="font" type="font/woff2" href={`${assetBase}/fonts/fraunces-900.woff2`} crossorigin />
+    {/* Preload the two faces the first paint needs. The href is the *hashed* URL Vite
+        emitted for these files — the same string the bundled CSS points at, so the
+        preload and the @font-face cannot drift apart (a mismatch means downloading the
+        font twice, or preloading a URL that 404s). */}
+    <link rel="preload" as="font" type="font/woff2" href={nunitoVarUrl} crossorigin />
+    <link rel="preload" as="font" type="font/woff2" href={fraunces900Url} crossorigin />
     {buildApiUrl && (
       <script is:inline define:vars={{ buildApiUrl }}>
         window.APP_CONFIG = Object.assign(window.APP_CONFIG || {}, {
