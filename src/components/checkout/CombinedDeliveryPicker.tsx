@@ -270,7 +270,7 @@ export function CombinedDeliveryPicker({
           }}
         >
           <input type="radio" checked={method === 'nimiq_pay'} onChange={() => setMethod('nimiq_pay')} style={{ accentColor: 'var(--stamp)' }} />
-          <img src={asset("/img/nimiq-hexagon.png")} alt="" style={{ width: 28, height: 28, borderRadius: 6 }} />
+          <img src={asset("/img/nimiq-hexagon.png?v=128")} alt="" style={{ width: 28, height: 28, borderRadius: 6 }} />
           <span style={{ lineHeight: 1.2 }}>
             <div style={{ fontWeight: 900, fontSize: 13 }}>{t('delivery.cdpMethodNim')}</div>
             <div style={{ fontSize: 11, color: 'var(--ink-on-green-deep)', fontWeight: 700 }}>{t('delivery.cdpFullCashback')}</div>

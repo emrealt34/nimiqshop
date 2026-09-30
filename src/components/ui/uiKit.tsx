@@ -18,7 +18,7 @@ import { asset, pagePath } from '../../lib/asset';
 export function NimMark({ size = 16, className = '', style }: { size?: number; className?: string; style?: CSSProperties }) {
   return (
     <img
-      src={asset("/img/nimiq-hexagon.png")}
+      src={asset("/img/nimiq-hexagon.png?v=128")}
       alt="NIM"
       width={size}
       height={size}

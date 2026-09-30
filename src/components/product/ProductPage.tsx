@@ -766,7 +766,7 @@ export function ProductPage() {
                 {t(chips.hero)}
               </span>
               <span className="chip" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                <img src={asset("/img/nimiq-hexagon.png")} alt="NIM" width={14} height={14} style={{ borderRadius: 3 }} /> {t('productPage.payWithNimChip')}
+                <img src={asset("/img/nimiq-hexagon.png?v=128")} alt="NIM" width={14} height={14} style={{ borderRadius: 3 }} /> {t('productPage.payWithNimChip')}
               </span>
               <span className="chip" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                 <FlagMark country={product.country} size={18} /> {countryName(product.country)}
@@ -839,7 +839,7 @@ export function ProductPage() {
             <span className="btn-label">{t('productPage.addToCart')}</span>
           </button>
           <button className="btn btn-gold btn-block btn-lg" onClick={doBuy} disabled={dead} title={dead ? t('productPage.notPurchasableTitle', { country: product.country || t('productPage.whereThisCountry') }) : undefined} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', justifyContent: 'center', opacity: dead ? 0.5 : 1 }}>
-            <img src={asset("/img/nimiq-hexagon.png")} alt="NIM" width={14} height={14} style={{ borderRadius: 3 }} />
+            <img src={asset("/img/nimiq-hexagon.png?v=128")} alt="NIM" width={14} height={14} style={{ borderRadius: 3 }} />
             <span className="btn-label">{dead ? t('productPage.notAvailableHere') : buyLabel}</span>
           </button>
         </div>
@@ -905,7 +905,7 @@ function PackageChooser({
             <div className="pd-pkg-face">{faceLabel}</div>
             {nimPrice ? (
               <div className="pd-pkg-nim">
-                <img src={asset("/img/nimiq-hexagon.png")} alt="NIM" width={12} height={12} style={{ borderRadius: 2, verticalAlign: 'middle' }} />
+                <img src={asset("/img/nimiq-hexagon.png?v=128")} alt="NIM" width={12} height={12} style={{ borderRadius: 2, verticalAlign: 'middle' }} />
                 <span> {nimPrice}</span>
               </div>
             ) : (
@@ -971,7 +971,7 @@ function RangeChooser({
         <div style={{ textAlign: 'right' }}>
           <div className="xs faint">{t('productPage.nimEstimate')}</div>
           <div className="strong nim-price" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
-            <img src={asset("/img/nimiq-hexagon.png")} alt="NIM" width={14} height={14} style={{ borderRadius: 2, verticalAlign: 'middle' }} />
+            <img src={asset("/img/nimiq-hexagon.png?v=128")} alt="NIM" width={14} height={14} style={{ borderRadius: 2, verticalAlign: 'middle' }} />
             <span>{nimMin} - {nimMax}</span>
           </div>
         </div>
@@ -1026,7 +1026,7 @@ function RangeChooser({
             {fmtMoney(value, rangeCur)}
           </div>
           <span className="big-nim" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px', whiteSpace: 'normal', textAlign: 'center' }}>
-            <img src={asset("/img/nimiq-hexagon.png")} alt="NIM" width={14} height={14} style={{ borderRadius: 2, verticalAlign: 'middle' }} />
+            <img src={asset("/img/nimiq-hexagon.png?v=128")} alt="NIM" width={14} height={14} style={{ borderRadius: 2, verticalAlign: 'middle' }} />
             {nimText}
           </span>
         </div>

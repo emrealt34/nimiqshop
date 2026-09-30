@@ -866,7 +866,7 @@ export function PayScreen({
         <div className="pay-hero-amt">
           {nimText ? (
             <>
-              <img className="pay-nim-ico" src={asset("/img/nimiq-hexagon.png")} alt="NIM" width={22} height={22} style={{ borderRadius: 5 }} />
+              <img className="pay-nim-ico" src={asset("/img/nimiq-hexagon.png?v=128")} alt="NIM" width={22} height={22} style={{ borderRadius: 5 }} />
               <span className="big-nim">{nimText}</span>
             </>
           ) : (

@@ -91,7 +91,7 @@ export function Icon({
   if (name === 'nimiq') {
     return (
       <img
-        src={asset("/img/nimiq-hexagon.png")}
+        src={asset("/img/nimiq-hexagon.png?v=128")}
         alt="NIM"
         width={size}
         height={size}

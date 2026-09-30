@@ -52,5 +52,5 @@ export function nimFallbackText(): string {
   return inNimiqPay() ? tr('nim.inInvoice') : tr('nim.shownInPay');
 }
 
-export const NIM_LOGO = asset('/img/nimiq-hexagon.png');
+export const NIM_LOGO = asset('/img/nimiq-hexagon.png?v=128');
 export { getNimRate };
