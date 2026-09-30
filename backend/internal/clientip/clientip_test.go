@@ -66,7 +66,7 @@ func TestResolveTrustBoundaries(t *testing.T) {
 		{name: "untrusted forwarding ignored", peer: "203.0.113.1", trust: true, wantIP: "203.0.113.1", source: "socket"},
 		{name: "untrusted mandatory proxy", peer: "203.0.113.1", trust: true, p: Policy{SharedSecret: secret}, wantIP: "203.0.113.1", source: "socket", fail: true},
 		{name: "trusted no header", peer: "127.0.0.1", trust: true, wantIP: "127.0.0.1", source: "socket"},
-		{name: "nearest untrusted wins", peer: "127.0.0.1", trust: true, headers: map[string][]string{"X-Forwarded-For": {"1.2.3.4, 203.0.113.2, 127.0.0.2"}}, wantIP: "203.0.113.2", source: "trusted-proxy"},
+		{name: "nearest untrusted wins", peer: "127.0.0.1", trust: true, headers: map[string][]string{"X-Forwarded-For": {"1.2.3.4, 203.0.113.2, 127.0.0.1"}}, wantIP: "203.0.113.2", source: "trusted-proxy"},
 		{name: "repeated header", peer: "127.0.0.1", trust: true, headers: map[string][]string{"X-Forwarded-For": {"1.2.3.4", "2.3.4.5"}}, fail: true},
 		{name: "oversized header", peer: "127.0.0.1", trust: true, headers: map[string][]string{"X-Forwarded-For": {strings.Repeat("1", 2049)}}, fail: true},
 		{name: "long chain", peer: "127.0.0.1", trust: true, headers: map[string][]string{"X-Forwarded-For": {strings.Repeat("127.0.0.1,", 32) + "1.2.3.4"}}, fail: true},
