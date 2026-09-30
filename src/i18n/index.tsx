@@ -342,6 +342,13 @@ function applyLang(code: LangCode, persist: boolean) {
   if (typeof document !== 'undefined') {
     document.documentElement.setAttribute('lang', code);
     document.documentElement.setAttribute('data-lang', code);
+    // The dictionary is fetched as its own chunk for the five non-English
+    // languages, so `lang`/`data-lang` (written before paint) no longer prove
+    // the strings are in place. This attribute is only ever set here, after
+    // the translation memory is applied — test suites and debugging read it.
+    // NOT `data-i18n*`: those prefixes belong to the static-shell translator
+    // (lib/staticI18n.ts), which would try to translate <html> itself.
+    document.documentElement.setAttribute('data-i18n-ready', code);
   }
   if (persist) {
     try { localStorage.setItem(STORAGE_KEY, code); } catch {}
@@ -369,32 +376,22 @@ export function onLangChange(fn: (lang: LangCode) => void): () => void {
 /* ---------------- Provider ---------------- */
 
 export function I18nProvider({ children, initial }: { children: ReactNode; initial?: LangCode }) {
-  // The dictionary for a non-English language arrives as its own chunk, so the
-  // provider starts in English (the fallback) and switches as soon as the
-  // requested strings are in memory. `dictLoaded` keeps the already-warm case
-  // synchronous — no extra frame for a language the browser cached.
+  // The requested language is adopted IMMEDIATELY — html lang, the switcher and
+  // every `t()` consumer agree from the first frame — while the dictionary for a
+  // non-English language is still travelling as its own chunk. Until it lands
+  // the strings resolve through the English fallback (buildT), and `dictTick`
+  // re-renders every consumer the moment the real strings exist.
   const wanted = (): LangCode => (isValidCode(initial) ? initial : detectLang());
-  const [lang, setLangState] = useState<LangCode>(() => {
-    const code = wanted();
-    if (dictLoaded(code)) {
-      // apply (without persisting an auto-detect we only just guessed)
-      applyLang(code, false);
-      return code;
-    }
-    return DEFAULT_LANG;
-  });
+  const [lang, setLangState] = useState<LangCode>(wanted);
+  const [dictTick, setDictTick] = useState(0);
 
-  // Boot: fetch the detected dictionary, then apply it.
   useEffect(() => {
-    const code = wanted();
-    if (dictLoaded(code)) { applyLang(code, false); return; }
     let alive = true;
-    void loadDict(code).then(() => { if (alive) setLangState(code); });
+    void loadDict(lang).then(() => { if (alive) setDictTick((n) => n + 1); });
     return () => { alive = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [lang]);
 
-  // Keep the global singleton in sync with React state.
+  // Keep the global singleton (and the static Astro shell) in sync.
   useEffect(() => {
     if (dictLoaded(lang)) applyLang(lang, true);
     else void loadDict(lang).then(() => applyLang(lang, true));
@@ -404,9 +401,7 @@ export function I18nProvider({ children, initial }: { children: ReactNode; initi
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       const next = e.newValue;
-      if (e.key === STORAGE_KEY && isValidCode(next) && next !== lang) {
-        void loadDict(next).then(() => setLangState(next));
-      }
+      if (e.key === STORAGE_KEY && isValidCode(next) && next !== lang) setLangState(next);
     };
     window.addEventListener('storage', onStorage);
     // Also pick up changes from non-React callers in this tab.
@@ -416,10 +411,17 @@ export function I18nProvider({ children, initial }: { children: ReactNode; initi
 
   const ctx = useMemo<I18nCtx>(() => ({
     lang,
-    setLang: (code: LangCode) => { void loadDict(code).then(() => setLangState(code)); },
+    // Switching is asynchronous on purpose: a language never renders with the
+    // wrong strings, it renders with English fallback and then swaps.
+    setLang: (code: LangCode) => {
+      const next = isValidCode(code) ? code : DEFAULT_LANG;
+      setLangState(next);
+      void loadDict(next).then(() => applyLang(next, true));
+    },
     t: buildT(lang),
     langs: LANGS,
-  }), [lang]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [lang, dictTick]);
 
   return <I18nContext.Provider value={ctx}>{children}</I18nContext.Provider>;
 }
@@ -453,7 +455,15 @@ export function useLangEffect(fn: (lang: LangCode, t: Translator) => void) {
 // mounts still return a non-default language. (On the server this is a no-op.)
 if (typeof window !== 'undefined') {
   const code = detectLang();
+  // Apply immediately so <html lang> and every synchronous `t()` consumer agree
+  // with the URL/cookie from the first frame…
   applyLang(code, false);
+  // …then re-apply once the dictionary has actually arrived. Non-English
+  // dictionaries are separate chunks now, so the first call translates with the
+  // English fallback; this second one fires the language listeners again and
+  // turns the static shell (skip link, footer, 404 page) into the right
+  // language. It is a no-op for English and for an already-loaded dictionary.
+  void loadDict(code).then(() => applyLang(code, false));
 }
 
 export default { t, setLang, getLang, detectLang, LANGS, I18nProvider, useT };

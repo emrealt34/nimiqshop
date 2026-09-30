@@ -20,7 +20,7 @@
  * sync even if the two copies of the i18n module are not the same instance.
  * Two tabs stay in sync for the same reason (applyLang writes the attribute).
  */
-import { onLangChange, t } from '../i18n';
+import { getLang, loadDict, onLangChange, t } from '../i18n';
 import { siteName } from './config';
 
 type Vars = Record<string, string>;
@@ -65,15 +65,29 @@ export function initStaticI18n() {
   if (started || typeof document === 'undefined') return;
   started = true;
   applyStaticI18n();
+  // A non-English dictionary is its own chunk: translate again the moment it
+  // exists, even if this bundle ended up with its own copy of the i18n module
+  // (the copy's listener would never fire for the app's load).
+  void loadDict(getLang()).then(() => applyStaticI18n());
   onLangChange(() => applyStaticI18n());
+  // The static shell is translated as soon as the page runs, but a non-English
+  // dictionary now arrives as its own chunk — the first pass therefore renders
+  // English. `data-i18n-ready` is written by the i18n module exactly when a
+  // dictionary is applied, so watching it re-translates the shell the moment
+  // the strings exist (data-lang alone is written before paint, so it can
+  // already hold the final value by the time this observer attaches).
   try {
-    let last = document.documentElement.getAttribute('data-lang');
+    const snapshot = () => [
+      document.documentElement.getAttribute('data-lang'),
+      document.documentElement.getAttribute('data-i18n-ready'),
+    ].join('|');
+    let last = snapshot();
     new MutationObserver(() => {
-      const now = document.documentElement.getAttribute('data-lang');
+      const now = snapshot();
       if (now === last) return;
       last = now;
       applyStaticI18n();
-    }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-lang'] });
+    }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-lang', 'data-i18n-ready'] });
   } catch {
     /* no MutationObserver (very old browser) — the onLangChange path still works */
   }
