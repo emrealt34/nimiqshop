@@ -239,3 +239,27 @@ every CI check plus a blocking `govulncheck` first.
 ## License
 
 [MIT](LICENSE).
+
+### Private security reports and whole-backend coverage
+
+Independent OSV, Semgrep, Trivy, DevSkim, OSSAR, Gitleaks, govulncheck and
+zizmor checks do not require the GitHub Code Scanning UI. SARIF-producing
+scanners retain reports as Actions artifacts. Vulnerability scanner failures
+remain blocking; unavailable report-upload APIs are not scanner results.
+Private CodeQL and SARIF ingestion require GitHub Code Security entitlement.
+Only after enabling that entitlement, set `ENABLE_PRIVATE_CODE_SCANNING=true`
+to run CodeQL and upload reports to GitHub's Security tab. OpenSSF Scorecard's
+public-repository assessment is not run against this private repository.
+SonarCloud separately requires `SONAR_TOKEN`; a missing token means no Sonar
+analysis, not a clean scan. Cloudflare remains the production frontend host;
+private GitHub Pages requires its own plan support and explicit
+`ENABLE_PRIVATE_GITHUB_PAGES=true` opt-in.
+
+The whole-backend target is **100% statement coverage**, not yet achieved.
+CI tests every backend package with `-race -coverpkg=./...`. Its existing
+54.3% baseline is a regression floor, not the target. The coverage report
+merges duplicate instrumentation blocks, lists uncovered statements and
+compares exact counts without rounding up or excluding production files.
+Run **Go 100% coverage audit** in Actions for the strict target check: it
+fails until every instrumented statement is exercised. The README badge
+continues to publish the measured result, never a hard-coded 100%.

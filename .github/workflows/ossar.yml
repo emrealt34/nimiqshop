@@ -34,8 +34,17 @@ jobs:
       - name: Run OSSAR
         uses: github/ossar-action@4e96c4f6e591eb4b991abfd459e40b136a317aea # v2.0.0
         id: ossar
+      - name: Preserve scanner report independently of GitHub license
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ github.job }}-security-report
+          path: ${{ steps.ossar.outputs.sarifFile }}
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Upload OSSAR results
         uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        if: ${{ always() && (!github.event.repository.private || vars.ENABLE_PRIVATE_CODE_SCANNING == 'true') }}
         with:
           sarif_file: ${{ steps.ossar.outputs.sarifFile }}
           category: ossar

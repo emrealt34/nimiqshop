@@ -109,6 +109,9 @@ func TreeMemo(amountNIM float64, product string) string {
 	p := clipBytes(product, budget)
 	if p == "" {
 		p = "purchase"
+		if len(prefix)+len(p)+len(suffix) > MaxMemoBytes {
+			return clipBytes(amt+" NIM plants trees @ "+shop(), MaxMemoBytes)
+		}
 	}
 	return prefix + p + suffix
 }

@@ -9,6 +9,7 @@ on:
     - cron: "30 8 * * 6"
   push:
     branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: osv-scanner-${{ github.ref }}
@@ -18,27 +19,27 @@ permissions:
   contents: read
 
 jobs:
-  scan-scheduled:
-    if: ${{ github.event_name == 'push' || github.event_name == 'schedule' }}
-    permissions:
-      security-events: write # upload SARIF to code scanning
-      contents: read
-      actions: read # codeql-action reads workflow metadata for the upload
-    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@a345acffa64b0eaede81a3d9aae6141214d9c8fc # v2.6.0
-    with:
-      # No ignore list: the only advisory that ever needed one (GO-2026-5932,
-      # golang.org/x/crypto) was resolved by dropping the module entirely.
-      scan-args: |-
-        -r
-        ./
-  scan-pr:
-    if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
-    permissions:
-      security-events: write # upload SARIF to code scanning
-      contents: read
-      actions: read # codeql-action reads workflow metadata for the upload
-    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@a345acffa64b0eaede81a3d9aae6141214d9c8fc # v2.6.0
-    with:
-      scan-args: |-
-        -r
-        ./
+  scan:
+    name: OSV dependency scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: backend/go.mod
+          cache: false
+      - name: Install pinned OSV scanner
+        run: go install github.com/google/osv-scanner/v2/cmd/osv-scanner@v2.6.0
+      - name: Scan all tracked dependency manifests (blocking)
+        run: osv-scanner scan source --recursive --format=sarif --output=osv-results.sarif ./
+      - name: Preserve findings even when the scan fails
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: osv-security-report
+          path: osv-results.sarif
+          if-no-files-found: warn
+          retention-days: 7

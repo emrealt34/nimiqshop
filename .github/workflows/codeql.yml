@@ -19,6 +19,8 @@ permissions:
 
 jobs:
   analyze:
+    # Private CodeQL requires a paid GitHub Code Security entitlement.
+    if: ${{ !github.event.repository.private || vars.ENABLE_PRIVATE_CODE_SCANNING == 'true' }}
     name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
