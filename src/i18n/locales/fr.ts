@@ -740,6 +740,34 @@ const fr = {
   },
 
   support: {
+
+    /* Help & FAQ page (src/components/support/SupportPage.tsx). The FAQ is
+       translated like every other customer-facing screen: the supplier policy
+       (codes, replacements, refunds are CryptoRefills') must read correctly in
+       the buyer's language, so it lives here, not hard-coded in the JSX. */
+    faq: {
+      title: 'Aide et FAQ',
+      lede: 'Réponses rapides sur les codes de cartes cadeaux, la livraison et ce qui se passe après le paiement.',
+      policyTitle: 'À qui s’adresser au sujet de votre carte ?',
+      policyBody: 'les codes de cartes cadeaux sont livrés, remplacés et remboursés par **CryptoRefills**, le vendeur officiel — écrivez-leur depuis **l’adresse e-mail à laquelle la carte a été envoyée**. Cette boutique ne traite pas les remboursements des achats effectués via le fournisseur.',
+      contactTitle: 'Contacter la boutique',
+      contactBody: 'Pour tout ce que la FAQ ne règle pas — suivi de commande, statut du cashback, paiements, bugs sur ce site — écrivez-nous. Nous ne pouvons pas rembourser les achats du fournisseur à votre place, mais nous vous aiderons toujours à retrouver votre commande et le bon canal CryptoRefills.',
+      noInbox: 'Il n’y a plus de boîte à tickets : l’e-mail est le seul canal, et les réponses prennent jusqu’à 2 jours ouvrés.',
+      q1: 'Mon code ne fonctionne pas — que faire ?',
+      a1: 'Les cartes cadeaux sont générées et envoyées **directement par CryptoRefills**, notre fournisseur — pas par cette boutique. Écrivez au support CryptoRefills **depuis l’adresse exacte à laquelle la carte a été livrée** (vérifiez d’abord les spams). Indiquez l’identifiant de commande et le nom du produit ; ils peuvent vérifier la livraison et réémettre un code valide.',
+      q2: 'Je n’ai jamais reçu l’e-mail de la carte cadeau',
+      a2: 'La carte est envoyée à l’**adresse de livraison saisie lors du paiement** — elle peut différer de votre adresse de contact. Les cartes numériques arrivent en général en quelques minutes. Cherchez « CryptoRefills » dans votre boîte et vos spams ; sinon, écrivez au support CryptoRefills depuis cette adresse avec votre identifiant de commande.',
+      q3: 'Comment fonctionnent les remboursements, remplacements et annulations ?',
+      a3: '**CryptoRefills est le vendeur officiel** de chaque achat : la carte, la facture et le service après-vente sont les leurs. Les remboursements, annulations et remplacements de codes sont traités exclusivement par CryptoRefills — cette boutique n’en est pas responsable et ne peut pas rembourser un achat terminé. Adressez la demande à l’adresse à laquelle la carte a été envoyée ; ils la régleront.',
+      q4: 'Où suivre ma commande ?',
+      a4: 'Chaque commande dispose d’une page de suivi publique — sans connexion. Ouvrez [Suivre la commande]({{track}}) et collez votre identifiant pour voir le cycle en direct (paiement → achat fournisseur → livré). Connecté, votre [liste de commandes]({{orders}}) affiche les mêmes statuts avec les détails de paiement.',
+      q5: 'J’ai payé, mais la commande affiche encore « en attente de paiement »',
+      a5: 'Les paiements sont vérifiés on-chain ; un ou deux blocs de confirmation sont normaux avant le passage en « traitement ». Si votre portefeuille indique le transfert réglé après 30 minutes, rouvrez la commande depuis votre [liste de commandes]({{orders}}) — le statut s’actualise — et ne nous contactez qu’ensuite avec le hash de la transaction.',
+      q6: 'Quand mon cashback est-il versé ?',
+      a6: 'Le cashback est crédité **après que CryptoRefills a marqué votre commande comme honorée** — jamais avant la livraison de la carte. Il est versé en NIM au portefeuille utilisé au paiement (ou à l’adresse de plantation d’arbres si vous avez choisi le don). Les montants en direct sont sur la [page cashback]({{cashback}}).',
+      q7: 'Est-ce un double débit ou deux commandes pour un même panier ?',
+      a7: 'Un paiement qui échoue à la validation ne crée jamais de commande fournisseur, et la boutique refuse une seconde commande active pour le même panier — un double débit est donc très rare. Si votre portefeuille montre réellement deux paiements réglés, écrivez à CryptoRefills avec **les deux** identifiants de commande ; eux seuls peuvent régulariser et rembourser un doublon.',
+    },
     title: 'Support',
     newTicket: 'Nouveau ticket',
     subject: 'Sujet',

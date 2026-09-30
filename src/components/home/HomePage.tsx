@@ -593,9 +593,17 @@ function productPriceText(p: Product, t: (k: string, v?: Record<string, string |
 
 /* ---------------- UI primitives ---------------- */
 function SkeletonGrid() {
+  // Four cards, not ten. `#gridWrap` is min-height:62vh, so with four cards the
+  // grid area is exactly as tall as the empty state and as the error state —
+  // the three states swap without changing the document height. Ten cards made
+  // the loading state ~990px against the empty state's 567px, and that collapse
+  // pulled the footer 423px up the page when a catalog request failed: the
+  // single largest CLS number in the Lighthouse report (0.05), on every device
+  // whenever the API is slow or down. A grid of real products grows the page
+  // *downwards*, which is harmless — the footer only leaves the viewport.
   return (
     <div className="grid products">
-      {Array.from({ length: 10 }).map((_, i) => (
+      {Array.from({ length: 4 }).map((_, i) => (
         <div key={i} className="skeleton-card" style={{ height: 190, borderRadius: 14, background: 'var(--surface-2)' }} />
       ))}
     </div>

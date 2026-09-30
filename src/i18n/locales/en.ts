@@ -749,6 +749,34 @@ const en = {
   },
 
   support: {
+
+    /* Help & FAQ page (src/components/support/SupportPage.tsx). The FAQ is
+       translated like every other customer-facing screen: the supplier policy
+       (codes, replacements, refunds are CryptoRefills') must read correctly in
+       the buyer's language, so it lives here, not hard-coded in the JSX. */
+    faq: {
+      title: 'Help & FAQ',
+      lede: 'Quick answers about gift codes, delivery and what happens after checkout.',
+      policyTitle: 'Who to contact about your card:',
+      policyBody: 'gift codes are delivered, replaced and refunded by **CryptoRefills**, the merchant of record — write to them from **the email address the gift card was sent to**. This shop does not process refunds or purchases made through the supplier.',
+      contactTitle: 'Contact the shop',
+      contactBody: 'For anything the FAQ could not settle — order lookups, cashback status, payments, bugs on this site — write to us. We cannot refund supplier purchases for you, but we will always help you find your order and the right CryptoRefills channel.',
+      noInbox: 'There is no ticket inbox any more — email is the only channel, and answers take up to 2 business days.',
+      q1: 'My code is not working — what do I do?',
+      a1: 'Gift cards are generated and emailed **directly by CryptoRefills**, our supplier — not by this shop. Email CryptoRefills support **from the exact address the gift card was delivered to** (check your spam/junk folder first). Include your order id and the product name; they can verify delivery and re-issue a working code.',
+      q2: 'I never received the gift card email',
+      a2: 'The card goes to the **delivery email you entered at checkout** — it may differ from your contact email. Digital cards usually arrive within a few minutes. Search your inbox and spam for “CryptoRefills”, and if it is missing, email CryptoRefills support from that address with your order id.',
+      q3: 'How do refunds, replacements and cancellations work?',
+      a3: '**CryptoRefills is the merchant of record** for every purchase: the card, the invoice and the after-sales process are theirs. Refunds, cancellations and code replacements are handled exclusively by CryptoRefills — this shop is not responsible for them and cannot issue a refund on a completed purchase. Route the request to the address the gift card was sent to and they will resolve it.',
+      q4: 'Where can I track my order?',
+      a4: 'Every order has a public tracking page — no login needed. Open [Track order]({{track}}) and paste your order id to see the live lifecycle (payment → supplier purchase → delivered). Signed in, your [orders list]({{orders}}) shows the same statuses with payment details.',
+      q5: 'I paid, but the order still says “awaiting payment”',
+      a5: 'Payments are verified on-chain; a block or two of confirmation is normal before the order moves to “processing”. If your wallet shows the transfer as settled after 30 minutes, reopen the order from your [orders list]({{orders}}) — it refreshes the status — and only then contact us with the transaction hash.',
+      q6: 'When is my cashback paid?',
+      a6: 'Cashback is credited **after CryptoRefills marks your order fulfilled** — never before the card is delivered. It is paid in NIM to the wallet used at checkout (or to the tree-planting address if you chose donation). Live amounts are on the [cashback page]({{cashback}}).',
+      q7: 'Am I looking at a duplicate charge / two orders for one cart?',
+      a7: 'A payment that fails validation never creates a supplier order, and the shop refuses a second live order for the same cart — so a duplicate charge is extremely rare. If your wallet really shows two settled payments, email CryptoRefills with **both** order ids; only they can reconcile and refund a duplicate.',
+    },
     title: 'Support',
     newTicket: 'New ticket',
     subject: 'Subject',

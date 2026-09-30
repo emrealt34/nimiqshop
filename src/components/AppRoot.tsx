@@ -4,7 +4,7 @@
  * and the page content so context is shared across the whole island. Each
  * Astro page mounts ONE <AppRoot> via client:load.
  */
-import { type ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { AppProviders } from './AppProviders';
 import { CartProvider } from '../lib/cartStore';
 import { SiteShell, type ShellKey } from './shell/SiteShell';
@@ -19,6 +19,14 @@ import { I18nProvider } from '../i18n';
 export function AppRoot({ activeKey, children }: { activeKey: ShellKey; children: ReactNode }) {
   // (No pre-hydration footer handling here any more: the pages are
   // server-rendered, so there is no empty-content frame to hide it for.)
+  //
+  // Hydration beacon. The island hydrates on idle (see the pages' client:idle),
+  // so "the HTML is there" and "the app answers clicks" are two different
+  // moments; this attribute marks the second one. tests/e2e waits for it before
+  // interacting, and it costs one attribute write.
+  useEffect(() => {
+    document.documentElement.setAttribute('data-app-ready', '1');
+  }, []);
   return (
     <I18nProvider>
       <CartProvider>

@@ -740,6 +740,34 @@ const de = {
   },
 
   support: {
+
+    /* Help & FAQ page (src/components/support/SupportPage.tsx). The FAQ is
+       translated like every other customer-facing screen: the supplier policy
+       (codes, replacements, refunds are CryptoRefills') must read correctly in
+       the buyer's language, so it lives here, not hard-coded in the JSX. */
+    faq: {
+      title: 'Hilfe & FAQ',
+      lede: 'Kurze Antworten zu Gutscheincodes, Lieferung und dem Ablauf nach dem Bezahlen.',
+      policyTitle: 'An wen wendest du dich wegen deiner Karte?',
+      policyBody: 'Gutscheincodes werden von **CryptoRefills** geliefert, ersetzt und erstattet — dem Merchant of Record. Schreibe ihnen von **der E-Mail-Adresse, an die der Gutschein gesendet wurde**. Dieser Shop wickelt keine Erstattungen für Käufe über den Lieferanten ab.',
+      contactTitle: 'Kontakt zum Shop',
+      contactBody: 'Wenn die FAQ nicht weiterhilft — Bestellstatus, Cashback, Zahlungen, Fehler auf dieser Seite — schreib uns. Wir können Käufe beim Lieferanten nicht für dich erstatten, helfen dir aber immer, deine Bestellung und den richtigen CryptoRefills-Kanal zu finden.',
+      noInbox: 'Ein Ticket-Postfach gibt es nicht mehr — E-Mail ist der einzige Kanal, Antworten dauern bis zu 2 Werktage.',
+      q1: 'Mein Code funktioniert nicht — was tun?',
+      a1: 'Geschenkkarten werden **direkt von CryptoRefills**, unserem Lieferanten, erzeugt und per E-Mail versendet — nicht von diesem Shop. Schreibe dem CryptoRefills-Support **von genau der Adresse, an die die Karte geliefert wurde** (prüfe zuerst den Spam-Ordner). Gib deine Bestellnummer und den Produktnamen an; sie können die Lieferung prüfen und einen gültigen Code ausstellen.',
+      q2: 'Ich habe die Gutschein-E-Mail nie erhalten',
+      a2: 'Die Karte geht an die **Liefer-E-Mail-Adresse, die du beim Bezahlen angegeben hast** — sie kann von deiner Kontaktadresse abweichen. Digitale Karten kommen meist in wenigen Minuten. Suche in Posteingang und Spam nach „CryptoRefills“; fehlt sie, schreibe dem CryptoRefills-Support von dieser Adresse mit deiner Bestellnummer.',
+      q3: 'Wie funktionieren Erstattungen, Ersatz und Stornierungen?',
+      a3: '**CryptoRefills ist bei jedem Kauf der Merchant of Record**: Karte, Rechnung und After-Sales liegen bei ihnen. Erstattungen, Stornierungen und Code-Ersatz wickelt ausschließlich CryptoRefills ab — dieser Shop ist dafür nicht zuständig und kann einen abgeschlossenen Kauf nicht erstatten. Richte die Anfrage an die Adresse, an die der Gutschein gesendet wurde; dort wird sie gelöst.',
+      q4: 'Wo kann ich meine Bestellung verfolgen?',
+      a4: 'Jede Bestellung hat eine öffentliche Tracking-Seite — ohne Anmeldung. Öffne [Bestellung verfolgen]({{track}}) und füge deine Bestellnummer ein, um den Live-Ablauf zu sehen (Zahlung → Einkauf beim Lieferanten → geliefert). Angemeldet zeigt deine [Bestellliste]({{orders}}) dieselben Status mit Zahlungsdetails.',
+      q5: 'Ich habe bezahlt, aber die Bestellung sagt noch „Zahlung ausstehend“',
+      a5: 'Zahlungen werden on-chain geprüft; ein bis zwei Bestätigungsblöcke sind normal, bevor die Bestellung auf „in Bearbeitung“ wechselt. Zeigt deine Wallet die Überweisung nach 30 Minuten als abgeschlossen, öffne die Bestellung über deine [Bestellliste]({{orders}}) neu — das aktualisiert den Status — und erst dann melde dich mit dem Transaktions-Hash.',
+      q6: 'Wann wird mein Cashback ausgezahlt?',
+      a6: 'Cashback wird **erst gutgeschrieben, nachdem CryptoRefills deine Bestellung als erfüllt markiert** — nie bevor die Karte geliefert ist. Es wird in NIM an die beim Bezahlen verwendete Wallet gezahlt (oder an die Baumpflanz-Adresse, wenn du gespendet hast). Aktuelle Beträge stehen auf der [Cashback-Seite]({{cashback}}).',
+      q7: 'Sehe ich eine doppelte Abbuchung bzw. zwei Bestellungen für einen Warenkorb?',
+      a7: 'Eine Zahlung, die die Prüfung nicht besteht, erzeugt nie eine Lieferantenbestellung, und der Shop lehnt eine zweite aktive Bestellung für denselben Warenkorb ab — eine doppelte Abbuchung ist also sehr selten. Zeigt deine Wallet wirklich zwei abgeschlossene Zahlungen, schreibe CryptoRefills mit **beiden** Bestellnummern; nur sie können eine Doppelzahlung klären und erstatten.',
+    },
     title: 'Support',
     newTicket: 'Neues Ticket',
     subject: 'Betreff',

@@ -740,6 +740,34 @@ const pt = {
   },
 
   support: {
+
+    /* Help & FAQ page (src/components/support/SupportPage.tsx). The FAQ is
+       translated like every other customer-facing screen: the supplier policy
+       (codes, replacements, refunds are CryptoRefills') must read correctly in
+       the buyer's language, so it lives here, not hard-coded in the JSX. */
+    faq: {
+      title: 'Ajuda e FAQ',
+      lede: 'Respostas rápidas sobre códigos de vale-presente, entrega e o que acontece depois do pagamento.',
+      policyTitle: 'Com quem falar sobre o seu cartão?',
+      policyBody: 'os códigos de vale-presente são entregues, substituídos e reembolsados pela **CryptoRefills**, o vendedor responsável — escreva-lhes **do endereço de e-mail para o qual o cartão foi enviado**. Esta loja não processa reembolsos de compras feitas através do fornecedor.',
+      contactTitle: 'Falar com a loja',
+      contactBody: 'Para tudo o que a FAQ não resolver — consulta de encomendas, estado do cashback, pagamentos, erros neste site — escreva-nos. Não podemos reembolsar compras do fornecedor por si, mas ajudamos sempre a encontrar a sua encomenda e o canal correto da CryptoRefills.',
+      noInbox: 'Já não existe caixa de tickets — o e-mail é o único canal e as respostas demoram até 2 dias úteis.',
+      q1: 'O meu código não funciona — o que faço?',
+      a1: 'Os vales-presente são gerados e enviados **diretamente pela CryptoRefills**, o nosso fornecedor — não por esta loja. Escreva ao suporte da CryptoRefills **a partir do endereço exato para onde o cartão foi entregue** (verifique primeiro o spam). Inclua o id da encomenda e o nome do produto; eles podem verificar a entrega e emitir um código válido.',
+      q2: 'Nunca recebi o e-mail do vale-presente',
+      a2: 'O cartão vai para o **e-mail de entrega que indicou no pagamento** — pode ser diferente do seu e-mail de contacto. Os cartões digitais chegam em poucos minutos. Procure “CryptoRefills” na caixa de entrada e no spam; se não encontrar, escreva ao suporte da CryptoRefills a partir desse endereço com o id da encomenda.',
+      q3: 'Como funcionam reembolsos, substituições e cancelamentos?',
+      a3: 'A **CryptoRefills é o vendedor responsável** de todas as compras: o cartão, a fatura e o pós-venda são deles. Reembolsos, cancelamentos e substituições de códigos são tratados exclusivamente pela CryptoRefills — esta loja não é responsável por eles e não pode reembolsar uma compra concluída. Envie o pedido para o endereço para onde o cartão foi enviado e eles resolvem.',
+      q4: 'Onde posso acompanhar a minha encomenda?',
+      a4: 'Cada encomenda tem uma página de acompanhamento pública — sem iniciar sessão. Abra [Acompanhar encomenda]({{track}}) e cole o id da encomenda para ver o ciclo em direto (pagamento → compra ao fornecedor → entregue). Com sessão iniciada, a sua [lista de encomendas]({{orders}}) mostra os mesmos estados com os detalhes de pagamento.',
+      q5: 'Paguei, mas a encomenda ainda diz «a aguardar pagamento»',
+      a5: 'Os pagamentos são verificados on-chain; um ou dois blocos de confirmação são normais antes de a encomenda passar a «em processamento». Se a sua carteira mostrar a transferência liquidada após 30 minutos, reabra a encomenda na [lista de encomendas]({{orders}}) — atualiza o estado — e só depois nos contacte com o hash da transação.',
+      q6: 'Quando é pago o meu cashback?',
+      a6: 'O cashback é creditado **depois de a CryptoRefills marcar a encomenda como cumprida** — nunca antes da entrega do cartão. É pago em NIM para a carteira usada no pagamento (ou para o endereço de plantação de árvores, se escolheu doar). Os valores em direto estão na [página de cashback]({{cashback}}).',
+      q7: 'Estou a ver uma cobrança duplicada / duas encomendas para um carrinho?',
+      a7: 'Um pagamento que falha a validação nunca cria encomenda no fornecedor, e a loja recusa uma segunda encomenda ativa para o mesmo carrinho — uma cobrança duplicada é, por isso, muito rara. Se a sua carteira mostrar mesmo dois pagamentos liquidados, escreva à CryptoRefills com **ambos** os ids de encomenda; só eles podem reconciliar e reembolsar um duplicado.',
+    },
     title: 'Suporte',
     newTicket: 'Novo ticket',
     subject: 'Assunto',

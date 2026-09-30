@@ -40,12 +40,12 @@ async function sentences(page: import('@playwright/test').Page) {
 // design (AdminPage has no t() at all). Everything customer-facing is checked.
 const OPERATOR_ONLY = new Set(['admin']);
 
-// /support is a deliberately English FAQ: it quotes the supplier's code,
-// refund and replacement policy verbatim (CryptoRefills is the merchant of
-// record), and a mistranslation of that policy is worse than English. Its
-// text is still checked in the language it ships in — the crash, links and
-// responsive specs all visit it in every language.
-const ENGLISH_ONLY = new Set(['support']);
+// No English-only customer-facing screens any more. /support used to be one
+// (hard-coded English FAQ quoting the supplier policy verbatim); its copy now
+// lives in the locale files like everything else, so the guard covers it too —
+// a translated-but-wrong policy is a bug we want to catch by reading the
+// strings, not by hiding the screen from this test.
+const ENGLISH_ONLY = new Set<string>();
 
 test.describe.configure({ timeout: 90_000 });
 

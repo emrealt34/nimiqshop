@@ -3,5 +3,5 @@ import BaseLayout from '../layouts/Base.astro';
 import { ActivityPage } from '../components/activity/ActivityPage';
 ---
 <BaseLayout title="Live activity — shop.nimiqbase.com" titleKey="pageTitle.activity" activeKey="activity">
-  <ActivityPage client:load />
+  <ActivityPage client:idle />
 </BaseLayout>

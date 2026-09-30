@@ -3,5 +3,5 @@ import BaseLayout from '../layouts/Base.astro';
 import { OrdersPage } from '../components/orders/OrdersPage';
 ---
 <BaseLayout title="Orders — shop.nimiqbase.com" titleKey="pageTitle.orders" activeKey="orders">
-  <OrdersPage client:load />
+  <OrdersPage client:idle />
 </BaseLayout>

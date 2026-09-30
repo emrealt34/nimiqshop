@@ -236,6 +236,16 @@ export async function open(page: Page, url: string) {
     .poll(async () => (await page.locator('#page-content').first().innerText().catch(() => '')).trim().length, { timeout: 15_000 })
     .toBeGreaterThan(10);
   await page.evaluate(() => document.fonts?.ready);
+  // The island hydrates on idle (client:idle), which keeps ~140 KB of JS out of
+  // the critical path but means "content is visible" no longer implies "clicks
+  // do something". Wait for AppRoot's beacon so a click can't race hydration.
+  // Pages with no island at all (the static 404) never set it — they are not
+  // idle-hydrating, they are done.
+  await page.waitForFunction(
+    () => document.documentElement.getAttribute('data-app-ready') === '1' || !document.querySelector('astro-island'),
+    null,
+    { timeout: 20_000 },
+  );
   await page.waitForTimeout(300);
   return res;
 }

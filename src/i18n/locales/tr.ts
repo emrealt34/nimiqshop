@@ -741,6 +741,34 @@ const tr = {
   },
 
   support: {
+
+    /* Help & FAQ page (src/components/support/SupportPage.tsx). The FAQ is
+       translated like every other customer-facing screen: the supplier policy
+       (codes, replacements, refunds are CryptoRefills') must read correctly in
+       the buyer's language, so it lives here, not hard-coded in the JSX. */
+    faq: {
+      title: 'Yardım ve SSS',
+      lede: 'Hediye kartı kodları, teslimat ve ödeme sonrası süreçle ilgili hızlı yanıtlar.',
+      policyTitle: 'Kartınız için kime yazmalısınız?',
+      policyBody: 'hediye kartı kodları **CryptoRefills** tarafından teslim edilir, değiştirilir ve iade edilir; kayıtlı satıcı (merchant of record) onlardır. Onlara **hediye kartının gönderildiği e-posta adresinden** yazın. Bu mağaza, tedarikçi üzerinden yapılan alışverişlerde iade işlemi yapmaz.',
+      contactTitle: 'Mağazayla iletişime geçin',
+      contactBody: 'SSS’nin çözemediği her şey için — sipariş sorgulama, cashback durumu, ödemeler, bu sitedeki hatalar — bize yazın. Tedarikçi alışverişlerinin iadesini sizin adınıza yapamayız, ancak siparişinizi ve doğru CryptoRefills kanalını bulmanıza her zaman yardımcı oluruz.',
+      noInbox: 'Artık talep (ticket) kutusu yok — tek kanal e-posta ve yanıtlar en fazla 2 iş günü sürer.',
+      q1: 'Kodum çalışmıyor — ne yapmalıyım?',
+      a1: 'Hediye kartları bu mağaza tarafından değil, tedarikçimiz **CryptoRefills tarafından doğrudan** oluşturulur ve e-postayla gönderilir. CryptoRefills desteğine **hediye kartının teslim edildiği adresten** yazın (önce spam/gereksiz klasörüne bakın). Sipariş kimliğinizi ve ürün adını ekleyin; teslimatı doğrulayıp çalışan bir kod verebilirler.',
+      q2: 'Hediye kartı e-postası hiç gelmedi',
+      a2: 'Kart, **ödeme sırasında girdiğiniz teslimat e-postasına** gider — iletişim e-postanızdan farklı olabilir. Dijital kartlar genelde birkaç dakika içinde ulaşır. Gelen kutunuzda ve spam klasörünüzde “CryptoRefills” araması yapın; bulamazsanız o adresten sipariş kimliğinizle CryptoRefills desteğine yazın.',
+      q3: 'İade, değişim ve iptal nasıl işliyor?',
+      a3: 'Her alışverişte **kayıtlı satıcı CryptoRefills’tir**: kart, fatura ve satış sonrası süreç onlara aittir. İade, iptal ve kod değişimi yalnızca CryptoRefills tarafından yürütülür — bu mağaza bunlardan sorumlu değildir ve tamamlanmış bir alışveriş için iade yapamaz. Talebinizi hediye kartının gönderildiği adresten iletin, onlar çözecektir.',
+      q4: 'Siparişimi nereden takip edebilirim?',
+      a4: 'Her siparişin herkese açık bir takip sayfası var — giriş gerekmez. [Sipariş takibi]({{track}}) sayfasını açıp sipariş kimliğinizi yapıştırın; canlı süreci görürsünüz (ödeme → tedarikçi alımı → teslim). Giriş yaptıysanız [sipariş listesi]({{orders}}) aynı durumları ödeme ayrıntılarıyla gösterir.',
+      q5: 'Ödeme yaptım ama sipariş hâlâ “ödeme bekleniyor” diyor',
+      a5: 'Ödemeler zincir üzerinde doğrulanır; sipariş “işleniyor” durumuna geçmeden önce bir iki blok onayı normaldir. Cüzdanınızda transfer 30 dakika sonra kesinleşmiş görünüyorsa [sipariş listesinden]({{orders}}) siparişi yeniden açın — durumu tazeler — ve ancak ondan sonra işlem hash’i ile bize yazın.',
+      q6: 'Cashback ne zaman ödenir?',
+      a6: 'Cashback, **CryptoRefills siparişinizi tamamlandı olarak işaretledikten sonra** yatırılır — kart teslim edilmeden asla. Ödeme sırasında kullandığınız cüzdana NIM olarak (bağış seçtiyseniz ağaç dikim adresine) gönderilir. Güncel tutarlar [cashback sayfasında]({{cashback}}).',
+      q7: 'Aynı sepet için iki sipariş / mükerrer çekim mi görüyorum?',
+      a7: 'Doğrulamadan geçmeyen bir ödeme tedarikçi siparişi oluşturmaz ve mağaza aynı sepet için ikinci bir canlı siparişi kabul etmez — bu yüzden mükerrer çekim çok nadirdir. Cüzdanınızda gerçekten iki kesinleşmiş ödeme görünüyorsa **iki** sipariş kimliğiyle CryptoRefills’e yazın; mükerrer kaydı yalnızca onlar çözebilir ve iade edebilir.',
+    },
     title: 'Destek',
     newTicket: 'Yeni talep',
     subject: 'Konu',

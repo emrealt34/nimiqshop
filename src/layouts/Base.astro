@@ -231,7 +231,11 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
       </script>
     )}
     <script is:inline src={`${assetBase}/config.js`} defer></script>
-    <script is:inline src={`${assetBase}/vendor/HubApi.umd.js`} defer></script>
+    {/* Wallet SDK is NOT loaded here. src/lib/vendorLoad.ts injects it with
+        ensureLib('HubApi') and already warms it on idle; the eager deferred tag
+        that used to sit at this spot was a second copy of the same 11 KB on
+        every page, including the ones that never open a wallet. The loader is
+        the single source of truth, so a page cannot drift from it. */}
     <script is:inline>
       // NOTE: there used to be a `pre-hydration` class here. It let the
       // stylesheet hide the footer while the page was still an empty

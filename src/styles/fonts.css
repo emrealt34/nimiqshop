@@ -68,3 +68,53 @@
   unicode-range: U+0000-00FF, U+0100-017F, U+0131, U+0152-0153, U+2000-206F,
     U+20A0-20BF, U+2122, U+2190-2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
+
+/* ---------------------------------------------------------------------------
+ * Metric-matched fallbacks.
+ *
+ * `font-display: swap` paints the fallback first and repaints with the webfont
+ * when it lands. That repaint is a layout change if the two fonts have
+ * different metrics: with the stylesheet inlined (no render-blocking CSS) the
+ * swap happens *after* first paint, and it measured 0.055 CLS on a throttled
+ * mobile load — the hero h1 wrapped differently, grew a line and pushed the
+ * whole page down, which is the largest single number in our Lighthouse
+ * report. Fonts are not the only thing that can shift, but this one is
+ * deterministic and cheap to remove.
+ *
+ * The two faces below take the webfonts' own vertical metrics and a measured
+ * width ratio, so the fallback occupies the same box:
+ *
+ *   Fraunces   ascent 1956/2000 = 97.8%, descent 510/2000 = 25.5%, gap 0
+ *              width: 116.7% of Liberation Serif's sample advance
+ *   Nunito     ascent 1011/1000 = 101.1%, descent 353/1000 = 35.3%, gap 0
+ *              width: 103.6% of Liberation Sans / Arial
+ *
+ * The src lists are deliberate: Liberation Sans/Serif are metric-compatible
+ * with Arial/Times New Roman, so the same ratios hold on Linux and Windows
+ * (and the ascent/descent overrides hold everywhere — they are the part that
+ * stops the page from moving).
+ *
+ * The width ratio is measured against the real copy, not a pangram: a sweep
+ * over candidate values (100.9% = mixed-sample average, 103.6% = lowercase-text
+ * average) built and re-measured the page each time and 103.6% is where the
+ * hero lede and the search row stop re-wrapping — the two blocks that produced
+ * the remaining 0.033 of CLS. Fallback and webfont now agree on line breaks as
+ * well as on line boxes (CLS 0.0385 → 0.0050 on a throttled phone load).
+ */
+@font-face {
+  font-family: "Nunito Fallback";
+  src: local("Liberation Sans"), local("Arial"), local("Helvetica"), local("DejaVu Sans");
+  ascent-override: 101.1%;
+  descent-override: 35.3%;
+  line-gap-override: 0%;
+  size-adjust: 103.6%;
+}
+
+@font-face {
+  font-family: "Fraunces Fallback";
+  src: local("Liberation Serif"), local("Times New Roman"), local("DejaVu Serif");
+  ascent-override: 97.8%;
+  descent-override: 25.5%;
+  line-gap-override: 0%;
+  size-adjust: 116.7%;
+}
