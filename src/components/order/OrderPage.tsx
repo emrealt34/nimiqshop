@@ -79,6 +79,33 @@ const ORDER_REDEEM_STEPS: Record<string, string[]> = {
   mixed: ['orderPage.redeemMixed1', 'orderPage.redeemMixed2', 'orderPage.redeemMixed3'],
 };
 
+/**
+ * Body of the "Rate your delivery" sheet.
+ *
+ * A component rather than a pre-built element: the sheet outlives the render
+ * pass that opened it, so it must subscribe to the translator itself. That way
+ * a rating prompt that opens before this visitor's dictionary chunk arrives
+ * (or a language switch while it is open) re-renders in the right language
+ * instead of freezing in English.
+ */
+function RateDeliveryPrompt({ onRate, onLater }: { onRate: (stars: number) => void; onLater: () => void }) {
+  const { t } = useT();
+  return (
+    <div className="center" style={{ padding: '4px 2px 2px' }}>
+      <div className="strong" style={{ fontSize: '1.05rem' }}>{t('orderPage.howWasDelivery')}</div>
+      <div className="small muted mt-1">{t('orderPage.howWasIt')}</div>
+      <div className="mt-2" style={{ display: 'flex', justifyContent: 'center' }}>
+        <StarPicker size={34} onSelect={onRate} />
+      </div>
+      <button className="btn btn-ghost btn-block mt-2" onClick={onLater}>
+        <Icon name="clock" size={16} />
+        <span className="btn-label">{t('orderPage.rateLater')}</span>
+      </button>
+      <div className="xs faint mt-1">{t('orderPage.rateNoPressure')}</div>
+    </div>
+  );
+}
+
 function giftChannelLabel(ch: string) {
   // "email" is the only note channel there is — the shop has no SMS sender.
   return ch === 'email' ? i18nT('orderPage.byEmail') : String(ch || '');
@@ -681,32 +708,23 @@ export function OrderView() {
       load(false);
     };
     openSheet({
-      title: t('orderPage.rateTitle'),
+      // Both the heading and the body translate at RENDER time. The prompt
+      // opens the moment the order payload lands, which can beat this
+      // visitor's dictionary chunk; a t() captured here would leave the whole
+      // prompt (and the dialog's accessible name) in the fallback language
+      // until the sheet was closed and reopened.
+      title: (tr) => tr('orderPage.rateTitle'),
       render: (close) => (
-        <div className="center" style={{ padding: '4px 2px 2px' }}>
-          <div className="strong" style={{ fontSize: '1.05rem' }}>{t('orderPage.howWasDelivery')}</div>
-          <div className="small muted mt-1">{t('orderPage.howWasIt')}</div>
-          <div className="mt-2" style={{ display: 'flex', justifyContent: 'center' }}>
-            <StarPicker
-              size={34}
-              onSelect={(r) => {
-                rate(r);
-                close();
-              }}
-            />
-          </div>
-          <button
-            className="btn btn-ghost btn-block mt-2"
-            onClick={() => {
-              try { localStorage.setItem(laterKey, '1'); } catch {}
-              close();
-            }}
-          >
-            <Icon name="clock" size={16} />
-            <span className="btn-label">{t('orderPage.rateLater')}</span>
-          </button>
-          <div className="xs faint mt-1">{t('orderPage.rateNoPressure')}</div>
-        </div>
+        <RateDeliveryPrompt
+          onRate={(stars) => {
+            rate(stars);
+            close();
+          }}
+          onLater={() => {
+            try { localStorage.setItem(laterKey, '1'); } catch {}
+            close();
+          }}
+        />
       ),
     });
   }, [data, isQuote, openSheet, toast, load, t]);

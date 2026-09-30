@@ -10,7 +10,7 @@
 import { Component, createContext, useCallback, useContext, useEffect, useRef, useState, type ErrorInfo, type ReactNode } from 'react';
 import { Icon } from './ui/Icon';
 import { siteName } from '../lib/config';
-import { useT } from '../i18n';
+import { useT, type Translator } from '../i18n';
 
 /* ---------------- Toasts ---------------- */
 type ToastKind = 'success' | 'error' | 'info' | 'warn';
@@ -43,14 +43,22 @@ function ToastView({ t: toast, onDone }: { t: Toast; onDone: () => void }) {
 }
 
 /* ---------------- Sheets ---------------- */
+
+/** A sheet heading: a ready string, or a resolver that translates at render
+ * time. The resolver exists because a sheet OUTLIVES the render pass that
+ * opened it: a caller that captured `t(...)` before the locale dictionary for
+ * the visitor's language had arrived would otherwise show that heading — and
+ * the dialog's accessible name — in the fallback language forever. */
+export type SheetTitle = string | ((t: Translator) => string);
+
 type SheetState = {
   id: number;
-  title: string;
+  title: SheetTitle;
   wide?: boolean;
   render: (close: () => void) => ReactNode;
 };
 type SheetCtx = {
-  openSheet: (opts: { title: string; wide?: boolean; render: SheetState['render'] }) => number;
+  openSheet: (opts: { title: SheetTitle; wide?: boolean; render: SheetState['render'] }) => number;
   closeSheet: (id?: number) => void;
 };
 const SheetContext = createContext<SheetCtx>({ openSheet: () => 0, closeSheet: () => {} });
@@ -117,7 +125,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500);
   }, []);
 
-  const openSheet = useCallback((opts: { title: string; wide?: boolean; render: SheetState['render'] }) => {
+  const openSheet = useCallback((opts: { title: SheetTitle; wide?: boolean; render: SheetState['render'] }) => {
     const id = ++sheetId.current;
     setSheets((prev) => [...prev, { id, title: opts.title, wide: opts.wide, render: opts.render }]);
     return id;
@@ -157,6 +165,10 @@ export function AppProviders({ children }: { children: ReactNode }) {
 
 function SheetView({ sheet, onClose, isTop }: { sheet: SheetState; onClose: () => void; isTop: boolean }) {
   const { t } = useT();
+  // Re-resolve the heading on every render, so a language change (or the
+  // arrival of the language's dictionary chunk) updates both the visible title
+  // and the dialog's accessible name.
+  const title = typeof sheet.title === 'function' ? sheet.title(t) : sheet.title;
   const dialogRef = useRef<HTMLDivElement>(null);
   const openerRef = useRef<HTMLElement | null>(typeof document === 'undefined' ? null : document.activeElement as HTMLElement);
   const closeRef = useRef(onClose);
@@ -211,11 +223,11 @@ function SheetView({ sheet, onClose, isTop }: { sheet: SheetState; onClose: () =
         className={`sheet${sheet.wide ? ' sheet-wide' : ''}`}
         role="dialog"
         aria-modal={isTop || undefined}
-        aria-label={sheet.title}
+        aria-label={title}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sheet-head">
-          <div className="strong">{sheet.title}</div>
+          <div className="strong">{title}</div>
           <button type="button" className="sheet-close" aria-label={t('actions.close')} onClick={onClose}>
             <Icon name="x" size={20} />
           </button>
