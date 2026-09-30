@@ -1,0 +1,22 @@
+# Default owner for everything in the repository.
+*                           @emrealt34
+
+# Money and identity paths: a silent mistake here is unrecoverable for a
+# customer, so they are called out explicitly for review.
+/backend/internal/db/         @emrealt34
+/backend/internal/auth/       @emrealt34
+/backend/internal/cashback/   @emrealt34
+/backend/internal/nimiq/      @emrealt34
+/backend/internal/cryptorefills/ @emrealt34
+/backend/internal/mailtrap/   @emrealt34
+/src/components/checkout/    @emrealt34
+/src/components/admin/       @emrealt34
+
+# Build, release and security automation.
+/.github/                     @emrealt34
+/scripts/                    @emrealt34
+/cli/                        @emrealt34
+/deploy/                     @emrealt34
+
+# Copy and translations: changes here are reviewed for wording, not just types.
+/src/i18n/locales/           @emrealt34

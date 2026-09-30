@@ -1,0 +1,71 @@
+name: PR triage
+
+# Keeps the pull-request queue readable and feeds the long test suite:
+# a change under the frontend or e2e tree automatically gets the `e2e`
+# label, which is what triggers tests.yml on a pull request.
+#
+# Runs on `pull_request` (not pull_request_target): labeler only reads the
+# changed-file list and writes labels, so it never needs the head branch or a
+# write token for the base repo's secrets. Fork and Dependabot pull requests
+# get a read-only token, so the jobs are skipped there explicitly (otherwise
+# the label write fails and paints every Dependabot PR red) — label them by
+# hand, they are not a security boundary.
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-triage-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  labeler:
+    name: Label changed areas
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository
+      && github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write # add labels to the pull request
+    steps:
+      - uses: actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13 # v7.0.0
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          # Never sync: `e2e` and `dependencies` are added elsewhere, and
+          # sync-labels would delete them again on the next push.
+          sync-labels: false
+
+  e2e:
+    name: Add `e2e` label for frontend changes
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository
+      && github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write # add labels to the pull request
+    steps:
+      - uses: actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13 # v7.0.0
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          sync-labels: false
+          # `include` is the action's newline-separated path list, not a YAML
+          # sequence: GitHub's workflow schema rejects a list under `with`.
+          include: |
+            src/**
+            public/**
+            tests/e2e/**
+            playwright.config.ts
+            astro.config.mjs
+            scripts/csp-inline.mjs
+            scripts/public-url.mjs
+            scripts/proxy.mjs
+          # Only the Playwright workflow itself decides whether a frontend
+          # change needs the long suite; a Go-only change must not pay for it.
+          pr-label: 'e2e'

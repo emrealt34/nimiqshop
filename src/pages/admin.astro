@@ -1,0 +1,7 @@
+---
+import BaseLayout from '../layouts/Base.astro';
+import { AdminPage } from '../components/admin/AdminPage';
+---
+<BaseLayout title="Operator console — shop.nimiqbase.com" activeKey="none">
+  <AdminPage client:only="react" />
+</BaseLayout>

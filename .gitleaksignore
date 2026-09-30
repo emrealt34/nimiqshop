@@ -1,0 +1,6 @@
+# gitleaks fingerprints (commit:file:rule:line) that are known non-secrets.
+# b7e5871 briefly carried a fixed, fake JWT secret in the Go integration
+# tests; the literal was replaced by a runtime-generated secret in 47938b8
+# and the string never protected anything. Kept here so full-history
+# (scheduled) scans stay green without rewriting history.
+b7e58711b26de2ce26414c81749aa51793f05955:backend/cmd/server/main_test.go:generic-api-key:615

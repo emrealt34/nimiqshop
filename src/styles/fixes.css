@@ -1,0 +1,3722 @@
+/* React island UI fixes: AppProviders uses these semantic class names. */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(62, 46, 26, .52);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: fade .2s ease;
+}
+.sheet-backdrop > .sheet {
+  width: min(560px, 100%);
+  max-height: min(88dvh, 860px);
+  border: 2px solid var(--line-strong);
+  border-radius: var(--r-xl);
+  animation: pop .2s ease;
+}
+.sheet-backdrop > .sheet.sheet-wide { width: min(720px, 100%); }
+.toast-stack {
+  position: fixed;
+  z-index: 1100;
+  left: 50%;
+  bottom: max(18px, calc(var(--sab) + 18px));
+  transform: translateX(-50%);
+  width: min(380px, calc(100vw - 28px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.toast-stack .toast {
+  width: 100%;
+  box-sizing: border-box;
+  pointer-events: auto;
+  padding: 9px 12px;
+  min-height: 0;
+  font-size: .88rem;
+}
+@media (max-width: 719px) {
+  .sheet-backdrop { padding: 12px; }
+  .sheet-backdrop > .sheet { max-height: 90dvh; }
+}
+
+/* ==========================================================================
+   Cashback & staking page — responsiveness
+   --------------------------------------------------------------------------
+   The page used inline flex-wrap everywhere, which only "worked" because the
+   icons happened to shrink. Real layout now lives here so every block has a
+   defined behaviour at 320px, 390px, 768px and up.
+   ========================================================================== */
+
+/* --- top bar: 5 tabs instead of 4 --------------------------------------- */
+.tabbar { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 1fr; }
+@media (max-width: 400px) { .tabbar a { font-size: .66rem; letter-spacing: 0; padding: 6px 2px; } }
+@media (max-width: 400px) { .tabbar a svg { width: 20px; height: 20px; } }
+
+/* --- headline rate card -------------------------------------------------- */
+/* Page title: responsive size so "Cashback & staking" stays on one line. */
+.cb-title {
+  font-family: var(--font-serif);
+  font-size: clamp(1.35rem, 1.05rem + 1.7vw, 2rem);
+  line-height: 1.16;
+  letter-spacing: -0.01em;
+}
+/* The v3 wallet block (address display) is gone — this page never shows a
+   wallet label or an address, so its grid rules were deleted with it. */
+.cb-rate { font-size: clamp(28px, 8vw, 34px); line-height: 1.1; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+
+/* --- amount + action rows ------------------------------------------------ */
+.cb-form-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.cb-form-row .input { flex: 1 1 120px; min-width: 0; width: auto; }
+.cb-form-row .cb-unit { flex: 0 0 auto; }
+.cb-form-row .btn { flex: 1 1 auto; min-width: 0; }
+@media (min-width: 640px) {
+  .cb-form-row .input { flex: 0 0 150px; }
+  .cb-form-row .btn { flex: 0 0 auto; }
+  .cb-form-row .btn.cb-primary { margin-left: auto; }
+}
+.cb-form-row .input.mono { flex: 1 1 220px; }
+.cb-tools-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.cb-tools-row .btn { flex: 1 1 auto; }
+@media (min-width: 640px) { .cb-tools-row .btn { flex: 0 0 auto; } }
+
+/* --- payout ledger rows --------------------------------------------------- */
+.cb-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 6px 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid var(--line, #e5e7eb);
+}
+@media (max-width: 480px) { .cb-row { grid-template-columns: auto minmax(0, 1fr); } .cb-row .cb-row-right { grid-column: 1 / -1; text-align: right; } }
+.cb-row .cb-row-main { min-width: 0; overflow-wrap: anywhere; }
+.cb-row .cb-row-right { text-align: right; min-width: 0; overflow-wrap: anywhere; }
+/* Monogram state — no logo / logo failed: the brand's initial in the tile's
+   serif face. Pure text, no image file to 404, never a white void. The letter
+   stays kraft-dark in BOTH themes because the tile itself is forced white in
+   both (see the baselined .thumb background). */
+/* ONE global placeholder for every tile that has no (loadable) logo: the bag
+   icon on the brand background — homepage look, applied everywhere. The icon
+   stays kraft-dark in BOTH themes because the tile itself is forced white in
+   both (see the baselined .thumb background). */
+.thumb-ph {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: #4E3D28;
+  opacity: 0.55;
+}
+/* dark brand backgrounds (Koton #181818, IKEA #055ba9): the icon flips to
+   white so it never vanishes into the tile colour. */
+.thumb-ph.on-dark { color: #FFFFFF; opacity: 0.8; }
+.thumb-ph svg {
+  width: 38%;
+  height: 38%;
+  min-width: 16px;
+  min-height: 16px;
+  max-width: 44px;
+  max-height: 44px;
+}
+/* The global unified thumb is width:100%!important by design (pixel-parity with
+   the homepage card), so every context MUST give it a sized track. Without one
+   the tile inflates to the grid column (the old ~1000x600 white slab). */
+.cb-thumb { width: 96px; min-width: 96px; }
+@media (max-width: 480px) { .cb-thumb { width: 72px; min-width: 72px; } }
+
+/* ---- "Hide out of stock" toggle: box it like the inputs and line it up. */
+label.oos-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 48px;
+  padding: 12px 14px;
+  margin: 0;
+  background: var(--surface-1);
+  border: 1.5px dashed var(--line-dash);
+  border-radius: var(--r-m);
+  color: var(--ink);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.55;
+  cursor: pointer;
+  /* Wrap, don't overflow: on a narrow toolbar the label is the widest item and
+     nowrap pushed "Out of stock hidden" past the card edge on small screens. */
+  white-space: normal;
+  max-width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
+}
+/* Icon and checkbox keep their size; only the text yields and wraps. */
+label.oos-toggle input[type="checkbox"], label.oos-toggle svg { flex-shrink: 0; }
+label.oos-toggle span { min-width: 0; overflow-wrap: anywhere; }
+label.oos-toggle:hover { border-color: var(--stamp); }
+label.oos-toggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--stamp);
+  cursor: pointer;
+}
+
+/* ---- Footer: real Code-128 barcode encoding nimiqbase.com (no text) ---- */
+.footer-barcode {
+  display: flex;
+  align-items: center;
+  color: #4e3d28; /* kraft bars in light; dark override below keeps them visible */
+}
+[data-theme="dark"] .footer-barcode { color: var(--ink-dim); }
+.footer-barcode img,
+.footer-barcode svg {
+  width: 132px;
+  height: auto;
+  display: block;
+}
+@media (min-width: 901px) {
+  .footer .container {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 22px;
+  }
+  .footer .container > span:first-child { text-align: left; } /* stretch (default): box = track, so long © text ellipsizes instead of shoving the barcode */
+  .footer .container .footer-barcode { justify-self: center; }
+  .footer .container .row { justify-self: end; }
+}
+/* early mobile footer grid removed — superseded by FOOTER FINAL FIX v2 at end of file */
+/* early 360 footer removed — superseded by final fix */
+
+/* ---- "Stake NIM…" staker line: clickable, wraps on narrow screens ---- */
+.staker-cb-link {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 5px 6px;
+  width: 100%;
+  margin-inline: auto;
+  text-align: center;
+  text-decoration: none;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.staker-cb-link:hover { text-decoration: underline; }
+.staker-cb-link svg { flex: none; }
+.staker-cb-link.muted { color: var(--ink-dim); }
+.staker-cb-link.muted:hover { color: var(--stamp); }
+
+/* ---- Nimiq Pay / small-screen native checkout ---- */
+html.in-nimiq-pay {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  touch-action: manipulation;
+}
+html.in-nimiq-pay,
+html.in-nimiq-pay body {
+  overscroll-behavior: none;
+}
+html.in-nimiq-pay input,
+html.in-nimiq-pay select,
+html.in-nimiq-pay textarea {
+  font-size: 16px !important;
+}
+html.in-nimiq-pay .mainnav { display: none; }
+/* Main nav must NEVER wrap onto a second line (long labels like "🌳 Plant
+   Trees" pushed rows down on mid-width screens). If it can't fit, it's hidden
+   in favour of the bottom tab bar rather than wrapping. */
+.mainnav{ flex-wrap: nowrap !important; }
+.mainnav a{ white-space: nowrap; }
+@media (max-width: 1199px){ .mainnav{ display: none !important; } }
+@media (min-width: 1200px){ .mainnav{ display: flex; flex-wrap: nowrap; } }
+html.in-nimiq-pay .kf-pkg { display: none; }
+html.in-nimiq-pay .hero h1 { font-size: clamp(1.35rem, 5vw, 1.8rem); }
+html.in-nimiq-pay .hero .lede { font-size: 0.95rem; }
+html.in-nimiq-pay .tabbar {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+html.in-nimiq-pay .footer {
+  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+}
+html.in-nimiq-pay #main.page {
+  padding-bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+}
+.how-strip {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin: 8px auto 14px;
+}
+.how-step {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  background: var(--surface-1, #fff);
+  border: 1.5px dashed var(--line-dash, #e5e7eb);
+  border-radius: 14px;
+  min-width: 0;
+}
+.how-n {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  background: var(--stamp, #c7481d);
+  color: #fff;
+  font-size: 0.85rem;
+}
+@media (min-width: 720px) {
+  .how-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+.come-back {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  border-radius: 14px;
+  border: 2px solid var(--line-strong);
+  background: var(--surface-1);
+  color: inherit;
+  text-decoration: none;
+}
+.come-back > svg { flex: 0 0 auto; }
+.come-back-txt { flex: 1 1 auto; min-width: 0; }
+.come-back-cta {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  font-weight: 800;
+  color: var(--stamp, #c7481d);
+  background: rgba(199, 72, 29, 0.1);
+  border: 1.5px solid rgba(199, 72, 29, 0.35);
+  padding: 6px 12px;
+  border-radius: 999px;
+}
+
+.pay-recap {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border: 1.5px dashed var(--line-dash, #e5e7eb);
+  border-radius: 12px;
+  display: grid;
+  gap: 8px;
+}
+.pay-recap > div {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+.pay-recap dt { margin: 0; font-size: 0.72rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-dim, #7a6a55); font-weight: 800; }
+
+/* Product page: back control must share the same column as the hero.
+   Left-aligning it on .container while .pd is max-width:820px centered
+   made Shop overlap the logo on ~900–1100px desktops. */
+.pd-back {
+  display: inline-flex !important;
+  align-items: center;
+  margin: 0 0 16px;
+  position: relative;
+  z-index: 2;
+}
+
+/* Category row: never wrap eSIMs onto a lonely second line.
+   Short labels (.seg-sm) kick in under 480px so four tabs fit. */
+.seg-sm { display: none; }
+.seg-lg { display: inline; }
+/* ===== GLOBAL SEG RESPONSIVENESS FIX =====
+   All .seg rows (home categories, orders filters, admin tabs, product tabs)
+   must never be cut on the right on mobile. They stay single-row, touch-scrollable,
+   with proper box-sizing and scroll snap. Short labels ensure 4 tabs fit at 320px. */
+.seg {
+  box-sizing: border-box !important;
+  max-width: 100% !important;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.seg::-webkit-scrollbar { display: none !important; }
+@media (max-width: 640px) {
+  .toolbar .seg,
+  .seg {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    scroll-snap-type: x proximity !important;
+    scroll-padding-inline: 6px !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  .seg button, .seg .seg-item {
+    flex: 0 0 auto !important;
+    min-width: max-content !important;
+    max-width: none !important;
+    padding: 8px 14px !important;
+    font-size: 0.7rem !important;
+    letter-spacing: 0.03em !important;
+    white-space: nowrap !important;
+    scroll-snap-align: start !important;
+    box-sizing: border-box !important;
+  }
+  /* Orders filters (5 tabs) need slightly tighter padding to hint scroll */
+  #filters.seg button, #filters .seg-item {
+    padding: 8px 12px !important;
+  }
+}
+@media (max-width: 480px) {
+  .seg-lg { display: none !important; }
+  .seg-sm { display: inline !important; }
+  .seg button, .seg .seg-item {
+    padding: 8px 10px !important;
+    font-size: 0.68rem !important;
+  }
+}
+@media (max-width: 380px) {
+  .seg button, .seg .seg-item {
+    padding: 7px 8px !important;
+    font-size: 0.64rem !important;
+    letter-spacing: 0.02em !important;
+  }
+}
+@media (max-width: 340px) {
+  .seg button, .seg .seg-item {
+    padding: 6px 7px !important;
+    font-size: 0.62rem !important;
+  }
+}
+
+.product-card .thumb .product-img { z-index: 1; }
+
+/* 320px first viewport: hero + 3 steps + come-back fully above the tab bar. */
+@media (max-width: 360px) {
+  .hero { padding-top: 8px; padding-bottom: 4px; }
+  .hero h1 { font-size: 1.18rem !important; margin-bottom: 6px; }
+  .hero .lede { font-size: 0.8rem; margin: 0 0 8px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .hero-actions { gap: 6px; }
+  .hero-actions .btn { min-height: 42px; padding: 8px 12px; font-size: 0.9rem; }
+  .how-strip { margin: 2px auto 6px; gap: 4px; }
+  .how-step { padding: 6px 4px; gap: 2px; }
+  .how-step .strong { font-size: 0.72rem; line-height: 1.2; }
+  .how-rest { display: none; }
+  .come-back { padding: 6px 8px; margin-bottom: 8px; font-size: 0.78rem; }
+  .come-back-cta { font-size: 0.78rem; }
+  .toolbar { margin: 8px 0 6px; }
+}
+.pd-top {
+  position: relative;
+  z-index: 0;
+  align-items: center !important;
+  clear: both;
+}
+.pay-recap dd { margin: 0; font-weight: 700; overflow-wrap: anywhere; }
+@media (max-width: 719px) {
+  .kf-pkg { display: none; }
+  .hero { padding-top: 14px; padding-bottom: 8px; }
+  .hero h1 { font-size: clamp(1.28rem, 6.2vw, 1.7rem); line-height: 1.18; margin-bottom: 8px; }
+  .hero h1 br { display: none; }
+  .hero .lede { font-size: 0.9rem; margin: 0 0 10px; }
+  .hero-actions { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
+  .hero-actions .btn { width: 100%; justify-content: center; min-height: 44px; }
+  .hero-cashback { display: none !important; }
+  .how-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 4px auto 10px; }
+  .how-step { flex-direction: column; align-items: center; text-align: center; padding: 8px 6px; gap: 4px; }
+  .how-step .small { display: none; }
+  .how-n { width: 22px; height: 22px; font-size: 0.75rem; }
+  .come-back { padding: 8px 10px; margin-bottom: 10px; font-size: 0.85rem; }
+  .come-back-txt { min-width: 0; }
+  .toolbar { margin: 10px 0 8px; }
+  .toolbar.filters { gap: 8px; }
+  .toolbar.filters .field { flex: 1 1 140px; min-width: 0; }
+  .toolbar.filters .input, .toolbar.filters .btn-country { max-width: none; width: 100%; }
+  label.oos-toggle { white-space: normal; width: 100%; min-height: 44px; padding: 8px 12px; font-size: 0.85rem; }
+  .grid.products { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .product-card { min-width: 0; }
+  .p-name { overflow-wrap: anywhere; }
+  .tabbar { min-height: 56px; padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .btn { min-height: 44px; }
+  .cart-btn, .acct-btn { min-width: 44px; min-height: 44px; }
+  .pd .row.mt-3 { flex-wrap: wrap; }
+  .pd .row.mt-3 .btn { min-width: 0; }
+  #main.page { padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
+  .come-back-cta { margin-left: 0; width: 100%; }
+  .sheet-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .sheet-backdrop > .sheet,
+  .sheet-backdrop > .sheet.sheet-wide {
+    width: 100%;
+    max-width: 100%;
+    border-radius: 18px 18px 0 0;
+    max-height: min(92dvh, calc(100dvh - env(safe-area-inset-top, 0px)));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .sheet-body {
+    -webkit-overflow-scrolling: touch;
+  }
+  input.input,
+  select.input,
+  textarea.input {
+    font-size: 16px;
+    min-height: 44px;
+  }
+  .btn.btn-lg,
+  .btn.btn-block {
+    min-height: 44px;
+  }
+}
+
+/* Cart: daily order limit reached — clear, on-brand note */
+.limit-reached { color: var(--stamp, #c7481d); font-weight: 800; }
+
+/* -------- Hero headline: stop it ballooning on tablet/desktop (web) --------
+ * --fs-hero keys off the full viewport width (1.5rem + 3.4vw), but on
+ * two-column layouts the hero text only gets a ~450-630px column. The old
+ * scale kept 50-56px serif type there, wrapping the whole headline into 5-6
+ * huge lines. Size it to the column so it stays a compact poster, not a wall
+ * of giant text. */
+@media (min-width: 720px) and (max-width: 899px) {
+  .hero h1 {
+    font-size: clamp(1.95rem, 1.35rem + 2.1vw, 2.5rem);
+    line-height: 1.14;
+    margin-bottom: 12px;
+  }
+}
+@media (min-width: 900px) {
+  .hero h1 {
+    font-size: clamp(1.9rem, 1.3rem + 1.6vw, 2.5rem);
+    line-height: 1.15;
+    margin-bottom: 12px;
+  }
+}
+
+/* ================= Promo-code card: collapsed-by-default accordion ========= */
+/* Smooth open/close: a grid-row 0fr->1fr transition, so both expanding AND
+   folding animate (height + fade) instead of popping on/off. */
+.promo-body {
+  margin: 0;
+  display: grid;
+  grid-template-rows: 0fr;
+  overflow: hidden;
+  visibility: hidden;
+  transition: grid-template-rows 0.32s cubic-bezier(0.3, 0.75, 0.25, 1),
+              visibility 0s linear 0.32s;
+}
+.promo-body[data-open="true"] {
+  grid-template-rows: 1fr;
+  visibility: visible;
+  transition: grid-template-rows 0.32s cubic-bezier(0.3, 0.75, 0.25, 1),
+              visibility 0s;
+}
+.promo-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+.promo-body[data-open="true"] .promo-inner {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1.5px dashed var(--line-dash, rgba(78, 61, 40, 0.4));
+}
+.promo-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 4px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--ink, #4e3d28);
+  font: inherit;
+  cursor: pointer;
+  border-radius: var(--r-m, 10px);
+}
+.promo-trigger:hover .promo-title { color: var(--stamp, #c7481d); }
+.promo-ico {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-s, 6px);
+  background: var(--stamp-soft, rgba(199, 72, 29, 0.12));
+  color: var(--stamp, #c7481d);
+}
+.promo-main {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.promo-title {
+  font-weight: 900;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-dim, #7c6a4e);
+  transition: color 0.12s ease;
+}
+.promo-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--green-600, #2f5540);
+  min-width: 0;
+}
+.promo-summary span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.promo-summary svg { flex: none; }
+.promo-hint { color: var(--ink-faint, #9b8763); font-weight: 600; }
+.promo-chip { flex: none; }
+.promo-plus {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2, #efe4c6);
+  border: 1.5px solid var(--line-strong, #4e3d28);
+  color: var(--ink-dim, #7c6a4e);
+}
+.promo-caret {
+  flex: none;
+  display: grid;
+  place-items: center;
+  color: var(--ink-dim, #7c6a4e);
+  transition: transform 0.18s ease;
+}
+.promo-trigger[aria-expanded="true"] .promo-caret { transform: rotate(180deg); }
+
+/* ---- page hero ---- */
+.support-hero { display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; margin:6px 0 18px; }
+.support-hero-main { display:flex; align-items:center; gap:12px; min-width:0; }
+.sup-ico { flex:none; width:46px; height:46px; border-radius:14px; display:grid; place-items:center;
+  background:var(--surface-2); border:2px solid var(--line-strong); color:var(--stamp);
+  box-shadow:3px 3px 0 rgba(78,61,40,.18); }
+.support-title { font-family:var(--font-serif); font-weight:900; letter-spacing:-.01em; margin:0; font-size:clamp(1.4rem,3vw,1.9rem); }
+.sup-chips { display:flex; gap:8px; flex-wrap:wrap; }
+.sup-chips .chip { border:1.5px solid var(--line-strong); background:var(--surface-1); color:var(--ink); font-weight:800; }
+
+/* ---- ticket list cards ---- */
+.ticket-card { display:flex; align-items:center; gap:14px; text-decoration:none; color:inherit;
+  border:2px solid var(--line-strong); border-radius:var(--r-l); background:var(--surface-1);
+  padding:14px 16px; box-shadow:3px 3px 0 rgba(78,61,40,.16); transition:transform .12s var(--ease), box-shadow .12s var(--ease); }
+.ticket-card:hover { transform:translate(-1px,-1px); box-shadow:5px 5px 0 rgba(78,61,40,.22); }
+.ticket-card.unread { border-style:solid; box-shadow:4px 4px 0 rgba(214,158,46,.4); }
+.ticket-ico { flex:none; width:42px; height:42px; border-radius:12px; display:grid; place-items:center;
+  background:var(--surface-2); border:2px solid var(--line-dash); color:var(--stamp); }
+.ticket-card.unread .ticket-ico { background:var(--stamp); border-color:var(--stamp); color:#FFF3DF; }
+.t-subject { font-weight:900; font-size:1rem; color:var(--ink); }
+.t-snip { color:var(--ink-faint); font-size:var(--fs-xs); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:3px; }
+.t-meta { display:flex; flex-direction:column; align-items:flex-end; gap:5px; flex-shrink:0; }
+.t-time { white-space:nowrap; }
+
+/* ---- conversation shell ---- */
+.convo-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.chat-window { max-height:56vh; overflow-y:auto; scroll-behavior:smooth; scrollbar-width:thin;
+  padding:18px 14px; background:
+    radial-gradient(circle at 12px 14px, var(--paper-dot) 2px, transparent 2.4px) 0 0/22px 22px,
+    linear-gradient(var(--paper-1), var(--paper-2));
+  border:2px solid var(--line-strong); border-radius:var(--r-l); position:relative; }
+.ticket-legend { display:flex; gap:6px; flex-wrap:wrap; margin:6px 0 0; padding:8px 10px; background:var(--surface-1);
+  border:1.5px dashed var(--line-dash); border-radius:var(--r-m); }
+.legend-step { font-size:.7rem; font-weight:800; color:var(--ink-faint); display:inline-flex; align-items:center; gap:5px; }
+.legend-step:not(:last-child)::after { content:"→"; color:var(--line-dash); font-weight:900; }
+.legend-step.active { color:var(--stamp); text-decoration:underline; text-underline-offset:3px; text-decoration-thickness:2px; }
+
+/* ---- message rows ---- */
+.msg { display:flex; gap:10px; align-items:flex-start; margin-bottom:16px; }
+.msg:last-child { margin-bottom:0; }
+.msg-out { flex-direction:row-reverse; }
+.msg-ava { flex:none; width:34px; height:34px; border-radius:50%; display:grid; place-items:center;
+  overflow:hidden; border:2px solid var(--line-strong); box-shadow:2px 2px 0 rgba(78,61,40,.15); background:var(--surface-2); }
+.msg-ava-staff { background:var(--surface-2); color:var(--stamp-ink); }
+.msg-ava-you { background:var(--surface-2); }
+.msg-ava-img { width:100%; height:100%; display:block; }
+.msg-body { min-width:0; max-width:min(80%,540px); display:flex; flex-direction:column; gap:3px; }
+.msg-out .msg-body { align-items:flex-end; }
+.msg-who { display:inline-flex; align-items:center; gap:6px; font-size:.66rem; font-weight:900;
+  letter-spacing:.09em; text-transform:uppercase; color:var(--ink-dim); padding:0 2px; }
+.msg-staff { font-size:.56rem; background:var(--stamp); color:#FFF3DF; border-radius:var(--pill);
+  padding:1.5px 7px; letter-spacing:.08em; }
+.msg-bubble { white-space:pre-wrap; word-break:break-word; overflow-wrap:anywhere; line-height:1.5;
+  padding:9px 13px; font-size:var(--fs-sm); font-weight:600; color:var(--ink);
+  border:2px solid var(--line-strong); }
+.msg-bubble.in { background:var(--surface-1); border-radius:4px 14px 14px 14px; box-shadow:3px 3px 0 rgba(78,61,40,.14); }
+.msg-bubble.out { background:var(--stamp-soft); border-color:var(--stamp); color:var(--ink-on-stamp-soft);
+  border-radius:14px 4px 14px 14px; box-shadow:3px 3px 0 rgba(199,72,29,.16); }
+.msg-time { font-size:.64rem; font-weight:800; color:var(--ink-faint); padding:0 3px; }
+.day-chip { align-self:center; margin:6px auto 14px; padding:3px 12px; background:var(--surface-1);
+  border:1.5px solid var(--line-strong); border-radius:var(--pill); font-weight:900;
+  letter-spacing:.07em; text-transform:uppercase; font-size:10px; width:fit-content; color:var(--ink-dim);
+  box-shadow:2px 2px 0 rgba(78,61,40,.12); }
+
+/* ---- waiting / info banners inside conversation ---- */
+.waiting-banner { border-style:solid; }
+.ticket-actions { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-top:12px; }
+.resolve-guard { margin-top:12px; padding:12px 14px; background:var(--orange-soft); border:2px dashed var(--stamp);
+  border-radius:var(--r-m); }
+.resolve-guard p { margin:0 0 10px; font-size:.85rem; font-weight:700; color:var(--ink-on-orange-deep); }
+.resolved-card { margin-top:12px; display:flex; gap:12px; align-items:center; background:var(--green-soft);
+  border:2px solid var(--green); border-radius:var(--r-m); padding:12px 14px; color:var(--ink-on-green); }
+.resolved-card .strong { font-size:.9rem; }
+.resolved-card svg { color:var(--green); flex-shrink:0; }
+
+/* ---- composer ---- */
+.composer { border:2px solid var(--line-strong); border-radius:var(--r-l); padding:10px;
+  background:var(--surface-1); box-shadow:3px 3px 0 rgba(78,61,40,.16); }
+.composer .composer-input { border:none; background:transparent; min-height:44px; }
+.composer .composer-send { box-shadow:2px 2px 0 rgba(78,61,40,.2); }
+
+/* ---- admin support panel ---- */
+.asup-toolbar { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+.asup-filters { display:flex; gap:6px; flex-wrap:wrap; }
+.asup-filters .btn { border:1.5px dashed var(--line-dash); }
+.asup-filters .btn.on { background:var(--ink); border-style:solid; border-color:var(--ink); color:#FFF6E8; }
+.asup-list { display:flex; flex-direction:column; gap:10px; }
+.asup-card { display:flex; align-items:center; gap:12px; border:2px solid var(--line-strong); background:var(--surface-1);
+  border-radius:var(--r-l); padding:11px 13px; cursor:pointer; text-align:left; width:100%;
+  font:inherit; color:inherit; box-shadow:2px 2px 0 rgba(78,61,40,.14); transition:transform .1s var(--ease); }
+.asup-card:hover { transform:translateY(-1px); }
+.asup-card.selected { border-color:var(--stamp); box-shadow:0 0 0 3px rgba(199,72,29,.16); }
+.asup-subject { font-weight:900; }
+.asup-snip { color:var(--ink-faint); font-size:var(--fs-xs); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
+.asup-meta { display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex-shrink:0; }
+.asup-badge { font-size:.58rem; font-weight:900; letter-spacing:.06em; text-transform:uppercase;
+  padding:2px 7px; border-radius:var(--pill); background:var(--surface-2); border:1px solid var(--line-dash); color:var(--ink-dim); }
+.asup-empty { text-align:center; padding:22px 10px; color:var(--ink-faint); font-size:var(--fs-sm); }
+.asup-detail { border:2px solid var(--line-strong); border-radius:var(--r-l); overflow:hidden;
+  background:var(--surface-1); box-shadow:3px 3px 0 rgba(78,61,40,.16); }
+.asup-detail-head { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
+  padding:12px 14px; background:var(--surface-2); border-bottom:2px solid var(--line-strong); }
+.asup-chat { max-height:46vh; overflow-y:auto; padding:16px 12px; background:var(--surface-1); scrollbar-width:thin; }
+.asup-chat .msg-bubble.in { background:#FBF4DE; }
+.asup-reply { border-top:2px solid var(--line-strong); padding:10px 12px; }
+.asup-reply-row { display:flex; gap:8px; align-items:stretch; flex-wrap:wrap; }
+.asup-reply-row textarea { flex:1 1 300px; min-height:64px; }
+.asup-reply-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.asup-status-sel { border:1.5px solid var(--line-strong); background:var(--surface-1); border-radius:var(--r-m);
+  padding:6px 8px; font:inherit; font-size:.8rem; font-weight:800; color:var(--ink); }
+.asup-who { font-size:.6rem; font-weight:900; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint); }
+.asup-addr { font-family:var(--font-mono); font-size:.72rem; color:var(--ink-dim); }
+
+@media (max-width:640px) {
+  .msg-body { max-width:86%; }
+  .ticket-card { gap:10px; padding:11px 12px; }
+  .t-meta { align-items:flex-start; }
+  .ticket-card { flex-wrap:wrap; }
+  .ticket-card > .btn-ico, .ticket-card > svg { display:none; }
+  .convo-head { flex-direction:column; }
+}
+
+.linklike { background:none; border:none; padding:0; margin:0; font:inherit; color:var(--stamp-ink);
+  text-decoration:underline; text-underline-offset:2px; cursor:pointer; font-weight:800; }
+.linklike:hover { color:var(--stamp-ink-hover); }
+
+/* ---- admin: players / cashback queue / customer list / activity ---- */
+.astat-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(128px, 1fr)); gap:10px; margin-top:10px; }
+.astat { border:2px solid var(--line-strong); border-radius:var(--r-m); background:var(--surface-1);
+  padding:10px 12px; box-shadow:2px 2px 0 rgba(78,61,40,.12); min-width:0; }
+.astat-label { font-size:.6rem; font-weight:900; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-faint);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.astat-value { font-size:1.55rem; font-weight:900; line-height:1.15; margin-top:2px; font-variant-numeric:tabular-nums; }
+.astat-hint { font-size:.66rem; font-weight:700; color:var(--ink-dim); margin-top:2px; }
+
+.ausr-list { display:flex; flex-direction:column; gap:8px; }
+.ausr-row { display:flex; align-items:center; gap:10px; width:100%; text-align:left; font:inherit; color:inherit;
+  border:2px solid var(--line-strong); background:var(--surface-1); border-radius:var(--r-l); padding:9px 11px;
+  cursor:pointer; box-shadow:2px 2px 0 rgba(78,61,40,.12); transition:transform .1s var(--ease); }
+.ausr-row:hover { transform:translateY(-1px); border-color:var(--stamp); }
+.ausr-ava { width:30px; height:30px; border-radius:50%; flex:0 0 auto; }
+.ausr-main { display:flex; flex-direction:column; min-width:0; flex:1 1 auto; }
+.ausr-addr { font-size:.82rem; font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ausr-sub { font-size:.66rem; font-weight:700; color:var(--ink-faint); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ausr-metrics { display:grid; grid-template-columns:repeat(4, minmax(52px, auto)); gap:8px; flex:0 0 auto; }
+.ausr-metric { display:flex; flex-direction:column; align-items:flex-end; line-height:1.1; }
+.ausr-metric b { font-size:.82rem; font-weight:900; font-variant-numeric:tabular-nums; }
+.ausr-metric i { font-style:normal; font-size:.58rem; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-faint); }
+.ausr-sorts .btn { white-space:nowrap; }
+
+.atl { list-style:none; margin:8px 0 0; padding:0 0 0 2px; }
+.atl-row { display:grid; grid-template-columns:46px 24px 1fr; gap:8px; align-items:start;
+  padding:7px 0; border-bottom:1px dashed rgba(78,61,40,.16); }
+.atl-row:last-child { border-bottom:0; }
+.atl-time { font-size:.68rem; font-weight:800; color:var(--ink-dim); padding-top:3px; }
+.atl-dot { display:flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%;
+  border:1.5px solid var(--line-strong); background:var(--surface-2); color:var(--ink-dim); }
+.atl-row.tone-good .atl-dot { border-color:var(--green); color:var(--green-ink); background:rgba(31,122,74,.08); }
+.atl-row.tone-stamp .atl-dot { border-color:var(--stamp); color:var(--stamp-ink); background:rgba(199,72,29,.08); }
+.atl-row.tone-bad .atl-dot { border-color:var(--red); color:var(--red-ink); background:rgba(190,42,32,.08); }
+.atl-row.tone-warn .atl-dot { border-color:#B8860B; color:var(--ink-on-warn-gold); background:rgba(184,134,11,.10); }
+.atl-row.tone-faint .atl-dot { opacity:.55; }
+.atl-body { display:flex; flex-direction:column; min-width:0; }
+.atl-label { font-size:.82rem; font-weight:900; }
+.atl-detail { font-size:.72rem; font-weight:700; color:var(--ink-dim); overflow-wrap:anywhere; }
+.atl-meta { font-size:.62rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase; color:var(--ink-faint);
+  overflow-wrap:anywhere; }
+
+@media (max-width:560px) {
+  .astat-grid { grid-template-columns:repeat(2, minmax(0,1fr)); }
+  .ausr-row { flex-wrap:wrap; }
+  .ausr-metrics { grid-template-columns:repeat(4, minmax(0,1fr)); width:100%; gap:4px; }
+  .ausr-metric { align-items:flex-start; }
+  .ausr-metric b { font-size:.76rem; }
+  .ausr-row > svg:last-child { display:none; }
+  .atl-row { grid-template-columns:40px 22px 1fr; }
+}
+@media (min-width:561px) and (max-width:1023px) {
+  .astat-grid { grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); }
+}
+
+/* --- cashback page v3: hero + steps + calculator --------------------------- */
+.cb-hero {
+  display: grid; gap: 18px; grid-template-columns: 1fr; align-items: center;
+  padding: 18px 20px; border: 1px solid var(--line-dash);
+  background: linear-gradient(135deg, var(--surface-1), var(--hero-wash));
+  box-shadow: 0 5px 18px rgba(78,61,40,.06);
+}
+@media (min-width: 720px) {
+  .cb-hero { grid-template-columns: minmax(0, 1.2fr) minmax(260px, .8fr) auto; }
+  .cb-hero .cb-hero-cta { grid-column: 3; justify-self: end; }
+}
+.cb-hero-main { min-width: 0; }
+.cb-hero .cb-rate { display: flex; align-items: center; gap: 9px; margin-top: 3px; color: var(--green, #2f5540); font-size: clamp(2rem, 6vw, 3rem); line-height: 1; }
+.cb-hero .cb-rate .chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; line-height: 1.2; }
+.cb-hero-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 11px 0; border-top: 1px solid var(--line-dash); border-bottom: 1px solid var(--line-dash); }
+.cb-hero-stats > div { min-width: 0; }
+.cb-hero-stats .strong { display: flex; align-items: center; gap: 4px; font-size: clamp(14px, 3.5vw, 18px); white-space: nowrap; }
+.cb-hero-stats .nim-unit { display: inline-flex; align-items: center; gap: 3px; }
+.cb-hero-cta .btn { width: auto; white-space: nowrap; }
+@media (max-width: 719px) { .cb-hero-cta .btn { width: 100%; } }
+@media (max-width: 480px) { .cb-hero { padding: 16px; gap: 14px; } .cb-hero-stats { gap: 6px; } .cb-hero-stats .strong { font-size: 14px; } }
+
+.cb-steps { display: grid; gap: 10px; grid-template-columns: 1fr; }
+@media (min-width: 640px) { .cb-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.cb-step {
+  display: flex; gap: 10px; align-items: flex-start;
+  background: var(--surface-1); border: 1.5px dashed var(--line-dash); border-radius: var(--r-l);
+  padding: 12px 14px; min-width: 0;
+}
+.cb-step-n {
+  flex: 0 0 26px; width: 26px; height: 26px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--stamp); color: var(--on-stamp); font-weight: 900; font-size: 13px;
+}
+
+/* calculator */
+.cb-calc-inputs { display: grid; gap: 16px; grid-template-columns: 1fr; }
+@media (min-width: 720px) { .cb-calc-inputs { grid-template-columns: 1fr 1fr; gap: 20px; } }
+.cb-slider { display: block; min-width: 0; }
+.cb-slider input[type="range"] { width: 100%; margin: 10px 0 6px; display: block; }
+.cb-slider-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.cb-slider-val { display: inline-flex; align-items: baseline; gap: 6px; font-size: clamp(18px, 4.5vw, 22px); font-weight: 800; }
+.cb-slider-input {
+  width: 9ch; max-width: 40vw; background: transparent; border: 0; border-bottom: 1.5px dashed var(--line-dash);
+  color: var(--ink); font: inherit; font-weight: 800; text-align: right; padding: 0 2px;
+}
+.cb-slider-input:focus { outline: none; border-bottom-color: var(--stamp); }
+.cb-slider-foot { display: flex; justify-content: space-between; gap: 8px; }
+.cb-slider-foot > :nth-child(2) { text-align: center; flex: 1; }
+
+.cb-calc-picks { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 14px; }
+.cb-seg { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.cb-seg-label { margin-right: 2px; }
+.cb-seg-btn {
+  background: var(--surface-2); border: 1.5px dashed var(--line-dash); border-radius: var(--pill);
+  padding: 6px 12px; font-size: var(--fs-xs); font-weight: 800; color: var(--ink-dim); cursor: pointer; min-height: 32px;
+}
+.cb-seg-btn small { font-weight: 600; opacity: 0.8; }
+.cb-seg-btn.on { background: var(--stamp-soft); border-style: solid; border-color: var(--stamp); color: var(--stamp-600); }
+.cb-seg-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.cb-calc-out { display: grid; gap: 10px; grid-template-columns: 1fr; }
+@media (min-width: 640px) { .cb-calc-out { grid-template-columns: 1.2fr 1fr; } }
+.cb-calc-main {
+  background: var(--stamp-soft); border: 1.5px solid var(--stamp); border-radius: var(--r-l); padding: 14px 16px; min-width: 0;
+}
+.cb-calc-main.alt { background: var(--green-soft); border-color: var(--green); }
+.cb-calc-big {
+  font-family: var(--font-serif); font-weight: 900; letter-spacing: -0.01em; line-height: 1.1;
+  font-size: clamp(26px, 7vw, 36px); color: var(--stamp); margin: 2px 0 4px; overflow-wrap: anywhere;
+}
+.cb-calc-main.alt .cb-calc-big { color: var(--green-600); }
+.cb-calc-big small { font-family: var(--font); font-size: 0.42em; font-weight: 700; color: var(--ink-dim); letter-spacing: 0; }
+.cb-calc-kv dt { font-weight: 600; }
+
+/* collapsible blocks */
+.cb-details { border: 1.5px dashed var(--line-dash); border-radius: var(--r-m); padding: 10px 14px; background: var(--surface-2); }
+.cb-details > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; }
+.cb-details > summary::-webkit-details-marker { display: none; }
+.cb-details > summary::after { content: '+'; margin-left: auto; font-weight: 900; color: var(--ink-faint); }
+.cb-details[open] > summary::after { content: '–'; }
+.cb-details .btn { width: auto; }
+.cb-fineprint { background: transparent; }
+
+/* --- cashback page v4: all-NIM, staker-base rule, paged payouts ------------ */
+/* The NIM word, branded: hexagon logo + "NIM" as one unbreakable unit. */
+.nim-unit { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.nim-unit svg, .nim-unit img { flex: none; }
+.nim-unit.small { gap: 3px; }
+.cb-toggle {
+  display: inline-flex; align-items: center; gap: 8px; flex: none;
+  border: 1.5px dashed var(--line-dash); border-radius: 999px; background: var(--surface-2);
+  padding: 6px 12px 6px 6px; font: inherit; font-size: 12px; font-weight: 700; color: var(--muted); cursor: pointer;
+  white-space: nowrap;
+}
+.cb-toggle.wide { width: 100%; justify-content: flex-start; margin-bottom: 14px; }
+.cb-toggle.on { color: var(--green); border-style: solid; border-color: var(--green); }
+.cb-toggle-knob { width: 26px; height: 16px; border-radius: 999px; background: var(--line-dash); position: relative; flex: none; }
+.cb-toggle-knob::after { content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #fff; transition: left .15s; }
+.cb-toggle.on .cb-toggle-knob { background: var(--green); }
+.cb-toggle.on .cb-toggle-knob::after { left: 12px; }
+.cb-slider.off input[type="range"] { opacity: .45; }
+.cb-calc-main.zero .cb-calc-big { color: var(--muted); }
+.cb-seg-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+.cb-payouts-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.cb-payouts-head > span:first-child { display: inline-flex; align-items: center; gap: 6px; }
+.cb-row-title { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.cb-row-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.cb-rate-chip { font-size: 11px; flex: none; }
+.pager { display: flex; justify-content: center; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pager .btn { flex: 0 0 auto; min-height: 38px; padding: 6px 12px; }
+.pager .btn.pager-num { min-width: 38px; justify-content: center; }
+.pager .btn.pager-num.active { background: var(--stamp); color: var(--on-stamp); border-color: var(--stamp); box-shadow: none; cursor: default; }
+.pager .pager-gap { color: var(--ink-dim); padding: 0 2px; }
+
+/* responsiveness: nothing on this page may push the viewport wider */
+.cb-hero, .cb-calc, .cb-steps, .cb-row { max-width: 100%; }
+.cb-hero-main, .cb-hero-stats > div { min-width: 0; overflow-wrap: anywhere; }
+.cb-rate { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: clamp(30px, 8vw, 40px); line-height: 1.1; }
+.cb-slider-input { max-width: 8ch; }
+.cb-calc-kv dt { min-width: 0; overflow-wrap: anywhere; }
+.cb-calc-kv dd { white-space: nowrap; }
+/* Desktop: keep the stake amount + action together instead of pinning the
+   button to the card's far edge. */
+@media (min-width: 640px) {
+  #cb-stake-form .cb-form-row { max-width: 440px; }
+  #cb-stake-form .cb-form-row .btn.cb-primary { margin-left: 0; }
+}
+@media (max-width: 480px) {
+  .cb-hero-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .cb-hero-stats .strong { font-size: 14px; }
+  .cb-form-row .cb-primary { width: 100%; }
+  .pager { justify-content: flex-start; }
+  .pager .btn.pager-prev, .pager .btn.pager-next { flex: 1 1 40%; justify-content: center; }
+  .pager .btn.pager-num { flex: 0 0 auto; }
+}
+
+/* ==========================================================================
+   Plant Trees page — theme-consistent (kraft/paper) + fully responsive.
+   Mobile-first. Mirrors the site's tokens; no horizontal overflow anywhere.
+   ========================================================================== */
+.pt-page{ display:flex; flex-direction:column; gap:clamp(14px,2vw,20px);
+  padding:clamp(12px,2vw,22px) 0 64px; min-width:0 }
+/* NOTE: no `width` here — .pt-page is a .container (width:var(--container)),
+   so removing the width override restores the site's centred, capped width
+   (max ~1160px) instead of stretching full-bleed on desktop. */
+
+/* ---- generic panel + text helpers ---- */
+.pt-card,.pt-hero,.pt-share-card,.pt-settlement,.pt-impact,.pt-partner,
+.note-box.pt-note,.pt-yourank{ width:100%; max-width:100%; min-width:0 }
+.pt-icon-inline{ display:inline-flex; align-items:center; gap:6px; vertical-align:middle; min-width:0 }
+.pt-icon-inline svg{ flex:0 0 auto }
+
+/* ---- page header / hero ---- */
+.pt-hero{ background:linear-gradient(180deg,var(--green-soft),transparent 60%),var(--surface-1);
+  border:1.5px dashed var(--line-dash); border-radius:var(--r-l);
+  padding:clamp(16px,3vw,26px); display:grid; grid-template-columns:1fr; gap:clamp(16px,2.5vw,22px);
+  align-items:center }
+@media (min-width:840px){ .pt-hero{ grid-template-columns:minmax(0,1.55fr) minmax(0,0.9fr) } }
+.pt-hero-main{ display:flex; flex-direction:column; gap:10px; min-width:0 }
+.pt-eyebrow{ display:flex; align-items:center; gap:8px; font-size:var(--fs-xs); font-weight:900;
+  letter-spacing:.16em; text-transform:uppercase; color:var(--green); flex-wrap:wrap; line-height:1.4 }
+.pt-title{ margin:0; font-size:clamp(1.7rem,1.35rem+1.6vw,2.5rem); line-height:1.08;
+  letter-spacing:-.01em; overflow-wrap:anywhere }
+.pt-lead{ color:var(--ink-dim); margin:0; max-width:70ch; overflow-wrap:anywhere }
+.pt-chips{ display:flex; flex-wrap:wrap; gap:8px; min-width:0; max-width:100% }
+.pt-chip{ background:var(--green-soft); color:var(--green-600); border-color:rgba(62,107,79,.4);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.35; min-width:0; max-width:100%; flex:0 1 auto; display:inline-flex; align-items:center; gap:6px }
+@media (max-width:420px){ .pt-chip{ font-size:var(--fs-xs); padding:4px 10px } .pt-chip svg{ width:13px;height:13px } }
+.pt-hero-actions{ display:flex; flex-wrap:wrap; gap:8px; margin-top:2px }
+.pt-hero-actions .btn{ flex:0 1 auto; min-width:0 }
+
+/* Partner lockup: left column = the pitch, right column = the OneTreePlanted
+   card, stretched over the full height of the hero. On phones the hero is a
+   single column and the partner block moves to the TOP (order:-1) as its own
+   block, instead of trailing the share button. */
+.pt-hero-side{ display:flex; flex-direction:column; gap:14px; min-width:0; align-self:stretch }
+.pt-partner{ flex:1 1 auto; background:var(--surface-1); border:1.5px dashed var(--line-dash); border-radius:var(--r-l);
+  padding:clamp(14px,2vw,20px); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px;
+  box-shadow:var(--shadow-1); text-align:center; min-width:0 }
+.pt-partner img{ max-width:100%; height:auto; width:min(100%,320px); display:block }
+.pt-partner-cap{ font-size:10px; letter-spacing:.14em; text-transform:uppercase; font-weight:900;
+  color:var(--ink-faint); display:inline-flex; align-items:center; gap:4px }
+@media (max-width:839.98px){
+  .pt-hero-side{ order:-1 }
+  .pt-partner{ padding:12px 14px; gap:6px }
+  .pt-partner img{ width:min(100%,215px) }
+}
+
+.pt-hero-tree{ display:flex; align-items:center; gap:14px; padding:clamp(14px,2.5vw,20px);
+  border:1.5px dashed rgba(62,107,79,.42); border-radius:var(--r-l); background:var(--surface-1);
+  min-width:0; box-shadow:none }
+.pt-hero-tree-val{ width:100%; min-width:0; display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center }
+.pt-tree-count{ font-family:var(--font-serif); font-weight:900; font-size:clamp(2rem,1.5rem+2.4vw,3rem);
+  line-height:1; color:var(--green-600) }
+
+/* ---- global totals ---- */
+.pt-stats{ display:grid; gap:12px; grid-template-columns:repeat(2,minmax(0,1fr)) }
+@media (min-width:620px){ .pt-stats{ grid-template-columns:repeat(4,minmax(0,1fr)) } }
+.pt-stat{ background:var(--surface-1); border:1.5px dashed var(--line-dash); border-radius:var(--r-l);
+  padding:clamp(12px,2vw,18px); text-align:center; display:flex; flex-direction:column;
+  align-items:center; gap:5px; min-width:0 }
+.pt-stat-ico{ width:44px; height:44px; border-radius:12px; display:grid; place-items:center;
+  background:var(--green-soft); color:var(--green-600); flex:0 0 auto }
+.pt-stat-ico svg{ width:22px; height:22px }
+@media (max-width:420px){ .pt-stat-ico{ width:38px;height:38px } .pt-stat-ico svg{ width:19px;height:19px } }
+.pt-stat-num{ font-family:var(--font-serif); font-weight:900; font-size:clamp(1.25rem,1.05rem+1.2vw,1.7rem);
+  color:var(--ink); line-height:1.1; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.pt-stat-label{ font-size:var(--fs-xs); color:var(--ink-dim); font-weight:700; line-height:1.3 }
+
+/* ---- generic card head ---- */
+.pt-card{ background:var(--surface-1); border:1.5px dashed var(--line-dash); border-radius:var(--r-l);
+  padding:clamp(14px,2.4vw,22px) }
+.pt-card-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px 12px;
+  flex-wrap:wrap; margin-bottom:14px }
+.pt-section-title{ margin:0; font-size:clamp(1.1rem,1rem+.5vw,1.4rem); display:inline-flex;
+  align-items:center; gap:8px; flex-wrap:wrap; line-height:1.2; overflow-wrap:anywhere; min-width:0 }
+.pt-card-head .pt-seg{ display:inline-flex; gap:6px; flex-wrap:wrap; flex:0 1 auto; min-width:0 }
+.pt-seg .btn{ white-space:nowrap }
+@media (max-width:560px){ .pt-card-head .pt-seg{ width:100% } .pt-card-head .pt-seg .btn{ flex:1 1 auto; justify-content:center } }
+.pt-sub{ margin:0; color:var(--ink-dim); font-size:var(--fs-sm); line-height:1.5 }
+
+/* ---- personal impact card ---- */
+.pt-impact{ background:linear-gradient(180deg,var(--green-soft),transparent 85%),var(--surface-1);
+  border:1.5px dashed rgba(62,107,79,.42) }
+.pt-impact-head{ display:flex; gap:clamp(12px,2vw,18px); align-items:flex-start; min-width:0; width:100% }
+.pt-avatar{ flex:0 0 auto; width:56px; height:56px }
+.pt-avatar .pt-ident-lg{ width:56px; height:56px; border-radius:14px }
+.pt-avatar .pt-icon-dot{ width:56px; height:56px; border-radius:14px }
+.pt-icon-dot{ display:grid; place-items:center; background:var(--green-soft); color:var(--green-600) }
+.pt-impact-info{ flex:1 1 auto; min-width:0 }
+.pt-big-number{ font-size:clamp(1.5rem,1.3rem+1.2vw,2rem); line-height:1.12; color:var(--green-600);
+  font-family:var(--font-serif); font-weight:800; margin:2px 0 2px; overflow-wrap:anywhere;
+  display:flex; align-items:center; gap:clamp(6px,1vw,12px); flex-wrap:wrap }
+.pt-big-number .pt-bn-ico{ display:inline-flex; align-items:center; line-height:1; flex:0 0 auto; color:var(--green) }
+.pt-big-number .pt-bn-unit{ font-family:var(--font); font-weight:700; font-size:.62em; letter-spacing:.3px;
+  color:var(--ink-dim); text-transform:none }
+.pt-impact-meta{ display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; margin-top:8px }
+.pt-impact-meta > span{ display:inline-flex; align-items:center; gap:5px; font-size:var(--fs-sm);
+  color:var(--ink-dim); background:var(--surface-2); border:1px dashed var(--line-dash);
+  padding:4px 10px; border-radius:999px; line-height:1.3; white-space:normal }
+.pt-impact-meta .pt-pref{ color:var(--green-600); font-weight:700 }
+.pt-actions{ display:flex; flex-wrap:wrap; gap:8px; margin-top:clamp(12px,2vw,18px);
+  padding-top:clamp(12px,2vw,16px); border-top:1.5px dashed var(--line-dash); min-width:0 }
+.pt-actions .btn{ flex:0 1 auto; white-space:nowrap; min-width:0 }
+.pt-copied{ margin-top:10px; align-items:center; flex-wrap:wrap }
+
+/* ---- share preview card (green) ---- */
+.pt-share-card{ background:linear-gradient(135deg,var(--green) 0%,var(--green-600) 75%);
+  color:#fff; border-radius:var(--r-xl); padding:clamp(16px,3vw,24px);
+  box-shadow:var(--shadow-1); overflow:hidden }
+.pt-share-top{ display:flex; gap:16px; align-items:flex-start; justify-content:space-between;
+  min-width:0 }
+.pt-share-main{ flex:1 1 auto; min-width:0 }
+.pt-share-main .pt-impact-num{ font-size:clamp(2rem,1.6rem+3vw,3rem); font-weight:800;
+  line-height:1; margin-top:6px; display:flex; align-items:center; gap:6px; flex-wrap:wrap }
+.pt-share-main .pt-impact-sub{ font-size:clamp(.82rem,.78rem+.5vw,.95rem); margin-top:8px;
+  max-width:34ch; line-height:1.4; display:flex; gap:6px; flex-wrap:wrap; min-width:0 }
+.pt-share-tree{ flex:0 0 auto; color:rgba(255,255,255,.92); line-height:1 }
+.pt-share-foot{ display:flex; justify-content:space-between; align-items:center; gap:12px;
+  flex-wrap:wrap; margin-top:clamp(14px,2vw,20px); padding-top:14px;
+  border-top:1px solid rgba(255,255,255,.22) }
+.pt-share-brand{ display:inline-flex; align-items:center; gap:8px; min-width:0; font-size:.85rem; opacity:.95 }
+.pt-share-chip{ display:inline-flex; align-items:center; gap:5px; background:rgba(255,255,255,.14);
+  border:1px dashed rgba(255,255,255,.55); border-radius:999px; padding:6px 12px;
+  font-size:var(--fs-xs); font-weight:700; line-height:1.35; text-align:center; white-space:normal }
+
+/* ---- "your standing" pin ---- */
+.pt-yourank{ display:flex; align-items:center; gap:12px; margin-bottom:14px; padding:10px 12px;
+  background:var(--green-soft); border:1.5px dashed rgba(62,107,79,.4); border-radius:var(--r-l) }
+.pt-yourank .pt-ident-lg{ width:36px; height:36px; border-radius:9px; flex:0 0 auto }
+.pt-yourank-info{ min-width:0; display:flex; flex-direction:column; gap:2px }
+.pt-yourank-line{ font-size:var(--fs-sm); overflow-wrap:anywhere; line-height:1.4 }
+
+/* ---- leaderboard ---- */
+.pt-leader{ list-style:none; margin:0; padding:0; display:grid; gap:2px; width:100% }
+.pt-leader > li{ display:flex; align-items:center; gap:8px; padding:9px 6px;
+  border-bottom:1px dashed var(--line-dash); min-width:0 }
+.pt-leader > li:last-child{ border-bottom:none }
+.pt-badge{ flex:0 0 auto; min-width:30px; height:30px; padding:0 6px; border-radius:9px;
+  display:inline-flex; align-items:center; justify-content:center; gap:4px; font-weight:900; font-size:14px;
+  background:var(--surface-2); color:var(--ink-dim) }
+.pt-badge svg{ width:15px; height:15px }
+.pt-badge.gold{ background:var(--gold-grad-soft); color:var(--gold-ink) }
+.pt-badge.silver{ background:rgba(96,96,112,.16); color:var(--ink-on-silver) }
+.pt-badge.bronze{ background:rgba(166,94,46,.18); color:var(--ink-on-bronze) }
+.pt-ident{ flex:0 0 auto; width:28px; height:28px; border-radius:8px; display:block }
+.pt-leader-code{ flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis;
+  white-space:nowrap; font-size:var(--fs-sm); letter-spacing:.02em }
+.pt-leader-trees{ flex:0 0 auto; display:inline-flex; align-items:center; gap:4px;
+  white-space:nowrap; font-weight:800; color:var(--green-600); font-size:var(--fs-sm) }
+.pt-leader-orders{ flex:0 0 auto; white-space:nowrap; color:var(--ink-faint); font-size:var(--fs-xs) }
+.pt-you-row{ background:var(--green-soft); border-radius:var(--r-m) }
+.pt-you-badge{ flex:0 0 auto; display:inline-flex; align-items:center; gap:4px;
+  background:var(--green); color:#fff; font-size:10px; font-weight:800; text-transform:uppercase;
+  letter-spacing:.04em; padding:3px 8px; border-radius:999px }
+
+/* ---- pager ---- */
+.pt-pager{ display:flex; align-items:center; justify-content:space-between; gap:10px;
+  margin-top:14px; padding-top:12px; border-top:1px dashed var(--line-dash) }
+.pt-pager .btn{ min-width:0; white-space:nowrap }
+
+/* ---- monthly payouts ---- */
+.pt-settlements{ display:grid; gap:10px; width:100% }
+.pt-settlement{ padding:14px; border:1px dashed var(--line-dash); background:var(--surface-2);
+  border-radius:var(--r-m) }
+.pt-settlement-head{ display:flex; flex-wrap:wrap; gap:10px 12px; justify-content:space-between;
+  align-items:flex-start }
+.pt-settlement-info{ display:flex; flex-direction:column; gap:3px; min-width:0; flex:1 1 auto }
+.pt-settlement-info .strong{ overflow-wrap:anywhere; line-height:1.35 }
+.pt-settlement .btn{ flex:0 0 auto; white-space:nowrap }
+.pt-txhash{ display:block; margin-top:8px; word-break:break-all; opacity:.75;
+  font-size:var(--fs-xs); color:var(--ink-dim) }
+.pt-footnote{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; color:var(--ink-faint); line-height:1.4 }
+.pt-footnote span{ min-width:0 }
+.note-box.pt-note{ line-height:1.5 }
+
+/* ---- share-image preview overlay ---- */
+.pt-overlay{ position:fixed; inset:0; z-index:1200; background:rgba(78,61,40,.45);
+  display:flex; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(2px) }
+.pt-overlay-box{ background:var(--surface-1); border:1.5px dashed var(--line-dash); border-radius:var(--r-l);
+  max-width:min(560px,100%); width:100%; padding:18px; display:flex; flex-direction:column; gap:12px;
+  max-height:92vh; overflow:auto; box-shadow:var(--shadow-pop) }
+.pt-overlay-box img{ width:100%; height:auto; border-radius:12px; border:1px solid var(--line-dash) }
+.pt-overlay-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px }
+.pt-overlay-head .btn{ flex:0 0 auto }
+.pt-overlay-actions{ display:flex; gap:8px; flex-wrap:wrap }
+.pt-overlay-actions .btn{ flex:1 1 auto; justify-content:center }
+
+/* ---- share-card caption ---- */
+.pt-caption{ background:var(--surface-2, rgba(0,0,0,.03)); border:1px dashed var(--line-dash);
+  border-radius:12px; padding:10px 12px; display:flex; flex-direction:column; gap:6px }
+.pt-caption-label{ display:flex; align-items:center; gap:6px; font-weight:600; font-size:13px;
+  color:var(--ink-soft, currentColor) }
+.pt-caption-text{ margin:0; font-size:13px; line-height:1.5; color:var(--ink-2, currentColor);
+  word-break:break-word; overflow-wrap:anywhere }
+.pt-caption .btn{ align-self:flex-start }
+
+/* ---- narrow-screen refinements ---- */
+@media (max-width:560px){
+  .pt-impact-head{ flex-direction:column; align-items:center; text-align:center }
+  .pt-impact-info{ text-align:center; width:100% }
+  .pt-big-number{ justify-content:center }
+  .pt-impact-meta{ justify-content:center }
+  .pt-actions{ flex-direction:column }
+  .pt-actions .btn{ width:100%; justify-content:center }
+  .pt-share-top{ flex-direction:column }
+  .pt-share-foot{ flex-direction:column; align-items:flex-start }
+  .pt-card-head{ flex-direction:column; align-items:flex-start }
+}
+@media (min-width:561px) and (max-width:760px){
+  .pt-actions .btn{ flex:1 1 auto }
+}
+
+/* ---- topbar: brand + mainnav + actions must not run off the right edge
+   in the narrow-desktop band where the horizontal nav first appears. The
+   nav row, the brand cap and the fluid link type all live in the
+   "Header width budget (v2)" block further down — keep them together there. ---- */
+
+/* Bottom tab bar covers the widths where the top mainnav is hidden, so there
+   is always exactly one horizontal navigation row (never a wrapped one). */
+@media (max-width: 1199px){ .tabbar{ display: grid !important; } }
+@media (min-width: 1200px){ .tabbar{ display: none !important; } }
+
+/* ---- pay-hero: the "Pay directly to CryptoRefills / amount / You get" card.
+   These classes had NO styles at all, so the sheet rendered them raw:
+   "You get" glued to the value and the amount overflowing on small screens. */
+.pay-hero {
+  background: var(--surface-1);
+  border: 1.5px solid var(--line, #e6e2d8);
+  border-radius: var(--r-m, 14px);
+  padding: 14px 16px;
+  text-align: center;
+}
+.pay-hero-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint, #8a7d63);
+}
+.pay-hero-amt {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+/* .big-nim ships white-space:nowrap — on a 320px screen "≈ 14,269 NIM + fee"
+   burst out of the card. Let it wrap inside the hero. */
+.pay-hero-amt .big-nim { white-space: normal; overflow-wrap: anywhere; }
+.pay-hero-youget {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1.5px dashed var(--line-dash, #e0d7c2);
+}
+.pay-hero-youget .pay-you-get { min-width: 0; overflow-wrap: anywhere; }
+.pay-hero-del {
+  margin-top: 8px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Public donation wallet: show the live NIM/USD conversion next to the
+   dollar-denominated rollover rule, so the threshold is actionable for NIM
+   contributors rather than only displaying the raw address. */
+.pt-wallet-market {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+.pt-wallet-market-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1.5px dashed rgba(62, 107, 79, .35);
+  border-radius: var(--r-m);
+  background: var(--green-soft);
+}
+.pt-wallet-market-label {
+  color: var(--ink-faint);
+  font-size: var(--fs-xs);
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.pt-wallet-market-value {
+  color: var(--green-600);
+  font-size: clamp(.96rem, .88rem + .25vw, 1.12rem);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.pt-wallet-market-note {
+  color: var(--ink-dim);
+  font-size: var(--fs-xs);
+  line-height: 1.35;
+}
+@media (max-width: 560px) {
+  .pt-wallet-market { grid-template-columns: 1fr; }
+}
+
+/* Cached public chain balance for the tree donation wallet. */
+.pt-wallet-balance {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1.5px dashed rgba(62, 107, 79, .42);
+  border-radius: var(--r-m);
+  background: var(--surface-2);
+}
+.pt-wallet-balance-copy {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+.pt-wallet-balance-value {
+  flex: 0 0 auto;
+  color: var(--green-600);
+  font-size: clamp(1rem, .9rem + .35vw, 1.2rem);
+  white-space: nowrap;
+}
+.pt-wallet-balance-stale {
+  flex: 0 0 auto;
+  color: var(--ink-faint);
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+@media (max-width: 560px) {
+  .pt-wallet-balance { align-items: flex-start; flex-wrap: wrap; }
+  .pt-wallet-balance-value { margin-left: auto; }
+}
+
+/* ========================================================================
+   Your impact card — responsive rework
+   The old card relied on a flex row plus a mobile "stack everything" rule.
+   That made the identity, long status copy, metric pills, and six share
+   buttons compete for the same width. Keep the markup, but give each region
+   an explicit layout that can shrink without horizontal overflow.
+   ======================================================================== */
+.pt-impact {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  padding: clamp(16px, 3vw, 28px);
+}
+.pt-impact-head {
+  display: grid;
+  grid-template-columns: clamp(48px, 7vw, 64px) minmax(0, 1fr);
+  align-items: start !important;
+  gap: clamp(10px, 2vw, 18px);
+  width: 100%;
+  min-width: 0;
+}
+.pt-avatar {
+  width: clamp(48px, 7vw, 64px);
+  height: clamp(48px, 7vw, 64px);
+  min-width: 0;
+}
+.pt-avatar .pt-ident-lg,
+.pt-avatar .pt-icon-dot {
+  width: 100%;
+  height: 100%;
+  max-width: 64px;
+  max-height: 64px;
+  border-radius: clamp(11px, 1.5vw, 16px);
+}
+.pt-impact-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  width: 100%;
+  text-align: left !important;
+}
+.pt-impact-info > .xs {
+  max-width: 100%;
+  line-height: 1.35;
+}
+.pt-big-number {
+  width: 100%;
+  min-width: 0;
+  justify-content: flex-start !important;
+  align-items: center;
+  gap: 6px 9px;
+  line-height: 1.1;
+}
+.pt-big-number > span:not(.pt-bn-ico) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.pt-big-number > span:nth-child(2) {
+  white-space: nowrap;
+}
+.pt-big-number .pt-bn-unit {
+  flex: 0 1 auto;
+  max-width: 100%;
+  line-height: 1.25;
+}
+.pt-impact-info > .small.muted {
+  max-width: 100%;
+  min-width: 0;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.pt-impact-info > .small.pt-icon-inline {
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  line-height: 1.45;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.pt-impact-info > .small.pt-icon-inline svg {
+  flex: 0 0 auto;
+  margin-top: .15em;
+}
+.pt-impact-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+  gap: 8px;
+  margin-top: 10px;
+}
+.pt-impact-meta > span {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  line-height: 1.3;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.pt-impact-meta > span svg {
+  flex: 0 0 auto;
+  margin-top: .1em;
+}
+.pt-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+  gap: 8px;
+  margin-top: clamp(16px, 3vw, 22px);
+  padding-top: clamp(14px, 2.5vw, 18px);
+}
+.pt-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  padding: 8px 10px;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.pt-actions .btn:first-child {
+  grid-column: 1 / -1;
+}
+.pt-copied {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .pt-impact {
+    padding: clamp(14px, 4vw, 20px);
+  }
+  .pt-impact-meta {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .pt-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 430px) {
+  .pt-impact-head {
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: 10px;
+  }
+  .pt-impact-meta {
+    grid-template-columns: 1fr;
+  }
+  .pt-impact-meta > span {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 350px) {
+  .pt-impact {
+    padding: 14px;
+  }
+  .pt-impact-head {
+    grid-template-columns: 1fr;
+  }
+  .pt-avatar {
+    width: 48px;
+    height: 48px;
+  }
+  .pt-actions {
+    grid-template-columns: 1fr;
+  }
+  .pt-actions .btn:first-child {
+    grid-column: auto;
+  }
+}
+
+/* ========================================================================
+   Your impact card — polished layout matching the responsive QA PNGs.
+   The content is deliberately split into identity, impact, footprint, status,
+   and share regions so each region can reflow independently. All icons remain
+   the shared Lucide <Icon> component from the app.
+   ======================================================================== */
+.pt-impact {
+  padding: clamp(16px, 2.6vw, 28px);
+}
+.pt-impact-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 18px 24px;
+  min-width: 0;
+  padding-bottom: clamp(16px, 2.4vw, 24px);
+  border-bottom: 1.5px dashed var(--line-dash);
+}
+.pt-impact-identity {
+  display: flex;
+  align-items: flex-start;
+  gap: clamp(10px, 1.8vw, 18px);
+  min-width: 0;
+}
+.pt-impact-identity .pt-avatar {
+  flex: 0 0 clamp(48px, 6vw, 68px);
+  width: clamp(48px, 6vw, 68px);
+  height: clamp(48px, 6vw, 68px);
+}
+.pt-impact-identity .pt-avatar .pt-ident-lg,
+.pt-impact-identity .pt-avatar .pt-icon-dot {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+}
+.pt-impact-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+  padding-top: 2px;
+}
+.pt-impact-tagline {
+  color: var(--ink-dim);
+  font-size: clamp(.86rem, .8rem + .25vw, 1.04rem);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.pt-impact-destination {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 170px;
+}
+.pt-impact-destination-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 7px 14px;
+  border: 1.5px solid rgba(62, 107, 79, .3);
+  border-radius: 999px;
+  background: var(--green-soft);
+  color: var(--green-600);
+  font-size: var(--fs-sm);
+  font-weight: 900;
+  white-space: nowrap;
+}
+.pt-impact-destination-note {
+  color: var(--ink-faint);
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  line-height: 1.3;
+}
+.pt-impact-main {
+  display: grid;
+  grid-template-columns: minmax(230px, .78fr) minmax(0, 1.22fr);
+  gap: clamp(14px, 2.5vw, 28px);
+  align-items: stretch;
+  min-width: 0;
+  padding: clamp(18px, 2.8vw, 30px) 0;
+  border-bottom: 1.5px dashed var(--line-dash);
+}
+.pt-impact-total {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+  align-content: center;
+  column-gap: 12px;
+  row-gap: 2px;
+  min-width: 0;
+  padding: clamp(18px, 2.5vw, 26px);
+  border: 1.5px solid rgba(62, 107, 79, .23);
+  border-radius: var(--r-l);
+  background: var(--green-soft);
+}
+.pt-impact-total-icon {
+  grid-row: 1 / span 2;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  color: var(--green-600);
+}
+.pt-impact-total-value {
+  min-width: 0;
+  color: var(--green-600);
+  font-family: var(--font-serif);
+  font-size: clamp(2.8rem, 2.2rem + 2vw, 4.15rem);
+  font-weight: 900;
+  line-height: .95;
+  overflow-wrap: anywhere;
+}
+.pt-impact-total-label {
+  min-width: 0;
+  color: var(--ink-dim);
+  font-size: clamp(1rem, .9rem + .35vw, 1.28rem);
+  font-weight: 900;
+  line-height: 1.25;
+}
+.pt-impact-orders {
+  grid-column: 1 / -1;
+  margin-top: 12px;
+  color: var(--ink-dim);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.pt-impact-footprint {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+.pt-impact-section-label {
+  margin-bottom: 10px;
+  color: var(--ink-faint);
+  font-size: var(--fs-xs);
+  font-weight: 900;
+  letter-spacing: .18em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+.pt-impact-footprint-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+.pt-impact-stat {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  min-height: 72px;
+  padding: 12px 14px;
+  border: 1.5px solid rgba(78, 61, 40, .18);
+  border-radius: var(--r-l);
+  background: var(--surface-2);
+  color: var(--ink-dim);
+}
+.pt-impact-stat > svg {
+  flex: 0 0 auto;
+}
+.pt-impact-stat > span {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.pt-impact-stat small {
+  color: var(--ink-faint);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .14em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+.pt-impact-stat strong {
+  color: var(--green-600);
+  font-size: clamp(1rem, .9rem + .25vw, 1.18rem);
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.pt-impact-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  min-width: 0;
+  margin-top: 12px;
+  padding: 11px 14px;
+  border-radius: var(--r-m);
+  background: var(--surface-2);
+  color: var(--ink-dim);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  line-height: 1.4;
+}
+.pt-impact-status > svg {
+  flex: 0 0 auto;
+  margin-top: .1em;
+  color: var(--green);
+}
+.pt-impact-status > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.pt-impact-share {
+  min-width: 0;
+  padding-top: clamp(18px, 2.8vw, 28px);
+}
+.pt-impact-share .pt-impact-section-label {
+  margin-bottom: 12px;
+}
+
+@media (max-width: 760px) {
+  .pt-impact-top {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .pt-impact-destination {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+  .pt-impact-main {
+    grid-template-columns: 1fr;
+  }
+  .pt-impact-total {
+    min-height: 148px;
+  }
+}
+@media (max-width: 430px) {
+  .pt-impact {
+    padding: 16px;
+  }
+  .pt-impact-footprint-grid {
+    grid-template-columns: 1fr;
+  }
+  .pt-impact-destination {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .pt-impact-stat {
+    min-height: 62px;
+  }
+}
+@media (max-width: 350px) {
+  .pt-impact-identity {
+    flex-direction: column;
+  }
+  .pt-impact-total {
+    grid-template-columns: 42px minmax(0, 1fr);
+    padding: 16px;
+  }
+  .pt-impact-total-icon {
+    width: 42px;
+    height: 42px;
+  }
+}
+
+/* ========================================================================
+   Impact card v4 — a real nim.shop receipt, not a generic green dashboard.
+   This deliberately uses the same kraft / ink / stamp-red language as the
+   rest of the shop: hard ink edge, offset shadow, dashed receipt rules and
+   one restrained green impact panel.
+   ======================================================================== */
+.pt-impact {
+  padding: 0;
+  overflow: hidden;
+  background: var(--surface-1);
+  border: 2px solid var(--line-strong);
+  border-radius: var(--r-l);
+  box-shadow: var(--shadow-2);
+}
+.pt-impact-shell { min-width: 0; }
+.pt-impact-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: clamp(18px, 3vw, 28px) clamp(18px, 3.2vw, 32px);
+  border-bottom: 1.5px dashed var(--line-dash);
+  background: rgba(255,255,255,.18);
+}
+.pt-impact-bar-brand {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+.pt-impact-logo {
+  display: grid;
+  place-items: center;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  border-radius: var(--r-s);
+  background: var(--stamp);
+  color: var(--on-stamp);
+  box-shadow: 2px 2px 0 rgba(78,61,40,.24);
+}
+.pt-impact-bar-copy { min-width: 0; }
+.pt-impact-kicker,
+.pt-impact-metrics-label {
+  color: var(--ink-faint);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .2em;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+.pt-impact-title {
+  margin: 3px 0 0;
+  color: var(--ink);
+  font-size: clamp(1.4rem, 1.12rem + 1.1vw, 2rem);
+  line-height: 1.05;
+}
+.pt-impact-stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 7px 10px;
+  border: 1.5px solid var(--stamp);
+  border-radius: var(--r-s);
+  color: var(--stamp);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .14em;
+  line-height: 1;
+  transform: rotate(2deg);
+}
+.pt-impact-stamp.is-empty {
+  border-color: var(--line-dash);
+  color: var(--ink-faint);
+}
+.pt-impact-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1.18fr) minmax(220px, .82fr);
+  gap: 12px;
+  padding: clamp(18px, 3.2vw, 32px);
+  border-bottom: 1.5px dashed var(--line-dash);
+}
+.pt-impact-total-copy {
+  min-width: 0;
+  padding: clamp(18px, 2.8vw, 28px);
+  border-radius: var(--r-m);
+  background: var(--green);
+  color: #fff;
+  box-shadow: 3px 3px 0 rgba(62,107,79,.2);
+}
+.pt-impact-total-copy .pt-impact-kicker { color: rgba(255,255,255,.68); }
+.pt-impact-count-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  min-width: 0;
+  margin-top: 8px;
+}
+.pt-impact-count {
+  min-width: 0;
+  color: #fff;
+  font-family: var(--font-serif);
+  font-size: clamp(4rem, 3.2rem + 4.2vw, 7rem);
+  font-weight: 900;
+  letter-spacing: -.06em;
+  line-height: .82;
+  overflow-wrap: anywhere;
+}
+.pt-impact-count-label {
+  padding-bottom: 5px;
+  color: rgba(255,255,255,.9);
+  font-size: clamp(1.05rem, .9rem + .45vw, 1.35rem);
+  font-weight: 900;
+  line-height: 1.03;
+}
+.pt-impact-orders {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 18px;
+  color: rgba(255,255,255,.72);
+  font-size: var(--fs-sm);
+  line-height: 1.35;
+}
+.pt-impact-destination {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 1.5px dashed var(--line-dash);
+  border-radius: var(--r-m);
+  background: var(--surface-2);
+}
+.pt-impact-identicon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 52px;
+  width: 52px;
+  height: 52px;
+  overflow: hidden;
+  border: 2px solid var(--surface-1);
+  border-radius: var(--r-s);
+  background: var(--surface-1);
+  color: var(--green-600);
+  box-shadow: 2px 2px 0 rgba(78,61,40,.16);
+}
+.pt-impact-identicon img { width: 100%; height: 100%; object-fit: cover; }
+.pt-impact-destination-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.pt-impact-destination-copy strong {
+  color: var(--ink);
+  font-size: var(--fs-lg);
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.pt-impact-destination-copy > span {
+  color: var(--ink-dim);
+  font-size: var(--fs-xs);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.pt-impact-metrics-label {
+  margin: clamp(18px, 3vw, 28px) clamp(18px, 3.2vw, 32px) 10px;
+}
+.pt-impact-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 0 clamp(18px, 3.2vw, 32px);
+}
+.pt-impact-metric {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  padding: 13px 14px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-s);
+  background: var(--surface-2);
+}
+.pt-impact-metric-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-s);
+  color: var(--green-600);
+  background: var(--green-soft);
+}
+.pt-impact-metric > span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.pt-impact-metric small {
+  color: var(--ink-faint);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .12em;
+  line-height: 1.25;
+}
+.pt-impact-metric strong {
+  color: var(--ink);
+  font-size: clamp(1rem, .9rem + .3vw, 1.2rem);
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.pt-impact-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  margin: 12px clamp(18px, 3.2vw, 32px) 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--stamp);
+  background: var(--stamp-soft);
+  color: var(--ink-dim);
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  line-height: 1.4;
+}
+.pt-impact-status > svg { flex: 0 0 auto; margin-top: .1em; color: var(--stamp); }
+.pt-impact-status > span { min-width: 0; overflow-wrap: anywhere; }
+.pt-impact-share-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+  margin: clamp(20px, 3.4vw, 32px) clamp(18px, 3.2vw, 32px) 10px;
+  padding-top: clamp(18px, 3vw, 26px);
+  border-top: 1.5px dashed var(--line-dash);
+}
+.pt-impact-share-head > svg { flex: 0 0 auto; color: var(--stamp); }
+.pt-impact-share-copy {
+  margin-top: 3px;
+  color: var(--ink-dim);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+}
+.pt-impact .pt-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0 clamp(18px, 3.2vw, 32px) clamp(20px, 3.4vw, 32px);
+  border: 0;
+}
+.pt-impact .pt-actions .btn {
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  white-space: normal;
+  line-height: 1.2;
+}
+.pt-impact .pt-actions .btn:first-child { grid-column: 1 / -1; }
+.pt-impact .pt-actions .btn.btn-gold {
+  background: var(--stamp);
+  border-color: var(--stamp);
+}
+.pt-impact .pt-actions .btn.btn-outline {
+  color: var(--ink);
+  border-color: var(--line-dash);
+}
+.pt-impact .pt-actions .btn.btn-outline:hover { background: var(--surface-2); }
+.pt-impact .pt-copied { margin: 0 clamp(18px, 3.2vw, 32px) 24px; }
+
+@media (max-width: 700px) {
+  .pt-impact-summary { grid-template-columns: 1fr; }
+}
+@media (max-width: 520px) {
+  .pt-impact-bar { align-items: flex-start; }
+  .pt-impact-stamp { font-size: 9px; padding-inline: 8px; }
+  .pt-impact-metrics { grid-template-columns: 1fr; }
+  .pt-impact .pt-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pt-impact .pt-actions .btn:first-child { grid-column: 1 / -1; }
+}
+@media (max-width: 360px) {
+  .pt-impact-bar { flex-direction: column; }
+  .pt-impact-count-row { align-items: flex-start; flex-direction: column; gap: 7px; }
+  .pt-impact-count-label { padding: 0; }
+  .pt-impact .pt-actions { grid-template-columns: 1fr; }
+  .pt-impact .pt-actions .btn:first-child { grid-column: auto; }
+}
+
+/* Share preview overlay follows the receipt card instead of looking like a
+   second unrelated component. */
+.pt-overlay-box {
+  border: 2px solid var(--line-strong);
+  border-radius: var(--r-l);
+  box-shadow: var(--shadow-pop);
+}
+.pt-overlay-head { padding-bottom: 10px; border-bottom: 1.5px dashed var(--line-dash); }
+.pt-overlay-head .strong { font-family: var(--font-serif); font-size: 1.45rem; }
+.pt-caption { border-radius: var(--r-s); }
+
+/* Impact card v4.1 — narrow viewport hardening.  The card has no fixed
+   widths/heights: every inner grid can shrink, long hostnames/status copy can
+   wrap, and the share controls become one clear tap target per row on the
+   smallest phones. */
+.pt-impact,
+.pt-impact-shell,
+.pt-impact-bar,
+.pt-impact-bar-brand,
+.pt-impact-summary,
+.pt-impact-summary > *,
+.pt-impact-destination-copy,
+.pt-impact-share-head,
+.pt-impact-share-head > div {
+  min-width: 0;
+  max-width: 100%;
+}
+.pt-impact-title,
+.pt-impact-share-copy,
+.pt-impact-destination-copy strong,
+.pt-impact-destination-copy span,
+.pt-impact-status span {
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+.pt-impact-count { white-space: nowrap; }
+.pt-impact-count-row { max-width: 100%; }
+
+@media (max-width: 700px) {
+  .pt-impact-summary { padding: 18px; }
+  .pt-impact-metrics { padding-inline: 18px; }
+  .pt-impact-metrics-label { margin-inline: 18px; }
+  .pt-impact-share-head { margin-inline: 18px; }
+  .pt-impact .pt-actions { padding-inline: 18px; }
+  .pt-impact-status { margin-inline: 18px; }
+}
+
+@media (max-width: 520px) {
+  .pt-impact-bar { padding: 17px 18px 16px; }
+  .pt-impact-bar-brand { gap: 10px; }
+  .pt-impact-logo { flex-basis: 38px; width: 38px; height: 38px; }
+  .pt-impact-logo svg { width: 19px; height: 19px; }
+  .pt-impact-title { font-size: clamp(1.28rem, 6vw, 1.7rem); }
+  .pt-impact-stamp { margin-top: 2px; }
+  .pt-impact-destination { align-items: flex-start; padding: 14px; }
+  .pt-impact-identicon { flex-basis: 46px; width: 46px; height: 46px; }
+  .pt-impact-metrics-label { margin-top: 20px; }
+  .pt-impact-share-head { align-items: flex-start; gap: 10px; }
+  .pt-impact-share-head > svg { margin-top: 2px; }
+}
+
+@media (max-width: 380px) {
+  .pt-impact-summary { padding: 14px; }
+  .pt-impact-total-copy { padding: 16px; }
+  .pt-impact-count { font-size: clamp(3.3rem, 20vw, 4.2rem); }
+  .pt-impact-count-label { font-size: 1rem; }
+  .pt-impact-orders { margin-top: 13px; font-size: .78rem; }
+  .pt-impact-metrics,
+  .pt-impact-share-head,
+  .pt-impact-status,
+  .pt-impact .pt-actions { margin-left: 14px; margin-right: 14px; }
+  .pt-impact-metrics { padding-inline: 0; }
+  .pt-impact .pt-actions { padding-inline: 0; }
+  .pt-impact-metrics-label { margin-left: 14px; margin-right: 14px; }
+  .pt-impact-metric { padding: 11px; gap: 8px; }
+  .pt-impact-metric small { font-size: 8px; letter-spacing: .08em; }
+  .pt-impact-share-copy { font-size: .8rem; }
+}
+
+@media (max-width: 330px) {
+  .pt-impact-bar { padding-inline: 14px; }
+  .pt-impact-logo { flex-basis: 34px; width: 34px; height: 34px; }
+  .pt-impact-kicker { font-size: 9px; letter-spacing: .14em; }
+  .pt-impact-title { font-size: 1.22rem; }
+  .pt-impact-destination { gap: 9px; }
+  .pt-impact-destination-copy strong { font-size: 1rem; }
+  .pt-impact-destination-copy span { font-size: 10px; }
+  .pt-impact-status { font-size: .76rem; }
+}
+
+/* The portrait PNG is tall by design; keep its preview usable on short phone
+   screens without stretching the image or pushing the action row off-screen. */
+.pt-overlay { padding: max(10px, env(safe-area-inset-top, 10px)) 10px max(10px, env(safe-area-inset-bottom, 10px)); }
+.pt-overlay-box { width: min(620px, calc(100vw - 20px)); padding: clamp(12px, 3vw, 20px); }
+.pt-overlay-box > img { max-height: 56dvh; object-fit: contain; background: var(--bg); }
+@media (max-width: 430px) {
+  .pt-overlay-head { gap: 8px; }
+  .pt-overlay-head .strong { font-size: 1.2rem; }
+  .pt-overlay-head .xs { line-height: 1.35; }
+  .pt-overlay-actions { display: grid; grid-template-columns: 1fr; }
+}
+
+/* Impact card v4.2 — mobile-first container layout.
+   The previous rules started with a desktop two-column grid and tried to undo
+   it at viewport breakpoints. That still fails when the card sits in a narrow
+   content column on a tablet or inside a sheet. Start with one column and opt
+   into extra columns only when the CARD itself is wide enough. */
+.pt-impact {
+  container: impact-card / inline-size;
+}
+.pt-impact-bar { flex-direction: column; }
+.pt-impact-summary { grid-template-columns: 1fr; }
+.pt-impact-metrics { grid-template-columns: 1fr; }
+.pt-impact .pt-actions { grid-template-columns: 1fr; }
+.pt-impact .pt-actions .btn:first-child { grid-column: auto; }
+.pt-impact-count-row { flex-direction: column; align-items: flex-start; gap: 7px; }
+.pt-impact-count { font-size: clamp(3.15rem, 18vw, 6rem); font-size: clamp(3.15rem, 18cqw, 6rem); }
+.pt-impact-count-label { padding-bottom: 0; }
+.pt-impact-destination { align-items: flex-start; }
+
+/* 360px is the minimum comfortable width for the count lockup. */
+@container impact-card (min-width: 360px) {
+  .pt-impact-count-row { flex-direction: row; align-items: flex-end; gap: 12px; }
+  .pt-impact-count-label { padding-bottom: 5px; }
+}
+
+/* A normal phone / narrow tablet: keep the receipt header vertical, but give
+   the actions two columns so they remain thumb-sized instead of tiny. */
+@container impact-card (min-width: 480px) {
+  .pt-impact-bar { flex-direction: row; align-items: flex-start; }
+  .pt-impact .pt-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pt-impact .pt-actions .btn:first-child { grid-column: 1 / -1; }
+}
+
+/* Only a genuinely wide card gets side-by-side contribution/destination and
+   two metric columns. This avoids the common 700–820px tablet overflow band. */
+@container impact-card (min-width: 760px) {
+  .pt-impact-summary { grid-template-columns: minmax(0, 1.16fr) minmax(250px, .84fr); }
+  .pt-impact-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pt-impact .pt-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .pt-impact .pt-actions .btn:first-child { grid-column: 1 / -1; }
+}
+
+@container impact-card (max-width: 479px) {
+  .pt-impact-bar { gap: 12px; }
+  .pt-impact-summary { padding: 16px; }
+  .pt-impact-metrics { padding-inline: 16px; }
+  .pt-impact-metrics-label { margin-inline: 16px; }
+  .pt-impact-status { margin-inline: 16px; }
+  .pt-impact-share-head { margin-inline: 16px; }
+  .pt-impact .pt-actions { padding-inline: 16px; }
+}
+
+@container impact-card (max-width: 359px) {
+  .pt-impact-bar { padding-inline: 14px; }
+  .pt-impact-title { font-size: 1.22rem; }
+  .pt-impact-logo { flex-basis: 34px; width: 34px; height: 34px; }
+  .pt-impact-summary { padding: 14px; }
+  .pt-impact-total-copy { padding: 16px; }
+  .pt-impact-count { font-size: clamp(3rem, 18vw, 4rem); font-size: clamp(3rem, 18cqw, 4rem); }
+  .pt-impact-destination { padding: 13px; }
+  .pt-impact-metric { padding: 11px; }
+  .pt-impact-metric small { letter-spacing: .07em; }
+  .pt-impact-status { font-size: .78rem; }
+  .pt-impact .pt-actions { padding-inline: 14px; }
+}
+
+/* Fallback for older embedded WebViews without CSS container queries. The
+   modern path above responds to the card's actual width; this path responds
+   to the viewport and remains overflow-safe rather than reverting to the old
+   desktop-first layout. */
+@supports not (container-type: inline-size) {
+  @media (min-width: 480px) {
+    .pt-impact-bar { flex-direction: row; align-items: flex-start; }
+    .pt-impact .pt-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .pt-impact .pt-actions .btn:first-child { grid-column: 1 / -1; }
+  }
+  @media (min-width: 760px) {
+    .pt-impact-summary { grid-template-columns: minmax(0, 1.16fr) minmax(250px, .84fr); }
+    .pt-impact-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .pt-impact .pt-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+}
+
+/* The tree mark belongs to the "trees funded" lockup. It is intentionally not
+   a decorative icon floating in the top-right corner of the contribution panel. */
+.pt-impact-count-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  line-height: 1.1;
+}
+.pt-impact-count-label > svg { flex: 0 0 auto; color: currentColor; }
+@container impact-card (max-width: 359px) {
+  .pt-impact-count-label { gap: 7px; }
+  .pt-impact-count-label > svg { width: 24px; height: 24px; }
+}
+
+/* Impact card v5 — keep the liked receipt look, remove the redundant side
+   destination panel. The contribution block is now one clean hero, with the
+   order count and destination kept together on one compact metadata line. */
+.pt-impact-summary {
+  display: block;
+  padding: clamp(18px, 3.2vw, 32px);
+}
+.pt-impact-total-copy {
+  width: 100%;
+  box-shadow: 3px 3px 0 rgba(62,107,79,.2);
+}
+.pt-impact-orders {
+  flex-wrap: wrap;
+  row-gap: 8px;
+  column-gap: 16px;
+}
+.pt-impact-order-item,
+.pt-impact-order-destination {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  line-height: 1.35;
+}
+.pt-impact-order-destination {
+  padding-left: 12px;
+  border-left: 1px solid rgba(255,255,255,.32);
+}
+.pt-impact-order-destination img {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  flex: 0 0 auto;
+}
+@container impact-card (max-width: 479px) {
+  .pt-impact-summary { padding: 16px; }
+  .pt-impact-order-destination {
+    padding-left: 0;
+    border-left: 0;
+  }
+}
+@container impact-card (max-width: 359px) {
+  .pt-impact-summary { padding: 14px; }
+  .pt-impact-orders { flex-direction: column; align-items: flex-start; gap: 7px; }
+}
+
+.pt-tree-wallet-address {
+  display: block;
+  max-width: min(62ch, 100%);
+  margin-top: 3px;
+  color: var(--ink-dim);
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  line-height: 1.35;
+}
+
+/* The public wallet row now carries the actual address; let the address wrap
+   inside the header instead of pushing Copy address off-screen. */
+.pt-card-head > .pt-icon-inline {
+  flex: 1 1 260px;
+  min-width: 0;
+  max-width: 100%;
+  align-items: flex-start;
+}
+.pt-card-head > .pt-icon-inline > span {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Anonymous activity rows use a non-interactive privacy label, never a
+   generated identicon or a copyable Nimiq address. */
+.feed-wallet-private {
+  padding-left: 10px;
+  cursor: default;
+}
+.feed-wallet-private:hover {
+  border-style: dashed;
+}
+
+/* Operator console is a set of small pages, not one long admin scroll. */
+.admin-section-nav {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 8px;
+  overflow-x: auto;
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--r-m, 12px);
+  background: var(--surface-2);
+  scrollbar-width: thin;
+}
+.admin-section-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  min-height: 48px;
+  padding: 7px 12px;
+  border: 1.5px solid transparent;
+  border-radius: var(--r-s, 8px);
+  background: transparent;
+  color: var(--ink-dim);
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+}
+.admin-section-tab:hover,
+.admin-section-tab:focus-visible {
+  border-color: var(--line-strong);
+  background: var(--surface-1);
+  outline: none;
+}
+.admin-section-tab.is-active {
+  border-color: var(--stamp);
+  background: var(--surface-1);
+  color: var(--stamp);
+  box-shadow: 2px 2px 0 rgba(78, 61, 40, .12);
+}
+.admin-section-tab-copy {
+  display: grid;
+  gap: 1px;
+}
+.admin-section-tab-label {
+  font-size: .84rem;
+  font-weight: 900;
+}
+.admin-section-tab-hint {
+  color: var(--ink-faint);
+  font-size: .68rem;
+  font-weight: 700;
+}
+.admin-section-tab.is-active .admin-section-tab-hint {
+  color: var(--stamp);
+  opacity: .75;
+}
+.admin-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 4px 2px;
+}
+.admin-section-heading h2 {
+  margin: 0;
+  font-size: clamp(1.2rem, 2.5vw, 1.55rem);
+}
+.admin-rule-picks {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.admin-rule-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 42px;
+  padding: 8px 11px;
+  border: 1.5px dashed var(--line-dash);
+  border-radius: var(--r-s, 8px);
+  background: var(--surface-1);
+  cursor: pointer;
+}
+.admin-rule-pick:hover,
+.admin-rule-pick.is-blocked {
+  border-style: solid;
+  border-color: var(--stamp);
+}
+.admin-rule-pick.is-blocked {
+  color: var(--stamp);
+  background: var(--stamp-soft);
+}
+.admin-rule-pick input {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--stamp);
+}
+@media (max-width: 620px) {
+  .admin-section-nav {
+    margin-left: -4px;
+    margin-right: -4px;
+    border-radius: var(--r-s, 8px);
+  }
+  .admin-section-tab {
+    min-height: 44px;
+    padding: 7px 10px;
+  }
+  .admin-section-tab-hint {
+    display: none;
+  }
+  .admin-section-heading {
+    margin-top: 12px;
+  }
+}
+
+/* Named catalog-rule selectors: operators choose human labels instead of
+   having to remember supplier slugs or country codes. */
+.admin-rule-picker-row {
+  align-items: flex-start;
+}
+.admin-rule-picker {
+  flex: 1 1 320px;
+  min-width: 280px;
+  padding: 12px;
+  border: 1.5px dashed var(--line-dash);
+  border-radius: var(--r-m, 12px);
+  background: var(--surface-2);
+}
+.admin-rule-picker-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+.admin-rule-count {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border: 1px solid var(--line-dash);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.admin-rule-search {
+  width: 100%;
+  margin-top: 10px;
+}
+.admin-rule-option-list {
+  display: grid;
+  gap: 6px;
+  max-height: 230px;
+  overflow: auto;
+  margin-top: 10px;
+  padding: 2px;
+  overscroll-behavior: contain;
+}
+.admin-rule-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 36px;
+  padding: 7px 9px;
+  border: 1px solid var(--line-dash);
+  border-radius: var(--r-s, 8px);
+  background: var(--surface-1);
+  cursor: pointer;
+}
+.admin-rule-option:hover,
+.admin-rule-option.is-selected {
+  border-color: var(--stamp);
+  background: var(--stamp-soft);
+}
+.admin-rule-option input {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  accent-color: var(--stamp);
+}
+.admin-rule-option-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+.admin-rule-option-code {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--ink-faint);
+  font-family: var(--font-mono, monospace);
+  font-size: .68rem;
+  overflow-wrap: anywhere;
+}
+.admin-rule-empty {
+  padding: 12px 8px;
+}
+@media (max-width: 620px) {
+  .admin-rule-picker {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+/* ---- final narrow-layout guardrails -------------------------------------
+   Long country names, out-of-stock labels and cashback stake CTAs are
+   controls, not paragraphs: keep each one on a single line and let the text
+   shorten before the control is allowed to fall below its neighbours. */
+.btn-country-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+.btn-country-label {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.btn-country > svg {
+  flex: 0 0 auto;
+}
+label.oos-toggle {
+  flex-wrap: nowrap;
+  min-width: 0;
+  white-space: nowrap;
+}
+label.oos-toggle > span {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The shared "Cashback needs a stake" banner must stay a rail. */
+.come-back {
+  flex-wrap: nowrap;
+  min-width: 0;
+  gap: clamp(6px, 1.4vw, 14px);
+}
+/* Both labels opt into the runtime re-fit (src/lib/fitText.ts): the nowrap
+   above is the *shape* we want, and the runtime shrinks the type to keep it —
+   with data-fit="wrap" as the escape hatch when a translation is longer than
+   the rail can shrink to (it then wraps instead of ending in an ellipsis). */
+.come-back-txt {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.come-back-cta {
+  flex: 0 1 auto;
+  width: auto !important;
+  min-width: 0;
+  max-width: min(48%, 260px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The pay-screen stake rail contains either a button or a details summary.
+   Both are kept beside the copy, including on 320px screens. */
+.checkout-cashback-stake {
+  flex-wrap: nowrap;
+}
+.checkout-cashback-stake-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+.checkout-cashback-stake-copy strong,
+.checkout-cashback-stake-copy small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.checkout-cashback-stake > button,
+.checkout-cashback-stake > details {
+  min-width: 0;
+  max-width: 38%;
+  margin-left: 0 !important;
+}
+.checkout-cashback-stake > button {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.checkout-cashback-stake > details > summary {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* QuickStake's amount and action are one control rail too. */
+.quick-stake-form-row,
+.cb-form-row.quick-stake-form-row {
+  flex-wrap: nowrap;
+}
+.cb-form-row.quick-stake-form-row .input {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.cb-form-row.quick-stake-form-row .btn {
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+}
+@media (max-width: 560px) {
+  .come-back {
+    padding: 8px 9px;
+    gap: 6px;
+    /* On a phone the rail may break: the CTA drops to its own line rather than
+       being squeezed into a column too narrow for its own text. */
+    flex-wrap: wrap;
+  }
+  .come-back > svg {
+    width: 16px;
+    height: 16px;
+  }
+  .come-back-txt {
+    font-size: .76rem;
+    line-height: 1.25;
+  }
+  .come-back-cta {
+    max-width: 42%;
+    padding: 5px 7px;
+    font-size: .64rem;
+  }
+  .checkout-cashback-stake {
+    gap: 5px;
+    padding: 7px;
+  }
+  .checkout-cashback-stake-icon {
+    width: 25px;
+    height: 25px;
+    flex-basis: 25px;
+  }
+  .checkout-cashback-stake-copy strong { font-size: .7rem; }
+  .checkout-cashback-stake-copy small { font-size: .6rem; }
+  .checkout-cashback-stake > button,
+  .checkout-cashback-stake > details {
+    max-width: 35%;
+  }
+  .checkout-cashback-stake > button {
+    padding: 6px 7px;
+    font-size: .64rem;
+  }
+  .checkout-cashback-stake > details > summary {
+    font-size: .6rem;
+  }
+  .cb-form-row.quick-stake-form-row {
+    gap: 5px;
+  }
+  .cb-form-row.quick-stake-form-row .btn {
+    padding-inline: 7px;
+    font-size: .7rem;
+  }
+}
+
+/* Activity NIM volume tile uses the same real public Nimiq mark as checkout
+   and wallet surfaces, not the generic Lucide hexagon outline. */
+.act-tile-nim-mark {
+  display: block !important;
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  vertical-align: middle;
+}
+
+/* ---- final mobile topbar/profile rail -----------------------------------
+   The account chip and the desktop links must never create a second, hidden
+   horizontal page. At tablet widths the bottom tab bar is already present, so
+   keep the topbar to brand + cart + profile only. */
+@media (max-width: 1199px) {
+  .topbar .mainnav {
+    display: none !important;
+  }
+  .topbar-inner {
+    gap: clamp(6px, 2vw, 12px);
+  }
+}
+
+/* ---- Header width budget (v2) -----------------------------------------
+   The old rule let the brand be the *only* flexible item while mainnav was
+   `flex: 0 0 auto; min-width: max-content`. The nav therefore took its full
+   intrinsic width first and the wordmark absorbed every missing pixel: at
+   ≥1200px "shop.nimiqbase.com" rendered as "shop.nimiqbase.c…" even though
+   the nav row had free space left over on both sides.
+
+   The budget is now the other way round:
+     · the brand keeps its natural width (it only yields when a viewport is
+       genuinely out of room, and a hard cap keeps an absurdly long hostname
+       from eating the whole rail),
+     · the nav claims the free space (flex: 1 1 auto) and spreads its items
+       evenly inside it (justify-content: space-evenly), so six links fill a
+       wide bar instead of huddling against the brand,
+     · its type scales fluidly with the viewport, so no discrete 0.62rem →
+       0.76rem jump exists any more for the brand to be crushed by.
+   ---------------------------------------------------------------------- */
+.topbar-inner { min-width: 0; gap: clamp(6px, 1vw, 16px); }
+/* The bar is the one row that has to hold brand + six links + four controls,
+   so it gets a slightly wider track than the 1160px content grid (the accent
+   here is ≤50px per side, and only where the viewport can afford it). French
+   and Portuguese nav labels are long: on the shared grid the row ran out of
+   room and the wordmark paid for it. */
+@media (min-width: 1200px) {
+  .topbar-inner { width: min(1280px, 100% - 32px); }
+}
+/* The wordmark no longer yields to the nav: when the row is out of room the
+   *nav* is the flexible item and absorbs it (the runtime re-fit shrinks its
+   labels), so the brand can keep its name at every base font size. Shrinking
+   both at once was what left the links ellipsized — the brand's shrink only
+   moved room around instead of freeing any. The hard cap below is the one case
+   the wordmark still shrinks for, and the runtime handles that one by reducing
+   its type instead of clipping it. */
+.topbar .brand {
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: min(38vw, 360px);
+}
+.topbar .brand img,
+.topbar .brand svg { flex-shrink: 0; }
+.topbar #site-wordmark {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.topbar .mainnav {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-left: 0;
+  justify-content: space-evenly;
+  gap: clamp(2px, 0.5vw, 10px);
+}
+.topbar .mainnav a {
+  /* Shrinkable only as a last resort: with text-overflow in place a link
+     ellipsizes instead of painting over the cart when space runs out. */
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Readable header labels: ~11.8px at 1000px, ~12.2px at 1440px, capped at
+     ~13.4px on wide screens. (Was capped at 0.60rem = 9.6px — far too small.)
+     src/lib/fitText.ts still shrinks them if a long language runs out of room. */
+  font-size: clamp(0.74rem, 0.6rem + 0.18vw, 0.84rem);
+  letter-spacing: clamp(0.02em, 0.04vw, 0.05em);
+  padding: 7px clamp(5px, 0.5vw, 8px);
+}
+.topbar .cart-btn,
+.topbar .acct-wrap,
+.topbar .acct-btn,
+.topbar-inner > .btn {
+  flex: 0 0 auto;
+}
+.topbar-inner > .btn { white-space: nowrap; }
+.topbar .acct-menu {
+  max-width: calc(100vw - 24px);
+}
+
+/* The narrow desktop band (the top nav appears at 1000px; the tab bar covers
+   everything below it) is the tight one: six links + four controls + the
+   wordmark. The verbose "Connect wallet" label yields first there, so the
+   brand keeps its full name and the nav keeps all six items on one row. */
+/* Runtime row budget (src/lib/fitText.ts) — the same compact shape the
+   1000–1180px band below uses, but applied whenever the *measured* row is out
+   of room: a bigger browser base font, a longer language, a zoomed page. The
+   wallet button keeps its aria-label, so going icon-only stays accessible. */
+.topbar-inner[data-fit-tight="1"],
+.topbar-inner[data-fit-tight="2"] {
+  gap: 8px;
+}
+.topbar-inner[data-fit-tight="1"] .btn .btn-label,
+.topbar-inner[data-fit-tight="2"] .btn .btn-label {
+  display: none;
+}
+.topbar-inner[data-fit-tight="1"] .btn.btn-gold,
+.topbar-inner[data-fit-tight="2"] .btn.btn-gold {
+  padding: 8px 10px;
+}
+.topbar-inner[data-fit-tight="1"] .mainnav,
+.topbar-inner[data-fit-tight="2"] .mainnav {
+  gap: 2px;
+}
+.topbar-inner[data-fit-tight="2"] .mainnav a {
+  padding: 6px 5px;
+}
+/* Level 2 also caps the brand: the wordmark then re-fits its own type into the
+   cap instead of being clipped by it. */
+.topbar-inner[data-fit-tight="2"] .brand {
+  max-width: min(22vw, 220px);
+}
+
+@media (min-width: 1000px) and (max-width: 1180px) {
+  .topbar-inner { gap: 8px; }
+  .topbar .mainnav { gap: 2px; }
+  .topbar .mainnav a { padding: 6px clamp(5px, 0.5vw, 8px); }
+  .topbar .brand { gap: 7px; font-size: 1.1rem; }
+  .topbar .brand svg,
+  .topbar .brand img { width: 40px; height: 40px; }
+  .topbar .acct-btn { padding: 3px 7px 3px 3px; }
+  .topbar .btn .btn-label { display: none; }
+  .topbar .btn.btn-gold { padding: 8px 10px; }
+}
+
+/* One step closer to the 1181px layout: the wordmark keeps its full name,
+   the logo is still the small one. French/Portuguese labels are the longest
+   of the six languages, so the brand stays compact a little further up. */
+@media (min-width: 1181px) and (max-width: 1300px) {
+  .topbar .brand { gap: 8px; font-size: 1.16rem; }
+  .topbar .brand svg,
+  .topbar .brand img { width: 44px; height: 44px; }
+}
+
+/* Keep every bottom-nav item inside its equal grid cell too. */
+.tabbar,
+.tabbar a {
+  min-width: 0;
+  overflow: hidden;
+}
+.tabbar a > span:last-child {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  .topbar-inner {
+    width: calc(100% - max(var(--sal), 12px) - max(var(--sar), 12px));
+    max-width: 100%;
+    gap: 6px;
+  }
+  .topbar .brand {
+    flex: 1 1 auto;
+    overflow: hidden;
+    gap: 6px;
+    font-size: 1.15rem;
+  }
+  .topbar .brand img {
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+  }
+  .topbar #site-wordmark {
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* Phones get one break opportunity, after the dot: 360px cannot show
+     "shop.<host>" on one line at a readable size once the four icon controls
+     have taken their share, and a two-line wordmark beats a truncated one. */
+  .topbar #site-wordmark {
+    white-space: normal;
+  }
+  .topbar #site-wordmark .wm-head,
+  .topbar #site-wordmark .wm-tail {
+    display: inline-block;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Profile remains a clear avatar button; address, chevron and long connect
+     copy yield before they can push the cart or the viewport rightward. */
+  .topbar .acct-btn {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    padding: 4px;
+    gap: 0;
+    justify-content: center;
+  }
+  .topbar .acct-btn .addr,
+  .topbar .acct-btn > svg {
+    display: none !important;
+  }
+  .topbar .btn.btn-gold {
+    min-width: 44px;
+    width: 44px;
+    padding: 8px;
+    gap: 0;
+  }
+  .topbar .btn.btn-gold .btn-label {
+    display: none !important;
+  }
+  .topbar .cart-btn {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+  }
+}
+
+@media (max-width: 360px) {
+  .topbar-inner { gap: 4px; }
+  .topbar .brand { font-size: 1.05rem; gap: 5px; }
+  .topbar .brand img { width: 36px; height: 36px; flex-basis: 36px; }
+  .topbar .acct-btn,
+  .topbar .btn.btn-gold,
+  .topbar .cart-btn {
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+  }
+}
+
+/* Cashback fee disclosure stays visible next to the amount and before payment.
+   No collapsed details, low-contrast fine print or hover-only explanations. */
+.cashback-fee-notice {
+  min-width: 0;
+  padding: 11px 13px;
+  border: 1px solid var(--line-strong, #4e3d28);
+  border-left: 3px solid var(--stamp, #b4471c);
+  border-radius: var(--r-m, 10px);
+  background: var(--gold-soft, #fbf3df);
+  color: var(--ink, #241c13);
+  text-align: left;
+  font-size: 13px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.cashback-fee-notice-title { display: block; font-size: 14px; font-weight: 800; }
+.cashback-fee-notice p { margin: 4px 0 0; }
+.cashback-fee-notice .cashback-fee-notice-example {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line-strong, #4e3d28);
+  font-weight: 600;
+}
+
+/* =========================================================
+   GLOBAL UNIFIED THUMB — user request: every product image
+   on every page MUST be pixel-identical to the homepage
+   product card thumb. This block overrides all per-page
+   variants (order-card, cart-thumb, feed-thumb, checkout-preview)
+   so the same <div class="thumb thumb-gc"> markup renders
+   identically everywhere. Background forced white as in the
+   provided snippet: rgb(255, 255, 255).
+   ========================================================= */
+.thumb {
+  aspect-ratio: 16 / 10 !important;
+  border-radius: var(--r-s) !important;
+  border: 2px solid var(--line-strong) !important;
+  box-shadow: 3px 3px 0 rgba(78, 61, 40, 0.22) !important;
+  display: grid !important;
+  place-items: center !important;
+  font-size: clamp(1.6rem, 4vw, 2.1rem) !important;
+  font-family: var(--font-serif) !important;
+  font-weight: 900 !important;
+  overflow: hidden !important;
+  position: relative !important;
+  background: rgb(255, 255, 255);
+  color: var(--ink) !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+}
+/* kill per-page size overrides */
+.order-card .thumb,
+.thumb.thumb-detail,
+.thumb-stack-shell {
+  aspect-ratio: 16 / 10 !important;
+  width: 100% !important;
+  height: auto !important;
+  border-radius: var(--r-s) !important;
+  border: 2px solid var(--line-strong) !important;
+  box-shadow: 3px 3px 0 rgba(78,61,40,0.22) !important;
+  background: rgb(255, 255, 255);
+}
+.thumb .product-img {
+  position: absolute !important;
+  inset: 0 !important;
+  margin: auto !important;
+  width: auto !important;
+  height: auto !important;
+  max-width: 86% !important;
+  max-height: 86% !important;
+  object-fit: contain !important;
+  border-radius: 4px !important;
+  box-shadow: 4px 4px 0 rgba(78, 61, 40, 0.2) !important;
+  background: rgb(255, 255, 255);
+  z-index: 1 !important;
+}
+/* checkout preview stack uses the unified thumb sizing */
+.checkout-cart-preview-stack {
+  width: auto !important;
+  height: auto !important;
+}
+
+/* Activity feed unified thumb — same markup styling as homepage thumb */
+.feed-thumb, .feed-thumb.feed-thumb-stack {
+  aspect-ratio: 16 / 10 !important;
+  width: 72px !important;
+  height: auto !important;
+  min-height: 0 !important;
+  border-radius: var(--r-s) !important;
+  border: 2px solid var(--line-strong) !important;
+  box-shadow: 3px 3px 0 rgba(78,61,40,0.22) !important;
+  background: rgb(255, 255, 255);
+  display: grid !important;
+  place-items: center !important;
+  overflow: hidden !important;
+  position: relative !important;
+}
+
+
+/* Product detail hero unified — make pd-image use same thumb look when it contains UnifiedThumb */
+.pd-image:has(.thumb) {
+  flex: none !important;
+  width: 180px !important;
+  height: auto !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  display: block !important;
+  align-self: center !important;
+}
+.pd-image .thumb {
+  width: 100% !important;
+  align-self: center;
+}
+
+/* ===== GLOBAL CHIP RESPONSIVENESS FIX =====
+   Every pill in the shop (pt-chips, chips-row, sup-chips, hero-chips, p-meta etc.)
+   must stay single-line, never wrap inside, and never overflow the card.
+   Container wraps, chip shrinks/ellipsizes if needed. Long sentence chips (howto-mini) keep their exception. */
+.chip,
+.pt-chip,
+.hero-chips .chip,
+.sup-chips .chip,
+.chips-row .chip,
+.p-meta .chip {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  flex: 0 1 auto !important;
+  line-height: 1.35 !important;
+  vertical-align: middle;
+}
+.chip span,
+.pt-chip span,
+.hero-chips .chip span,
+.sup-chips .chip span {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  min-width: 0 !important;
+}
+.chip svg,
+.pt-chip svg,
+.chip .pt-chip-icon,
+.hero-chips .chip svg,
+.sup-chips .chip svg {
+  flex-shrink: 0 !important;
+  display: inline-block;
+  vertical-align: middle;
+}
+.pt-chips,
+.chips-row,
+.sup-chips,
+.hero-chips,
+.p-meta,
+.admin-chips {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  align-items: center !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+/* Long sentence chips (howto) intentionally wrap — keep exception */
+.howto-mini .chip,
+.admin-chips .chip {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  max-width: 100% !important;
+  flex: 1 1 auto !important;
+}
+.howto-mini .chip span,
+.admin-chips .chip span {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+/* Mobile: chips get slightly smaller and may wrap sooner, but never overflow */
+@media (max-width: 600px) {
+  .chip,
+  .pt-chip,
+  .chips-row .chip,
+  .sup-chips .chip,
+  .p-meta .chip {
+    font-size: 12px !important;
+    padding: 4px 10px !important;
+    max-width: 100% !important;
+  }
+  .pt-chips, .chips-row, .sup-chips { gap: 6px !important; }
+}
+@media (max-width: 420px) {
+  .pt-chip { font-size: var(--fs-xs) !important; padding: 4px 10px !important; }
+  .pt-chip svg { width: 13px !important; height: 13px !important; }
+}
+
+/* ===== SCROLL STABILITY ON RESIZE =====
+   Prevent the “jump to top” when resizing at the bottom.
+   Keep footer and seg heights stable across breakpoints so documentHeight
+   doesn't jump, and disable automatic scroll anchoring jumps. */
+html {
+  overflow-anchor: none;
+  scrollbar-gutter: stable;
+}
+body {
+  overflow-anchor: none;
+}
+/* Reserve footer height so bottom anchor is stable */
+.footer {
+  min-height: 64px;
+  contain: layout;
+}
+.seg {
+  contain: layout;
+}
+
+/* === BEST FLOW — ultra minimal checkout (Sep 2025) === */
+.checkout-picker-subtitle{font-size:13px !important;line-height:1.5 !important;max-width:520px}
+.checkout-cart-preview{border-radius:10px !important}
+.checkout-pay-hero-min{padding:14px;border:2px solid var(--line-strong);border-radius:10px;background:var(--paper-tint);text-align:center}
+.checkout-details-min{margin-top:10px;border:1.5px dashed var(--line-mid);border-radius:8px;padding:10px;background:var(--surface-1)}
+.checkout-details-min summary{font-weight:800;cursor:pointer;font-size:13px;color:var(--ink);list-style:none;display:flex;gap:8px;align-items:center}
+.checkout-details-min summary::-webkit-details-marker{display:none}
+.checkout-details-min summary:before{content:'▸';font-size:10px;transition:.15s;display:inline-block}
+.checkout-details-min[open] summary:before{transform:rotate(90deg)}
+.gift-toggle--best{margin:6px 0}
+
+
+/* === PICKER SIMPLE — hide heavy promo header and stake, keep only compare cards === */
+.checkout-cashback-spotlight-head{ display:none !important; }
+.checkout-cashback-stake{ display:none !important; }
+.checkout-usdt-note{ display:none !important; }
+.checkout-cashback-spotlight{ padding:0 !important; background:transparent !important; border:none !important; box-shadow:none !important; }
+.checkout-cashback-compare{ gap:10px !important; }
+/* === CART THUMB — left middle centering (Sep 16) === */
+.cart-row{ display:grid !important; grid-template-columns:104px 1fr !important; gap:10px 12px !important; align-items:center !important; padding:10px !important; }
+.cart-row > div:first-child{ grid-column:1 !important; grid-row:1 / span 2 !important; align-self:center !important; justify-self:start !important; }
+.cart-row .cart-main{ grid-column:2 !important; grid-row:1 !important; align-self:center !important; }
+.cart-row .cart-controls{ grid-column:1 / span 2 !important; justify-self:center !important; display:flex !important; gap:8px !important; align-items:center !important; margin-top:4px !important; }
+.cart-row .thumb.thumb-gc{ width:104px !important; height:104px !important; aspect-ratio:unset !important; display:block !important; position:relative !important; overflow:hidden !important; border-radius:8px !important; }
+.cart-row .thumb.thumb-gc .product-img{ position:absolute !important; inset:0 !important; margin:auto !important; max-width:86% !important; max-height:86% !important; object-fit:contain !important; object-position:center !important; }
+
+/* === TOOLBAR FIX — geoNote hidden + Sort arrow centered (Sep 16) === */
+#geoNote{ display:none !important; }
+.toolbar.filters .field select.input#sortSel{ background-position:right 15px center !important; background-repeat:no-repeat !important; padding-right:40px !important; }
+.toolbar.filters .field label.field::after,
+.toolbar.filters .field::after,
+.toolbar.filters label.field::after{ display:none !important; content:none !important; }
+.toolbar.filters .field{ position:relative; }
+.toolbar.filters{ align-items:flex-end; gap:12px; }
+
+
+/* TOOLBAR FIX 2026-09-16 — country picker arrow must be same red as Sort (user: siyah çubuk -> kırmızı) */
+.country-pick .btn-country svg,
+.btn-country svg {
+  color: var(--stamp) !important;
+  stroke: var(--stamp) !important;
+}
+.country-pick .btn-country {
+  /* ensure same visual weight as native select */
+}
+
+/* MOBILE FOOTER FIX 2026-09-16 — footer must sit ABOVE fixed tabbar, not under it (user: alttaki şey altına giriyor) */
+/* FOOTER FINAL FIX 2026-09-16 v2 — footer never under tabbar, container never under footer, fully responsive */
+.footer {
+  position: relative;
+  border-top: 2px solid var(--line-strong);
+  background: var(--surface-1);
+  color: var(--ink-dim);
+  padding: 24px 0;
+  margin: 0;
+}
+.footer .container {
+  width: var(--container);
+  margin-inline: auto;
+  /* ONE layout at every width: © start · barcode DEAD CENTER · github end.
+     Equal 1fr side columns are what keep the barcode optically centered —
+     auto side columns let the free space pile up on one side (the old
+     "everything slid right" bug). */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px 22px;
+}
+.footer .container > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.footer-barcode img,
+.footer-barcode svg {
+  width: 132px;
+  height: auto;
+  display: block;
+  max-width: 100%;
+}
+@media (min-width: 901px) {
+  .footer .container {
+    display: grid !important;
+    grid-template-columns: 1fr auto 1fr !important;
+    align-items: center !important;
+    gap: 22px !important;
+  }
+  .footer .container > span:first-child { text-align: left; }
+  .footer .container .footer-barcode { justify-self: center; }
+  .footer .container .row { justify-self: end; }
+}
+@media (max-width: 900px) {
+  .footer {
+    padding: 18px 0 18px !important;
+    margin: 0 0 calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 12px) !important;
+    background: var(--surface-1) !important;
+  }
+  /* MOBILE FOOTER ROW 2026-09-16 — user: "mobilde de yan yana, kesinlikle alt alta değil".
+     Same 3-column row as desktop: © text | barcode | github. Nothing wraps. */
+  .footer .container {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) !important;
+    flex-wrap: nowrap !important;
+    gap: 10px !important;
+    align-items: center !important;
+    text-align: left !important;
+    padding-inline: clamp(12px, 4vw, 20px) !important;
+  }
+  .footer .container > span:first-child {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-size: 11px !important;
+    line-height: 1.3 !important;
+    min-width: 0 !important;
+  }
+  .footer-credit { display: none !important; }
+  .footer-barcode { justify-self: center !important; flex: none !important; }
+  .footer-barcode img,
+  .footer-barcode svg {
+    width: clamp(64px, 22vw, 110px) !important;
+  }
+  .footer .container .row {
+    justify-content: flex-end !important;
+    justify-self: end !important;
+    flex: none !important;
+  }
+  #main {
+    padding-bottom: 24px !important;
+  }
+  .tabbar {
+    padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+    min-height: calc(60px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+@media (max-width: 380px) {
+  .footer .container { gap: 8px !important; }
+  .footer .container > span:first-child { font-size: 10px !important; }
+  .footer-barcode img, .footer-barcode svg { width: clamp(56px, 20vw, 90px) !important; }
+}
+
+/* SUPPORT + TRACK FIX 2026-09-16 — support locked buttons vertical with gap, track button centered (user: yapış yapış, ortalanmamış) */
+.locked {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 0 !important;
+}
+.locked .lock-ico { margin-bottom: 16px !important; }
+.locked h2 { margin-bottom: 8px !important; }
+.locked p { margin-bottom: 18px !important; }
+.tracking-search {
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 14px !important;
+}
+.tracking-search .field { flex: none !important; width: 100% !important; }
+.tracking-search > button {
+  align-self: center !important;
+  width: auto !important;
+  min-width: 180px !important;
+}
+@media (max-width: 640px) {
+  .tracking-search > button { width: 100% !important; max-width: 340px !important; }
+  .locked .btn { width: 100% !important; max-width: 340px !important; }
+}
+
+/* PT-HERO FIX 2026-09-16 — image ugly on small screens, doesn't fit (user: resim küçük ekranlarda çirkin sığmamış) */
+/* The old mobile banner (::before, cover-cropped OTP lockup) butchered the
+   horizontal logo — the lockup now lives in its own partner slot inside the
+   hero markup, at every width. */
+@media (max-width: 640px) {
+  .pt-hero {
+    background: var(--surface-1) !important;
+    border: 2px solid var(--line-strong) !important;
+    box-shadow: 4px 4px 0 rgba(78,61,40,.18) !important;
+  }
+  .pt-hero-main {
+    max-width: none !important;
+  }
+  .pt-hero .pt-title {
+    font-size: clamp(1.6rem, 1.4rem + 2vw, 2rem) !important;
+  }
+  .pt-hero .pt-eyebrow {
+    justify-content: center !important;
+    font-size: 11px !important;
+  }
+  .pt-hero .pt-chips {
+    justify-content: center !important;
+    gap: 6px !important;
+  }
+  .pt-hero .pt-lead {
+    font-size: 13px !important;
+    line-height: 1.5 !important;
+  }
+}
+
+/* CASHBACK + PLANT TREES — show content even when not logged in (user: giriş farketmemeli, içerik tamamen gösterilmeli) */
+/* The personal impact card was gated behind me?.enabled — make it visible with a connect prompt */
+.pt-impact-empty {
+  text-align: center;
+  padding: 20px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+/* plant trees / cashback stats already public — no display override needed; keep original grid (fix: remove harmful display:block that broke yan-yana kartlar) */
+
+/* === DARK FIXES.CSS OVERRIDES — siyah tema thorough === */
+[data-theme="dark"] .cashback-fee-notice {
+  background: var(--surface-1) !important;
+  color: var(--ink) !important;
+  border-color: var(--line-strong) !important;
+  border-left-color: var(--stamp) !important;
+}
+[data-theme="dark"] .cashback-fee-notice p { color: var(--ink-dim); }
+[data-theme="dark"] .checkout-pay-hero-min,
+[data-theme="dark"] .checkout-details-min {
+  background: var(--surface-1) !important;
+  border-color: var(--line-dash) !important;
+  color: var(--ink) !important;
+}
+[data-theme="dark"] .pt-partner { background: var(--surface-1) !important; }
+[data-theme="dark"] .msg-bubble.in { background: var(--surface-1) !important; border-color: var(--line-dash) !important; color: var(--ink) !important; }
+[data-theme="dark"] .msg-bubble.note { background: var(--surface-1) !important; border-color: var(--stamp) !important; color: var(--ink) !important; }
+[data-theme="dark"] .asup-chat .msg-bubble.in { background: var(--surface-2) !important; }
+[data-theme="dark"] .asup-status-sel { background: var(--surface-1) !important; }
+[data-theme="dark"] .come-back { background: var(--surface-1) !important; border-color: var(--line-strong) !important; }
+[data-theme="dark"] .how-step { background: var(--surface-1) !important; border-color: var(--line-dash) !important; }
+[data-theme="dark"] .pt-share-chip { background: rgba(255,255,255,0.08) !important; }
+[data-theme="dark"] .checkout-picker-hero { background: var(--surface-1) !important; border-color: rgba(199,72,29,0.18) !important; }
+[data-theme="dark"] .checkout-cashback-spotlight { background: var(--surface-1) !important; border-color: rgba(212,160,48,0.28) !important; }
+[data-theme="dark"] .pay-fallback { background: var(--surface-1) !important; border-color: var(--gold-400) !important; }
+/* .checkout-cashback-choice / -stake / .cb-wallet-redirect-inline removed:
+   this !important flat fill also erased their .is-active wash, so a selected
+   option was indistinguishable from an unselected one in dark mode. Their
+   backgrounds are --wash-* tokens now and invert by themselves. */
+[data-theme="dark"] .checkout-cart-preview,
+[data-theme="dark"] .checkout-cart-preview-stack,
+[data-theme="dark"] .checkout-tag {
+  background: var(--surface-2) !important;
+}
+
+/* ==========================================================================
+   Impact card v6 — ONE inset for every block + overflow-proof share preview.
+
+   v4 → v5 each set their own margin-inline / padding-inline per block (14, 16,
+   18px, sometimes both margin AND padding plus width:100%), so blocks drifted
+   out of line and .pt-actions overflowed the card by ~12px on 320px phones.
+   The "share everywhere" label also reused .pt-impact-metrics-label INSIDE the
+   already-inset .pt-impact-share-head, so it was indented twice.
+
+   Now every row below the header uses the same inset, --ic-x, which is sized
+   from the CARD's width (container query), not the viewport.
+   ========================================================================== */
+.pt-card.pt-impact { --ic-x: 14px; overflow: hidden; }
+@container impact-card (min-width: 360px) { .pt-card.pt-impact .pt-impact-shell { --ic-x: 16px; } }
+@container impact-card (min-width: 480px) { .pt-card.pt-impact .pt-impact-shell { --ic-x: 22px; } }
+@container impact-card (min-width: 760px) { .pt-card.pt-impact .pt-impact-shell { --ic-x: 32px; } }
+
+.pt-card.pt-impact .pt-impact-shell { min-width: 0; }
+.pt-card.pt-impact .pt-impact-bar { padding-inline: var(--ic-x); gap: 12px; }
+.pt-card.pt-impact .pt-impact-bar-brand { min-width: 0; }
+.pt-card.pt-impact .pt-impact-bar-copy { min-width: 0; }
+.pt-card.pt-impact .pt-impact-kicker { overflow-wrap: anywhere; }
+.pt-card.pt-impact .pt-impact-summary { padding: var(--ic-x); }
+
+.pt-card.pt-impact .pt-impact-metrics-label,
+.pt-card.pt-impact .pt-impact-metrics,
+.pt-card.pt-impact .pt-impact-status,
+.pt-card.pt-impact .pt-impact-share-head,
+.pt-card.pt-impact .pt-actions,
+.pt-card.pt-impact .pt-copied,
+.pt-card.pt-impact .pt-impact-empty {
+  box-sizing: border-box;
+  width: auto;
+  max-width: none;
+  margin-left: var(--ic-x);
+  margin-right: var(--ic-x);
+  padding-left: 0;
+  padding-right: 0;
+}
+/* The label inside the share head must not get the inset a second time. */
+.pt-card.pt-impact .pt-impact-share-head .pt-impact-metrics-label {
+  margin: 0;
+  padding: 0;
+}
+.pt-card.pt-impact .pt-impact-share-head { align-items: flex-start; gap: 12px; }
+.pt-card.pt-impact .pt-impact-share-head > div { min-width: 0; flex: 1 1 auto; }
+.pt-card.pt-impact .pt-impact-share-head > svg { flex: 0 0 auto; margin-top: 2px; }
+
+/* Count lockup: the label may wrap (long languages) instead of forcing width. */
+.pt-card.pt-impact .pt-impact-count { overflow-wrap: normal; word-break: keep-all; line-height: .9; }
+.pt-card.pt-impact .pt-impact-count-row { flex-wrap: wrap; min-width: 0; }
+.pt-card.pt-impact .pt-impact-count-label { white-space: normal; min-width: 0; }
+.pt-card.pt-impact .pt-impact-orders > * { min-width: 0; overflow-wrap: anywhere; }
+
+/* Metrics: two tiles as soon as the card can hold them (values are short). */
+.pt-card.pt-impact .pt-impact-metrics { display: grid; grid-template-columns: 1fr; gap: 10px; }
+@container impact-card (min-width: 480px) {
+  .pt-card.pt-impact .pt-impact-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.pt-card.pt-impact .pt-impact-metric { min-width: 0; }
+.pt-card.pt-impact .pt-impact-metric > * { min-width: 0; }
+.pt-card.pt-impact .pt-impact-metric small { overflow-wrap: anywhere; }
+
+/* Status: icon stays top-aligned, text wraps. */
+.pt-card.pt-impact .pt-impact-status { align-items: flex-start; }
+.pt-card.pt-impact .pt-impact-status > svg { flex: 0 0 auto; margin-top: 2px; }
+.pt-card.pt-impact .pt-impact-status > span { min-width: 0; overflow-wrap: anywhere; }
+
+/* Actions: a grid that can never be wider than the card. Labels may wrap. */
+.pt-card.pt-impact .pt-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  padding-bottom: var(--ic-x);
+}
+.pt-card.pt-impact .pt-actions .btn {
+  width: 100%;
+  min-width: 0;
+  justify-content: center;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.2;
+}
+.pt-card.pt-impact .pt-actions .btn:first-child { grid-column: 1 / -1; }
+@container impact-card (min-width: 400px) {
+  .pt-card.pt-impact .pt-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container impact-card (min-width: 760px) {
+  .pt-card.pt-impact .pt-actions { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+@supports not (container-type: inline-size) {
+  @media (min-width: 480px) {
+    .pt-card.pt-impact { --ic-x: 22px; }
+    .pt-card.pt-impact .pt-impact-metrics,
+    .pt-card.pt-impact .pt-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+}
+
+/* ---- share-image preview --------------------------------------------------
+   Fill the dynamic viewport (mobile URL bar aware), keep the preview image
+   inside the screen, and keep the Download / Share buttons pinned at the
+   bottom of the dialog so they are never scrolled out of reach. */
+.pt-overlay {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  overscroll-behavior: contain;
+}
+.pt-overlay-box {
+  box-sizing: border-box;
+  width: min(560px, 100%);
+  max-width: 100%;
+  max-height: 100%;
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.pt-overlay-box > .pt-overlay-head { padding: 16px 18px 12px; flex: 0 0 auto; }
+.pt-overlay-head > div { min-width: 0; }
+.pt-overlay-preview,
+.pt-overlay-box > .pt-caption {
+  margin-left: 18px;
+  margin-right: 18px;
+}
+.pt-overlay-preview {
+  flex: 0 1 auto;
+  min-height: 0;
+  margin-top: 14px;
+  display: flex;
+  justify-content: center;
+}
+.pt-overlay-box .pt-overlay-preview img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  /* 4:5 image: never taller than the room left after head + buttons. */
+  max-height: min(62dvh, 640px);
+  aspect-ratio: 1080 / 1350;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid var(--line-dash);
+}
+/* The caption + preview scroll together; head and actions stay put. */
+.pt-overlay-box { overflow-y: auto; }
+.pt-overlay-box > .pt-caption { margin-top: 12px; }
+.pt-caption-text { overflow-wrap: anywhere; }
+.pt-overlay-box > .pt-overlay-actions {
+  position: sticky;
+  bottom: 0;
+  margin-top: 14px;
+  padding: 12px 18px max(14px, env(safe-area-inset-bottom));
+  background: var(--surface-1);
+  border-top: 1.5px dashed var(--line-dash);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  z-index: 1;
+}
+.pt-overlay-box > .pt-overlay-actions .btn {
+  min-width: 0;
+  justify-content: center;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.2;
+}
+@media (max-width: 420px) {
+  .pt-overlay { padding: 8px; }
+  .pt-overlay-box > .pt-overlay-head { padding: 14px 14px 10px; }
+  .pt-overlay-preview, .pt-overlay-box > .pt-caption { margin-left: 14px; margin-right: 14px; }
+  .pt-overlay-box > .pt-overlay-actions { padding-inline: 14px; }
+  .pt-overlay-box .pt-overlay-preview img { max-height: 54dvh; }
+  .pt-overlay-head .strong { font-size: 1.2rem; }
+}
+@media (max-width: 340px) {
+  .pt-overlay-box > .pt-overlay-actions { grid-template-columns: 1fr; }
+}
+
+/* Preview head: the serif title may be one long word ("Wirkungskarte");
+   it wraps/breaks instead of sliding under the close button, and on phones
+   the close button is icon-only (it keeps its aria-label). */
+.pt-overlay-head { align-items: flex-start; }
+.pt-overlay-head > div { flex: 1 1 auto; }
+.pt-overlay-head .strong { overflow-wrap: anywhere; hyphens: auto; line-height: 1.12; }
+@media (max-width: 420px) {
+  .pt-overlay-head .pt-overlay-close-label { display: none; }
+  .pt-overlay-head .btn { width: 44px; height: 44px; min-width: 44px; padding: 0; justify-content: center; }
+  /* Long share labels ("Görseli + metni paylaş") get a full-width row each
+     instead of a three-line half-width button. */
+  .pt-overlay-box > .pt-overlay-actions { grid-template-columns: 1fr; }
+}
+
+/* =============================================================================
+   RESPONSIVE SCAN FIXES — found by tests/e2e/responsive.spec.ts
+   (every screen × language × desktop/tablet/phone size). Each rule names the
+   finding it fixes; the scan fails the build if any of them regresses.
+   ========================================================================== */
+
+/* Wordmark: below 380px the four header controls leave the brand <100px —
+   not enough for a readable "shop. / nimiqbase.com" at ≥10px. The logo icon
+   stays (the link keeps its aria-label); the text returns from 380px up. */
+@media (max-width: 379.98px) {
+  .topbar #site-wordmark { display: none !important; }
+}
+
+/* Tab bar: labels never go below 10px; a long label ("Plantar árvores")
+   wraps onto a second line instead of shrinking to 8px or being ellipsized. */
+.tabbar a > span:last-child { line-height: 1.08; text-overflow: clip; }
+
+/* Footer credit: wraps at ≥10px instead of shrinking to 9px + ellipsis. */
+.footer .container > span:first-child { max-width: 100%; overflow-wrap: anywhere; }
+
+/* Segmented filters (orders: ALL / ACTIVE / DELIVERED / ISSUES / WITH SUPPORT;
+   home: ALL / CARDS / TOP-UPS / ESIMS): readable size; when the labels are
+   wider than the phone the rail scrolls sideways instead of cutting a label. */
+.seg { overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; max-width: 100%; }
+.seg::-webkit-scrollbar { display: none; }
+.seg > * { flex: 0 0 auto; }
+@media (max-width: 480px) {
+  .seg > button, .seg > a, .seg .seg-sm { font-size: 10.5px !important; }
+}
+
+/* Order list rating: compact stars that fit the row; "Rate:" moves above the
+   stars when the column is narrow instead of pushing stars off the card. */
+.ord-rate { flex-wrap: wrap !important; flex-shrink: 1 !important; min-width: 0; row-gap: 2px; }
+.ord-rate .stars.picker { gap: 0; }
+.ord-rate .star-btn { padding: 2px; min-width: 26px; min-height: 26px; align-items: center; justify-content: center; }
+.ord-rate .star-btn svg { width: 20px !important; height: 20px !important; }
+
+/* Home "repeat value" promo: readable on phones (was 9–9.4px). */
+@media (max-width: 480px) {
+  .come-back-txt, .come-back-txt .strong { font-size: 11px !important; line-height: 1.4; }
+  .come-back-cta { font-size: 11px !important; }
+}
+
+/* Impact card micro-labels: kicker, stamp, metric captions ≥10px (were 8–9px). */
+.pt-card.pt-impact .pt-impact-kicker,
+.pt-card.pt-impact .pt-impact-stamp,
+.pt-card.pt-impact small { font-size: max(10px, 1em) !important; }
+.pt-card.pt-impact .pt-impact-kicker { letter-spacing: .1em; }
+
+/* Cashback hero: `1fr` let the longest line (German button label) set a
+   min-content width wider than a 320px phone — content ran off the card. */
+.cb-hero { grid-template-columns: minmax(0, 1fr); }
+.cb-hero > * { min-width: 0; }
+.cb-hero .btn { white-space: normal; max-width: 100%; text-align: center; }
+
+/* Activity stat tiles: the 2-column grid could not shrink below the label
+   width in fr/tr at 320px. */
+.act-stats-grid > *, .act-tile, .act-tile > div { min-width: 0; }
+.act-tile-label, .act-tile .xs, .act-tile .small { overflow-wrap: anywhere; }
+
+/* Account chip: shortAddr() already returns a fixed 12-char "NQ07 0000 0…";
+   the old max-width:9ch cut it a second time ("NQ07 0000 0…" → "NQ07 000…"). */
+.acct-btn .addr { max-width: none; }
+
+/* Desktop link row starts at 1200px (was 1000px). Between 1000 and 1199px the
+   brand + six links + four controls never fit in de/fr/es/pt — the scan found
+   "SH…", "AKTIVIT…", "BESTELLUN…" at 1024px. Those widths (landscape tablets,
+   small laptops) now use the bottom tab bar like every other tablet width. */
+@media (min-width: 900.02px) and (max-width: 1199.98px) {
+  .footer { margin-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 12px) !important; }
+}
+
+/* Range sliders (cashback calculator): the <input> itself was only 8px tall,
+   so the tap/drag target was 8px (scan: tap-target < 24px). The input is now a
+   28px transparent hit area; the visible 8px kraft track is drawn by the track
+   pseudo-element, so the look is unchanged. Margins shrink by the added 20px. */
+input[type="range"] {
+  height: 28px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+.cb-slider input[type="range"] { margin: 0 0 -4px; }
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--surface-3);
+  border: 1.5px dashed var(--line-dash);
+  box-sizing: border-box;
+}
+input[type="range"]::-webkit-slider-thumb { margin-top: -8.5px; }
+input[type="range"]:focus-visible { outline: 2px solid var(--stamp); outline-offset: 2px; border-radius: 6px; }
+
+/* Wide screens: the nav type scales up with the viewport (≈13.4px at 1920px)
+   but the header row stayed capped at 1280px, so in French the row ran out of
+   room and the wordmark was cut ("shop.nimiqb…" at 1920px). From 1600px the
+   row gets up to 1440px. */
+@media (min-width: 1600px) {
+  .topbar-inner { width: min(1440px, 100% - 64px); }
+}
+
+/* Plant-trees leaderboard row on phones: rank + identicon + address + trees +
+   "N orders" + the YOU badge ran past a 320px screen ("VOUS" cut off). The
+   order count drops to a second line under the address. */
+@media (max-width: 480px) {
+  .pt-leader > li { flex-wrap: wrap; row-gap: 2px; }
+  .pt-leader-orders { order: 10; flex: 1 0 100%; padding-left: 72px; white-space: normal; }
+}
+
+/* fitText measures a label right after writing its font-size and freezes the
+   label's own transition for that frame — but children (the wordmark's
+   .wm-head/.wm-tail) still animated the inherited size via a `transition: all`
+   rule. Measurements then read the previous size and the fit oscillated
+   between ~18px and ~13px, leaving "nimiqbase.com" cut off on 390px phones. */
+[data-fit] * { transition: none !important; }
+
+/* Share preview overlay: <html> keeps `scrollbar-gutter: stable`, so a fixed
+   `inset: 0` layer stopped 15px short of the right edge on desktop and the
+   page showed through that strip. 100vw includes the gutter. */
+.pt-overlay { right: auto !important; width: 100vw !important; }
+
+/* Plant-trees footer links ("Learn more: onetreeplanted.org · polygonscan.com"):
+   one inline-flex row was wider than a 320px phone in tr/de and, centred, ran
+   off both edges. It wraps instead; each link stays whole. */
+.pt-foot-links { display: flex !important; flex-wrap: wrap; row-gap: 4px; column-gap: 4px; max-width: 100%; }
+.pt-foot-links > a { white-space: nowrap; }
+
+/* fitText row budget: while a pass measures the header row, nothing in it may
+   animate — otherwise (prefers-reduced-motion gives everything a 0.01ms
+   `transition: all`) the gap / brand cap / padding it just wrote still read
+   the old value, and the header flipped between two shapes on every frame at
+   1200px in French. The attribute is removed on the next frame. */
+[data-fit-busy], [data-fit-busy] * { transition: none !important; }

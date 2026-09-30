@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pay now — both rails, one template</title>
+<link rel="stylesheet" href="./_assets/activity.C1BiHr-7.css">
+<style>
+  body{margin:0;background:var(--paper,#f6f1e6);padding:28px 14px 60px}
+  .shot{max-width:430px;margin:0 auto}
+  .rail-title{font:800 0.8rem/1 system-ui;letter-spacing:.08em;text-transform:uppercase;color:#7a6a4f;margin:34px 4px 10px;display:flex;gap:8px;align-items:center}
+  .rail-title::after{content:"";flex:1;border-top:1.5px dashed #d8cdb4}
+  .sheet{position:static;transform:none}
+</style>
+</head>
+<body>
+<div class="shot">
+
+  <div class="rail-title">Rail 1 · Nimiq Pay — Lightning</div>
+  <div class="sheet" style="max-width:none">
+    <div class="sheet-body">
+      <div class="pay-hero mt-2">
+        <div class="pay-hero-label">Pay directly to CryptoRefills</div>
+        <div class="pay-hero-amt">
+          <img class="pay-nim-ico" src="./img/nimiq-hexagon.png" alt="NIM" width="22" height="22" style="border-radius:5px">
+          <span class="big-nim">≈ 14,269 NIM + fee</span>
+        </div>
+        <div class="pay-hero-youget">
+          <span class="xs faint">You get</span>
+          <span class="strong pay-you-get">Getir ×1</span>
+        </div>
+        <div class="pay-hero-del small">Top-up to 0555 ••• •• 67</div>
+      </div>
+
+      <div aria-busy="false">
+        <div class="xs faint mt-1" role="status">One supplier invoice. No funds are held by nim.shop.</div>
+        <div style="display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;margin-top:10px">
+          <span style="display:inline-flex;align-items:center;gap:7px;padding:5px 11px;border-radius:999px;background:#0582CA;color:#fff;font-weight:800;font-size:0.78rem;letter-spacing:0.01em">
+            <span style="display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;background:#fff;overflow:hidden">
+              <img src="./img/nimiq-hexagon.png" alt="" width="16" height="16" style="width:16px;height:16px;object-fit:contain;display:inline-block">
+            </span>
+            Pay with NIM
+          </span>
+          <span style="display:inline-flex;align-items:center;gap:7px;padding:5px 11px;border-radius:999px;background:#0E6BA8;color:#fff;font-weight:800;font-size:0.78rem;letter-spacing:0.01em">
+            <span style="display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;background:#fff;overflow:hidden">
+              <img src="./img/btc-lightning.png" alt="" width="16" height="16" style="width:16px;height:16px;object-fit:contain;display:inline-block">
+            </span>
+            Lightning Network
+          </span>
+        </div>
+        <p class="small muted mt-2" style="text-align:center">
+          Pay exactly <strong>≈ 14,269 NIM</strong> with Nimiq Pay — one supplier Lightning invoice, settled straight
+          from your wallet. Delivery starts automatically once the invoice is paid.
+        </p>
+        <button type="button" class="btn btn-gold btn-block btn-lg mt-2">
+          <img src="./img/nimiq-hexagon.png" alt="NIM" width="18" height="18" style="vertical-align:middle;border-radius:3px;display:inline-block">
+          <span class="btn-label">Pay with Nimiq Pay</span>
+        </button>
+        <button class="btn btn-outline btn-block mt-1">Copy payment request</button>
+        <button class="btn btn-outline btn-block mt-1">Verify &amp; show QR</button>
+        <div class="pay-qr mt-3">
+          <div class="pay-qr-frame"><div style="position:relative;display:inline-block;line-height:0">
+            <svg class="qr" data-qr="lightning" width="203" height="203" viewBox="0 0 29 29" style="background:#fff"></svg>
+            <span class="qr-ava" aria-hidden="true"><svg viewBox="0 0 32 32" width="32" height="32"><rect width="32" height="32" rx="6" fill="#0E6BA8"/><circle cx="16" cy="16" r="7" fill="#7cc7ff"/></svg></span>
+          </div></div>
+          <div class="xs faint mt-1">Scan once with Nimiq Pay and approve it in your wallet.</div>
+          <button class="btn btn-ghost mt-1">Hide QR</button>
+        </div>
+        <div class="note-box mt-2">
+          <span>A Lightning invoice can be paid exactly once — paying it twice is impossible by design. Keep this page open after paying; settlement usually takes a few seconds.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rail-title">Rail 2 · USDC — Polygon · same template, only the words differ</div>
+  <div class="sheet" style="max-width:none">
+    <div class="sheet-body">
+      <div class="pay-hero mt-2">
+        <div class="pay-hero-label">Pay directly to CryptoRefills · USDC on Polygon</div>
+        <div class="pay-hero-amt">
+          <img src="./img/usdc.png" alt="USDC" width="22" height="22" style="border-radius:5px">
+          <span class="big-nim">25.00 USDC</span>
+        </div>
+        <div class="pay-hero-youget">
+          <span class="xs faint">You get</span>
+          <span class="strong pay-you-get">Getir ×1</span>
+        </div>
+        <div class="pay-hero-del small">Code by email to friend@gmail.com</div>
+      </div>
+
+      <div aria-busy="false">
+        <div class="xs faint mt-1" role="status">One supplier invoice. No funds are held by nim.shop.</div>
+        <div style="display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;margin-top:10px">
+          <span style="display:inline-flex;align-items:center;gap:7px;padding:5px 11px;border-radius:999px;background:#0582CA;color:#fff;font-weight:800;font-size:0.78rem;letter-spacing:0.01em">
+            <span style="display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;background:#fff;overflow:hidden">
+              <img src="./img/usdc.png" alt="" width="16" height="16" style="width:16px;height:16px;object-fit:contain;display:inline-block">
+            </span>
+            Pay with USDC
+          </span>
+          <span style="display:inline-flex;align-items:center;gap:7px;padding:5px 11px;border-radius:999px;background:#0E6BA8;color:#fff;font-weight:800;font-size:0.78rem;letter-spacing:0.01em">
+            <span style="display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;background:#fff;overflow:hidden">
+              <img src="./img/polygon.png" alt="" width="16" height="16" style="width:16px;height:16px;object-fit:contain;display:inline-block">
+            </span>
+            Polygon Network
+          </span>
+        </div>
+        <p class="small muted mt-2" style="text-align:center">
+          Send exactly <strong>25.00 USDC</strong> with your Polygon wallet — one one-time address, settled straight
+          from your wallet. Delivery starts automatically after on-chain confirmation.
+        </p>
+        <button type="button" class="btn btn-gold btn-block btn-lg mt-2">
+          <img src="./img/polygon.png" alt="Polygon" width="18" height="18" style="vertical-align:middle;border-radius:3px;display:inline-block;background:#fff">
+          <span class="btn-label">Open wallet (Polygon)</span>
+        </button>
+        <button class="btn btn-outline btn-block mt-1">Copy payment address</button>
+        <button class="btn btn-outline btn-block mt-1">Verify &amp; show QR</button>
+        <div class="pay-qr mt-3">
+          <div class="pay-qr-frame"><div style="position:relative;display:inline-block;line-height:0">
+            <svg class="qr" data-qr="usdc" width="203" height="203" viewBox="0 0 29 29" style="background:#fff"></svg>
+            <span class="qr-ava" aria-hidden="true"><svg viewBox="0 0 32 32" width="32" height="32"><rect width="32" height="32" rx="6" fill="#0E6BA8"/><circle cx="16" cy="16" r="7" fill="#7cc7ff"/></svg></span>
+          </div></div>
+          <div class="xs faint mt-1">Scan once with your Polygon wallet and send the exact USDC amount.</div>
+          <button class="btn btn-ghost mt-1">Hide QR</button>
+        </div>
+        <div class="note-box mt-2">
+          <span>Only USDC on Polygon (chain 137) is accepted — funds sent on any other network cannot be recovered. Keep this page open after sending; confirmation usually takes ~30 seconds to a few minutes.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script>
+document.querySelectorAll('svg.qr').forEach((svg, n) => {
+  let seed = 1234 + n * 777;
+  const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+  const N = 29; let d = '';
+  const cell = (x, y) => { d += `M${x} ${y}h1v1h-1z`; };
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const inF1 = x < 8 && y < 8, inF2 = x >= N - 8 && y < 8, inF3 = x < 8 && y >= N - 8;
+    if (inF1 || inF2 || inF3) {
+      const lx = inF2 ? x - (N - 8) : x, ly = inF3 ? y - (N - 8) : y;
+      if (lx < 7 && ly < 7) { const ring = Math.max(Math.abs(lx - 3), Math.abs(ly - 3)); if (ring !== 2) cell(x, y); }
+      continue;
+    }
+    if (rnd() > 0.52) cell(x, y);
+  }
+  const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  p.setAttribute('d', d); p.setAttribute('fill', '#042133');
+  svg.appendChild(p);
+});
+</script>
+</body>
+</html>

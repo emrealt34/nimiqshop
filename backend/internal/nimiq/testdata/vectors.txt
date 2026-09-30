@@ -1,0 +1,24 @@
+# Public test vectors for the nimiq package tests (one "name = value" per
+# line, "#" starts a comment). Kept as data rather than as string literals in
+# the _test.go files so the sources stay free of long hex constants.
+#
+# bip39.*   Trezor python-mnemonic vectors.json (English, empty passphrase).
+# slip10.*  SLIP-0010 ed25519 test vector 1 (seed 000102…0f), chain m and m/0'.
+# tx.*      Golden Nimiq basic transaction: Blake2b-256 of SerializeContent,
+#           verified live against a testnet node (rpc.testnet.nimiqwatch.com).
+
+bip39.24.mnemonic = abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art
+bip39.24.seed     = 408b285c123836004f4b8842c89324c1f01382450c0d439af345ba7fc49acf705489c6fc77dbd4e3dc1dd8cc6bc9f043db8ada1e243c4a0eafb290d399480840
+bip39.12.mnemonic = abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about
+bip39.12.seed     = 5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4
+
+slip10.seed         = 000102030405060708090a0b0c0d0e0f
+slip10.m.private    = 2b4be7f19ee27bbf30c667b642d5f4aa69fd169872f8fc3059c08ebae2eb19e7
+slip10.m.chain      = 90046a93de5380a72b5e45010748567d5ea02bbf6522f979e05c0d8d8ca9fffb
+slip10.m0h.private  = 68e0fe46dfb67e368c75379acec591dad19df3cde26e63b93a8e704f1dade7a3
+slip10.m0h.chain    = 8b59aa11380b624e81507a27fedda59fea6d0b779a778918a2fd3590e16e9c69
+
+tx.seed      = 1111111111111111111111111111111111111111111111111111111111111111
+tx.to        = NQ07 8X9R 0DRM SESG TK5R GMCH FY3K VEUH VT7R
+tx.hash      = 549e57dbef4584a336f8990314c2dde924bd30cc35416bb00877623d581a44d3
+tx.wire_len  = 344

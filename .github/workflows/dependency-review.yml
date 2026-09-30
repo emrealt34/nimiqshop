@@ -1,0 +1,36 @@
+name: Dependency review
+
+# Blocks a pull request that introduces a dependency (npm, Go module or
+# GitHub Action) with a known high/critical vulnerability or a disallowed
+# licence, and posts the diff summary on the PR. Complements the scheduled
+# OSV / Trivy / govulncheck scans in security.yml.
+
+on:
+  pull_request:
+    branches: [main]
+  merge_group:
+    branches: [main]
+
+concurrency:
+  group: dependency-review-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    name: Dependency review
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write # comment the dependency diff summary on failure
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure

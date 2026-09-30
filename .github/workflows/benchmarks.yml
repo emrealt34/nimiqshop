@@ -1,0 +1,70 @@
+name: Benchmarks
+
+# Performance telemetry is intentionally separate from the blocking CI gate.
+# It produces comparable artifacts without making a normal PR wait for long
+# benchmark runs.
+on:
+  schedule:
+    - cron: "37 3 * * 1"
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: benchmarks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    name: Go benchmarks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Run benchmarks
+        working-directory: backend
+        run: go test -run=^$ -bench=. -benchmem -count=3 ./... | tee ../go-benchmarks.txt
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: go-benchmarks
+          path: go-benchmarks.txt
+          retention-days: 30
+
+  frontend:
+    name: Frontend build size
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run build
+      - name: Write build-size report
+        run: |
+          set -euo pipefail
+          {
+            echo "Commit: ${GITHUB_SHA}"
+            echo "Generated: $(date -u +%FT%TZ)"
+            echo
+            du -sh dist
+            du -ah dist | sort -h | tail -n 25
+          } | tee frontend-build-size.txt
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: frontend-build-size
+          path: frontend-build-size.txt
+          retention-days: 30

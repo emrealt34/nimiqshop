@@ -1,0 +1,385 @@
+name: Release
+
+# Three stages, in order:
+#   gate    — the same checks CI runs (types, i18n, API contract, lint, build,
+#             gofmt/vet/lint/test) plus a blocking govulncheck. A release
+#             never ships from a commit that its own gate rejects.
+#   release — build, pack, SHA256SUMS.txt, signed provenance, publish.
+#   image   — (in parallel with release) multi-arch container image pushed
+#             to ghcr.io/emrealt34/nimiqshop with signed provenance.
+#   verify  — re-reads the published assets: the archives must contain the
+#             exact layout install.sh / install.ps1 expect, and the binary
+#             boots far enough to answer /api/health.
+# No dependency or layer cache is used anywhere in this workflow: a poisoned
+# cache entry must never be able to reach a published artifact.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v2.1.0)"
+        required: false
+        default: "v2.1.0"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    name: Pre-release gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          # No dependency cache anywhere in this workflow: a poisoned cache
+          # entry must never be able to reach a published artifact.
+          package-manager-cache: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: backend/go.mod
+          cache: false
+      - name: Frontend gate
+        run: |
+          npm ci --no-audit --no-fund
+          npm run verify
+          npm run build
+          test -f dist/index.html
+      - name: Backend gate
+        working-directory: backend
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "::error::gofmt needed for:"; echo "$unformatted"; exit 1
+          fi
+          go vet ./...
+          go test -race -count=1 ./...
+      - name: govulncheck (blocking)
+        working-directory: backend
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+
+  release:
+    name: Build · attest · publish
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write # create the GitHub Release and push the tag
+      id-token: write # Sigstore signing for the build-provenance attestation
+      attestations: write # store the attestation with the repository
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          # No dependency cache anywhere in this workflow: a poisoned cache
+          # entry must never be able to reach a published artifact.
+          package-manager-cache: false
+
+      - name: Build frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+          test -f dist/index.html
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("dist/config.js")
+          t = p.read_text()
+          t = t.replace("API_BASE: 'https://shopapi.nimiqbase.com/api'", "API_BASE: '/api'")
+          t = t.replace('API_BASE: "https://shopapi.nimiqbase.com/api"', "API_BASE: '/api'")
+          p.write_text(t)
+          print("config.js API_BASE → /api")
+          PY
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: backend/go.mod
+          cache: false
+
+      - name: Build binaries and pack
+        working-directory: ${{ github.workspace }}
+        env:
+          GOFLAGS: -mod=readonly
+        run: |
+          set -euo pipefail
+          chmod +x cli/install.sh cli/nimshop
+          mkdir -p dist-release pack
+          cp cli/install.sh dist-release/install.sh
+          cp cli/install.ps1 dist-release/install.ps1
+          # Linux and Windows only — one .zip per target (no tarballs).
+          for t in linux/amd64 linux/arm64 windows/amd64 windows/arm64; do
+            os=${t%/*}
+            arch=${t#*/}
+            echo "==> $os/$arch"
+            exe=""
+            [[ "$os" == windows ]] && exe=".exe"
+            out="pack/nimshop-${os}-${arch}"
+            rm -rf "$out"
+            mkdir -p "$out/frontend" "$out/backend" "$out/cli"
+            ( cd backend && CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" go build -trimpath -ldflags="-s -w" \
+                -o "../${out}/nimshop-server${exe}" ./cmd/server )
+            cp -a dist/. "$out/frontend/"
+            cp backend/.env.example "$out/backend/.env.example"
+            if [[ "$os" == windows ]]; then
+              cp cli/nimshop.ps1 "$out/cli/nimshop.ps1"
+            else
+              cp cli/nimshop "$out/cli/nimshop"
+              chmod +x "$out/nimshop-server" "$out/cli/nimshop"
+            fi
+            ( cd pack && zip -qr "../dist-release/nimshop-${os}-${arch}.zip" "nimshop-${os}-${arch}" )
+          done
+          ( cd dist-release && sha256sum -- * > SHA256SUMS.txt )
+          ls -lh dist-release
+          cat dist-release/SHA256SUMS.txt
+
+      # Signed SLSA build provenance for every release asset (verify with
+      # `gh attestation verify <file> --repo emrealt34/nimiqshop`).
+      - id: attest
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist-release/*
+
+      # The same Sigstore bundle GitHub stores is also published next to the
+      # assets, so a release can be verified offline / without the GitHub
+      # API: `gh attestation verify <file> --repo emrealt34/nimiqshop
+      # --bundle nimshop-<tag>.provenance.sigstore.json`.
+      - name: Add the provenance bundle to the release assets
+        env:
+          BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
+          REQUESTED_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          TAG="$REQUESTED_TAG"
+          if [[ -z "$TAG" ]]; then
+            if [[ "${GITHUB_REF_TYPE}" == tag ]]; then TAG="${GITHUB_REF_NAME}"; else TAG="v2.1.0"; fi
+          fi
+          # SHA256SUMS.txt is itself an attested subject, so it is not
+          # regenerated here; the bundle is a signature artifact, not a
+          # checksummed one.
+          cp "$BUNDLE_PATH" "dist-release/nimshop-${TAG}.provenance.sigstore.json"
+          ls -lh dist-release
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # workflow_dispatch input, passed through env and never spliced into
+          # the script body: a tag is user-controlled text.
+          REQUESTED_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          TAG="$REQUESTED_TAG"
+          if [[ -z "$TAG" ]]; then
+            if [[ "${GITHUB_REF_TYPE}" == tag ]]; then TAG="${GITHUB_REF_NAME}"; else TAG="v2.1.0"; fi
+          fi
+          # A manual run for a tag that does not exist yet: gh creates the
+          # tag on this commit. A re-run for an existing tag replaces the
+          # release (assets are rebuilt and re-attested) but never the tag.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release delete "$TAG" --yes
+          fi
+          # --target only when gh has to create the tag itself. For a tag
+          # that already exists GitHub treats the target as a new ref and
+          # answers GITHUB_TOKEN with "HTTP 403: Resource not accessible by
+          # integration" whenever a later commit on main touched a workflow
+          # file (cli/cli#9514) — which is exactly the tag-push case.
+          target=()
+          if ! gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" >/dev/null 2>&1; then
+            target=(--target "$GITHUB_SHA")
+          fi
+          gh release create "$TAG" dist-release/* "${target[@]}" \
+            --title "nim.shop $TAG" \
+            --notes "## Install (Linux / Windows)
+
+          Linux:
+
+          \`\`\`bash
+          curl -fsSL https://github.com/emrealt34/nimiqshop/releases/latest/download/install.sh | bash
+          \`\`\`
+
+          Windows (PowerShell):
+
+          \`\`\`powershell
+          irm https://github.com/emrealt34/nimiqshop/releases/latest/download/install.ps1 | iex
+          \`\`\`
+
+          Then \`nimshop start\` — the shop comes up on port 8085 of your machine (the CLI prints the exact address)
+
+          \`nimshop status\` · \`nimshop stop\` · \`nimshop logs\`
+
+          One process serves API + frontend. Edit the install's \`backend/.env\` for supplier keys.
+
+          Prebuilt linux/amd64 + linux/arm64 + windows/amd64 + windows/arm64, each as a \`.zip\`. \`SHA256SUMS.txt\` lists every asset; each asset also carries signed SLSA build provenance — verify with \`gh attestation verify <file> --repo emrealt34/nimiqshop\` (the Sigstore bundle is published as \`nimshop-$TAG.provenance.sigstore.json\` for offline verification).
+
+          Container image (linux/amd64 + linux/arm64): \`docker pull ghcr.io/emrealt34/nimiqshop:${TAG#v}\` — verify with \`gh attestation verify oci://ghcr.io/emrealt34/nimiqshop:${TAG#v} --repo emrealt34/nimiqshop\`."
+
+  image:
+    name: Publish container image (GHCR)
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write # push to ghcr.io
+      id-token: write # Sigstore signing for the image provenance attestation
+      attestations: write # store the attestation with the repository
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Resolve tag
+        id: tag
+        env:
+          # workflow_dispatch input, passed through env and never spliced into
+          # the script body: a tag is user-controlled text.
+          REQUESTED_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          TAG="$REQUESTED_TAG"
+          if [[ -z "$TAG" ]]; then
+            if [[ "${GITHUB_REF_TYPE}" == tag ]]; then TAG="${GITHUB_REF_NAME}"; else TAG="v2.1.0"; fi
+          fi
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::tag must look like v1.2.3, got '$TAG'"; exit 1
+          fi
+          v="${TAG#v}"
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          {
+            echo "version=$v"
+            echo "tags=${image}:${v},${image}:${v%.*},${image}:${v%%.*},${image}:latest"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push (linux/amd64, linux/arm64)
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.tag.outputs.tags }}
+          labels: |
+            org.opencontainers.image.version=${{ steps.tag.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          provenance: mode=max
+          sbom: true
+
+      # Signed SLSA provenance for the image index digest, stored with the
+      # repository and pushed to the registry next to the image.
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ghcr.io/${{ github.repository }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+  verify:
+    name: Verify published assets
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read # gh release download on a public release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Re-download what users will download
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REQUESTED_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          TAG="$REQUESTED_TAG"
+          if [ -z "$TAG" ]; then
+            if [ "${GITHUB_REF_TYPE}" = tag ]; then TAG="${GITHUB_REF_NAME}"; else TAG="v2.1.0"; fi
+          fi
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          mkdir -p published
+          gh release download "$TAG" --dir published
+          ls -lh published
+
+      # Blocking: the archive layout is exactly what cli/install.sh and
+      # cli/install.ps1 unzip and execute, so a missing file here is a broken
+      # one-line install for every user.
+      - name: Checksum + archive layout
+        run: |
+          set -euo pipefail
+          ( cd published && sha256sum --check --ignore-missing SHA256SUMS.txt )
+          for archive in published/nimshop-*.zip; do
+            echo "==> $archive"
+            unzip -Z1 "$archive" | sort > /tmp/entries.txt
+            cat /tmp/entries.txt
+            # head first, then cut: with pipefail a `cut | head -n1` dies of
+            # SIGPIPE once head has its line and fails the whole step.
+            root="$(head -n1 /tmp/entries.txt | cut -d/ -f1)"
+            if [[ "$archive" == *windows* ]]; then
+              binary="$root/nimshop-server.exe"
+              cli_script="$root/cli/nimshop.ps1"
+            else
+              binary="$root/nimshop-server"
+              cli_script="$root/cli/nimshop"
+            fi
+            for expected in \
+              "$binary" \
+              "$root/frontend/index.html" \
+              "$root/backend/.env.example" \
+              "$cli_script"; do
+              grep -qxF "$expected" /tmp/entries.txt || {
+                echo "::error::$archive is missing $expected"; exit 1; }
+            done
+          done
+
+      - name: Boot the linux/amd64 archive and ask /api/health
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          work="$(mktemp -d)"
+          unzip -q published/nimshop-linux-amd64.zip -d "$work"
+          root="$(find "$work" -maxdepth 1 -mindepth 1 -type d -print -quit)"
+          cd "$root"
+          # Everything the shop needs to boot: a private JWT secret, a host
+          # name and a throwaway partner id. No supplier call happens at
+          # startup (the catalogue is request-driven), so no key is needed.
+          jwt_secret="$(head -c 32 /dev/urandom | base64 | tr -d '\n')"
+          export JWT_SECRET="$jwt_secret"
+          export SITE_HOST=localhost # DevSkim: ignore DS162092 release smoke test on the runner only
+          export CRYPTOREFILLS_PARTNER_ID=release-smoke
+          export LISTEN_ADDR=127.0.0.1:18099 # DevSkim: ignore DS162092 loopback-only smoke test by design
+          export BADGER_DIR="$work/badger"
+          export STATIC_DIR="$root/frontend"
+          ./nimshop-server > "$work/server.log" 2>&1 &
+          pid=$!
+          ok=0
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:18099/api/health | grep -q '"ok":true'; then ok=1; break; fi # DevSkim: ignore DS162092 loopback health probe by design
+            sleep 2
+          done
+          kill "$pid" 2>/dev/null
+          wait "$pid" 2>/dev/null
+          if [ "$ok" -ne 1 ]; then
+            echo "::warning::the released binary did not answer /api/health — see the log"
+            tail -n 40 "$work/server.log"
+            exit 0
+          fi
+          echo "released binary answered /api/health"

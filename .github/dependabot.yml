@@ -1,0 +1,89 @@
+version: 2
+# Dependabot is deliberately grouped: this repository has a fast CI gate and
+# a nightly Playwright suite, so one pull request per ecosystem keeps both
+# cheap to review. Security updates are never held back by a group.
+# Every ecosystem has a release cooldown: a brand-new version must be a week
+# old before it is proposed, the cheapest defence against a hijacked package
+# release that gets yanked within days (security updates bypass it).
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Istanbul
+    open-pull-requests-limit: 8
+    cooldown:
+      default-days: 7
+    groups:
+      # Astro + its integrations move together; splitting them produces
+      # pull requests that cannot pass the build on their own.
+      astro:
+        patterns:
+          - astro
+          - '@astrojs/*'
+      react:
+        patterns:
+          - react
+          - react-dom
+          - '@types/react'
+          - '@types/react-dom'
+      tooling:
+        patterns:
+          - eslint
+          - typescript
+          - oxlint
+          - '@eslint/*'
+          - '@microsoft/*'
+    labels:
+      - dependencies
+      - frontend
+    commit-message:
+      prefix: 'build(deps)'
+
+  - package-ecosystem: gomod
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Istanbul
+    open-pull-requests-limit: 8
+    cooldown:
+      default-days: 7
+    groups:
+      # The vendored x/crypto copy is deliberately absent from go.mod, so the
+      # module graph here is small enough to review dependency by dependency.
+      fasthttp:
+        patterns:
+          - 'github.com/valyala/fasthttp'
+          - 'github.com/fasthttp/router'
+          - 'github.com/klauspost/compress'
+    labels:
+      - dependencies
+      - go
+    commit-message:
+      prefix: 'build(deps)'
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Istanbul
+    open-pull-requests-limit: 8
+    cooldown:
+      default-days: 7
+    groups:
+      # Action pins are 40-character SHAs with a `# vX.Y.Z` comment; a group
+      # keeps the pin/comment pairs reviewable in one diff.
+      actions:
+        patterns:
+          - '*'
+    labels:
+      - dependencies
+      - ci
+    commit-message:
+      prefix: 'ci'

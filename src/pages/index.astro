@@ -1,0 +1,21 @@
+---
+import BaseLayout from '../layouts/Base.astro';
+import { ShopPage } from '../components/home/ShopPage';
+---
+<BaseLayout
+  title="shop.nimiqbase.com — Gift cards &amp; more, paid with NIM · BTC Lightning" titleKey="pageTitle.shop"
+  activeKey="shop"
+>
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "OnlineStore",
+      "name": "shop.nimiqbase.com",
+      "url": "https://shop.nimiqbase.com/",
+      "paymentAccepted": "NIM (Nimiq)",
+      "currenciesAccepted": "NIM",
+      "description": "Nimiq Pay BTC Lightning shop with no internal customer balance for gift cards, mobile top-ups and eSIMs. Open source; payment tracking is transparent."
+    }
+  </script>
+  <ShopPage client:only="react" />
+</BaseLayout>

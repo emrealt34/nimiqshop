@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/emrealt34/nimiqshop/security/advisories/new
+    about: Report secrets, payment bugs, wallet handling and auth bypasses privately. Never as a public issue.
+  - name: Releases and install instructions
+    url: https://github.com/emrealt34/nimiqshop/releases
+    about: Download the latest Linux/Windows build, SHA256SUMS.txt and the signed provenance attestation.

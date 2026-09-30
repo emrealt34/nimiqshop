@@ -1,0 +1,44 @@
+name: OSV-Scanner
+
+on:
+  pull_request:
+    branches: [main]
+  merge_group:
+    branches: [main]
+  schedule:
+    - cron: "30 8 * * 6"
+  push:
+    branches: [main]
+
+concurrency:
+  group: osv-scanner-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  scan-scheduled:
+    if: ${{ github.event_name == 'push' || github.event_name == 'schedule' }}
+    permissions:
+      security-events: write # upload SARIF to code scanning
+      contents: read
+      actions: read # codeql-action reads workflow metadata for the upload
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@a345acffa64b0eaede81a3d9aae6141214d9c8fc # v2.6.0
+    with:
+      # No ignore list: the only advisory that ever needed one (GO-2026-5932,
+      # golang.org/x/crypto) was resolved by dropping the module entirely.
+      scan-args: |-
+        -r
+        ./
+  scan-pr:
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+    permissions:
+      security-events: write # upload SARIF to code scanning
+      contents: read
+      actions: read # codeql-action reads workflow metadata for the upload
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@a345acffa64b0eaede81a3d9aae6141214d9c8fc # v2.6.0
+    with:
+      scan-args: |-
+        -r
+        ./

@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# nim.shop CLI — start / stop / status / logs for a release install.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BIN="$ROOT/nimshop-server"
+ENV_FILE="$ROOT/backend/.env"
+PID_FILE="$ROOT/nimshop.pid"
+LOG_DIR="$ROOT/logs"
+LOG_FILE="$LOG_DIR/nimshop.log"
+
+die() { printf 'nimshop: %s\n' "$*" >&2; exit 1; }
+pid_alive() { [[ -f "$PID_FILE" ]] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; }
+
+cmd="${1:-help}"
+
+case "$cmd" in
+  start)
+    [[ -x "$BIN" ]] || die "binary missing: $BIN (re-run install.sh)"
+    [[ -f "$ENV_FILE" ]] || die "missing $ENV_FILE"
+    if pid_alive; then
+      echo "already running (pid $(cat "$PID_FILE"))"
+      exit 0
+    fi
+    mkdir -p "$LOG_DIR" "$ROOT/backend/data/badger"
+    cd "$ROOT/backend"
+    nohup "$BIN" >>"$LOG_FILE" 2>&1 &
+    echo $! >"$PID_FILE"
+    sleep 0.4
+    if pid_alive; then
+      port=$(sed -n 's/^LISTEN_ADDR=://p' "$ENV_FILE" | head -1)
+      echo "nim.shop started (pid $(cat "$PID_FILE"))  →  http://127.0.0.1:${port:-8085}"
+    else
+      tail -n 40 "$LOG_FILE" >&2 || true
+      die "server exited — see $LOG_FILE"
+    fi
+    ;;
+  stop)
+    if pid_alive; then
+      kill "$(cat "$PID_FILE")" 2>/dev/null || true
+      sleep 0.3
+      pid_alive && kill -9 "$(cat "$PID_FILE")" 2>/dev/null || true
+      rm -f "$PID_FILE"
+      echo "stopped"
+    else
+      rm -f "$PID_FILE"
+      echo "not running"
+    fi
+    ;;
+  restart)
+    "$0" stop || true
+    "$0" start
+    ;;
+  status)
+    if pid_alive; then
+      echo "running  pid=$(cat "$PID_FILE")"
+    else
+      echo "stopped"
+      exit 1
+    fi
+    ;;
+  logs)
+    mkdir -p "$LOG_DIR"
+    tail -n "${2:-80}" -f "$LOG_FILE"
+    ;;
+  *)
+    cat <<EOF
+nim.shop CLI
+
+  nimshop start     start backend + frontend (one process)
+  nimshop stop
+  nimshop restart
+  nimshop status
+  nimshop logs [n]
+
+Install dir: $ROOT
+EOF
+    ;;
+esac

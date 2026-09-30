@@ -1,0 +1,70 @@
+{
+  "name": "nimiqshop-astro",
+  "version": "2.1.0",
+  "description": "nim.shop frontend — Astro + React frontend for the nim.shop gift-card marketplace. Visual/behavioral parity with the original vanilla-JS build.",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev --host 0.0.0.0",
+    "dev:tunnel": "astro dev --host 0.0.0.0 --port 4321",
+    "build": "astro build",
+    "build:all": "node scripts/build-all.mjs",
+    "build:backend": "node scripts/build-all.mjs --backend-only",
+    "flags:fetch": "node scripts/fetch-flags.mjs",
+    "build:frontend": "node scripts/build-all.mjs --frontend-only",
+    "preview": "node scripts/static-server.mjs",
+    "preview:vite": "astro preview --host 0.0.0.0",
+    "start": "node scripts/run-stack.mjs preview",
+    "start:backend": "node scripts/run-backend-only.mjs",
+    "start:dev": "node scripts/run-stack.mjs dev",
+    "start:tunnel": "node scripts/run-stack.mjs tunnel",
+    "check": "tsc --noEmit",
+    "check:i18n": "node scripts/check-i18n.mjs",
+    "check:keys": "node scripts/check-i18n-keys.mjs",
+    "tunnel:unpin": "node scripts/unpin-hosts.mjs",
+    "tunnel": "node scripts/run-stack.mjs tunnel",
+    "tunnel:origin": "node scripts/run-stack.mjs tunnel-origin",
+    "start:stack": "node scripts/run-stack.mjs preview",
+    "install:cloudflared": "node devtools/ensure-cloudflared.mjs",
+    "diagnose": "node scripts/diagnose-url.mjs",
+    "test:e2e:build": "node tests/e2e/support/build.mjs",
+    "test:e2e": "node tests/e2e/support/build.mjs && playwright test",
+    "test:e2e:quick": "playwright test",
+    "test:e2e:smoke": "playwright test --grep @smoke",
+    "test:responsive": "playwright test --project=desktop --project=tablet --project=phone",
+    "test:e2e:report": "playwright show-report",
+    "check:e2e": "tsc -p tests/e2e",
+    "check:i18n:deep": "node scripts/check-i18n-deep.mjs",
+    "check:api": "node scripts/check-api-routes.mjs",
+    "check:workflows": "node scripts/check-workflow-policy.mjs",
+    "check:config": "bash scripts/check-config-syntax.sh",
+    "lint": "npm run lint:js && npm run lint:ts",
+    "lint:js": "eslint .",
+    "lint:ts": "oxlint",
+    "verify": "npm run check && npm run check:e2e && npm run check:i18n && npm run check:keys && npm run check:i18n:deep && npm run check:api && npm run check:workflows && npm run check:config && npm run lint"
+  },
+  "dependencies": {
+    "@astrojs/react": "^7.0.0",
+    "@nimiq/mini-app-sdk": "^0.2.3",
+    "astro": "^7.3.5",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@microsoft/eslint-formatter-sarif": "^3.1.0",
+    "@playwright/test": "1.63.0",
+    "@types/node": "^26.6.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "eslint": "^10.11.0",
+    "globals": "^17.12.0",
+    "oxlint": "1.86.0",
+    "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}

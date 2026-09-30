@@ -1,0 +1,126 @@
+{
+  "AMOUNT_LESS_THEN_MINIMUM_ALLOWED": {
+    "scope": "order",
+    "message": "The order total is below the minimum payment amount. Increase the amount or adjust the cart before trying again."
+  },
+  "MAXIMUM_AMOUNT_PER_ORDER_EXCEEDED": {
+    "scope": "order",
+    "message": "The order total exceeds the per-order maximum. Reduce the order amount before trying again."
+  },
+  "DAILY_SPENDING_LIMIT_EXCEEDED": {
+    "scope": "account",
+    "message": "Your Cryptorefills daily spending limit has been reached. Wait for that limit to reset or review your account tier. Splitting the cart does not bypass this limit."
+  },
+  "MONTHLY_SPENDING_LIMIT_EXCEEDED": {
+    "scope": "account",
+    "message": "Your Cryptorefills monthly spending limit has been reached. Wait for that limit to reset or review your account tier. Splitting the cart does not bypass this limit."
+  },
+  "PRODUCT_COUNT_EXCEEDED": {
+    "scope": "order",
+    "message": "The cart contains more products than allowed in one order. Reduce the product quantity before trying again."
+  },
+  "MULTIPLE_LIMITED_PRODUCT_SAME_ORDER": {
+    "scope": "order",
+    "message": "This order contains more than one limited product. Remove the conflicting limited products and recheck the cart."
+  },
+  "NOT_AVAILABLE_PRODUCT": {
+    "scope": "item",
+    "message": "This product is no longer available in the Cryptorefills catalogue. Remove it or choose another product."
+  },
+  "OUT_OF_STOCK": {
+    "scope": "item",
+    "message": "This product is out of stock. Remove it or choose another product; availability may change later."
+  },
+  "NOT_ACTIVE": {
+    "scope": "item",
+    "message": "This product is inactive or temporarily paused. Choose another product or check again later."
+  },
+  "INVALID_BENEFICIARY_ACCOUNT": {
+    "scope": "input",
+    "message": "The delivery email, phone number or beneficiary account is not accepted. Correct the delivery details before trying again."
+  },
+  "NOT_ALLOWED_PAYMENT_VIA": {
+    "scope": "payment",
+    "message": "The selected payment option is not allowed for this order. Choose another payment option offered by this shop, or contact support if none is available."
+  },
+  "UNSUPPORTED_PROTOCOL_COIN_COMBINATION": {
+    "scope": "payment",
+    "message": "This payment method and network combination is not supported. Choose another payment option offered by this shop, or contact support."
+  },
+  "LOGIN_REQUIRED": {
+    "scope": "account",
+    "message": "These products require a signed-in Cryptorefills account. Sign in to Cryptorefills before trying again. Connecting a Nimiq wallet here is not the same as signing in there."
+  },
+  "COUPON_REQUIRES_LOGIN": {
+    "scope": "account",
+    "message": "This Cryptorefills coupon requires a signed-in Cryptorefills account. Sign in there, or remove the coupon before trying again."
+  },
+  "COUPON_NOT_FOUND": {
+    "scope": "coupon",
+    "message": "The Cryptorefills coupon was not found. Check the code or remove it before trying again."
+  },
+  "COUPON_NOT_ACTIVE": {
+    "scope": "coupon",
+    "message": "The Cryptorefills coupon is not active yet. Wait until it becomes active or remove it."
+  },
+  "COUPON_ALREADY_SPENT": {
+    "scope": "coupon",
+    "message": "This Cryptorefills coupon has already been redeemed by this account. Remove it or use another eligible coupon."
+  },
+  "COUPON_MAX_USAGE_REACHED": {
+    "scope": "coupon",
+    "message": "This Cryptorefills coupon has reached its total usage limit. Remove it or use another eligible coupon."
+  },
+  "COUPON_EXPIRED": {
+    "scope": "coupon",
+    "message": "The Cryptorefills coupon has expired. Remove it or use another eligible coupon."
+  },
+  "COUPON_BELOW_MIN_AMOUNT": {
+    "scope": "coupon",
+    "message": "The order is below this Cryptorefills coupon’s minimum amount. Adjust the cart or remove the coupon."
+  },
+  "COUPON_NOT_VALID_FOR_USER": {
+    "scope": "coupon",
+    "message": "This Cryptorefills coupon is not valid for your account. Remove it or use a coupon available to you."
+  },
+  "COUPON_NOT_VALID_FOR_CATEGORY": {
+    "scope": "coupon",
+    "message": "This Cryptorefills coupon does not apply to the selected product categories. Change the selection or remove the coupon."
+  },
+  "COUPON_NOT_VALID_FOR_KIND": {
+    "scope": "coupon",
+    "message": "This Cryptorefills coupon does not apply to the selected product kind. Change the selection or remove the coupon."
+  },
+  "COUPON_NOT_VALID_FOR_BRAND": {
+    "scope": "coupon",
+    "message": "This Cryptorefills coupon does not apply to the selected brands. Change the selection or remove the coupon."
+  },
+  "COUPON_NOT_VALID_FOR_COUNTRY": {
+    "scope": "coupon",
+    "message": "This Cryptorefills coupon is not valid in the order country. Check the intended country or remove the coupon."
+  },
+  "COUPON_NOT_VALID_FOR_STORE": {
+    "scope": "coupon",
+    "message": "This Cryptorefills coupon is not valid for the requested store or region. Check the intended store or remove the coupon."
+  },
+  "KYC_MISSING": {
+    "scope": "account",
+    "message": "Cryptorefills requires identity verification for this order or spending tier. Open your Cryptorefills account and complete verification before trying again."
+  },
+  "KYC_PENDING": {
+    "scope": "account",
+    "message": "Your Cryptorefills identity verification is already in progress. It typically completes within 20 minutes but may take up to 48 hours. Wait for the result; contact Cryptorefills support if it remains pending beyond that."
+  },
+  "VERIFICATION_REQUIRED": {
+    "scope": "account",
+    "message": "Cryptorefills requires additional verification before this order can proceed. Review your Cryptorefills account and contact Cryptorefills support if this persists."
+  },
+  "SUSPENDED_COIN": {
+    "scope": "payment",
+    "message": "The selected payment coin is temporarily suspended by Cryptorefills. Wait until it is available again, or choose another payment option offered by this shop."
+  },
+  "SUSPENDED_NETWORK": {
+    "scope": "payment",
+    "message": "The selected payment network is temporarily suspended by Cryptorefills. Wait until it is available again, or choose another payment option offered by this shop."
+  }
+}

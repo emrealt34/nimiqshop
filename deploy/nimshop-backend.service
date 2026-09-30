@@ -1,0 +1,33 @@
+[Unit]
+Description=nim.shop Go backend (API on :__API_PORT__)
+Documentation=file://__APP_HOME__/README_SETUP.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__SERVICE_USER__
+Group=__SERVICE_GROUP__
+# The Go binary loads backend/.env and resolves BADGER_DIR=./data/badger
+# relative to its working directory, so this MUST stay <app>/backend.
+WorkingDirectory=__APP_HOME__/backend
+ExecStart=__APP_HOME__/backend/bin/nimshop-server
+Restart=on-failure
+RestartSec=3
+KillSignal=SIGTERM
+TimeoutStopSec=20
+
+# Optional memory ceiling for large boxes (see "Memory envelope" in backend/.env.example):
+# Environment=GOMEMLIMIT=4GiB
+
+# --- Hardening (adjust if you move BADGER_DIR elsewhere) ---
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+ReadWritePaths=__APP_HOME__/backend/data
+
+[Install]
+WantedBy=multi-user.target

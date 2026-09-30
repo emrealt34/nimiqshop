@@ -1,0 +1,628 @@
+/**
+ * HomePage.tsx — React port of pages/home.js: storefront catalog (gift
+ * cards / top-ups / eSIMs), search, country picker, sort, hide-out-of-stock,
+ * responsive product grid with chunked render + card caching. Behavior is
+ * faithful to the original (dedup, self-healing missing list, geo suggest).
+ */
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Icon } from '../ui/Icon';
+import { FlagMark } from '../ui/FlagMark';
+import { ComeBackBanner } from '../ui/uiKit';
+import { flattenBrands, type Product } from '../../lib/catalog';
+import { UnifiedThumb } from '../ui/UnifiedThumb';
+import { orderedCountries } from '../../lib/countries';
+import { listGiftCards, listTopups, listEsims, searchProducts, getGeo, getProduct, getFXRates, cachedFX } from '../../lib/api';
+import {
+  catalogHasItems,
+  readCachedCatalog,
+  writeCachedCatalog,
+  type CatalogMap,
+} from '../../lib/catalogCache';
+import { countryName, parseCurrencyValue } from '../../lib/format';
+import { useToast } from '../AppProviders';
+import { useInNimiqPay, openInNimiqPay } from '../../lib/miniapp';
+import { NimiqPayInstallDialog } from '../ui/NimiqPayInstallDialog';
+import { siteName } from '../../lib/config';
+import { useT } from '../../i18n';
+import { pagePath } from '../../lib/asset';
+
+
+/** Category chips — labels are i18n keys (the array is module-level, so it
+ *  cannot call useT() itself; the render maps the key through t()). */
+const CATS: { key: string; labelKey: string; shortKey: string }[] = [
+  { key: 'all', labelKey: 'home.catEverything', shortKey: 'home.catAllShort' },
+  { key: 'gift_card', labelKey: 'home.catGiftCards', shortKey: 'home.catCardsShort' },
+  { key: 'phone_refill', labelKey: 'home.catTopups', shortKey: 'home.catTopups' },
+  { key: 'esim', labelKey: 'home.catEsims', shortKey: 'home.catEsims' },
+];
+
+/**
+ * A comparable "price" for sorting. Re-parses the raw min price and only
+ * accepts it when a real currency was detected, so "1720 Minecoins", "1 month"
+ * or "Aylık fizy Premium" are never mistaken for money. Returns a USD value so
+ * prices in different currencies (TRY, USD, EUR…) rank correctly, or `null`
+ * for non-money items. Null sorts last in both directions — a "no price" item
+ * must never top the "low to high" list.
+ */
+function usdSortKey(p: Product, fx: Record<string, number> | null): number | null {
+  const parsed = parseCurrencyValue(p.min_raw);
+  const min = parsed.value;
+  const ccy = parsed.currency;
+  if (min <= 0 || !ccy) return null;
+  const rate = fx ? Number(fx[ccy]) || 0 : 0;
+  if (rate > 0) return min * rate; // FX available → true cross-currency ranking
+  return min; // FX unknown → raw value (still correct within one country)
+}
+
+export function HomePage() {
+  const { t } = useT();
+  const inPay = useInNimiqPay();
+  const { toast } = useToast();
+  const [catalogs, setCatalogs] = useState<Record<string, Product[]>>({ gift_card: [], phone_refill: [], esim: [] });
+  const [activeCat, setActiveCat] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState<Product[] | null>(null);
+  const [country, setCountry] = useState('TR');
+  const [sortKey, setSortKey] = useState('default');
+  // The operator's global catalog rule decides whether out-of-stock products
+  // are removed server-side. When the rule is "show", keep them visible by
+  // default and mark them on the card; buyers can still hide them locally.
+  const [hideOutOfStock, setHideOutOfStock] = useState(true);
+  const [fx, setFx] = useState<Record<string, number> | null>(() => (typeof cachedFX === 'function' ? cachedFX() : null));
+  const [showPayInstall, setShowPayInstall] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [shelfNote, setShelfNote] = useState('');
+  const [busy, setBusy] = useState(true);
+  const userChoseCountry = useRef(false);
+  const [geoNote, setGeoNote] = useState('');
+  const mountAlive = useRef(true);
+  const catalogRequest = useRef(0);
+
+  // Restore saved country
+  useEffect(() => {
+    mountAlive.current = true;
+    try {
+      const saved = localStorage.getItem('nimshop_country');
+      if (saved && /^[A-Za-z]{2}$/.test(saved)) {
+        setCountry(saved.toUpperCase());
+        userChoseCountry.current = true;
+      }
+    } catch {}
+    return () => {
+      mountAlive.current = false;
+    };
+  }, []);
+
+  const loadCatalogs = useCallback(async (c: string) => {
+    const request = ++catalogRequest.current;
+    const current = () => mountAlive.current && request === catalogRequest.current;
+    setLoadError(null);
+    setShelfNote('');
+    const cached = readCachedCatalog(c);
+    setCatalogs(cached || { gift_card: [], phone_refill: [], esim: [] });
+    setBusy(true);
+    const results = await Promise.allSettled([listGiftCards(c, false), listTopups(c, false), listEsims(c, false)]);
+    if (!current()) return;
+    const keys = ['gift_card', 'phone_refill', 'esim'];
+    const merged: CatalogMap = { gift_card: [], phone_refill: [], esim: [] };
+    const missing: string[] = [];
+    results.forEach((result, index) => {
+      const key = keys[index];
+      if (result.status === 'fulfilled') merged[key] = flattenBrands(result.value, c);
+      else {
+        missing.push(key);
+        merged[key] = cached?.[key] || [];
+      }
+    });
+    if (!current()) return;
+    setCatalogs(merged);
+    setBusy(false);
+    if (!missing.length) writeCachedCatalog(c, merged);
+    else if (catalogHasItems(merged)) {
+      setShelfNote(t('home.shelfNote'));
+    } else {
+      setLoadError(t('home.loadError'));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => { void loadCatalogs(country); }, [country, loadCatalogs]);
+
+  useEffect(() => {
+    getFXRates().then((r) => {
+      if (mountAlive.current && r?.usd_per_unit) setFx(r.usd_per_unit);
+    }).catch(() => {});
+    getGeo().then((geo) => {
+      if (!mountAlive.current || userChoseCountry.current) return;
+      const cc = String(geo?.country || '').toUpperCase();
+      const all = [...orderedCountries().popular, ...orderedCountries().rest];
+      if (!all.some(([code]) => code === cc)) return;
+      setCountry(cc);
+      setGeoNote(''); // removed per user request — no location note
+    }).catch(() => {});
+  }, []);
+
+  const applyCountry = (code: string, manual: boolean) => {
+    // Invalidate the previous response immediately, before React's effect.
+    ++catalogRequest.current;
+    setCountry(code);
+    if (manual) {
+      userChoseCountry.current = true;
+      setGeoNote('');
+      try { localStorage.setItem('nimshop_country', code); } catch {}
+    }
+    setSearchTerm('');
+    setSearchResults(null);
+    if (code === country) void loadCatalogs(code);
+  };
+
+  useEffect(() => {
+    let active = true;
+    const term = searchTerm.trim();
+    setSearchResults(null);
+    if (!term) return;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await searchProducts(term, country);
+        if (active) setSearchResults(normalizeList(res, country));
+      } catch {
+        const query = term.toLowerCase();
+        const local = Object.values(catalogs).flat().filter((p) => p.name.toLowerCase().includes(query));
+        if (active) setSearchResults(local);
+      }
+    }, 300);
+    return () => { active = false; clearTimeout(timer); };
+  }, [searchTerm, country, catalogs]);
+
+  const items = useMemo(() => {
+    let list: Product[];
+    if (searchTerm.trim() && searchResults) list = searchResults;
+    else list = activeCat === 'all' ? [...catalogs.gift_card, ...catalogs.phone_refill, ...catalogs.esim] : catalogs[activeCat] || [];
+    if (hideOutOfStock) list = list.filter((p) => p.in_stock !== false);
+    list = list.filter((p) => !isMissingProduct(p.id, p.country));
+    if (sortKey === 'price-asc' || sortKey === 'price-desc') {
+      const dir = sortKey === 'price-asc' ? 1 : -1;
+      list = [...list].sort((a, b) => {
+        const ka = usdSortKey(a, fx);
+        const kb = usdSortKey(b, fx);
+        // Items without a money price always sink to the bottom.
+        if (ka === null && kb === null) return 0;
+        if (ka === null) return 1;
+        if (kb === null) return -1;
+        return (ka - kb) * dir;
+      });
+    } else if (sortKey === 'name') {
+      list = [...list].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }));
+    }
+    return list;
+  }, [catalogs, activeCat, searchTerm, searchResults, hideOutOfStock, sortKey, fx]);
+
+  return (
+    <>
+      <section className="hero container fade-in">
+        <div>
+          <h1>
+            {t('home.heroTitle1')}
+            <br />
+            <span className="gold-text">{t('home.heroTitle2')}</span>
+          </h1>
+          <p className="lede">
+            {t('home.heroLede')}
+          </p>
+          <div className="hero-actions">
+            <a className="btn btn-gold btn-lg" href="#browse" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+              <Icon name="bag" size={20} />
+              <span>{t('home.browseShelf')}</span>
+            </a>
+            <a className="btn btn-ghost btn-lg hero-cashback" href={pagePath("/cashback")} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+              <Icon name="spark" size={20} />
+              <span>{t('home.earnCashback')}</span>
+            </a>
+            {inPay ? (
+              <span className="chip" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <Icon name="check" size={15} />
+                {t('home.runningInPay')}
+              </span>
+            ) : (
+              <button
+                className="btn btn-ghost btn-lg"
+                onClick={() => {
+                  openInNimiqPay(() => setShowPayInstall(true));
+                }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+              >
+                <Icon name="nimiq" size={20} />
+                <span>{t('home.openInPay')}</span>
+              </button>
+            )}
+          </div>
+        </div>
+        <aside className="kf-pkg" aria-label={t('home.packageAria')}>
+          <div className="kf-pkg-head">
+            <h2 style={{ fontSize: '1.1rem', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>{t('home.insidePackage')}</h2>
+            <div className="kf-stamp">{t('home.fastDelivery')}</div>
+          </div>
+          <ul>
+            <li style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <Icon name="lock" size={17} /> {t('home.bulletNoBalance')}
+            </li>
+            <li style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <Icon name="bolt" size={17} /> {t('home.bulletLightning')}
+            </li>
+            <li style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <Icon name="star" size={17} /> {t('home.bulletRatings')}
+            </li>
+            <li style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <Icon name="gift" size={17} /> {t('home.bulletInstant')}
+            </li>
+            <li style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <Icon name="check" size={17} /> {t('home.bulletOpenSource')}
+            </li>
+          </ul>
+        </aside>
+      </section>
+
+      <div className="container how-strip" aria-label={t('home.howAria', { site: siteName() })}>
+        <div className="how-step">
+          <span className="how-n">1</span>
+          <div>
+            <div className="strong">{t('home.how1Title')}</div>
+            <div className="small muted">{t('home.how1Text')}</div>
+          </div>
+        </div>
+        <div className="how-step">
+          <span className="how-n">2</span>
+          <div>
+            <div className="strong">{t('home.how2Title')}</div>
+            <div className="small muted">{t('home.how2Text', { site: siteName() })}</div>
+          </div>
+        </div>
+        <div className="how-step">
+          <span className="how-n">3</span>
+          <div>
+            <div className="strong">{t('home.how3Title')}<span className="how-rest">{t('home.how3Rest')}</span></div>
+            <div className="small muted">{t('home.how3Text')}</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="container">
+        <ComeBackBanner />
+      </div>
+
+      <div className="container" id="browse">
+        <div className="toolbar">
+          <div className="seg" id="catSeg">
+            {CATS.map((c) => (
+              <button
+                key={c.key}
+                className={c.key === activeCat ? 'active' : ''}
+                aria-pressed={c.key === activeCat}
+                onClick={() => {
+                  setActiveCat(c.key);
+                  setSearchTerm('');
+                  setSearchResults(null);
+                }}
+              >
+                <span className="seg-lg">{t(c.labelKey)}</span>
+                <span className="seg-sm">{t(c.shortKey)}</span>
+              </button>
+            ))}
+          </div>
+          <div className="searchbox">
+            <Icon name="search" size={18} />
+            <input
+              className="input"
+              type="search"
+              placeholder={t('home.searchPlaceholder')}
+              aria-label={t('home.searchAria')}
+              autoComplete="off"
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+              }}
+            />
+          </div>
+        </div>
+        <div className="toolbar filters">
+          {/* NOTE: this is a <div>, not a <label> — a label would forward its
+              click to the nested button (double toggle + the caption opening
+              the popup). Same for the out-of-stock toggle below. */}
+          <div className="field">
+            <span className="xs faint">{t('home.labelCountry')}</span>
+            <CountryPicker country={country} onChange={applyCountry} />
+          </div>
+          <label className="field">
+            <span className="xs faint">{t('home.labelSort')}</span>
+            <select className="input" id="sortSel" aria-label={t('home.labelSort')} value={sortKey} onChange={(e) => setSortKey(e.target.value)}>
+              <option value="default">{t('home.sortFeatured')}</option>
+              <option value="price-asc">{t('home.sortPriceAsc')}</option>
+              <option value="price-desc">{t('home.sortPriceDesc')}</option>
+              <option value="name">{t('home.sortName')}</option>
+            </select>
+          </label>
+          <div className="field">
+            <span className="xs faint">&nbsp;</span>
+            <label className="toggle oos-toggle" htmlFor="hideOOS">
+              <input type="checkbox" id="hideOOS" checked={hideOutOfStock} onChange={(e) => setHideOutOfStock(e.target.checked)} />
+              <Icon name={hideOutOfStock ? 'eye-off' : 'eye'} size={16} />
+              <span>{hideOutOfStock ? t('home.hideOos') : t('home.showOos')}</span>
+            </label>
+          </div>
+          {geoNote ? <span className="xs faint" id="geoNote">{geoNote}</span> : null}
+        </div>
+        {shelfNote && <div className="catalog-notice" role="status">
+          <span>{shelfNote}</span>
+          <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => loadCatalogs(country)}>{t('home.tryAgain')}</button>
+        </div>}
+        <div id="gridWrap" aria-busy={busy || (!!searchTerm.trim() && searchResults === null)}>
+          {loadError ? (
+            <ErrorState message={loadError} onRetry={() => loadCatalogs(country)} />
+          ) : (busy && !catalogHasItems(catalogs)) || (!!searchTerm.trim() && searchResults === null) ? (
+            <SkeletonGrid />
+          ) : items.length === 0 ? (
+            <EmptyState
+              title={searchTerm ? t('home.noResults') : t('home.nothingHere')}
+              text={
+                searchTerm
+                  ? t('home.noMatch', { term: searchTerm })
+                  : hideOutOfStock
+                  ? t('home.noneInStock')
+                  : t('home.catalogEmpty')
+              }
+            />
+          ) : (
+            <ProductGrid products={items} onBuy={toast} />
+          )}
+        </div>
+      </div>
+      {showPayInstall && <NimiqPayInstallDialog onClose={() => setShowPayInstall(false)} />}
+    </>
+  );
+}
+
+function normalizeList(data: any, country: string): Product[] {
+  if (!data) return [];
+  if (data.categories) return flattenBrands(data, country);
+  if (Array.isArray(data)) {
+    if (data.length > 0 && data[0].family && !data[0].name) return flattenBrands(data, country);
+    return data;
+  }
+  return [];
+}
+
+/* ---------------- Missing-product memory (self-healing list) ---------------- */
+function missingProducts(): { id: string; country: string; at: number }[] {
+  try {
+    const arr = JSON.parse(sessionStorage.getItem('nimshop_missing:v2') || '[]');
+    const cutoff = Date.now() - 6 * 3600 * 1000;
+    return arr.filter((m: any) => m.at > cutoff);
+  } catch {
+    return [];
+  }
+}
+function isMissingProduct(id: string, country: string): boolean {
+  return missingProducts().some((m) => m.id === id && m.country === country);
+}
+
+function CountryPicker({ country, onChange }: { country: string; onChange: (code: string, manual: boolean) => void }) {
+  const { t } = useT();
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const { popular, rest } = orderedCountries();
+  const all = [...popular, ...rest];
+  const current = all.find(([c]) => c === country) || [country, countryName(country)];
+
+  // Close on outside click / Escape — the popup is a floating layer, so it
+  // must not stay open when the buyer taps or tabs away.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent | TouchEvent) => {
+      if (!wrapRef.current || !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('touchstart', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('touchstart', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="country-pick" id="countryPick" ref={wrapRef} style={{ position: 'relative' }}>
+      <button
+        className="input btn-country"
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={t('home.labelCountry')}
+        title={current[1]}
+        onClick={() => setOpen((o) => !o)}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', justifyContent: 'space-between', width: '100%' }}
+      >
+        <span className="btn-country-main" style={{ display: 'inline-flex', gap: '8px', alignItems: 'center' }}>
+          <FlagMark country={country} size={18} />
+          {/* data-fit: the country name is a control label, not a paragraph —
+              it keeps one line and gives up a little type size (never below
+              10px, wrapping if it must) instead of ending in an ellipsis. */}
+          <span className="btn-country-label" data-fit="wrap" data-fit-min="10">{current[1]}</span>
+        </span>
+        <Icon name="chevron-down" size={15} style={{ color: "var(--stamp)" }} />
+      </button>
+      {open && (
+        <div
+          className="country-pop open"
+          role="listbox"
+          aria-label={t('home.labelCountry')}
+          // COUNTRY-PICKER FIX: app.css ships `.country-pop { display: none }`
+          // (the vanilla build toggled it with an inline style). React renders
+          // this node conditionally instead, so the CSS rule hid the popup
+          // completely and the button looked dead. Force it visible here.
+          style={{ display: 'block', position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 40, background: 'var(--surface-1)', border: '1.5px solid var(--line-strong)', color: 'var(--ink)', borderRadius: 12, maxHeight: 320, overflow: 'auto', boxShadow: 'var(--shadow-pop)', minWidth: 220 }}
+        >
+          {popular.length > 0 && (
+            <div>
+              <div className="xs faint country-pop-label" style={{ padding: '8px 12px 4px' }}>
+                {t('home.popular')}
+              </div>
+              {popular.map(countryRow)}
+            </div>
+          )}
+          {rest.length > 0 && (
+            <div>
+              <div className="xs faint country-pop-label" style={{ padding: '8px 12px 4px' }}>
+                {t('home.allCountries')}
+              </div>
+              {rest.map(countryRow)}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  function countryRow([code, name]: [string, string]) {
+    return (
+      <button
+        key={code}
+        className="country-row"
+        type="button"
+        role="option"
+        data-cc={code}
+        aria-selected={code === country}
+        title={name}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen(false);
+          onChange(code, true);
+        }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          width: '100%',
+          padding: '8px 12px',
+          border: '0',
+          background: code === country ? 'var(--surface-2)' : 'none',
+          cursor: 'pointer',
+          textAlign: 'left',
+          fontWeight: 700,
+          fontSize: '0.92rem',
+          color: 'var(--ink)',
+        }}
+      >
+        <FlagMark country={code} size={16} />
+        <span>{name}</span>
+        <span className="xs faint country-row-cc" style={{ marginLeft: 'auto' }}>
+          {code}
+        </span>
+      </button>
+    );
+  }
+}
+
+function ProductGrid({ products, onBuy }: { products: Product[]; onBuy: (msg: string, k?: 'info') => void }) {
+  const { t } = useT();
+  return (
+    <div className="grid products fade-in">
+      {products.map((p) => (
+        <a
+          key={p.id + '|' + p.country}
+          className="product-card"
+          href={p.in_stock !== false ? pagePath(`/product?id=${encodeURIComponent(p.id)}&country=${encodeURIComponent(p.country)}`) : undefined}
+          aria-label={t('home.viewProduct', { name: p.name })}
+          onMouseEnter={() => getProduct(p.id, p.country).catch(() => {})}
+          onFocus={() => getProduct(p.id, p.country).catch(() => {})}
+          onClick={(e) => {
+            if (p.in_stock === false) {
+              e.preventDefault();
+              onBuy(t('home.soldOutToast'), 'info');
+            }
+          }}
+        >
+          <ProductThumb p={p} oos={p.in_stock === false} />
+          <div className="p-name" title={p.name}>
+            {p.name}
+          </div>
+          <div className="p-meta" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+            {/* No px caps here: a price range ("TRY57 - TRY5,000", "1 GB 3 days
+                - 50 GB 90 days") and a translated country name are routinely
+                wider than a fixed 110/130px box, which used to hide the upper
+                end of the range. Let them take the width the card offers and
+                wrap inside it instead of being ellipsized. */}
+            <span className="chip" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <FlagMark country={p.country} size={16} />
+              <span className="chip-txt">{countryName(p.country)}</span>
+            </span>
+            <span className="p-price" style={{ fontSize: '0.8rem' }}>
+              {productPriceText(p, t)}
+            </span>
+          </div>
+        </a>
+      ))}
+    </div>
+  );
+}
+
+function ProductThumb({ p, oos = false }: { p: Product; oos?: boolean }) {
+  const { t } = useT();
+  // Per user request: 100% identical everywhere — ONE single global tile
+  // (UnifiedThumb). No fallback layers and no fallback files: when a product has
+  // no (loadable) logo the tile shows the global icon-on-background placeholder.
+  return (
+    <div style={{ position: 'relative' }}>
+      <UnifiedThumb src={p.logo_url} alt={p.name} bg={p.bg_color || 'rgb(255,255,255)'} />
+      {oos && <div className="oos" style={{ position: 'absolute', inset: 0, zIndex: 2, display: 'grid', placeItems: 'center', background: 'var(--scrim, rgba(20, 16, 12, 0.78))', color: 'var(--on-scrim, #FFF6E8)', fontWeight: 900, letterSpacing: '0.14em', textTransform: 'uppercase', fontSize: 'var(--fs-sm)' }}>{t('shop.outOfStock')}</div>}
+    </div>
+  );
+}
+
+function productPriceText(p: Product, t: (k: string, v?: Record<string, string | number>) => string): string {
+  if (p.min_raw && p.max_raw && p.min_raw !== p.max_raw) return `${p.min_raw} - ${p.max_raw}`;
+  if (p.min_raw) return p.min_raw;
+  return p.currency ? t('home.priceIn', { currency: p.currency }) : '';
+}
+
+/* ---------------- UI primitives ---------------- */
+function SkeletonGrid() {
+  return (
+    <div className="grid products">
+      {Array.from({ length: 10 }).map((_, i) => (
+        <div key={i} className="skeleton-card" style={{ height: 190, borderRadius: 14, background: 'var(--surface-2)' }} />
+      ))}
+    </div>
+  );
+}
+
+function EmptyState({ title, text }: { title: string; text: string }) {
+  return (
+    <div className="center" style={{ padding: '40px 10px', textAlign: 'center' }}>
+      <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'center', color: 'var(--faint)' }}>
+        <Icon name="search" size={40} />
+      </div>
+      <div className="strong">{title}</div>
+      <div className="small muted mt-1">{text}</div>
+    </div>
+  );
+}
+
+function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const { t } = useT();
+  return (
+    <div className="center" style={{ padding: '40px 10px', textAlign: 'center' }}>
+      <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'center', color: 'var(--stamp-ink)' }}>
+        <Icon name="alert" size={40} />
+      </div>
+      <div className="strong">{t('errors.wentWrong')}</div>
+      <div className="small muted mt-1">{message}</div>
+      <button className="btn btn-gold mt-2" onClick={onRetry}>
+        {t('home.tryAgain')}
+      </button>
+    </div>
+  );
+}

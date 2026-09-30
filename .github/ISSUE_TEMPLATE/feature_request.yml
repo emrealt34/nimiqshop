@@ -1,0 +1,42 @@
+name: Feature request
+description: Suggest a change to the shop, the API or the tooling
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do that the shop does not support today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: What should happen instead? Sketch the flow if it is user-facing.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Storefront UI
+        - Checkout / payments
+        - Cashback / staking
+        - Tree planting
+        - Admin panel
+        - Backend / API
+        - CLI, install or deployment
+        - CI, security or release
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+    validations:
+      required: false

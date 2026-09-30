@@ -1,0 +1,233 @@
+name: CI
+
+# The fast quality gate that runs on every push and pull request (a few
+# minutes end to end):
+#
+#   frontend — tsc (app + e2e sources), i18n parity (keys · placeholders ·
+#              tags · untranslated), API route contract, ESLint + oxlint,
+#              Astro production build
+#   backend  — gofmt, go vet, golangci-lint, `go test -race` with coverage,
+#              static release-style build
+#   coverage — publishes the Go coverage number to the `badges` branch
+#              (README badge) after a green run on main
+#   pages    — deploys the static frontend to GitHub Pages after a green run
+#              on main (the Go API is hosted elsewhere; see public/config.js)
+#
+# The long Playwright suites are deliberately NOT here: they live in
+# tests.yml and run nightly, on demand, or on pull requests labelled `e2e`,
+# so a normal push never waits on them.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  merge_group:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+
+jobs:
+  frontend:
+    name: Frontend · types · i18n · lint · build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Typecheck (app + e2e)
+        run: |
+          npm run check
+          npm run check:e2e
+      - name: i18n parity + API contract
+        run: |
+          npm run check:i18n
+          npm run check:keys
+          npm run check:i18n:deep
+          npm run check:api
+      - name: Lint (ESLint for JS, oxlint for TS/TSX)
+        run: npm run lint
+      - name: Build
+        run: npm run build
+      - run: test -f dist/index.html
+
+  backend:
+    name: Backend · vet · lint · test · build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: gofmt
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "::error::gofmt needed for:"; echo "$unformatted"; exit 1
+          fi
+      - run: go vet ./...
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.14.0
+          working-directory: backend
+      - name: Test (race detector + coverage)
+        # -coverpkg=./... attributes statements executed by the API-level tests
+        # in cmd/server to the packages they live in (handlers, db, settlement…).
+        run: go test -race -count=1 -coverpkg=./... -coverprofile=coverage.out -covermode=atomic ./...
+      - name: Coverage summary
+        run: |
+          total="$(go tool cover -func=coverage.out | tail -n 1 | awk '{print $3}' | tr -d '%')"
+          echo "Go statement coverage: ${total}%"
+          echo "### Go coverage: ${total}%" >> "$GITHUB_STEP_SUMMARY"
+          echo "$total" > coverage.txt
+      - name: Build (static, release flags)
+        run: CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /tmp/nimshop-server ./cmd/server
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: go-coverage
+          path: |
+            backend/coverage.out
+            backend/coverage.txt
+          retention-days: 7
+
+  workflows:
+    name: Workflows · actionlint · policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: backend/go.mod
+          cache: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+      - name: actionlint (workflow syntax, expressions, runner labels, shell)
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -color
+      # Repository workflow policy: least-privilege `permissions`, job
+      # timeouts, SHA-pinned actions with version comments,
+      # persist-credentials: false and concurrency groups.
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Workflow policy (pins, permissions, timeouts, concurrency)
+        run: npm run check:workflows
+
+  coverage-badge:
+    name: Coverage badge (badges branch)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write # push the badge JSON to the `badges` branch
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: go-coverage
+          path: coverage
+      - name: Publish shields.io endpoint JSON
+        env:
+          # The token is used for exactly one `git push` below and is never
+          # written into .git/config (persist-credentials: false above).
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          auth="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)"
+          push() { git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${auth}" "$@"; }
+          pct="$(tr -d '[:space:]' < coverage/coverage.txt)"
+          whole="${pct%.*}"
+          if   [ "$whole" -ge 80 ]; then color=brightgreen
+          elif [ "$whole" -ge 60 ]; then color=green
+          elif [ "$whole" -ge 40 ]; then color=yellowgreen
+          elif [ "$whole" -ge 20 ]; then color=yellow
+          else color=orange; fi
+          printf '{"schemaVersion":1,"label":"go coverage","message":"%s%%","color":"%s"}\n' "$pct" "$color" > /tmp/go-coverage.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if push ls-remote --exit-code --heads origin badges >/dev/null 2>&1; then
+            push fetch --depth=1 origin badges
+            git worktree add --detach badges origin/badges
+          else
+            # First run: an empty orphan branch that only ever holds badge JSON.
+            git worktree add --detach badges
+            git -C badges checkout -q --orphan badges
+            git -C badges rm -rfq .
+          fi
+          cp /tmp/go-coverage.json badges/go-coverage.json
+          cd badges
+          git add go-coverage.json
+          if git diff --cached --quiet; then
+            echo "coverage unchanged (${pct}%)"
+          else
+            git commit -q -m "go coverage ${pct}% (${GITHUB_SHA::7})"
+            push push origin HEAD:badges
+          fi
+
+  pages:
+    name: GitHub Pages (static frontend)
+    # Static frontend only. The Go API cannot stay running on GitHub; Pages
+    # talks to the public API configured in public/config.js (API_BASE).
+    # Deploys only after the fast gate passed on main — a red run never
+    # ships. The long Playwright suites (tests.yml) are deliberately not a
+    # deploy gate.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [frontend, backend, workflows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pages: write # actions/deploy-pages
+      id-token: write # OIDC token that deploy-pages presents to the Pages service
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+        env:
+          PUBLIC_BASE: /nimiqshop/
+          API_URL: https://shopapi.nimiqbase.com
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: dist
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
