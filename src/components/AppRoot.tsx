@@ -4,7 +4,7 @@
  * and the page content so context is shared across the whole island. Each
  * Astro page mounts ONE <AppRoot> via client:load.
  */
-import { useEffect, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { AppProviders } from './AppProviders';
 import { CartProvider } from '../lib/cartStore';
 import { SiteShell, type ShellKey } from './shell/SiteShell';
@@ -17,11 +17,8 @@ import { I18nProvider } from '../i18n';
  * contract: "test mode = the original, plus one button that fakes the
  * trigger". Operator-facing test tooling lives in the admin Test Center. */
 export function AppRoot({ activeKey, children }: { activeKey: ShellKey; children: ReactNode }) {
-  // The stylesheet hides the footer while `pre-hydration` is set on <html>
-  // (see Base.astro): the static shell paints an empty content area, and the
-  // footer would otherwise be pushed down the moment this island renders —
-  // the landing page's entire CLS. Mounting the app shell is what reveals it.
-  useEffect(() => { document.documentElement.classList.remove('pre-hydration'); }, []);
+  // (No pre-hydration footer handling here any more: the pages are
+  // server-rendered, so there is no empty-content frame to hide it for.)
   return (
     <I18nProvider>
       <CartProvider>
