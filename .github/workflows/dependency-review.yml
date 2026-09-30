@@ -30,7 +30,27 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+      - if: ${{ !github.event.repository.private || vars.ENABLE_PRIVATE_CODE_SCANNING == 'true' }}
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: high
           comment-summary-in-pr: on-failure
+      - name: Private repository dependency scan without licensed API
+        if: ${{ github.event.repository.private && vars.ENABLE_PRIVATE_CODE_SCANNING != 'true' }}
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: backend/go.mod
+          cache: false
+      - name: Scan private repository dependencies (blocking)
+        if: ${{ github.event.repository.private && vars.ENABLE_PRIVATE_CODE_SCANNING != 'true' }}
+        run: |
+          go install github.com/google/osv-scanner/v2/cmd/osv-scanner@v2.6.0
+          osv-scanner scan source --recursive --format=sarif --output=dependency-review.sarif ./
+      - name: Preserve private dependency findings
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: private-dependency-review
+          path: dependency-review.sarif
+          if-no-files-found: ignore
+          retention-days: 7

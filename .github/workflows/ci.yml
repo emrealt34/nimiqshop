@@ -199,7 +199,7 @@ jobs:
     # Deploys only after the fast gate passed on main — a red run never
     # ships. The long Playwright suites (tests.yml) are deliberately not a
     # deploy gate.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && (!github.event.repository.private || vars.ENABLE_PRIVATE_GITHUB_PAGES == 'true')
     needs: [frontend, backend, workflows]
     runs-on: ubuntu-latest
     timeout-minutes: 15
