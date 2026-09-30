@@ -52,7 +52,21 @@
   --teal: var(--green);    --teal-soft: var(--green-soft);
   --blue: #4E6172;         --blue-soft: rgba(78, 97, 114, 0.12);
   --orange: #C7661C;       --orange-soft: rgba(199, 102, 28, 0.12);
-  --red: #B4471C;          --red-soft: rgba(180, 71, 28, 0.11);
+  --red: #B4471C;
+
+  /* ---------- Text-only state colours (operator console) ----------
+     Chip and section-tab text sits on --surface-1/--surface-2, and the display
+     accents (--stamp, --red) are tuned for FILLS: used as text there they
+     measure 3.8-4.4:1 and fail WCAG AA (Lighthouse flags them on /admin).
+     These steps are ≥4.6:1 on BOTH surfaces, and are lifted again in the dark
+     theme below (where the same values would be near-invisible on charcoal).
+     They are only ever used as `color:` — never as a background. */
+  --text-chip: #6E5C43;   /* 5.06 on --surface-2, 5.59 on --surface-1, 4.64 on --bg */
+  --text-ok: #2F5540;     /* 6.65 / 7.34 / 6.09 */
+  --text-alert: #A83A16;  /* 5.05 / 5.58 / 4.63 */
+  --text-danger: #8F3415; /* 6.21 / 6.85 / 5.69 */
+
+  --red-soft: rgba(180, 71, 28, 0.11);
   --purple: #7A5C8F;       --purple-soft: rgba(122, 92, 143, 0.12);
 
   /* Type */
@@ -4346,6 +4360,12 @@ html { overflow-x: clip; }
   --orange-soft: rgba(199, 102, 28, 0.20);
   --red: #C24E22;
   --red-soft: rgba(194, 78, 34, 0.18);
+
+  /* Text-only state colours, lifted for charcoal (see the light block). */
+  --text-chip: #aeb3bb;   /* == --ink-dim dark: 5.95 on --surface-2 */
+  --text-ok: #5FB583;     /* == --green-600 dark: 5.03 / 5.78 / 6.84 */
+  --text-alert: #E08A5F;  /* 4.76 / 5.47 / 6.48 */
+  --text-danger: #E08A5F;
   --purple: #9A78B5;
   --purple-soft: rgba(154, 120, 181, 0.20);
 

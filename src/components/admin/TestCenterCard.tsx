@@ -230,8 +230,10 @@ export function TestCenterCard() {
   };
 
   const statusChip = (s?: string) => {
+    // Text-only state tokens: --green/--stamp as text on the chip surface are
+    // 4.85:1 / 3.79:1 — the latter fails AA (this is the admin status chip).
     const tone =
-      s === 'fulfilled' ? 'var(--green, #1a7f37)' : s === 'awaiting_payment' ? 'var(--stamp)' : 'var(--ink, #333)';
+      s === 'fulfilled' ? 'var(--text-ok, #2F5540)' : s === 'awaiting_payment' ? 'var(--text-alert, #A83A16)' : 'var(--ink, #333)';
     return (
       <span className="chip" style={{ fontWeight: 800, color: tone, borderColor: tone }}>
         {s || '—'}

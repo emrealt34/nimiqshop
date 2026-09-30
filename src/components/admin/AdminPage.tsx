@@ -34,12 +34,16 @@ import { CopyButton, AlertBox } from '../ui/uiKit';
 import { pagePath } from '../../lib/asset';
 
 function badge(label: string, on: boolean, detail?: string) {
-  const color = on ? 'var(--green)' : 'var(--red)';
+  // Two tokens: the vivid one fills the dot and the border, the text-only one
+  // (>=4.6:1 on the chip surface) carries the label. Using the fill colour for
+  // the text measured 4.30:1 (red) / 4.85:1 (green) — under AA on the dot's row.
+  const fill = on ? 'var(--green)' : 'var(--red)';
+  const text = on ? 'var(--text-ok)' : 'var(--text-danger)';
   return (
-    <span className="chip" style={{ borderColor: color, color }}>
-      <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: color, marginRight: '6px' }} />
+    <span className="chip" style={{ borderColor: fill, color: text }}>
+      <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: fill, marginRight: '6px' }} />
       <span className="strong">{label}</span>
-      {detail ? <span className="xs faint"> · {detail}</span> : null}
+      {detail ? <span className="xs"> · {detail}</span> : null}
     </span>
   );
 }

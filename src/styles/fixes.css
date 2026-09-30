@@ -2331,7 +2331,8 @@ html.in-nimiq-pay #main.page {
   border: 1.5px solid transparent;
   border-radius: var(--r-s, 8px);
   background: transparent;
-  color: var(--ink-dim);
+  /* --ink-dim measures 4.12:1 here (the tab strip is --surface-2), under AA. */
+  color: var(--text-chip);
   cursor: pointer;
   text-align: left;
   white-space: nowrap;
@@ -2345,7 +2346,9 @@ html.in-nimiq-pay #main.page {
 .admin-section-tab.is-active {
   border-color: var(--stamp);
   background: var(--surface-1);
-  color: var(--stamp);
+  /* The vivid --stamp is a fill colour: as text on --surface-1 it measures
+     4.18:1. --text-alert is the same hue, dark enough for text (5.58:1). */
+  color: var(--text-alert);
   box-shadow: 2px 2px 0 rgba(78, 61, 40, .12);
 }
 .admin-section-tab-copy {
@@ -2357,13 +2360,16 @@ html.in-nimiq-pay #main.page {
   font-weight: 900;
 }
 .admin-section-tab-hint {
-  color: var(--ink-faint);
+  color: var(--text-chip);
   font-size: .68rem;
   font-weight: 700;
 }
+/* No extra opacity: .75 over an already-light surface blends --stamp down to
+   2.91:1, which is what Lighthouse flagged. The hint inherits the tab's own
+   (already AA-safe) colour instead. */
 .admin-section-tab.is-active .admin-section-tab-hint {
-  color: var(--stamp);
-  opacity: .75;
+  color: inherit;
+  opacity: 1;
 }
 .admin-section-heading {
   display: flex;
@@ -3093,6 +3099,12 @@ label.oos-toggle > span {
   align-items: center !important;
   min-width: 0 !important;
   max-width: 100% !important;
+}
+/* Chip text sits on the chip's own --surface-2 (or the card), where
+   --ink-dim measures 4.12:1 — under AA. Operator-console chips use the
+   text-only step; the vivid accent tokens stay for fills and borders. */
+.admin-chips .chip {
+  color: var(--text-chip);
 }
 /* Long sentence chips (howto) intentionally wrap — keep exception */
 .howto-mini .chip,
