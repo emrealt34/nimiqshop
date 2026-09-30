@@ -1,0 +1,29 @@
+# Local / single-host deployment of the published image.
+#   cp backend/.env.example backend/.env   # then fill in the secrets
+#   docker compose up -d
+# The shop answers on port 8084 of the loopback interface (API + frontend,
+# same origin); put a TLS-terminating reverse proxy in front for production.
+services:
+  nimshop:
+    image: ghcr.io/emrealt34/nimiqshop:latest
+    restart: unless-stopped
+    env_file: backend/.env
+    environment:
+      LISTEN_ADDR: ":8084"
+      STATIC_DIR: /app/frontend
+      BADGER_DIR: /data/badger
+    ports:
+      # Loopback only: expose it through your reverse proxy, not directly.
+      - "127.0.0.1:8084:8084" # DevSkim: ignore DS162092 loopback bind is the safe default
+    volumes:
+      - nimshop-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  nimshop-data:

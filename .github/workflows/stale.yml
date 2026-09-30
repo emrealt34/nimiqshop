@@ -1,0 +1,46 @@
+name: Stale
+
+# Closes pull requests that sat without review or a commit for sixty days and
+# nudges inactive issues. Security reports are exempt: they belong in the
+# private advisory flow described in SECURITY.md, never in a public issue.
+on:
+  schedule:
+    - cron: "17 1 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stale
+  cancel-in-progress: true
+
+jobs:
+  stale:
+    name: Mark stale issues and pull requests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write # label / comment / close stale issues
+      pull-requests: write # label / comment / close stale pull requests
+    steps:
+      - uses: actions/stale@4391f3da665fdf50b6810c1a66712fb9ba21aa93 # v11.0.0
+        with:
+          days-before-stale: 60
+          days-before-close: 14
+          stale-issue-label: stale
+          stale-pr-label: stale
+          stale-issue-message: >
+            No activity for 60 days. Add a note or close this issue.
+          stale-pr-message: >
+            No activity for 60 days. This will be closed in two weeks unless a
+            commit or a review lands.
+          close-issue-message: >
+            Closing after two months without activity. If this is still
+            relevant, open a new issue with current details.
+          close-pr-message: >
+            Closing after two months without activity. Reopen with a fresh push
+            if the work is still wanted; the branch and discussion stay.
+          exempt-issue-labels: pinned,security,security-advisory
+          exempt-pr-labels: pinned,security,security-advisory,e2e,dependencies

@@ -1,0 +1,129 @@
+name: Container
+
+# Dockerfile hygiene and a real image build on every change, so the image
+# published by release.yml (ghcr.io/emrealt34/nimiqshop) cannot break
+# unnoticed between releases:
+#   hadolint — Dockerfile lint (SARIF to the Security tab)
+#   build    — linux/amd64 build with the BuildKit cache, loaded locally,
+#              smoke-tested (/api/health) and scanned by Trivy (OS packages
+#              of the distroless base + Go binary + bundled JS)
+# Nothing is pushed here.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  merge_group:
+    branches: [main]
+  schedule:
+    - cron: "37 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: container-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hadolint:
+    name: hadolint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write # upload SARIF to code scanning
+      actions: read # codeql-action reads workflow metadata for the upload
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
+        with:
+          dockerfile: Dockerfile
+          failure-threshold: info
+          format: sarif
+          output-file: hadolint.sarif
+      - uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        if: always()
+        with:
+          sarif_file: hadolint.sarif
+          category: hadolint
+
+  build:
+    name: Build · smoke test · Trivy image scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      security-events: write # upload SARIF to code scanning
+      actions: read # codeql-action reads workflow metadata for the upload
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build image (not pushed)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: nimshop:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+      - name: Smoke test (/api/health)
+        run: |
+          set -euo pipefail
+          # Everything the shop needs to boot (same recipe as the release
+          # smoke test): a throwaway JWT secret, a host name and a partner id.
+          JWT_SECRET="$(head -c 32 /dev/urandom | base64 | tr -d '\n')"
+          export JWT_SECRET
+          # The published port is bound to the runner's loopback only.
+          docker run -d --name nimshop-ci \
+            -e JWT_SECRET -e SITE_HOST=shop.example -e CRYPTOREFILLS_PARTNER_ID=ci-smoke \
+            -p 127.0.0.1:18084:8084 nimshop:ci # DevSkim: ignore DS162092 loopback-only smoke test by design
+          ok=0
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:18084/api/health | grep -q '"ok":true'; then ok=1; break; fi # DevSkim: ignore DS162092 loopback health probe by design
+            sleep 1
+          done
+          # The image's own HEALTHCHECK (static /app/healthcheck binary) must
+          # agree with the external probe.
+          for _ in $(seq 1 20); do
+            [ "$(docker inspect -f '{{.State.Health.Status}}' nimshop-ci)" = healthy ] && break
+            sleep 1
+          done
+          echo "docker health: $(docker inspect -f '{{.State.Health.Status}}' nimshop-ci)"
+          docker logs nimshop-ci | tail -n 40
+          health="$(docker inspect -f '{{.State.Health.Status}}' nimshop-ci)"
+          docker rm -f nimshop-ci >/dev/null
+          if [ "$health" != healthy ]; then
+            echo "::error::container HEALTHCHECK did not report healthy (got: $health)"
+            exit 1
+          fi
+          if [ "$ok" != 1 ]; then
+            echo "::error::container did not answer /api/health"
+            exit 1
+          fi
+          echo "container healthy"
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: nimshop:ci
+          scanners: vuln,secret
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          format: sarif
+          output: trivy-image.sarif
+          exit-code: "1"
+      - uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        if: always()
+        continue-on-error: true
+        with:
+          sarif_file: trivy-image.sarif
+          category: trivy-image

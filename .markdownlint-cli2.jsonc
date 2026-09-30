@@ -1,0 +1,11 @@
+{
+  // markdownlint-cli2 configuration for README / SECURITY / docs.
+  "config": {
+    "default": true,
+    "MD013": false,          // long lines are fine in prose tables and links
+    "MD033": false,          // inline HTML is used for the badge row / alignment
+    "MD041": false,          // files may start with a badge block, not a heading
+    "MD060": { "style": "any" }
+  },
+  "ignores": ["node_modules/**", "dist/**", ".astro/**", "backend/internal/xcrypto/**", "**/testdata/**", "CHANGELOG.md"]
+}

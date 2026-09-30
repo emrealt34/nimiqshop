@@ -1,0 +1,16 @@
+# yamllint configuration (workflows, dependabot, issue templates, labeler).
+extends: default
+rules:
+  line-length: disable
+  document-start: disable
+  truthy:
+    # `on:` in workflow files is a key, not a boolean.
+    check-keys: false
+  comments:
+    min-spaces-from-content: 1
+  braces:
+    max-spaces-inside: 1
+ignore: |
+  node_modules/
+  dist/
+  .astro/

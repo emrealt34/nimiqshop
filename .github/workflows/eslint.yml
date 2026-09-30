@@ -1,0 +1,55 @@
+name: ESLint
+
+# JS is linted by ESLint, TS/TSX by oxlint (`npm run lint` runs both and fails
+# the job on any error). The ESLint SARIF additionally lands in the Security →
+# Code scanning tab.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  merge_group:
+    branches: [main]
+  schedule:
+    - cron: "43 15 * * 1"
+
+concurrency:
+  group: eslint-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  eslint:
+    name: ESLint + oxlint (SARIF → code scanning)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write # upload SARIF to code scanning
+      actions: read # codeql-action reads workflow metadata for the upload
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Lint (ESLint + oxlint, fails the job on errors)
+        run: npm run lint
+      - name: oxlint annotations
+        if: always()
+        run: npx oxlint --format=github
+      - name: SARIF for the Security tab
+        if: always()
+        run: npx eslint . --format @microsoft/eslint-formatter-sarif --output-file eslint-results.sarif || true
+      - uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        if: always()
+        with:
+          sarif_file: eslint-results.sarif
+          category: eslint
+          wait-for-processing: true

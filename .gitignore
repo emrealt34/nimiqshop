@@ -1,0 +1,45 @@
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# Node / Go
+node_modules/
+.astro/
+backend/bin/
+backend/dist/
+bin/
+dist/
+*.exe
+*.test
+coverage.*
+
+# Runtime
+data/
+backend/data/
+*.sqlite
+*.log
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/all-blob-reports/
+/screenshots/
+
+# Python tooling caches (scripts/*.py)
+__pycache__/
+*.pyc
+
+# Lighthouse CI / SBOM artifacts from a local run
+/.lighthouseci/
+/sbom.cdx.json
+/go-benchmarks.txt

@@ -1,0 +1,58 @@
+# Path-based labels for actions/labeler (PR triage).
+# The `e2e` label is applied separately by .github/workflows/pr-triage.yml
+# because it has to trigger the long Playwright suite in tests.yml.
+'backend/**':
+  - backend
+  - go
+'cli/**':
+  - backend
+  - cli
+'deploy/**':
+  - infra
+'scripts/**':
+  - tooling
+'tests/e2e/**':
+  - e2e
+'src/i18n/**':
+  - i18n
+'src/components/**':
+  - frontend
+  - react
+'src/styles/**':
+  - frontend
+  - css
+'public/**':
+  - frontend
+'src/pages/**':
+  - frontend
+  - astro
+'astro.config.mjs':
+  - frontend
+  - astro
+'package.json':
+  - frontend
+  - deps
+'package-lock.json':
+  - frontend
+  - deps
+'backend/go.mod':
+  - go
+  - deps
+'backend/go.sum':
+  - go
+  - deps
+'.github/workflows/**':
+  - ci
+  - infra
+'.github/dependabot.yml':
+  - deps
+  - ci
+'LICENSE':
+  - meta
+'README.md':
+  - docs
+'SECURITY.md':
+  - docs
+  - security
+'.gitleaksignore':
+  - security

@@ -1,0 +1,15 @@
+{
+  "//": "Keys whose value may legitimately equal English (brand / technical terms). Add with care.",
+  "*": [
+    "checkout.flowMethodNim",
+    "trackPage.polygonChain",
+    "orderPage.polygonChain"
+  ],
+  "tr": [
+    "usdtCashback.switchToNimCashback"
+  ],
+  "de": [],
+  "fr": [],
+  "pt": [],
+  "es": []
+}

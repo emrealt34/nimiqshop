@@ -1,0 +1,50 @@
+# golangci-lint v2 configuration for the Go backend.
+# Run locally with:  cd backend && golangci-lint run ./...
+# CI runs the same command (see .github/workflows/ci.yml) and fails on any issue.
+version: "2"
+
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+linters:
+  # "standard" = errcheck, govet, ineffassign, staticcheck, unused.
+  default: standard
+  enable:
+    - asasalint
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - copyloopvar
+    - durationcheck
+    - gocheckcompilerdirectives
+    - misspell
+    - nilnesserr
+    - nosprintfhostport
+    - prealloc
+    - reassign
+    - unconvert
+    - usestdlibvars
+    - wastedassign
+    - whitespace
+  exclusions:
+    rules:
+      # Translated UI strings are not English prose.
+      - path: internal/i18n/locales/
+        linters: [misspell]
+      # Verbatim upstream copies (see internal/xcrypto/README.md). They are
+      # kept byte-identical to golang.org/x/crypto so the drift check can
+      # diff them; the generic-only build leaves a few asm-selection
+      # variables and helpers unreferenced.
+      - path: internal/xcrypto/
+        linters: [unused, whitespace]
+      - path: internal/xcrypto/
+        text: "U1000"
+
+formatters:
+  enable:
+    - gofmt
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

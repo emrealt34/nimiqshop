@@ -1,0 +1,349 @@
+---
+// Base.astro — the shared page shell. Mirrors the original index.html/orders.html
+// etc. head exactly (CSP, vendored fonts, theme) and mounts the React shell.
+import '../styles/fonts.css';
+import '../styles/app.css';
+import '../styles/fixes.css';
+import '../styles/accessibility.css';
+import type { ShellKey } from '../components/shell/SiteShell';
+
+interface Props {
+  title: string;
+  description?: string;
+  activeKey: ShellKey;
+  /** i18n key for the tab title on pages with no React router (e.g. 404).
+   *  React routes carry their own titleKey; this one is applied by the static
+   *  localiser so the tab follows the language too. */
+  titleKey?: string;
+  /** Extra head tags (JSON-LD, OG, etc.) passed via <Fragment set:html> not needed — use slots. */
+}
+const { title, description, activeKey, titleKey } = Astro.props;
+const siteName = 'shop.nimiqbase.com';
+
+// --- Locale ----------------------------------------------------------------
+// This build is STATIC (output: 'static') — there is NO per-request server
+// that could read cookies/headers at render time. <html lang> starts as "en"
+// and is corrected synchronously by the tiny inline script below BEFORE any
+// content paints, using the same priority chain the React i18n uses:
+//   ?lang= → cookie → localStorage → navigator.language → "en".
+// React then hydrates on top with the identical choice, so there is no flash
+// of the wrong language.
+const initialLang = 'en';
+
+// ---- Content Security Policy --------------------------------------------
+//
+// The CSP used to be one hardcoded string that shipped the development
+// policy to production. Two of its allowances exist only so `npm run dev`
+// works, and both are real attack surface on a live shop:
+//
+//   'unsafe-eval'          — lets any injected script compile and run a
+//                            string as code. Vite's dev server needs it for
+//                            HMR; a production Astro build emits plain ESM
+//                            and never calls eval.
+//   https://*.trycloudflare.com
+//                          — a wildcard over a domain anyone on the internet
+//                            can register a tunnel on. In `connect-src` it
+//                            means exfiltrated cardholder/checkout data could
+//                            be POSTed to an attacker's tunnel and the CSP
+//                            would not stop it.
+//
+// They are now gated on `import.meta.env.DEV`, which Vite replaces with a
+// literal at build time — so the dev string is not merely unused in the
+// production bundle, it is not present in it at all.
+const isDev = import.meta.env.DEV;
+// API_URL — ONE build-time knob for "frontend hosted elsewhere (Cloudflare
+// Pages, Netlify…) calling this backend": `API_URL=https://api.example.com npm run build`
+// bakes three things into every page: the API origin in CSP connect-src, a
+// preconnect to it, and a window.APP_CONFIG seed (API_BASE) that wins over
+// public/config.js's default. When empty everything keeps using the
+// same-origin '/api' proxy.
+const buildApiUrl = String(import.meta.env.PUBLIC_API_URL || process.env.API_URL || '').trim().replace(/\/+$/, '').replace(/\/api$/, '');
+// Production replaces 'unsafe-inline' with a placeholder that
+// integrations/csp-inline-hashes.mjs substitutes after the build with the
+// SHA-256 hashes of every inline script tag actually emitted into dist/. The
+// (Written without angle brackets on purpose: Vite's dev transform scans this
+//  file for script tags textually, and a literal tag inside a comment makes
+//  esbuild parse the rest of the comment as JavaScript.)
+// string must match CSP_HASH_PLACEHOLDER in that file; if it drifts, the
+// integration fails the build rather than shipping a policy that silently
+// blocks the theme, viewport and scroll scripts.
+//
+// Dev keeps 'unsafe-inline' (and 'unsafe-eval') because Vite injects its own
+// inline bootstrap and HMR script, whose contents change per request and
+// therefore cannot be hashed. `import.meta.env.DEV` is replaced with a literal
+// at build time, so the dev string is not present in the production bundle.
+//
+// https://static.cloudflareinsights.com is the Cloudflare Web Analytics
+// beacon that Cloudflare injects into every HTML response of a proxied zone
+// with Web Analytics switched on (the shop is served through Cloudflare
+// Pages). It reports to /cdn-cgi/rum on this origin, so connect-src needs
+// nothing beyond 'self'. Keep in sync with public/_headers.
+const cspScriptSrc = isDev
+  ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://hub.nimiq.com https://static.cloudflareinsights.com"
+  : "script-src 'self' __CSP_SCRIPT_HASHES__ https://hub.nimiq.com https://static.cloudflareinsights.com";
+const cspConnectExtra = isDev
+  ? ' http://localhost:8084 http://127.0.0.1:8084 https://*.trycloudflare.com'
+  : '';
+// `frame-ancestors` is deliberately NOT in the <meta> policy.
+//
+// The directive only has meaning when the policy arrives as an HTTP header —
+// the HTML spec lets a <meta> CSP express it, but every browser ignores it
+// there, and Chrome logs "The Content Security Policy directive
+// 'frame-ancestors' is ignored when delivered via a <meta> element" on every
+// single page load. That warning trains whoever reads the console to ignore
+// CSP messages, which is worse than the noise itself.
+//
+// The protection is not lost: public/_headers sends
+// `frame-ancestors 'none'` (plus `X-Frame-Options: DENY`) as a real header on
+// every response, and that is the copy browsers actually enforce. It stays out
+// of the meta tag purely because that copy would be a no-op.
+const contentSecurityPolicy = [
+  "default-src 'self'",
+  cspScriptSrc,
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data:",
+  `connect-src 'self' https://shopapi.nimiqbase.com https://*.shop.nimiqbase.com https://hub.nimiq.com https://hub.nimiq-testnet.com${buildApiUrl ? ' ' + buildApiUrl : ''}${cspConnectExtra}`,
+  'frame-src https://hub.nimiq.com https://hub.nimiq-testnet.com https://widget.trustpilot.com',
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  'upgrade-insecure-requests',
+].join('; ');
+
+// Only preconnect when an explicit cross-origin deployment is requested.
+const apiOrigin = buildApiUrl;
+const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
+---
+
+<!doctype html>
+<html lang={initialLang} data-lang={initialLang} data-title-key={titleKey}>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content={contentSecurityPolicy} />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#E7DAC0" />
+    <meta name="color-scheme" content="light dark" />
+    <!--
+      Boot-time language bootstrap (synchronous, runs before paint).
+      The site is fully static — there is no per-request server to decide the
+      language at render time. This tiny script reads ?lang=, then the
+      `nimshop-lang` cookie, then `localStorage.nimshop.lang`, then
+      navigator.language, and rewrites <html lang>/data-lang BEFORE the
+      browser paints any text. React's I18nProvider later reads the same
+      chain and picks the identical code, so there is zero flash of the
+      wrong language.
+    -->
+    <script is:inline>
+      (function () {
+        try {
+          var SUPPORTED = { en: 1, es: 1, de: 1, fr: 1, pt: 1, tr: 1 };
+          function clean(raw) {
+            if (!raw) return null;
+            var c = String(raw).trim().toLowerCase().slice(0, 2);
+            return SUPPORTED[c] ? c : null;
+          }
+          function readQuery() {
+            try {
+              var u = new URLSearchParams(location.search);
+              return clean(u.get('lang'));
+            } catch (e) { return null; }
+          }
+          function readCookie() {
+            try {
+              var m = document.cookie.match(/(?:^|;\s*)nimshop-lang=([^;]+)/);
+              return m ? clean(decodeURIComponent(m[1])) : null;
+            } catch (e) { return null; }
+          }
+          function readStorage() {
+            try { return clean(localStorage.getItem('nimshop.lang')); }
+            catch (e) { return null; }
+          }
+          function readNav() {
+            try {
+              var list = (navigator.languages && navigator.languages.length)
+                ? navigator.languages : [navigator.language];
+              for (var i = 0; i < list.length; i++) {
+                var c = clean(list[i]);
+                if (c) return c;
+              }
+            } catch (e) {}
+            return null;
+          }
+          var lang = readQuery() || readCookie() || readStorage() || readNav() || 'en';
+          document.documentElement.setAttribute('lang', lang);
+          document.documentElement.setAttribute('data-lang', lang);
+        } catch (e) {
+          // If anything throws (private mode, etc.) leave the build default.
+        }
+      })();
+    </script>
+    <script is:inline>
+      (function () {
+        try {
+          var k = 'nimshop.theme';
+          var t = localStorage.getItem(k);
+          if (t !== 'dark' && t !== 'light') {
+            t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          }
+          document.documentElement.setAttribute('data-theme', t);
+          document.documentElement.style.colorScheme = t;
+          var m = document.querySelector('meta[name="theme-color"]');
+          if (m) m.setAttribute('content', t === 'dark' ? '#1a1c20' : '#E7DAC0');
+          var cs = document.querySelector('meta[name="color-scheme"]');
+          if (cs) cs.setAttribute('content', t);
+        } catch (e) {}
+      })();
+    </script>
+    <meta
+      name="description"
+      content={description || "Buy gift cards, mobile top-ups and eSIMs with NIM via BTC Lightning in Nimiq Pay. No internal balance, direct CryptoRefills payment, and open source."}
+      data-i18n-attr={description ? undefined : 'content:meta.defaultDescription'}
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <title>{title}</title>
+    <link rel="icon" type="image/png" sizes="64x64" href={`${assetBase}/img/icon-64.png?v=nim-favicon-2`} />
+    <link rel="icon" type="image/png" sizes="512x512" href={`${assetBase}/img/icon-512.png?v=nim-favicon-2`} />
+    <link rel="apple-touch-icon" href={`${assetBase}/img/apple-touch-icon.png?v=nim-favicon-2`} />
+    <link rel="preconnect" href="https://cdn.cryptorefills.com" crossorigin />
+    {apiOrigin && <link rel="preconnect" href={apiOrigin} crossorigin />}
+    {apiOrigin && <link rel="dns-prefetch" href={apiOrigin} />}
+    <link rel="preload" as="font" type="font/woff2" href={`${assetBase}/fonts/nunito-var.woff2`} crossorigin />
+    <link rel="preload" as="font" type="font/woff2" href={`${assetBase}/fonts/fraunces-900.woff2`} crossorigin />
+    {buildApiUrl && (
+      <script is:inline define:vars={{ buildApiUrl }}>
+        window.APP_CONFIG = Object.assign(window.APP_CONFIG || {}, {
+          API_BASE: buildApiUrl + '/api',
+          FRONTEND_URL: '',
+          // SITE_HOST is the shop's brand, NOT the API host — leave it to
+          // config.js (default shop.nimiqbase.com). Seeding it from API_URL made
+          // the header wordmark read "shopapi.nimiqbase.com".
+        });
+      </script>
+    )}
+    <script is:inline src={`${assetBase}/config.js`}></script>
+    <script is:inline src={`${assetBase}/vendor/HubApi.umd.js`} defer></script>
+    <script is:inline>
+      (function () {
+        if (typeof window !== 'undefined' && window.nimiqPay) {
+          document.documentElement.classList.add('in-nimiq-pay');
+          var m = document.querySelector('meta[name="viewport"]');
+          if (m) m.setAttribute('content', 'width=device-width, initial-scale=1, viewport-fit=cover');
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#page-content" data-i18n="stat.skipToContent">Skip to content</a>
+    <noscript>
+      <div style="padding:40px;text-align:center;font-family:sans-serif;color:var(--ink, #4E3D28)">
+        <span data-i18n="stat.needsJs">{siteName} needs JavaScript to run the wallet connection and live order tracking.</span>
+      </div>
+    </noscript>
+
+    <main id="main" class="page">
+      <slot />
+    </main>
+
+    <footer class="footer">
+      <div class="container">
+        <span data-fit="wrap" data-fit-min="10">© <span>{siteName}</span><span class="footer-credit"> <span data-i18n="stat.poweredCredit">— powered by Nimiq &amp; CryptoRefills</span></span></span>
+        <div class="footer-barcode">
+          <!-- Inline (not <img>) so the bars can use currentColor: kraft brown
+               in light, footer-ink in dark — a brown barcode vanishes on the
+               dark surface. Geometry is byte-identical to barcode-nimiq.svg. -->
+          <svg viewBox="0 0 180 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+            <path stroke="currentColor" stroke-width="4" d="M2 24L2 0M24 24L24 0M56 24L56 0M100 24L100 0M134 24L134 0M156 24L156 0M178 24L178 0" />
+            <path stroke="currentColor" stroke-width="2" d="M7 24L7 0M13 24L13 0M35 24L35 0M39 24L39 0M45 24L45 0M61 24L61 0M85 24L85 0M89 24L89 0M105 24L105 0M111 24L111 0M117 24L117 0M141 24L141 0M173 24L173 0" />
+            <path stroke="currentColor" stroke-width="8" d="M70 24L70 0M124 24L124 0" />
+            <path stroke="currentColor" stroke-width="6" d="M79 24L79 0M149 24L149 0M167 24L167 0" />
+          </svg>
+        </div>
+        <span class="row">
+          <a
+            class="bb-gh"
+            href="https://github.com/emrealt34/nimiqshop"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Open-source repository on GitHub"
+            title="Open-source repository on GitHub"
+            data-i18n-attr="aria-label:stat.githubLabel title:stat.githubLabel"
+          >
+            <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <g transform="translate(1.05 0)">
+                <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/>
+              </g>
+            </svg>
+          </a>
+        </span>
+      </div>
+    </footer>
+    <script is:inline>
+      // Keep scroll position stable when resizing / zooming — if you are at the bottom, stay at the bottom
+      (function () {
+        var ticking = false;
+        var lastY = 0;
+        var lastH = 0;
+        var lastVH = 0;
+        function capture() {
+          try {
+            lastY = window.scrollY || document.documentElement.scrollTop || 0;
+            lastH = document.documentElement.scrollHeight || 0;
+            lastVH = window.innerHeight || 0;
+          } catch (e) {}
+        }
+        // capture on scroll (passive)
+        window.addEventListener('scroll', function () { if (!ticking) capture(); }, { passive: true });
+        // initial capture
+        capture();
+        function onResize() {
+          if (ticking) return;
+          ticking = true;
+          var wasAtBottom = lastH - (lastY + lastVH) < 160;
+          var prevH = lastH;
+          var prevY = lastY;
+          requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+              try {
+                var newH = document.documentElement.scrollHeight || 0;
+                var newVH = window.innerHeight || 0;
+                if (wasAtBottom) {
+                  var target = Math.max(0, newH - newVH);
+                  if (Math.abs(window.scrollY - target) > 2) window.scrollTo(0, target);
+                } else if (prevH > 0) {
+                  // preserve relative position for large layout shifts (e.g., breakpoint changes)
+                  // keep the same distance from top unless we were at bottom
+                  // do nothing — browser already keeps scrollY, but if max scroll shrank, clamp
+                  var maxY = Math.max(0, newH - newVH);
+                  if (prevY > maxY) window.scrollTo(0, maxY);
+                }
+              } catch (e) {}
+              capture();
+              ticking = false;
+            });
+          });
+        }
+        window.addEventListener('resize', onResize, { passive: true });
+        if (window.visualViewport) {
+          window.visualViewport.addEventListener('resize', onResize, { passive: true });
+        }
+        // also handle orientationchange
+        window.addEventListener('orientationchange', function () { setTimeout(onResize, 150); }, { passive: true });
+      })();
+    </script>
+    <script>
+      // Translates the static shell (skip link, footer credit, GitHub label and
+      // the static 404 page) and keeps it in sync with the language switcher.
+      import { initStaticI18n } from '../lib/staticI18n';
+      // …and re-fits every width-budgeted label (header nav, wordmark, tab bar,
+      // come-back banner) after a language switch, a resize or a late font, so
+      // a longer translation can never stay ellipsized.
+      import { initFit } from '../lib/fitText';
+      initStaticI18n();
+      initFit();
+    </script>
+  </body>
+</html>

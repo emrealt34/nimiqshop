@@ -1,0 +1,53 @@
+name: Workflow security (zizmor)
+
+# Static analysis of the GitHub Actions workflows themselves: template
+# injection, unpinned or impostor actions, persisted credentials in
+# artifacts, cache poisoning on release paths, excessive permissions,
+# dangerous triggers. Findings land in the Security tab (SARIF) and the run
+# fails on any finding, so a risky workflow edit is caught in the pull
+# request that introduces it. The repository is kept clean at zizmor's
+# strictest ("pedantic") persona.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/**"
+      - ".github/actions/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/**"
+      - ".github/actions/**"
+  merge_group:
+    branches: [main]
+  schedule:
+    - cron: "52 6 * * 4"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zizmor-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  zizmor:
+    name: zizmor
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write # upload SARIF to code scanning
+      actions: read # codeql-action reads workflow metadata for the upload
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: zizmorcore/zizmor-action@cc914d7f3750a2d13d75c7f184a1060aa0e9d482 # v0.6.4
+        with:
+          version: "1.30.1"
+          persona: pedantic
+          min-severity: low
+          advanced-security: true

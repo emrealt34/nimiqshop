@@ -1,0 +1,43 @@
+name: Documentation links
+
+# External hosts (shields.io, scorecard.dev, raw.githubusercontent.com) rate
+# limit and occasionally time out, so this is a weekly sweep plus an advisory
+# pass on main — not a pull-request gate. A flaky third-party host must never
+# turn an unrelated commit red; a renamed release asset or a dead anchor in
+# the docs is what this is here to catch.
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "29 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: links
+  cancel-in-progress: true
+
+jobs:
+  links:
+    name: Check Markdown links
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Advisory on a push to main, blocking on the schedule and on a manual run.
+    continue-on-error: ${{ github.event_name == 'push' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          args: >-
+            --verbose
+            --no-progress
+            --exclude-path node_modules
+            --exclude-loopback
+            './README.md'
+            './SECURITY.md'
+            './tests/README.md'
+          fail: true

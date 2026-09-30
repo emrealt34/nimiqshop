@@ -1,0 +1,6 @@
+[codespell]
+# Generated/vendored/binary content and locale files (six languages of shop
+# copy) are skipped; the word list holds Turkish words that also appear in
+# English-language docs (paralel, adres) plus deliberate identifiers.
+skip = *.lock,package-lock.json,go.sum,./dist,./node_modules,./.git,*.svg,*.json,*.txt,./public/vendor,*/locales/*,testdata,*.min.js,playwright-report,blob-report,screenshots,__pycache__,*.png,*.woff2,*.ico,./backend/internal/xcrypto,./.astro
+ignore-words-list = nd,te,ba,fo,aci,ue,zar,froms,tcheckout,ist,separat,adresse,oder,bu,referenz,annonce,validador,nome,sting,unparseable,buildt,fulfilment,preselected,pre-selected,pre-select,paralel,adres
