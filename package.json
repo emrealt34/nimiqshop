@@ -19,6 +19,7 @@
     "start:tunnel": "node scripts/run-stack.mjs tunnel",
     "check": "tsc --noEmit",
     "check:i18n": "node scripts/check-i18n.mjs",
+    "check:fonts": "node scripts/check-fonts.mjs",
     "check:keys": "node scripts/check-i18n-keys.mjs",
     "tunnel:unpin": "node scripts/unpin-hosts.mjs",
     "tunnel": "node scripts/run-stack.mjs tunnel",
@@ -40,7 +41,7 @@
     "lint": "npm run lint:js && npm run lint:ts",
     "lint:js": "eslint .",
     "lint:ts": "oxlint",
-    "verify": "npm run check && npm run check:e2e && npm run check:i18n && npm run check:keys && npm run check:i18n:deep && npm run check:api && npm run check:workflows && npm run check:config && npm run lint",
+    "verify": "npm run check && npm run check:e2e && npm run check:i18n && npm run check:fonts && npm run check:keys && npm run check:i18n:deep && npm run check:api && npm run check:workflows && npm run check:config && npm run lint",
     "test:pages-proxy": "node --test scripts/test-pages-proxy.mjs"
   },
   "dependencies": {
