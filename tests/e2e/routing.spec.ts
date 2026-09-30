@@ -35,7 +35,7 @@ test.describe('routing @smoke', () => {
   });
 
   test('query-string routes render', async ({ page }) => {
-    for (const url of ['/product?id=p1&country=TR', '/order?id=o1', '/order?type=quote&id=q1', '/track?order=o1', '/support?ticket=t1']) {
+    for (const url of ['/product?id=p1&country=TR', '/order?id=o1', '/order?type=quote&id=q1', '/track?order=o1']) {
       await open(page, path(url));
       expect(await contentText(page), url).not.toMatch(NOT_FOUND_MARK);
     }

@@ -1462,7 +1462,7 @@ const fr = {
     rowTo: 'À',
     supplierState: 'Statut du fournisseur : {{state}}',
     helpTitle: 'Besoin d’aide ?',
-    helpHint: 'Ouvre le support avec cette commande déjà sélectionnée — rien à gérer ici.',
+    helpHint: 'Ouvre l’aide et la FAQ — règle en un coup d’œil la plupart des questions de code, de livraison et de remboursement.',
     rebuyHint: 'Recharge votre panier avec les articles de cette commande et l’ouvre — rien n’est payé avant la commande.',
     mayOnlyRedeem: 'Peut n’être utilisable que {{geo}}.',
     summaryTitle: 'Récapitulatif',

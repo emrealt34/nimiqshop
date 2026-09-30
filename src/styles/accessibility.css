@@ -14,6 +14,21 @@
 }
 .skip-link:focus { transform: translateY(0); }
 #page-content { min-width: 0; outline: none; }
+
+/* The pages are client:only islands: before hydration the slot is empty, so a
+   short first paint used to put the footer INSIDE the viewport and then push it
+   down by several hundred pixels once React rendered the real page (measured
+   CLS 0.07 on the landing page). Reserving the viewport height keeps the footer
+   below the fold from the very first frame, on every route. */
+/* Every page body is a client:only island, so the shell paints one frame with
+   an empty content area and React then fills it. That pushes the FOOTER down
+   (measured: 0.05-0.07 CLS, i.e. the landing page's entire layout shift), and
+   the footer sits inside the first screen while it happens. Hiding it for that
+   one frame removes the shift without reserving blank space — anything already
+   invisible is not scored. The class is added by the inline pre-paint script
+   (Base.astro) and removed as soon as the app shell mounts, so a visitor
+   without JavaScript always sees the footer. */
+html.pre-hydration footer.footer { visibility: hidden; }
 [id] { scroll-margin-top: calc(var(--header-h) + 16px); }
 .catalog-notice {
   display: flex;

@@ -1463,7 +1463,7 @@ const tr = {
     rowTo: 'Alıcı',
     supplierState: 'Tedarikçi durumu: {{state}}',
     helpTitle: 'Yardım ister misiniz?',
-    helpHint: 'Bu sipariş seçili olarak Destek’i açar — burada yapılacak bir şey yok.',
+    helpHint: 'Yardım & SSS bölümünü açar — kod, teslimat ve iade sorularının çoğunu tek bakışta çözer.',
     rebuyHint: 'Sepetinizi bu siparişin ürünleriyle doldurup açar — ödeme yalnızca satın alırken yapılır.',
     mayOnlyRedeem: 'Yalnızca {{geo}} kullanılabilir olabilir.',
     summaryTitle: 'Özet',

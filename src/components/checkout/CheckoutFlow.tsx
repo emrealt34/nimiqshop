@@ -236,23 +236,11 @@ export function CheckoutFlow({
   const [, setDelivery] = useState<DeliveryInfo | null>(null);
   const [activeItems, setActiveItems] = useState<CartItem[]>(items);
   const [siteCfg, setSiteCfg] = useState<{ enable_usdt?: boolean; tree_planting_enabled?: boolean; usdt_cashback_multiplier?: number; polygon_chain_id?: number } | null>(null);
-  const [cashbackDest] = useState<'cashback' | 'trees'>('cashback');
   const flowRef = useRef<{ done: boolean; started: boolean }>({ done: false, started: false });
 
   useEffect(() => {
     getSiteConfig().then(setSiteCfg).catch(() => {});
   }, []);
-
-  // ---------------- Delivery step -> choose payment ----------------
-  const onDeliveryDone = useCallback(
-    (info: DeliveryInfo) => {
-      setDelivery(info);
-      // Combined Stage 2 already includes payment method + destination + privacy
-      // → go straight to preparing/pay, no extra pick-payment sheet.
-      startCheckout(info);
-    },
-    [siteCfg, cashbackDest]
-  );
 
   const startCheckout = useCallback(
     async (info: DeliveryInfo) => {
@@ -266,6 +254,17 @@ export function CheckoutFlow({
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [activeItems]
+  );
+
+  // ---------------- Delivery step -> choose payment ----------------
+  const onDeliveryDone = useCallback(
+    (info: DeliveryInfo) => {
+      setDelivery(info);
+      // Combined Stage 2 already includes payment method + destination + privacy
+      // → go straight to preparing/pay, no extra pick-payment sheet.
+      startCheckout(info);
+    },
+    [startCheckout]
   );
 
   // ---------------- The orchestrator ----------------
@@ -552,8 +551,9 @@ export function CheckoutFlow({
   );
 
   useEffect(() => {
+    const flow = flowRef.current;
     return () => {
-      flowRef.current.done = true;
+      flow.done = true;
       (window as any).__promptResolver = undefined;
       (window as any).__payResolver = undefined;
     };

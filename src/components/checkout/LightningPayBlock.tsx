@@ -115,7 +115,7 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddre
     };
     check();
     return () => { alive = false; clearTimeout(timer); };
-  }, [quoteId, invoice]);
+  }, [quoteId, invoice, t]);
 
   // Simple flow: one clear Pay button. A single supplier Lightning invoice can
   // only ever be paid once, so re-opening the same invoice is always safe and

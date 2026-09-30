@@ -148,7 +148,7 @@ export function OrdersView() {
       });
     }
     return out;
-  }, []);
+  }, [t]);
 
   const quotePrice = useCallback((q: any) => {
     const micros = Number(q.product_usd);
@@ -255,7 +255,7 @@ export function OrdersView() {
         setLoading(false);
       }
     },
-    [normalizeOrders, normalizeQuotes]
+    [normalizeOrders, normalizeQuotes, t, lang]
   );
 
   useEffect(() => {

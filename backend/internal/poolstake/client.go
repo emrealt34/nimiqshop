@@ -42,13 +42,16 @@ const DefaultTTL = 60 * time.Second
 // tell "feature off" from "pool unreachable".
 var ErrNotConfigured = errors.New("poolstake: no pool API URL configured")
 
-// DefaultStakerBaseBps is the published staker base (1%). It is used ONLY
-// when the pool cannot be asked at all (no URL configured, or unreachable)
-// AND the operator has not set an admin override: the storefront still
-// advertises the rate staking buys. Whenever the pool answers, the pool's
-// own number applies verbatim — including an explicit 0 (base switched off)
-// — unless the operator's admin StakerCashbackBps override is present.
-const DefaultStakerBaseBps = 100
+// DefaultStakerBaseBps mirrors the staker base NimiqBase publishes
+// (config.DefaultCashbackBaseBps = 50, i.e. 0.5% for any positively-staked
+// address — see GET /api/cashback/terms on the pool). It is used ONLY when
+// the pool cannot be asked at all (no URL configured, or unreachable) AND
+// the operator has not set an admin override: the storefront then advertises
+// the same rate the pool would grant, never a more generous one. Whenever
+// the pool answers, the pool's own number applies verbatim — including an
+// explicit 0 (base switched off) — unless the operator's admin
+// StakerCashbackBps override is present.
+const DefaultStakerBaseBps = 50
 
 // Status is one answer about one address.
 type Status struct {
@@ -99,7 +102,7 @@ type Client struct {
 
 	mu      sync.Mutex
 	cache   map[string]cacheEntry
-	feedKey string // shared secret for the pool's /api/cashback/feed ("" = off)
+	feedKey string // shared secret for the pool's /api/cashback/profit ("" = off)
 
 	terms       Terms
 	termsExpiry time.Time
@@ -177,29 +180,10 @@ func (c *Client) Stake(ctx context.Context, address string) (Status, error) {
 	return st, nil
 }
 
-// FeedBatch mirrors one settled pool-fee batch from the pool's
-// GET /api/cashback/feed: the shop's realized fee income, split per staker
-// by their stake share. The single-ledger engine credits k*g(d) of each
-// share to the staker's ledger.
-type FeedBatch struct {
-	BatchNumber int64       `json:"batch_number"`
-	EpochNumber int64       `json:"epoch_number"`
-	PoolFeeLuna int64       `json:"pool_fee_luna"`
-	NumStakers  int64       `json:"num_stakers"`
-	LatestBatch int64       `json:"latest_batch"`
-	StakeShares []FeedShare `json:"stakers"`
-}
-
-// FeedShare is one staker's realized fee share for a batch (Luna).
-type FeedShare struct {
-	Address      string `json:"address"`
-	StakeLuna    int64  `json:"stake_luna"`
-	FeeShareLuna int64  `json:"fee_share_luna"`
-}
-
-// SetFeedKey installs the shared secret the pool's /api/cashback/feed
-// endpoint requires. Without it the feed is unavailable (public stake
-// lookups keep working).
+// SetFeedKey installs the shared secret the pool's /api/cashback/profit
+// endpoint requires (X-Feed-Key, matched against GPOOL_FEED_API_KEY on the
+// pool side). Without it the profit boost is unavailable (public stake and
+// terms lookups keep working).
 func (c *Client) SetFeedKey(key string) {
 	if c == nil {
 		return
@@ -207,52 +191,6 @@ func (c *Client) SetFeedKey(key string) {
 	c.mu.Lock()
 	c.feedKey = key
 	c.mu.Unlock()
-}
-
-// Feed pulls the pool-fee batches strictly after afterBatch (ascending),
-// up to limit. It is the ledger's money source: idempotent by construction
-// (afterBatch is the shop's own watermark) and safe to retry.
-func (c *Client) Feed(ctx context.Context, afterBatch, limit int64) ([]FeedBatch, int64, error) {
-	if !c.Ready() {
-		return nil, 0, ErrNotConfigured
-	}
-	if limit <= 0 {
-		limit = 200
-	}
-	if limit > 1000 {
-		limit = 1000
-	}
-	c.mu.Lock()
-	key := c.feedKey
-	c.mu.Unlock()
-	if key == "" {
-		return nil, 0, errors.New("poolstake: feed API key not configured")
-	}
-
-	endpoint := fmt.Sprintf("%s/api/cashback/feed?after_batch=%d&limit=%d", c.baseURL, afterBatch, limit)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return nil, 0, err
-	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("X-Feed-Key", key)
-
-	resp, err := c.hc.Do(req)
-	if err != nil {
-		return nil, 0, fmt.Errorf("poolstake: pool unreachable: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, 0, fmt.Errorf("poolstake: feed returned %d", resp.StatusCode)
-	}
-	var body struct {
-		LatestBatch int64       `json:"latest_batch"`
-		Batches     []FeedBatch `json:"batches"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-		return nil, 0, fmt.Errorf("poolstake: bad feed response: %w", err)
-	}
-	return body.Batches, body.LatestBatch, nil
 }
 
 // Profit is the pool's cumulative realized fee from one staker in a UTC

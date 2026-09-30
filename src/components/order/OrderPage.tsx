@@ -328,12 +328,12 @@ function refundCardForQuote(refund: any, t: Translator) {
 }
 
 /* ---------------- Help card (replaces the inline support thread) --------- */
-function HelpCard({ orderId }: { orderId: string }) {
+function HelpCard() {
   const { t } = useT();
   return (
     <a
       className="card"
-      href={pagePath(`/support?order=${encodeURIComponent(orderId)}`)}
+      href={pagePath("/support")}
       style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}
     >
       <div className="row between" style={{ alignItems: 'center', gap: 10 }}>
@@ -643,7 +643,7 @@ export function OrderView() {
         setLoading(false);
       }
     },
-    [id, isQuote, queryReady]
+    [id, isQuote, queryReady, t]
   );
 
   useEffect(() => {
@@ -709,7 +709,7 @@ export function OrderView() {
         </div>
       ),
     });
-  }, [data, isQuote, openSheet, toast, load]);
+  }, [data, isQuote, openSheet, toast, load, t]);
 
   if (queryReady && (!id || err === 'no-id')) {
     return (
@@ -1012,7 +1012,7 @@ function OrderContent({ o }: { o: any }) {
   );
   if (rateCard) rightItems.push(rateCard);
 
-  rightItems.push(<HelpCard key="support" orderId={o.id} />);
+  rightItems.push(<HelpCard key="support" />);
 
   return (
     <div className="container">
@@ -1269,7 +1269,7 @@ function QuoteContent({ q, refund, fulfillment }: { q: any; refund?: any; fulfil
   const rateCard = <RatingCard status={q.status} rating={q.rating || 0} onRate={(r) => rateQuote(q.id, r)} />;
   if (rateCard) rightItems.push(rateCard);
 
-  rightItems.push(<HelpCard key="support" orderId={q.id} />);
+  rightItems.push(<HelpCard key="support" />);
 
   return (
     <div className="container">

@@ -63,11 +63,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import en from './locales/en';
-import es from './locales/es';
-import de from './locales/de';
-import fr from './locales/fr';
-import pt from './locales/pt';
-import tr from './locales/tr';
 
 export type LangCode = 'en' | 'es' | 'de' | 'fr' | 'pt' | 'tr';
 
@@ -108,19 +103,58 @@ export interface LangMeta {
   english: string;
   /** Flag country-code (uses existing /img/flags/*.svg assets). */
   flag: string;
-  /** Dictionary bundle. */
-  dict: Dict;
 }
 
 /** The six languages the shop launches with. Order is the switcher order. */
 export const LANGS: LangMeta[] = [
-  { code: 'en', label: 'English', english: 'English', flag: 'gb', dict: en },
-  { code: 'es', label: 'Español', english: 'Spanish', flag: 'es', dict: es },
-  { code: 'de', label: 'Deutsch', english: 'German',  flag: 'de', dict: de },
-  { code: 'fr', label: 'Français', english: 'French', flag: 'fr', dict: fr },
-  { code: 'pt', label: 'Português', english: 'Portuguese', flag: 'pt', dict: pt },
-  { code: 'tr', label: 'Türkçe', english: 'Turkish', flag: 'tr', dict: tr },
+  { code: 'en', label: 'English', english: 'English', flag: 'gb' },
+  { code: 'es', label: 'Español', english: 'Spanish', flag: 'es' },
+  { code: 'de', label: 'Deutsch', english: 'German',  flag: 'de' },
+  { code: 'fr', label: 'Français', english: 'French', flag: 'fr' },
+  { code: 'pt', label: 'Português', english: 'Portuguese', flag: 'pt' },
+  { code: 'tr', label: 'Türkçe', english: 'Turkish', flag: 'tr' },
 ];
+
+/*
+ * LAZY DICTIONARIES
+ * -----------------
+ * english ships in the entry bundle (it is the fallback every render needs);
+ * the other five travel as their own chunks and load the moment the language
+ * is actually selected. Statically importing all six meant ~600 KB of source
+ * (≈130 KB gzipped) of translations were downloaded, parsed and executed on
+ * every page view in every language, which is what Lighthouse measured as
+ * unused JavaScript and blocking main-thread time.
+ */
+const LOADERS: Record<string, () => Promise<{ default: Dict }>> = {
+  es: () => import('./locales/es'),
+  de: () => import('./locales/de'),
+  fr: () => import('./locales/fr'),
+  pt: () => import('./locales/pt'),
+  tr: () => import('./locales/tr'),
+};
+
+const DICTS: Record<string, Dict> = { en: en as Dict };
+const pending = new Map<string, Promise<void>>();
+
+/** Load (once) the dictionary for `code`. English is always available. */
+export function loadDict(code: LangCode): Promise<void> {
+  if (DICTS[code]) return Promise.resolve();
+  const loader = LOADERS[code];
+  if (!loader) return Promise.resolve();
+  const inflight = pending.get(code);
+  if (inflight) return inflight;
+  const job = loader()
+    .then((mod) => { DICTS[code] = mod.default as Dict; })
+    .catch(() => { /* offline: English fallback keeps the UI readable */ })
+    .finally(() => { pending.delete(code); });
+  pending.set(code, job);
+  return job;
+}
+
+/** True when the dictionary is already in memory (used to avoid an EN flash). */
+export function dictLoaded(code: LangCode): boolean {
+  return !!DICTS[code];
+}
 
 const STORAGE_KEY = 'nimshop.lang';
 const COOKIE_NAME = 'nimshop-lang';
@@ -204,8 +238,8 @@ export interface Translator {
 }
 
 function buildT(lang: LangCode): Translator {
-  const dict = BY_CODE[lang]?.dict || BY_CODE[DEFAULT_LANG].dict;
-  const fallback = BY_CODE[DEFAULT_LANG].dict;
+  const dict = DICTS[lang] || DICTS[DEFAULT_LANG];
+  const fallback = DICTS[DEFAULT_LANG];
   const fn: Translator = ((key: DictKey, vars?: Record<string, string | number>) => {
     let node = resolve(key, dict);
     if (node === undefined) node = resolve(key, fallback); // graceful EN fallback
@@ -316,10 +350,14 @@ function applyLang(code: LangCode, persist: boolean) {
   listeners.forEach((l) => l(code));
 }
 
-/** Set language programmatically (e.g. from the switcher, or from ?lang=). */
-export function setLang(code: LangCode) {
+/**
+ * Set language programmatically (e.g. from the switcher, or from ?lang=).
+ * The dictionary chunk is fetched first: applying a language whose strings are
+ * not loaded yet would flash English for one frame.
+ */
+export function setLang(code: LangCode): Promise<void> {
   if (!isValidCode(code)) code = DEFAULT_LANG;
-  applyLang(code, true);
+  return loadDict(code).then(() => { applyLang(code, true); });
 }
 
 /** Subscribe to language changes outside React. Returns an unsubscribe fn. */
@@ -331,20 +369,44 @@ export function onLangChange(fn: (lang: LangCode) => void): () => void {
 /* ---------------- Provider ---------------- */
 
 export function I18nProvider({ children, initial }: { children: ReactNode; initial?: LangCode }) {
+  // The dictionary for a non-English language arrives as its own chunk, so the
+  // provider starts in English (the fallback) and switches as soon as the
+  // requested strings are in memory. `dictLoaded` keeps the already-warm case
+  // synchronous — no extra frame for a language the browser cached.
+  const wanted = (): LangCode => (isValidCode(initial) ? initial : detectLang());
   const [lang, setLangState] = useState<LangCode>(() => {
-    const code = isValidCode(initial) ? initial : detectLang();
-    // apply (without persisting an auto-detect we only just guessed)
-    applyLang(code, false);
-    return code;
+    const code = wanted();
+    if (dictLoaded(code)) {
+      // apply (without persisting an auto-detect we only just guessed)
+      applyLang(code, false);
+      return code;
+    }
+    return DEFAULT_LANG;
   });
 
+  // Boot: fetch the detected dictionary, then apply it.
+  useEffect(() => {
+    const code = wanted();
+    if (dictLoaded(code)) { applyLang(code, false); return; }
+    let alive = true;
+    void loadDict(code).then(() => { if (alive) setLangState(code); });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Keep the global singleton in sync with React state.
-  useEffect(() => { applyLang(lang, true); }, [lang]);
+  useEffect(() => {
+    if (dictLoaded(lang)) applyLang(lang, true);
+    else void loadDict(lang).then(() => applyLang(lang, true));
+  }, [lang]);
 
   // Keep two tabs of the same shop in sync.
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY && isValidCode(e.newValue) && e.newValue !== lang) setLangState(e.newValue);
+      const next = e.newValue;
+      if (e.key === STORAGE_KEY && isValidCode(next) && next !== lang) {
+        void loadDict(next).then(() => setLangState(next));
+      }
     };
     window.addEventListener('storage', onStorage);
     // Also pick up changes from non-React callers in this tab.
@@ -354,7 +416,7 @@ export function I18nProvider({ children, initial }: { children: ReactNode; initi
 
   const ctx = useMemo<I18nCtx>(() => ({
     lang,
-    setLang: setLangState,
+    setLang: (code: LangCode) => { void loadDict(code).then(() => setLangState(code)); },
     t: buildT(lang),
     langs: LANGS,
   }), [lang]);

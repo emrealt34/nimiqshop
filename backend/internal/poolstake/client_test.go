@@ -42,9 +42,6 @@ func TestConfigurationAndDisabledCalls(t *testing.T) {
 		if _, err := c.Stake(ctx, "NQ00"); !errors.Is(err, ErrNotConfigured) {
 			t.Fatalf("Stake: %v", err)
 		}
-		if _, _, err := c.Feed(ctx, 0, 0); !errors.Is(err, ErrNotConfigured) {
-			t.Fatalf("Feed: %v", err)
-		}
 		if _, err := c.Profit(ctx, "NQ00", ""); !errors.Is(err, ErrNotConfigured) {
 			t.Fatalf("Profit: %v", err)
 		}
@@ -67,9 +64,6 @@ func TestConfigurationAndDisabledCalls(t *testing.T) {
 	}
 	if _, err := c.Profit(ctx, "NQ00", ""); err == nil {
 		t.Fatal("missing profit key accepted")
-	}
-	if _, _, err := c.Feed(ctx, 0, 0); err == nil {
-		t.Fatal("missing feed key accepted")
 	}
 }
 
@@ -126,22 +120,7 @@ func TestStakeValuesAndCache(t *testing.T) {
 	}
 }
 
-func TestFeedAndProfitContracts(t *testing.T) {
-	for _, tc := range []struct {
-		limit int64
-		want  string
-	}{{-1, "200"}, {7, "7"}, {2001, "1000"}} {
-		c := fixtureClient(t, 200, `{"latest_batch":12,"batches":[{"batch_number":11,"pool_fee_luna":50,"stakers":[{"address":"NQ00","fee_share_luna":5}]}]}`, func(r *http.Request) {
-			if r.URL.Path != "/api/cashback/feed" || r.URL.Query().Get("limit") != tc.want || r.URL.Query().Get("after_batch") != "10" || r.Header.Get("X-Feed-Key") != "fixture-key" {
-				t.Errorf("feed contract: %v %v", r.URL, r.Header)
-			}
-		})
-		c.SetFeedKey("fixture-key")
-		batches, latest, err := c.Feed(context.Background(), 10, tc.limit)
-		if err != nil || latest != 12 || len(batches) != 1 || batches[0].BatchNumber != 11 || len(batches[0].StakeShares) != 1 || batches[0].StakeShares[0].FeeShareLuna != 5 {
-			t.Fatalf("feed: %+v %d %v", batches, latest, err)
-		}
-	}
+func TestProfitContract(t *testing.T) {
 	for _, period := range []string{"", "last_month & extra"} {
 		want := period
 		if want == "" {
@@ -191,7 +170,6 @@ func TestTermsConversionAndCache(t *testing.T) {
 func TestEveryEndpointFailure(t *testing.T) {
 	operations := map[string]func(*Client) error{
 		"stake":  func(c *Client) error { _, err := c.Stake(context.Background(), "NQ00"); return err },
-		"feed":   func(c *Client) error { _, _, err := c.Feed(context.Background(), 0, 1); return err },
 		"profit": func(c *Client) error { _, err := c.Profit(context.Background(), "NQ00", ""); return err },
 		"terms":  func(c *Client) error { _, err := c.Terms(context.Background()); return err },
 	}

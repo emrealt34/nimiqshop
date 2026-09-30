@@ -300,7 +300,9 @@ html.in-nimiq-pay #main.page {
   gap: 4px;
   white-space: nowrap;
   font-weight: 800;
-  color: var(--stamp, #c7481d);
+  /* --stamp-600 (#A83A16) instead of --stamp: 4.9:1 on the 10% orange wash,
+     the old #C7481D measured 3.7:1 and failed WCAG AA. */
+  color: var(--stamp-600, #a83a16);
   background: rgba(199, 72, 29, 0.1);
   border: 1.5px solid rgba(199, 72, 29, 0.35);
   padding: 6px 12px;
@@ -3720,3 +3722,8 @@ input[type="range"]:focus-visible { outline: 2px solid var(--stamp); outline-off
    the old value, and the header flipped between two shapes on every frame at
    1200px in French. The attribute is removed on the next frame. */
 [data-fit-busy], [data-fit-busy] * { transition: none !important; }
+
+/* WCAG AA on the activity tiles: --ink-faint (#9B8763) measures 3.0:1 on the
+   kraft card, which is fine for decorative body copy but too low for these
+   12px uppercase labels and their sub-line. --ink-dim is 4.5:1. */
+.act-tile-label, .act-tile-sub, .act-tile .xs.faint { color: var(--ink-dim); }

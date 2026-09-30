@@ -22,7 +22,7 @@ import { applyNimiqPayChrome, inNimiqPay, initNimiqMiniApp } from '../../lib/min
 import { NimiqPayInstallDialog } from '../ui/NimiqPayInstallDialog';
 import { ensureLib } from '../../lib/vendorLoad';
 import { loginWithHub, loginWithNimiqPay, prefetchHubLogin, initHubRedirectHandling, friendlyHubError } from '../../lib/hub';
-import { listQuotes, listOrders, listTickets } from '../../lib/api';
+import { listQuotes, listOrders } from '../../lib/api';
 import { siteName } from '../../lib/config';
 import { openCartSheet } from '../cart/CartSheet';
 import { useRouteKey, useRouter } from '../../lib/router';
@@ -99,62 +99,6 @@ function useAwaitingPaymentCount(): number {
   return count;
 }
 
-const SUPPORT_SEEN_KEY = 'nimshop.supportSeen';
-
-function useUnreadSupportCount(): number {
-  const [count, setCount] = useState(0);
-  const inFlight = useRef(false);
-  const alive = useRef(true);
-  const routeKey = useRouteKey();
-  const visible = useRef(true);
-  const tick = () => {
-    if (inFlight.current) return;
-    if (!alive.current || !document.visibilityState || document.visibilityState !== 'visible') return;
-    if (!isAuthed()) { setCount(0); return; }
-    inFlight.current = true;
-    listTickets()
-      .then((res: any) => {
-        if (!alive.current) return;
-        const rows = Array.isArray(res?.tickets) ? res.tickets : Array.isArray(res) ? res : [];
-        const onSupport = routeKey === 'support';
-        if (onSupport) {
-          localStorage.setItem(SUPPORT_SEEN_KEY, new Date().toISOString());
-          setCount(0);
-          return;
-        }
-        const seen = localStorage.getItem(SUPPORT_SEEN_KEY) || '';
-        const c = rows.filter((t: any) => {
-          const st = String(t?.status || '');
-          return (
-            t?.last_message_by === 'admin' &&
-            !['resolved', 'closed'].includes(st) &&
-            String(t?.updated_at || '') > seen
-          );
-        }).length;
-        setCount(c);
-      })
-      .catch(() => {})
-      .finally(() => { inFlight.current = false; });
-  };
-  const onVis = () => {
-    visible.current = document.visibilityState === 'visible';
-    if (visible.current) tick();
-  };
-  useEffect(() => {
-    alive.current = true;
-    document.addEventListener('visibilitychange', onVis);
-    tick();
-    const t = setInterval(tick, 20_000);
-    return () => {
-      alive.current = false;
-      document.removeEventListener('visibilitychange', onVis);
-      clearInterval(t);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeKey]);
-  return count;
-}
-
 /* ---------------- Root ---------------- */
 
 export function SiteShell({ activeKey }: { activeKey: ShellKey }) {
@@ -162,11 +106,10 @@ export function SiteShell({ activeKey }: { activeKey: ShellKey }) {
   const routeKey = useRouteKey();
   const key = routeKey || activeKey;
   const awaiting = useAwaitingPaymentCount();
-  const supUnread = useUnreadSupportCount();
   return (
     <>
-      <TopBar activeKey={key} awaiting={awaiting} supUnread={supUnread} />
-      <TabBar activeKey={key} awaiting={awaiting} supUnread={supUnread} />
+      <TopBar activeKey={key} awaiting={awaiting} />
+      <TabBar activeKey={key} awaiting={awaiting} />
     </>
   );
 }
@@ -370,7 +313,7 @@ function AccountArea() {
           {menuItem('spark',    t('account.cashbackStaking'), () => navigate('/cashback'))}
           {menuItem('tree',     t('account.plantTrees'),      () => navigate('/plant-trees'))}
           {menuItem('pulse',    t('account.publicActivity'),  () => navigate('/activity'))}
-          {menuItem('headset',  t('account.supportTickets'),  () => navigate('/support'))}
+          {menuItem('headset',  t('nav.support'),  () => navigate('/support'))}
           <button
             className="danger"
             onClick={doSignOut}
@@ -387,7 +330,7 @@ function AccountArea() {
 
 /* ---------------- Top bar ---------------- */
 
-function TopBar({ activeKey, awaiting, supUnread }: { activeKey: ShellKey; awaiting?: number; supUnread?: number }) {
+function TopBar({ activeKey, awaiting }: { activeKey: ShellKey; awaiting?: number }) {
   const { t } = useT();
   return (
     <header className="topbar">
@@ -407,7 +350,6 @@ function TopBar({ activeKey, awaiting, supUnread }: { activeKey: ShellKey; await
             >
               {t(`nav.${n.labelKey}` as any)}
               {n.key === 'orders'  && (awaiting || 0) > 0 && <span className="nav-badge">{awaiting}</span>}
-              {n.key === 'support' && (supUnread || 0) > 0 && <span className="nav-badge">{supUnread}</span>}
             </a>
           ))}
         </nav>
@@ -422,7 +364,7 @@ function TopBar({ activeKey, awaiting, supUnread }: { activeKey: ShellKey; await
 
 /* ---------------- Mobile tab bar ---------------- */
 
-function TabBar({ activeKey, awaiting, supUnread }: { activeKey: ShellKey; awaiting?: number; supUnread?: number }) {
+function TabBar({ activeKey, awaiting }: { activeKey: ShellKey; awaiting?: number }) {
   const { t } = useT();
   const [host, setHost] = useState<HTMLElement | null>(null);
   useEffect(() => {
@@ -465,7 +407,6 @@ function TabBar({ activeKey, awaiting, supUnread }: { activeKey: ShellKey; await
           <span className="tab-ico">
             <Icon name={n.icon} size={22} />
             {n.key === 'orders'  && (awaiting || 0) > 0 && <span className="nav-badge">{awaiting}</span>}
-            {n.key === 'support' && (supUnread || 0) > 0 && <span className="nav-badge">{supUnread}</span>}
           </span>
           {/* A tab cell is one sixth of a phone screen: French and German labels
               ("Planter des arbres", "Bäume pflanzen") do not fit on one line at a

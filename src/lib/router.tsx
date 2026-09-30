@@ -149,10 +149,19 @@ export function prefetchRoute(pathname: string): void {
   });
 }
 
-/** Warm every route chunk once the page is idle. Pages that are not in the main
- *  nav (/profile, /track, /admin, /order) are only reachable from a
- *  menu or a feed row, so nothing would prefetch them on hover — without this
- *  their first open shows the skeleton while the chunk downloads. */
+/**
+ * Warm the remaining route chunks — but only AFTER the visitor has started
+ * interacting with the page (first pointer/keyboard event), never during the
+ * initial load.
+ *
+ * Executing every page module up front cost ~400 KB of parse+compile on the
+ * very first seconds of the landing page (Lighthouse measured a 3.9 s
+ * total-blocking time and blamed the landing page for it). Route chunks are
+ * still warmed on intent — hovering/focusing any internal link calls
+ * prefetchRoute directly — so a click stays instant; this background pass only
+ * covers pages the visitor could not hover (a feed row opened by a deep link)
+ * and it waits until the browser is genuinely idle after that interaction.
+ */
 let warming = false;
 export function warmAllRoutes(): void {
   if (warming || typeof window === 'undefined') return;
@@ -161,10 +170,23 @@ export function warmAllRoutes(): void {
     const conn = (navigator as any)?.connection;
     if (conn && (conn.saveData || /2g/.test(String(conn.effectiveType || '')))) return;
   } catch { /* no Network Information API */ }
-  const start = () => ROUTES.forEach((r, i) => setTimeout(() => prefetchRoute(r.path), i * 220));
-  const idle = (window as any).requestIdleCallback;
-  if (typeof idle === 'function') idle(() => start(), { timeout: 2000 });
-  else setTimeout(start, 1200);
+
+  const start = () => {
+    // Small batches with room between them: the main thread stays free for
+    // whatever the visitor is actually doing.
+    ROUTES.forEach((r, i) => setTimeout(() => prefetchRoute(r.path), Math.floor(i / 3) * 1500));
+  };
+  const armed = () => {
+    window.removeEventListener('pointerdown', armed);
+    window.removeEventListener('keydown', armed);
+    window.removeEventListener('touchstart', armed);
+    window.removeEventListener('wheel', armed);
+    setTimeout(start, 2500);
+  };
+  window.addEventListener('pointerdown', armed);
+  window.addEventListener('keydown', armed);
+  window.addEventListener('touchstart', armed);
+  window.addEventListener('wheel', armed, { passive: true } as AddEventListenerOptions);
 }
 
 /* ------------------------------------------------------------------- state */
@@ -340,7 +362,8 @@ export function Router({
     };
   }, [navigate]);
 
-  /* idle prefetch: every route chunk in the background → instant navigation */
+  /* Background prefetch stays armed until the visitor interacts (see
+     warmAllRoutes) — the landing page itself must not execute every route. */
   useEffect(() => {
     warmAllRoutes();
   }, []);

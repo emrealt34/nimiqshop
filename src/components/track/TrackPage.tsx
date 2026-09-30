@@ -91,7 +91,7 @@ export function TrackView() {
       inFlight.current = false;
       if (alive.current) setLoading(false);
     }
-  }, [id, queryReady]);
+  }, [id, queryReady, t]);
 
   useEffect(() => {
     load();

@@ -6,7 +6,6 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Icon, type IconName } from '../ui/Icon';
-import { AdminSupportPanel } from './AdminSupportPanel';
 import { PlayersPanel, UsersPanel } from './AdminPeoplePanel';
 import { AppRoot } from '../AppRoot';
 import { useSheet, useToast } from '../AppProviders';
@@ -45,7 +44,7 @@ function badge(label: string, on: boolean, detail?: string) {
   );
 }
 
-type AdminSection = 'overview' | 'catalog' | 'test' | 'orders' | 'cashback' | 'trees' | 'people' | 'support' | 'email';
+type AdminSection = 'overview' | 'catalog' | 'test' | 'orders' | 'cashback' | 'trees' | 'people' | 'email';
 
 type RuleOption = { value: string; label: string };
 
@@ -96,7 +95,6 @@ const ADMIN_SECTIONS: Array<{ id: AdminSection; label: string; hint: string; ico
   { id: 'cashback', label: 'Cashback', hint: 'rates & ledgers', icon: 'wallet' },
   { id: 'trees', label: 'Trees', hint: 'settlements', icon: 'tree' },
   { id: 'people', label: 'People', hint: 'users & players', icon: 'user' },
-  { id: 'support', label: 'Support', hint: 'tickets', icon: 'message' },
   { id: 'email', label: 'Email', hint: 'Mailtrap tools', icon: 'send' },
 ];
 
@@ -1413,8 +1411,6 @@ export function AdminContent() {
         return <TreePayoutAdmin />;
       case 'people':
         return <UsersPanel />;
-      case 'support':
-        return <AdminSupportPanel />;
       case 'email':
         return <><StatusCard status={status} /><Composer status={status} /><TestEmailCard /></>;
       case 'overview':
@@ -1447,7 +1443,8 @@ export function AdminContent() {
             <div className="strong">Operator console</div>
             <div className="small muted mt-1">
               Sign in to manage orders & quotes, direct email notifications, cashback & the stake
-              ledger, tree payouts, catalog rules, people and support tickets. Access uses a separate
+              ledger, tree payouts, catalog rules and people. The support inbox is retired —
+              buyers are routed to the FAQ and the supplier. Access uses a separate
               operator login — the customer wallet session is not enough.
             </div>
             <button className="btn btn-gold mt-2" onClick={openLogin}>
@@ -1467,7 +1464,7 @@ function AdminHeader() {
         <h1 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Icon name="shield" size={24} /> Operator console
         </h1>
-        <div className="xs faint mt-1">Catalog, test orders, cashback, people, support and Mailtrap tools — separate from the customer wallet login.</div>
+        <div className="xs faint mt-1">Catalog, test orders, cashback, people and Mailtrap tools — separate from the customer wallet login.</div>
       </div>
       <a className="btn btn-ghost btn-sm" href={pagePath("/")}>
         <Icon name="back" size={14} />

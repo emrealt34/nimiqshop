@@ -16,6 +16,11 @@ dist/
 *.exe
 *.test
 coverage.*
+coverage-*.json
+coverage-*.md
+.lighthouseci/
+playwright-report/
+test-results/
 
 # Runtime
 data/

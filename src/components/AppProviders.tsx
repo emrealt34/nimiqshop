@@ -98,14 +98,15 @@ export function AppProviders({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hasSheets) return;
     const overflow = document.body.style.overflow;
+    const content = contentRef.current;
     const background = [document.querySelector('footer'), document.getElementById('tabbar-root')]
       .filter((node): node is HTMLElement => !!node).map((node) => ({ node, wasInert: node.hasAttribute('inert') }));
     document.body.style.overflow = 'hidden';
-    contentRef.current?.setAttribute('inert', '');
+    content?.setAttribute('inert', '');
     background.forEach(({ node }) => node.setAttribute('inert', ''));
     return () => {
       document.body.style.overflow = overflow;
-      contentRef.current?.removeAttribute('inert');
+      content?.removeAttribute('inert');
       background.forEach(({ node, wasInert }) => { if (!wasInert) node.removeAttribute('inert'); });
     };
   }, [hasSheets]);

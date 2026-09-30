@@ -1462,7 +1462,7 @@ const de = {
     rowTo: 'An',
     supplierState: 'Lieferantenstatus: {{state}}',
     helpTitle: 'Brauchst du Hilfe?',
-    helpHint: 'Öffnet den Support mit dieser Bestellung — hier ist nichts zu tun.',
+    helpHint: 'Öffnet Hilfe & FAQ — klärt die meisten Fragen zu Codes, Zustellung und Erstattung auf einen Blick.',
     rebuyHint: 'Füllt deinen Warenkorb mit den Artikeln dieser Bestellung und öffnet ihn — bezahlt wird erst beim Checkout.',
     mayOnlyRedeem: 'Möglicherweise nur einlösbar {{geo}}.',
     summaryTitle: 'Übersicht',

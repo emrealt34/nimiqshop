@@ -16,7 +16,6 @@ export const SCREENS: { name: string; url: string }[] = [
   { name: 'order-detail', url: '/order?id=o1' },
   { name: 'quote-detail', url: '/order?type=quote&id=q1' },
   { name: 'track-order', url: '/track?order=o1' },
-  { name: 'support-ticket', url: '/support?ticket=t1' },
   { name: 'not-found', url: '/this-page-does-not-exist' },
 ];
 

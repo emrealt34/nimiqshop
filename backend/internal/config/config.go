@@ -126,7 +126,7 @@ type Config struct {
 	PoolValidatorAddress string
 	PoolStakeCacheTTL    int // seconds; 0 = poolstake.DefaultTTL
 	PoolStakeTimeout     int // seconds; 0 = poolstake.DefaultTimeout
-	// PoolFeedAPIKey is the shared secret for the pool's /api/cashback/feed
+	// PoolFeedAPIKey is the shared secret for the pool's /api/cashback/profit
 	// (the realized-fee source of the single-ledger staker boost). Empty =
 	// ledger feed off (the base rate still works, the boost simply never
 	// accrues). PoolFeedPollSeconds is the feed cadence (default 30).

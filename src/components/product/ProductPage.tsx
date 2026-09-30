@@ -323,7 +323,7 @@ export function ProductPageShell() {
 }
 
 export function ProductPage() {
-  const { t, lang } = useT();
+  const { t } = useT();
   const id = queryParam('id');
   const countryParam = queryParam('country');
   const [product, setProduct] = useState<ProductDetail | null>(null);
@@ -440,7 +440,7 @@ export function ProductPage() {
     } finally {
       setLoading(false);
     }
-  }, [id, countryParam]);
+  }, [id, countryParam, t]);
 
   useEffect(() => {
     load();
@@ -498,6 +498,11 @@ export function ProductPage() {
     };
     timer = setTimeout(check, 450);
     return () => { alive = false; clearTimeout(timer); };
+    // Intentionally keyed on the primitives that invalidate the price. The
+    // nested product fields (range/packages/brand) only change together with
+    // product?.id, and re-running on every `product`/`pkg` object identity
+    // would restart the 450 ms debounce on unrelated renders.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product?.id, product?.country, value, denomination]);
 
   // ---------------- helpers for estimates ----------------
@@ -578,7 +583,7 @@ export function ProductPage() {
     return q > 1
       ? t('productPage.buyLabelMultiNoPrice', { qty: q, name: nm })
       : t('productPage.buyLabelNoPrice', { name: nm });
-  }, [product, qty, buyNIM, t, lang]);
+  }, [product, qty, buyNIM, t]);
 
   const cashbackLine = useMemo(() => {
     if (!product) return '';

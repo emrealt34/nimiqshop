@@ -1471,7 +1471,7 @@ const en = {
     rowTo: 'To',
     supplierState: 'Supplier state: {{state}}',
     helpTitle: 'Do you need help?',
-    helpHint: 'Opens Support with this order already selected — nothing to handle here.',
+    helpHint: 'Opens the Help & FAQ — it settles most code, delivery and refund questions in one look.',
     rebuyHint: 'Refills your cart with this order’s items and opens it — nothing is paid until you check out.',
     mayOnlyRedeem: 'May only be redeemable {{geo}}.',
     summaryTitle: 'Summary',

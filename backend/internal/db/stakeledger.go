@@ -1,7 +1,6 @@
 package db
 
 import (
-	"fmt"
 	"strconv"
 	"time"
 
@@ -19,31 +18,13 @@ import (
  *  - a purchase debits the ledger INSIDE the fulfillment transaction, so
  *    two racing deliveries for the same wallet can never both read the
  *    pre-debit balance (Badger retries the loser on conflict);
- *  - a pool-fee batch is applied and the watermark advanced in ONE
- *    transaction, so a crash between them replays the whole batch — and
- *    the per-ledger LastBatch guard makes even that replay a no-op.
+ *  - the batch-feed path is retired: GoPool replaced GET /api/cashback/feed
+ *    with the per-address GET /api/cashback/profit, whose cumulative deltas
+ *    (ApplyProfitSnapshot) are idempotent by construction. The watermark key
+ *    remains for pre-existing ledgers and shows in the admin console.
  */
 
 const stakeLedgerWatermarkKey = "sl:watermark"
-
-// FeedBatch is one settled pool-fee batch as delivered by GoPool's
-// GET /api/cashback/feed. Amounts are Luna (1 NIM = 100_000 Luna).
-type FeedBatch struct {
-	BatchNumber int64        `json:"batch_number"`
-	EpochNumber int64        `json:"epoch_number"`
-	PoolFeeLuna int64        `json:"pool_fee_luna"`
-	NumStakers  int64        `json:"num_stakers"`
-	LatestBatch int64        `json:"latest_batch"`
-	StakeShares []FeedStaker `json:"stakers"`
-}
-
-// FeedStaker is one staker's realized pool-fee share for the batch: the
-// shop's fee income attributed to that stake (fee * stake / total stake).
-type FeedStaker struct {
-	Address      string `json:"address"`
-	StakeLuna    int64  `json:"stake_luna"`
-	FeeShareLuna int64  `json:"fee_share_luna"`
-}
 
 func stakeLedgerKey(address string) []byte {
 	return []byte(prefixStakeLedger + canonicalStakeAddr(address))
@@ -169,86 +150,6 @@ func (s *Store) ApplyProfitSnapshot(address, month string, totalFeeLuna int64, n
 		return tx.Set(stakeLedgerKey(address), raw)
 	})
 	return credited, err
-}
-
-// ApplyFeedBatch credits each staker's realized pool-fee share
-// (k * g(d) * share, capped at A_MAX) to its ledger and advances the global
-// watermark — one atomic step, replay-safe (watermark + per-ledger
-// LastBatch). Batches at or below the watermark are skipped wholesale, so
-// a retried poll after a partial crash cannot double-credit.
-// Returns the number of ledger credits actually written.
-func (s *Store) ApplyFeedBatch(batches []FeedBatch, nimUsd float64, now time.Time) (int, error) {
-	if len(batches) == 0 {
-		return 0, nil
-	}
-	p := s.stakeLedgerParams()
-	// Batches must be ascending for the watermark to be meaningful.
-	for i := 1; i < len(batches); i++ {
-		if batches[i].BatchNumber <= batches[i-1].BatchNumber {
-			return 0, fmt.Errorf("feed batches not in ascending order: %d after %d",
-				batches[i].BatchNumber, batches[i-1].BatchNumber)
-		}
-	}
-	var applied int
-	err := s.Update(func(tx *badger.Txn) error {
-		watermark, _ := ledgerWatermarkInTx(tx)
-		newWatermark := watermark
-		for _, b := range batches {
-			if b.BatchNumber <= watermark {
-				continue // already applied (global guard, replay)
-			}
-			for _, st := range b.StakeShares {
-				if st.FeeShareLuna <= 0 {
-					continue
-				}
-				addr := canonicalStakeAddr(st.Address)
-				if addr == "" {
-					continue
-				}
-				var l stakeledger.Ledger
-				err := getJSON(tx, stakeLedgerKey(addr), &l)
-				if err != nil && err != ErrNotFound {
-					return err
-				}
-				if err == ErrNotFound {
-					// First sight: create with the batch's stake as the
-					// initial observation; the live watcher refines it.
-					l = *stakeledger.New(addr, 0, now)
-					l.S = float64(st.StakeLuna) / 100_000.0
-				}
-				if l.LastBatch >= b.BatchNumber {
-					continue // per-ledger guard (defense in depth)
-				}
-				// Keep the observed stake fresh when we have nothing
-				// better: a staker the shop has never polled should not
-				// accrue on a stale/zero S.
-				if l.S <= 0 && st.StakeLuna > 0 {
-					l.S = float64(st.StakeLuna) / 100_000.0
-				}
-				if written := l.Accrue(float64(st.FeeShareLuna)/100_000.0, nimUsd, p, now); written > 0 {
-					l.LastBatch = b.BatchNumber
-					raw, merr := marshal(l)
-					if merr != nil {
-						return merr
-					}
-					if serr := tx.Set(stakeLedgerKey(addr), raw); serr != nil {
-						return serr
-					}
-					applied++
-				}
-			}
-			if b.BatchNumber > newWatermark {
-				newWatermark = b.BatchNumber
-			}
-		}
-		if newWatermark != watermark {
-			if err := tx.Set([]byte(stakeLedgerWatermarkKey), []byte(strconv.FormatInt(newWatermark, 10))); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	return applied, err
 }
 
 func ledgerWatermarkInTx(tx *badger.Txn) (int64, error) {

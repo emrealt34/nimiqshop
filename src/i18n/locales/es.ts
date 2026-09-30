@@ -1462,7 +1462,7 @@ const es = {
     rowTo: 'Para',
     supplierState: 'Estado del proveedor: {{state}}',
     helpTitle: '¿Necesitas ayuda?',
-    helpHint: 'Abre Soporte con este pedido ya seleccionado: no hay nada que gestionar aquí.',
+    helpHint: 'Abre la Ayuda y las preguntas frecuentes: resuelve de un vistazo la mayoría de dudas sobre códigos, entregas y reembolsos.',
     rebuyHint: 'Rellena tu carrito con los artículos de este pedido y lo abre: no se paga nada hasta finalizar la compra.',
     mayOnlyRedeem: 'Solo puede ser canjeable {{geo}}.',
     summaryTitle: 'Resumen',

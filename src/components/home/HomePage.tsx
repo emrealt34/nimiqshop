@@ -440,7 +440,10 @@ function CountryPicker({ country, onChange }: { country: string; onChange: (code
         type="button"
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label={t('home.labelCountry')}
+        /* The visible label IS the selected country, so the accessible name is
+           "Shop country: <name>" — the audit requires the name to contain the
+           visible text, and a bare "Country" label failed it. */
+        aria-label={`${t('home.labelCountry')}: ${current[1]}`}
         title={current[1]}
         onClick={() => setOpen((o) => !o)}
         style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', justifyContent: 'space-between', width: '100%' }}

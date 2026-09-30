@@ -68,7 +68,8 @@ export function LanguageSwitcher() {
       <button
         type="button"
         className="lang-toggle"
-        aria-label={t('lang.choose')}
+        /* No aria-label: the sr-only text below is both the visible (a11y-tree)
+           label and the accessible name, so the two can never disagree. */
         aria-haspopup="menu"
         aria-expanded={open}
         title={t('lang.label')}
@@ -76,7 +77,7 @@ export function LanguageSwitcher() {
       >
         <Icon name="globe" size={18} />
         <FlagHex country={current.flag} size={16} />
-        <span className="sr-only">{t('lang.label')}: {current.label}</span>
+        <span className="sr-only">{t('lang.choose')}: {current.label}</span>
       </button>
       {open && (
         <div className="lang-menu open" role="menu" aria-label={t('lang.label')}>

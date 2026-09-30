@@ -161,7 +161,7 @@ export function ActivityView() {
     } finally {
       setLoaded(true);
     }
-  }, [renderSummary]);
+  }, [renderSummary, t]);
 
   useEffect(() => {
     load();
@@ -225,7 +225,11 @@ export function ActivityView() {
         </div>
       </div>
 
-      <div id="stats" className="act-stats mt-2">
+      {/* The stat tiles go from a one-line skeleton to a 3-tile grid once the
+          feed answers; reserving the grid's height keeps everything below it
+          (#summary and the footer) from being pushed down — that push measured
+          0.10 CLS before this. */}
+      <div id="stats" className="act-stats mt-2" style={{ minHeight: 132 }}>
         {!loaded ? (
           <div className="card" style={{ padding: '18px' }}>
             <SkeletonLines n={1} />
@@ -244,7 +248,7 @@ export function ActivityView() {
         )}
       </div>
 
-      <div id="summary" className="mt-2">
+      <div id="summary" className="mt-2" style={{ minHeight: 300 }}>
         {!loaded ? (
           <div className="card">
             <SkeletonLines n={3} />
@@ -293,6 +297,11 @@ export function ActivityView() {
       </div>
 
       <div id="feed" className="mt-2">
+        {/* The empty state below renders an <h3>; without a section heading in
+            between, the document jumped h1 → h3 and Lighthouse failed the
+            heading-order audit. The section is visually self-evident, so the
+            heading stays for assistive tech only. */}
+        <h2 className="sr-only">{t('activityPage.title')}</h2>
         {!loaded ? null : err ? (
           <ErrorState message={err} retry={load} />
         ) : !filtered.length ? (

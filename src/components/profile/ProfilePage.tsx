@@ -102,7 +102,7 @@ export function ProfileView() {
     } catch (err) {
       setState((s) => ({ ...s, err: friendlyApiMessage(err, t('errors.loadAccount')), loading: false }));
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     load();
