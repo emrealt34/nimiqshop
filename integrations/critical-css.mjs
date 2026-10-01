@@ -216,8 +216,13 @@ export default function criticalCss() {
             const move = [];
             container.each((node) => {
               if (node.type === 'atrule' && /keyframes|font-face/.test(node.name)) {
-                keep.push(node.toString());
-                inlineBytes += node.toString().length;
+                const text = node.toString();
+                if (node.name === 'font-face' && text.includes('nunito-var')) {
+                  move.push(text);
+                } else {
+                  keep.push(text);
+                  inlineBytes += text.length;
+                }
                 return;
               }
               if (node.type === 'atrule' && node.nodes) {
