@@ -89,6 +89,20 @@ const norm = (text) => text.replace(/\s+/g, ' ').trim();
 const ALWAYS_INLINE_SELECTORS = [
   '.overlay', '.sheet', '.sheet-backdrop', '.toast', '.toasts', '.toast-stack',
   '.tabbar', '.topbar', '.acct-menu', '.country-pop',
+  // Card geometry. The thumb's aspect-ratio + object-fit rules used to live
+  // in the deferred sheet, so the first paint drew every logo at its
+  // intrinsic (square, tall) size and the whole grid visibly shrank when
+  // css-late flipped ~300 ms in ("the list comes big, then fixes itself").
+  // A few KB of card chrome in the first frame buys a grid whose card boxes
+  // are final from the moment they exist — before any logo even loads.
+  '.thumb', '.product-img', '.product-card',
+  // The products grid's column rules exist TWICE in the sheet (readable +
+  // minified section). When one copy stayed inline and its duplicate went
+  // deferred, the deferred copy landed later in the document and out-ranked
+  // the inline @media override after the flip: the grid re-columned 5→6 and
+  // every card visibly shrank ~350 ms in. Grid rules are two lines; keep
+  // them all in the first frame.
+  '.grid',
 ];
 function alwaysInline(rule) {
   if (rule.selector === ':root') return true;
