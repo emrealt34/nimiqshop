@@ -33,7 +33,7 @@ import { asset } from '../../lib/asset';
 function NimIcon({ size = 18 }: { size?: number }) {
   return (
     <img
-      src={asset("/img/nimiq-hexagon.png?v=128")}
+      src={asset("/img/nimiq-hexagon.png?v=40")}
       alt="NIM"
       width={size}
       height={size}
@@ -169,7 +169,7 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddre
 
       <RailPills
         pills={[
-          { bg: '#0582CA', img: asset('/img/nimiq-hexagon.png?v=128'), label: t('checkout.lpPayWithNim') },
+          { bg: '#0582CA', img: asset('/img/nimiq-hexagon.png?v=40'), label: t('checkout.lpPayWithNim') },
           { bg: '#0E6BA8', img: asset('/img/btc-lightning.png'), label: t('checkout.lpBtcNetwork') },
         ]}
       />
@@ -188,7 +188,7 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddre
       {showQR && allowed && (
         <div className="pay-qr mt-3">
           <div className="pay-qr-frame"><div style={{ position: 'relative', display: 'inline-block', lineHeight: 0 }}>
-            <QR text={invoice} size={29} center={asset("/img/nimiq-hexagon.png?v=128")} />
+            <QR text={invoice} size={29} center={asset("/img/nimiq-hexagon.png?v=40")} />
             {avatarAddress && <span className="qr-ava" aria-hidden="true"><Identicon address={avatarAddress} /></span>}
           </div></div>
           <div className="xs faint mt-1">{t('checkout.lpScanOnce')}</div>

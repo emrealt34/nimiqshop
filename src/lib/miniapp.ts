@@ -3,6 +3,7 @@
  * Official SDK: `init()` waits for the injected `window.nimiq` provider.
  */
 import { useEffect, useState } from 'react';
+import { init as initMiniAppSdk, getHostLanguage } from '@nimiq/mini-app-sdk';
 
 export function inNimiqPay(): boolean {
   if (typeof window === 'undefined') return false;
@@ -76,8 +77,7 @@ export function initNimiqMiniApp(): Promise<unknown | null> {
     sdkReady = Promise.resolve(null);
     return sdkReady;
   }
-  sdkReady = import('@nimiq/mini-app-sdk')
-    .then(({ init: initMiniAppSdk }) => initMiniAppSdk({ timeout: 8000 }))
+  sdkReady = initMiniAppSdk({ timeout: 8000 })
     .then((p) => {
       sdkProvider = p || (window as unknown as { nimiq?: unknown }).nimiq || null;
       return sdkProvider;
@@ -96,8 +96,7 @@ export function getNimiqProvider(): unknown {
 
 export function hostLanguage(): string {
   try {
-    const payLang = typeof window !== 'undefined' ? (window as unknown as { nimiqPay?: { language?: string } }).nimiqPay?.language : undefined;
-    return payLang || (typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'en') || 'en';
+    return getHostLanguage() || (typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'en') || 'en';
   } catch {
     return 'en';
   }

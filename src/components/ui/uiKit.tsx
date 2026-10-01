@@ -16,12 +16,14 @@ import { asset, pagePath } from '../../lib/asset';
 /** Inline Nimiq mark (the hexagon logomark). Use this instead of a generic
  *  money symbol (💰 / $ / ≈) wherever the NIM brand mark is meant. */
 export function NimMark({ size = 16, className = '', style }: { size?: number; className?: string; style?: CSSProperties }) {
+  const h = Math.round(size * 0.9);
   return (
     <img
-      src={asset("/img/nimiq-hexagon.png?v=128")}
+      src={asset("/img/nimiq-hexagon.png?v=40")}
       alt="NIM"
       width={size}
-      height={size}
+      height={h}
+      decoding="async"
       className={className}
       style={{
         flexShrink: 0,

@@ -743,13 +743,6 @@ func (h *Handlers) AdminResolveQuote(ctx *fasthttp.RequestCtx) {
 func (h *Handlers) AdminOracleHealth(ctx *fasthttp.RequestCtx) {
 	callCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	quote, err := h.Oracle.NIMUSD(callCtx)
-	if err != nil && h.NIMUSDPrice != nil {
-		if p, pErr := h.NIMUSDPrice(callCtx); pErr == nil && p > 0 {
-			cancel()
-			writeJSON(ctx, fasthttp.StatusOK, map[string]any{"healthy": true, "median_usd": p, "valid_sources": h.Cfg.OracleMinSources, "spread_bps": 0, "observed_at": time.Now().UTC(), "sources": []any{}, "min_sources": h.Cfg.OracleMinSources, "max_spread_bps": h.Cfg.OracleMaxSpreadBps})
-			return
-		}
-	}
 	cancel()
 	if err != nil {
 		writeJSON(ctx, fasthttp.StatusServiceUnavailable, map[string]any{"healthy": false, "error": "oracle unavailable or sources disagree", "min_sources": h.Cfg.OracleMinSources, "max_spread_bps": h.Cfg.OracleMaxSpreadBps})

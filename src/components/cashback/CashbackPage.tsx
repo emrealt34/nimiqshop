@@ -886,7 +886,7 @@ function ProgrammeUnavailable({
 export function NimiqLogo({ size = 24 }: { size?: number }) {
   return (
     <img
-      src={asset("/img/nimiq-hexagon.png?v=128")}
+      src={asset("/img/nimiq-hexagon.png?v=40")}
       alt=""
       width={size}
       height={size}

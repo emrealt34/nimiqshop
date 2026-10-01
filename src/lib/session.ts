@@ -335,12 +335,15 @@ if (typeof window !== 'undefined') {
     signOut(true);
     window.dispatchEvent(new CustomEvent('nimshop:session', { detail: { authed: false, expired: true } }));
   });
-  // Ask the server on first load. Deferred so it never blocks first paint; the
-  // cached metadata renders immediately and this corrects it if needed.
+  // Ask the server on first load only when a returning session or CSRF cookie
+  // exists — anonymous visitors need zero /api/auth/session round-trip.
+  const maybeBootstrap = () => {
+    if (effective() || memoryAddr || csrfToken()) void bootstrapSession();
+  };
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => { void bootstrapSession(); }, { once: true });
+    document.addEventListener('DOMContentLoaded', maybeBootstrap, { once: true });
   } else {
-    void bootstrapSession();
+    maybeBootstrap();
   }
 }
 

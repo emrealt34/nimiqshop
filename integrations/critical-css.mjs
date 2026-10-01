@@ -284,7 +284,8 @@ export default function criticalCss() {
               if (body.includes('.idle=') && body.includes('astro:idle')) return '';
               if (body.includes('customElements.define("astro-island"')) return '';
               return full;
-            });
+            })
+            .replace(/<\/body>/i, '<template hidden></body>');
           await writeFile(file, nextHtml);
         }
 

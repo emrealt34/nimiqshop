@@ -89,19 +89,21 @@ export function Icon({
   // Nimiq brand mark: use the real hexagon PNG, not the generic Lucide outline
   // (the Lucide hexagon is pointy-top and looks rotated; the PNG is flat-top and matches the brand).
   if (name === 'nimiq') {
+    const h = Math.round(size * 0.9);
     return (
       <img
-        src={asset("/img/nimiq-hexagon.png?v=128")}
+        src={asset("/img/nimiq-hexagon.png?v=40")}
         alt="NIM"
         width={size}
-        height={size}
+        height={h}
+        decoding="async"
         className={className}
         style={{
           display: 'inline-block',
           verticalAlign: 'middle',
           flexShrink: 0,
           width: size,
-          height: size,
+          height: h,
           objectFit: 'contain',
           borderRadius: Math.max(2, Math.round(size * 0.18)),
           ...style,
