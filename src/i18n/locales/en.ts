@@ -999,7 +999,7 @@ const en = {
     popular: 'Popular',
     allCountries: 'All countries',
     soldOutToast: 'This one is sold out right now.',
-    kycBadge: 'KYC may be requested',
+    kycBadge: 'KYC possible',
     viewProduct: 'View {{name}}',
     shelfNote: 'Some categories could not refresh. Saved products may have changed; availability and prices are checked before checkout.',
     loadError: 'We could not load products for this country. Please try again.',

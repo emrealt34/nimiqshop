@@ -765,7 +765,7 @@ export function ProductPage() {
           <div className="pd-image" style={{ position: 'relative' }}>
             <UnifiedThumb src={product.logo_url || ''} alt={product.name} bg={product.bg_color || 'rgb(255,255,255)'} />
             {product.is_e_money && (
-              <div className="kyc-badge" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 3, padding: '3px 6px', background: 'rgba(16, 12, 9, 0.74)', color: '#FFF6E8', fontSize: '0.62rem', lineHeight: 1.2, fontWeight: 800, letterSpacing: '0.03em', textAlign: 'center', textTransform: 'uppercase' }}>
+              <div className="kyc-badge" style={{ position: 'absolute', left: 8, bottom: 8, zIndex: 3, padding: '4px 12px', borderRadius: 'var(--pill)', background: 'var(--gold-400)', color: 'var(--on-gold)', border: '1.5px solid var(--line-strong)', boxShadow: '2px 2px 0 rgba(78, 61, 40, 0.35)', fontSize: '0.72rem', lineHeight: 1.25, fontWeight: 900, letterSpacing: '0.04em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
                 {t('home.kycBadge')}
               </div>
             )}
@@ -773,8 +773,8 @@ export function ProductPage() {
           <div className="pd-info">
             <h1 style={{ margin: '0 0 8px', fontSize: 'clamp(1.3rem, 1.2rem + 1vw, 1.8rem)', lineHeight: 1.2, wordBreak: 'break-word' }}>{product.name}</h1>
             {product.is_e_money && (
-              <div className="kyc-note" role="note" style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', margin: '0 0 10px', padding: '8px 10px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--stroke, rgba(128, 128, 128, 0.25))', fontSize: 'var(--fs-sm)', lineHeight: 1.4 }}>
-                <span aria-hidden="true" style={{ fontWeight: 900, flex: '0 0 auto' }}>ⓘ</span>
+              <div className="kyc-note" role="note" style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', margin: '0 0 10px', padding: '8px 12px', borderRadius: 'var(--r-l)', background: 'var(--gold-grad-soft)', border: '1px solid var(--line)', fontSize: 'var(--fs-sm)', lineHeight: 1.4, color: 'var(--ink)' }}>
+                <span aria-hidden="true" style={{ fontWeight: 900, flex: '0 0 auto', color: 'var(--gold-600)' }}>ⓘ</span>
                 <span>{t('productPage.kycNotice')}</span>
               </div>
             )}

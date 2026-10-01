@@ -693,10 +693,12 @@ function ProductThumb({ p, oos = false }: { p: Product; oos?: boolean }) {
       <UnifiedThumb src={p.logo_url} alt={p.name} bg={p.bg_color || 'rgb(255,255,255)'} />
       {oos && <div className="oos" style={{ position: 'absolute', inset: 0, zIndex: 2, display: 'grid', placeItems: 'center', background: 'var(--scrim, rgba(20, 16, 12, 0.78))', color: 'var(--on-scrim, #FFF6E8)', fontWeight: 900, letterSpacing: '0.14em', textTransform: 'uppercase', fontSize: 'var(--fs-sm)' }}>{t('shop.outOfStock')}</div>}
       {/* e-money families: tell the buyer up front that the provider may ask
-          for identity verification. Absolute strip on the tile — zero layout
-          shift, visible even under the sold-out scrim (zIndex 3). */}
+          for identity verification. Styled as the site's stamp aesthetic —
+          gold pill, ink outline, hard package shadow — so it reads as part of
+          the card on every logo colour. Absolute: zero layout shift, visible
+          even under the sold-out scrim (zIndex 3). */}
       {p.is_e_money && (
-        <div className="kyc-badge" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 3, padding: '2px 3px', background: 'rgba(16, 12, 9, 0.74)', color: '#FFF6E8', fontSize: '0.56rem', lineHeight: 1.2, fontWeight: 800, letterSpacing: '0.03em', textAlign: 'center', textTransform: 'uppercase' }}>
+        <div className="kyc-badge" style={{ position: 'absolute', left: 6, bottom: 6, zIndex: 3, padding: '2.5px 8px', borderRadius: 'var(--pill)', background: 'var(--gold-400)', color: 'var(--on-gold)', border: '1.5px solid var(--line-strong)', boxShadow: '2px 2px 0 rgba(78, 61, 40, 0.35)', fontSize: '0.62rem', lineHeight: 1.25, fontWeight: 900, letterSpacing: '0.04em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
           {t('home.kycBadge')}
         </div>
       )}
