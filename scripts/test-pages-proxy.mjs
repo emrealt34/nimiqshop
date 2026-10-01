@@ -95,6 +95,37 @@ test('502 and network errors remain honest JSON failures, never success', async 
   }
 });
 
+test('backend down: catalog price falls back to CryptoRefills directly', async t => {
+  let crUrl = '';
+  t.mock.method(globalThis, 'fetch', async (url, init) => {
+    const u = String(url);
+    if (u.includes('shopapi.nimiqbase.com')) return new Response('down', { status: 502 });
+    crUrl = u;
+    return new Response(JSON.stringify({ coin_amount: '0.00012345', coin: 'BTC', product_id: 'p1' }), {
+      status: 200, headers: { 'Content-Type': 'application/json' },
+    });
+  });
+  const result = await onRequest({ request: req('/api/catalog/price?brand_name=Amazon.com.tr&country_code=TR&face_value=3593') });
+  assert.equal(result.status, 200);
+  assert.equal(result.headers.get('X-Catalog-Source'), 'cryptorefills-direct');
+  assert.ok(crUrl.includes('/v4/products/price'), 'asked the supplier price endpoint');
+  assert.ok(crUrl.includes('coin=BTC') && crUrl.includes('country_code=TR'));
+  const body = await result.json();
+  assert.equal(body.coin_amount, '0.00012345');
+  assert.ok(body.price_expires_at > body.price_checked_at, 'fresh 15s expiry stamped');
+});
+
+test('backend down: bad supplier price is not served as a quote', async t => {
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    const u = String(url);
+    if (u.includes('shopapi.nimiqbase.com')) return new Response('down', { status: 502 });
+    return new Response(JSON.stringify({ coin_amount: '-1', coin: 'BTC' }), { status: 200 });
+  });
+  const result = await onRequest({ request: req('/api/catalog/price?brand_name=X&country_code=TR&face_value=10') });
+  assert.equal(result.status, 502);
+  assert.equal((await result.json()).code, 'UPSTREAM_UNAVAILABLE');
+});
+
 test('non API paths cannot be proxied', async () => {
   assert.equal((await onRequest({ request: req('/_assets/client.js') })).status, 404);
 });

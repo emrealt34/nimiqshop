@@ -29,9 +29,10 @@ const CR_HEADERS = {
   'User-Agent': 'nimshop/1.0 +https://shop.nimiqbase.com',
   Accept: 'application/json',
 };
-async function crFamilyReply(incoming) {
+async function crFamilyReply(incoming, method) {
+  if (!['GET', 'HEAD'].includes(method)) return null;
   const m = incoming.pathname.match(/^\/api\/catalog\/products\/([^/]+)$/);
-  if (!m || !['GET', 'HEAD'].includes(incoming.searchParams ? 'GET' : 'GET')) return null;
+  if (!m) return null;
   const family = decodeURIComponent(m[1]);
   const cc = (String(incoming.searchParams.get('country') || 'TR').toUpperCase().slice(0, 2)) || 'TR';
   const lang = (String(incoming.searchParams.get('lang') || 'en').toLowerCase().slice(0, 5)) || 'en';
@@ -55,6 +56,58 @@ async function crFamilyReply(incoming) {
   } catch {
     return null;
   }
+}
+
+// Same idea for the informational price quote: GET /api/catalog/price asks
+// CryptoRefills /v4/products/price directly while the Go backend is down.
+// This is DISPLAY-only resilience — a quote lives 15 seconds by supplier
+// design (coin_amount tracks live BTC conversion), checkout re-quotes
+// through the backend and orders are impossible while it is down, so a
+// direct quote can never become the paid amount. Edge-cached 10 s, mirroring
+// the backend's own 15 s in-process micro-cache; browsers get no-store.
+async function crPriceReply(incoming, method) {
+  if (!['GET', 'HEAD'].includes(method)) return null;
+  if (incoming.pathname !== '/api/catalog/price') return null;
+  const q = incoming.searchParams;
+  if (q.get('coin') && q.get('coin').toUpperCase() !== 'NIM') return null; // backend rejects non-NIM pricing
+  const brand = String(q.get('brand_name') || q.get('brand') || '').trim();
+  const cc = String(q.get('country_code') || q.get('country') || '').toUpperCase().slice(0, 2);
+  const fv = Number(q.get('face_value'));
+  if (!brand || cc.length !== 2 || !(fv > 0) || !Number.isFinite(fv)) return null;
+  const url = `${CR_BASE}/v4/products/price?` + new URLSearchParams({
+    brand_name: brand, country_code: cc, face_value: String(fv), coin: 'BTC',
+  });
+  try {
+    const r = await fetch(url, { headers: CR_HEADERS, signal: AbortSignal.timeout(15_000), cf: { cacheTtl: 10 } });
+    if (!r.ok) { await r.body?.cancel(); return null; }
+    const j = await r.json();
+    const amt = String(j?.coin_amount || '');
+    // Same validity checks the Go client applies: positive decimal amount,
+    // coin echoed back as requested.
+    if (!/^\d+(\.\d+)?$/.test(amt) || Number(amt) <= 0) return null;
+    if (String(j?.coin || '').toUpperCase() !== 'BTC') return null;
+    const now = Date.now();
+    j.price_checked_at = new Date(now).toISOString();
+    j.price_expires_at = new Date(now + 15_000).toISOString();
+    j.price_source = '/v4/products/price (pages-direct)';
+    return new Response(JSON.stringify(j), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
+        'CDN-Cache-Control': 'public, max-age=10',
+        'Cloudflare-CDN-Cache-Control': 'public, max-age=10',
+        'X-Content-Type-Options': 'nosniff',
+        'X-Catalog-Source': 'cryptorefills-direct',
+      },
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function crCatalogFallback(incoming, method) {
+  return (await crFamilyReply(incoming, method)) || (await crPriceReply(incoming, method));
 }
 
 function unavailable(status = 502) {
@@ -100,13 +153,13 @@ export async function onRequest({ request }) {
       cf: { cacheTtl: 0, cacheEverything: false },
     });
   } catch {
-    const fb = await crFamilyReply(incoming);
+    const fb = await crCatalogFallback(incoming, request.method);
     if (fb) return fb;
     return unavailable();
   }
   if (upstream.status >= 500) {
     await upstream.body?.cancel();
-    const fb = await crFamilyReply(incoming);
+    const fb = await crCatalogFallback(incoming, request.method);
     if (fb) return fb;
     return unavailable(upstream.status);
   }

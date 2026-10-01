@@ -538,8 +538,34 @@ export const allowNewPurchase = async (id: string) => {
   releaseIntentForQuote(localStorage, id);
 };
 
-export const getProductPrice = (brand: string, country: string, value: number) =>
-  api('/catalog/price?' + new URLSearchParams({ brand_name: brand, country_code: country, face_value: String(value) }));
+/* Price quotes are live supplier money-path data with a 15 s lifetime — they
+ * are deliberately NOT static-first (see the backend: no-store, no stale
+ * fallback, checkout re-quotes). What we CAN remove is repeat round trips:
+ * re-renders and denomination re-clicks within the quote's own lifetime reuse
+ * the in-flight or ~12 s-old answer instead of refetching. */
+const PRICE_TTL_MS = 12_000;
+const _priceCache = new Map<string, { at: number; data: Record<string, any> }>();
+const _priceInflight = new Map<string, Promise<Record<string, any>>>();
+export const getProductPrice = (brand: string, country: string, value: number): Promise<Record<string, any>> => {
+  const key = '/catalog/price?' + new URLSearchParams({ brand_name: brand, country_code: country, face_value: String(value) });
+  const now = Date.now();
+  const hit = _priceCache.get(key);
+  if (hit && now - hit.at < PRICE_TTL_MS) return Promise.resolve(hit.data);
+  const flying = _priceInflight.get(key);
+  if (flying) return flying;
+  const p = api(key)
+    .then((data: any) => {
+      _priceCache.set(key, { at: Date.now(), data });
+      if (_priceCache.size > 60) {
+        const oldest = _priceCache.keys().next().value;
+        if (oldest) _priceCache.delete(oldest);
+      }
+      return data;
+    })
+    .finally(() => _priceInflight.delete(key));
+  _priceInflight.set(key, p);
+  return p;
+};
 
 /* ---------------- Wallet notification prefs ---------------- */
 export const getNotificationPrefs = () => api('/account/notifications', { auth: true });
