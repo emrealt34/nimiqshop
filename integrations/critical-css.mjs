@@ -93,6 +93,15 @@ const ALWAYS_INLINE_SELECTORS = [
 function alwaysInline(rule) {
   if (rule.selector === ':root') return true;
   if (rule.selector.includes('font-face')) return true;
+  // Theme rules ship inline, ALL of them. The capture tour walks the pages in
+  // the default (light) theme, so every `[data-theme=dark] …` rule lands in
+  // neverMatched and gets deferred — and the deferred sheet only flips on
+  // AFTER first paint. The pre-paint theme script sets data-theme=dark on
+  // <html>, but with no dark variables in the critical CSS the first frame
+  // resolves every var() to its light value: dark-theme users got a white
+  // page that snapped to black ~1s in. ~6 KB of variables and overrides,
+  // inlined on every page, is the cheap end of that trade.
+  if ((rule.selector || '').includes('data-theme')) return true;
   return ALWAYS_INLINE_SELECTORS.some((sel) => (rule.selector || '').includes(sel));
 }
 
@@ -228,13 +237,20 @@ export default function criticalCss() {
             const move = [];
             container.each((node) => {
               if (node.type === 'atrule' && /keyframes|font-face/.test(node.name)) {
+                // EVERY @font-face stays inline — including the body webfont
+                // (nunito-var) that used to be deferred here. A face the
+                // browser has not seen cannot be downloaded, and with
+                // font-display:optional the ~100 ms use-it-or-lose-it window
+                // starts at first layout: registering the face only when the
+                // deferred sheet flips meant the real font could never win
+                // the window and every load visibly swapped fallback→webfont
+                // a second in. The faces are inline, the woff2 files are
+                // preloaded in <head>, and optional guarantees the swap is
+                // either instant (cached/fast) or simply skipped for that
+                // pageview — text never changes typeface after paint.
                 const text = node.toString();
-                if (node.name === 'font-face' && text.includes('nunito-var')) {
-                  move.push(text);
-                } else {
-                  keep.push(text);
-                  inlineBytes += text.length;
-                }
+                keep.push(text);
+                inlineBytes += text.length;
                 return;
               }
               if (node.type === 'atrule' && node.nodes) {

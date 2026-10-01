@@ -2,6 +2,7 @@
 // Base.astro — the shared page shell. Mirrors the original index.html/orders.html
 // etc. head exactly (CSP, vendored fonts, theme) and mounts the React shell.
 import fraunces900Url from '../assets/fonts/fraunces-900.woff2';
+import nunitoVarUrl from '../assets/fonts/nunito-var.woff2';
 import '../styles/fonts.css';
 import '../styles/app.css';
 import '../styles/fixes.css';
@@ -244,9 +245,14 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
     <link rel="dns-prefetch" href="https://cdn.cryptorefills.com" />
     {apiOrigin && <link rel="preconnect" href={apiOrigin} crossorigin />}
     {apiOrigin && <link rel="dns-prefetch" href={apiOrigin} />}
-    {/* Preload the display font face the LCP heading needs. Body text uses the
-        metric-matched Nunito Fallback until nunito-var.woff2 swaps in asynchronously. */}
+    {/* Preload both webfont files. Both faces are font-display:optional, whose
+        ~100 ms window starts at first layout — the preload is what gives the
+        real fonts a chance to win it (and guarantees the file is cached for
+        the next visit, where it wins outright). Miss the window and the
+        metric-matched fallbacks render the whole pageview: no layout shift,
+        and no typeface change after paint, ever. */}
     <link rel="preload" as="font" type="font/woff2" href={fraunces900Url} crossorigin />
+    <link rel="preload" as="font" type="font/woff2" href={nunitoVarUrl} crossorigin />
     {buildApiUrl && (
       <script is:inline define:vars={{ buildApiUrl }}>
         window.APP_CONFIG = Object.assign(window.APP_CONFIG || {}, {

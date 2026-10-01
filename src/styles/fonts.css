@@ -34,12 +34,17 @@
  * same list the subsetter was given; `npm run check:fonts` keeps them honest.
  */
 
-/* Nunito — body copy, UI, prices. Variable wght 200..1000, latin + Turkish. */
+/* Nunito — body copy, UI, prices. Variable wght 200..1000, latin + Turkish.
+ * font-display:optional — see the note above the fallbacks: text either uses
+ * the real face from the first paint (cached, or fast enough to win the ~100 ms
+ * window the woff2 preload opens) or the metric-matched fallback for the whole
+ * pageview. There is no third state, i.e. no visible typeface change after
+ * load, which `swap` produced on every cold visit. */
 @font-face {
   font-family: "NunitoLocal";
   font-style: normal;
   font-weight: 100 1000;
-  font-display: swap;
+  font-display: optional;
   src: url("../assets/fonts/nunito-var.woff2") format("woff2");
   unicode-range: U+0000-00FF, U+0100-017F, U+0131, U+0152-0153, U+02BB-02BC,
     U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2082,
@@ -47,28 +52,35 @@
     U+2260, U+2264-2265, U+2713, U+FEFF, U+FFFD;
 }
 
-/* Fraunces — display serif: headings, brand, prices (preloaded). */
+/* Fraunces — display serif: headings, brand, prices (preloaded; optional for
+ * the same no-late-swap reason as Nunito). */
 @font-face {
   font-family: "FrauncesLocal";
   font-style: normal;
   font-weight: 700 900;
-  font-display: swap;
+  font-display: optional;
   src: url("../assets/fonts/fraunces-900.woff2") format("woff2");
   unicode-range: U+0000-00FF, U+0100-017F, U+0131, U+0152-0153, U+2000-206F,
     U+20A0-20BF, U+2122, U+2190-2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 /* ---------------------------------------------------------------------------
- * Metric-matched fallbacks.
+ * Metric-matched fallbacks — and why `optional` is safe.
  *
- * `font-display: swap` paints the fallback first and repaints with the webfont
- * when it lands. That repaint is a layout change if the two fonts have
- * different metrics: with the stylesheet inlined (no render-blocking CSS) the
- * swap happens *after* first paint, and it measured 0.055 CLS on a throttled
- * mobile load — the hero h1 wrapped differently, grew a line and pushed the
- * whole page down, which is the largest single number in our Lighthouse
- * report. Fonts are not the only thing that can shift, but this one is
- * deterministic and cheap to remove.
+ * The webfonts above use font-display:optional: the browser gives a preloaded
+ * face ~100 ms from first layout to arrive; if it does (warm cache, fast
+ * network) the page paints in the real font from frame one, and if it does
+ * not, the fallback below is used for that pageview and the downloaded file
+ * simply seeds the cache for the next one. Either way the typeface NEVER
+ * changes after paint — the `swap` repaint users saw ("fonts change after
+ * loading") cannot happen by construction.
+ *
+ * That is only acceptable because the fallbacks are metric-matched to the
+ * webfonts: same line boxes AND same line breaks (measured, see the width
+ * ratios below), so a fallback pageview is visually near-identical and
+ * layout-identical. History: with `swap` the post-paint repaint measured
+ * 0.055 CLS on a throttled mobile load before the matching existed; after
+ * matching it was layout-neutral but still a visible glyph change.
  *
  * The two faces below take the webfonts' own vertical metrics and a measured
  * width ratio, so the fallback occupies the same box:
