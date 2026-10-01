@@ -229,8 +229,9 @@ html.in-nimiq-pay textarea {
 }
 html.in-nimiq-pay .mainnav { display: none; }
 /* Main nav must NEVER wrap onto a second line (long labels like "🌳 Plant
-   Trees" pushed rows down on mid-width screens). If it can't fit, it's hidden
-   in favour of the bottom tab bar rather than wrapping. */
+   Trees" pushed rows down on mid-width screens). Below 1200px the bottom tab
+   bar is the navigation row (see the grid !important pair further down), so
+   the top nav simply does not render there — one row, never a wrapped one. */
 .mainnav{ flex-wrap: nowrap !important; }
 .mainnav a{ white-space: nowrap; }
 @media (max-width: 1199px){ .mainnav{ display: none !important; } }
@@ -2195,13 +2196,18 @@ label.oos-toggle > span {
 
 @media (min-width: 1000px) and (max-width: 1180px) {
   .topbar-inner { gap: 8px; }
-  .topbar .mainnav { gap: 2px; }
-  .topbar .mainnav a { padding: 6px clamp(5px, 0.5vw, 8px); }
   .topbar .brand { gap: 7px; font-size: 1.1rem; }
   .topbar .brand svg,
   .topbar .brand img { width: 40px; height: 40px; }
   .topbar .acct-btn { padding: 3px 7px 3px 3px; }
-  .topbar .btn .btn-label { display: none; }
+  /* Legacy from when the top nav appeared at 1000px: this band compacted the
+     row for six links + four controls and let the wallet label yield first.
+     The nav now lives at >=1200px (tab bar below), so at these widths the top
+     bar holds brand + four controls with room to spare — hiding the label
+     here only shrank the connect button to a bare hexagon for no reason.
+     When a row IS genuinely out of room (long language, big base font, nav
+     band at >=1200) fitText.ts sets data-fit-tight and level 1 drops the
+     label then, measured instead of guessed. */
   .topbar .btn.btn-gold { padding: 8px 10px; }
 }
 
@@ -2577,6 +2583,16 @@ body {
   color: var(--ink-dim);
   padding: 24px 0;
   margin: 0;
+}
+/* The fixed bottom tab bar exists below 1200px, so the footer needs its
+   clearance there. This rule sits AFTER the themed .footer block above (and
+   after app.css entirely), which is exactly where the earlier
+   `padding: 24px 0` kept winning the cascade and letting the tab bar cover
+   the footer's last row on 901-1199px screens. */
+@media (max-width: 1199px) {
+  .footer {
+    padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px) + 16px);
+  }
 }
 .footer .container {
   width: var(--container);

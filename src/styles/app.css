@@ -339,7 +339,7 @@ p { margin: 0 0 1em; }
 }
 .mainnav a:hover { color: var(--ink); border-color: rgba(78, 61, 40, 0.45); text-decoration: none; }
 .mainnav a.active { color: var(--ink); border-color: rgba(78, 61, 40, 0.6); background: rgba(78, 61, 40, 0.06); }
-@media (min-width: 900px) { .mainnav { display: flex; } }
+@media (min-width: 1200px) { .mainnav { display: flex; } }
 
 .topbar-spacer { flex: 1; }
 
@@ -432,7 +432,7 @@ p { margin: 0 0 1em; }
 .tabbar a svg { width: 22px; height: 22px; }
 .tabbar a.active { color: var(--stamp); }
 .tabbar a:active { transform: scale(0.94); }
-@media (min-width: 900px) { .tabbar { display: none; } }
+@media (min-width: 1200px) { .tabbar { display: none; } }
 
 /* ---------- 6. Buttons ---------- */
 .btn {
@@ -2188,12 +2188,12 @@ a.product-card:hover { text-decoration: none; }
 *, *::before, *::after{ box-sizing:border-box}
 @media (prefers-reduced-motion:reduce){ *, *::before, *::after{ animation-duration:0.01ms !important; animation-iteration-count:1 !important; transition:none !important} }
 .mainnav{ display:none; gap:4px; margin-left:8px}
-@media (min-width:900px){ .mainnav{ display:flex} }
+@media (min-width:1200px){ .mainnav{ display:flex} }
 .acct-btn .bal{ color:var(--stamp); font-weight:900; font-size:var(--fs-sm)}
 @media (max-width:430px){ .acct-btn .bal{ display:none} }
 @media (max-width:380px){ .acct-btn .addr{ display:none} }
 .tabbar{ position:fixed; left:0; right:0; bottom:0; top:auto; z-index:60; display:grid; grid-template-columns:repeat(4, 1fr); background:#F6EFDC; border-top:2px solid var(--line-strong); padding:6px max(var(--sal), 8px) calc(var(--sab) + 6px) max(var(--sar), 8px)}
-@media (min-width:900px){ .tabbar{ display:none} }
+@media (min-width:1200px){ .tabbar{ display:none} }
 /* Wrapping buttons: a width-constrained / full-width button must let its
    label wrap and fill the button instead of overflowing its edges. Icons stay
    fixed; any label span can shrink so long copy reflows inside the button. */
@@ -2290,8 +2290,8 @@ a.product-card:hover { text-decoration: none; }
 .pd-info{ flex:1; min-width:280px}
 @media (max-width:600px){ .packages-grid{ grid-template-columns:repeat(2, minmax(0, 1fr)) !important; gap:10px !important} .pd-top{ flex-direction:row; align-items:center; gap:14px; flex-wrap:nowrap} .pd-image{ width:108px; height:108px; flex:none; padding:10px} .pd-info{ min-width:0; flex:1} .pd-info h1{ font-size:1.25rem !important} }
 @media (max-width:380px){ .packages-grid{ grid-template-columns:repeat(2, minmax(0, 1fr)) !important; gap:8px !important} }
-@media (max-width:900px){ .tabbar{ background:var(--surface-1); border-top:3px solid var(--line-strong); box-shadow:0 -3px 0 rgba(78, 61, 40, 0.15); z-index:100} #main{ padding-bottom:20px} .footer{ background:#F6EFDC; border-top:2px solid #4E3D28; padding:16px 0 calc(60px + env(safe-area-inset-bottom, 0px) + 16px); position:relative} .footer .container{ display:flex; flex-direction:column; gap:12px; align-items:center; text-align:center} .footer .container > span:first-child{ font-size:11px; line-height:1.4} .footer .row{ justify-content:center; gap:16px; font-size:12px} }
-@media (min-width:901px){ .footer{ padding:24px 0} }
+@media (max-width:1199px){ .tabbar{ background:var(--surface-1); border-top:3px solid var(--line-strong); box-shadow:0 -3px 0 rgba(78, 61, 40, 0.15); z-index:100} #main{ padding-bottom:20px} .footer{ background:#F6EFDC; border-top:2px solid #4E3D28; padding:16px 0 calc(60px + env(safe-area-inset-bottom, 0px) + 16px); position:relative} .footer .container{ display:flex; flex-direction:column; gap:12px; align-items:center; text-align:center} .footer .container > span:first-child{ font-size:11px; line-height:1.4} .footer .row{ justify-content:center; gap:16px; font-size:12px} }
+@media (min-width:1200px){ .footer{ padding:24px 0} }
 .packages-grid{ max-width:100%; overflow:clip}
 .chip{ display:inline-flex; align-items:center; gap:4px; max-width:170px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; flex:0 1 auto; min-width:0}
 /* Inside a product card the translated country name must not be cut off: it

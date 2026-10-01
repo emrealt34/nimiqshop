@@ -265,7 +265,16 @@ function AccountArea() {
   const addr = getAddress();
 
   if (authed === null) {
-    return <span className="btn btn-gold btn-sm" aria-hidden="true" style={{ visibility: 'hidden' }}>{t('account.connect')}</span>;
+    // Pre-hydration placeholder. It mirrors the real button's structure
+    // (icon + .btn-label span, same flex/gap) so the reserved box is exactly
+    // the button's box: a text-only span measured ~11 px narrower and the
+    // whole control cluster jumped right when React swapped it in.
+    return (
+      <span className="btn btn-gold btn-sm" aria-hidden="true" style={{ visibility: 'hidden', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+        <Icon name="nimiq" size={18} />
+        <span className="btn-label">{t('account.connect')}</span>
+      </span>
+    );
   }
 
   const doSignOut = () => {
@@ -362,6 +371,11 @@ function TopBar({ activeKey, awaiting }: { activeKey: ShellKey; awaiting?: numbe
             </a>
           ))}
         </nav>
+        {/* Absorbs the free space whenever the nav is hidden (below its
+            breakpoint), pinning the controls to the right edge. Without it
+            the whole control cluster sat left-of-centre with a dead empty
+            half-bar on every width where the nav is not rendered. */}
+        <div className="topbar-spacer" aria-hidden="true" />
         <ThemeToggle />
         <LanguageSwitcher />
         <CartButton />
