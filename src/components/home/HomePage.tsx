@@ -660,17 +660,22 @@ function ProductGrid({ products, onBuy, allowWarm }: { products: Product[]; onBu
           <div className="p-name" title={p.name}>
             {p.name}
           </div>
-          <div className="p-meta" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-            {/* No px caps here: a price range ("TRY57 - TRY5,000", "1 GB 3 days
-                - 50 GB 90 days") and a translated country name are routinely
-                wider than a fixed 110/130px box, which used to hide the upper
-                end of the range. Let them take the width the card offers and
-                wrap inside it instead of being ellipsized. */}
+          {/* Meta is a FIXED two-row stack on every card: country chip on
+              row 1, price on row 2. A wrapped price line used to stretch one
+              card (Pasha Fencer's denomination-style range) and, because the
+              grid row grows to the tallest card, left the neighbours with a
+              floating meta block. One clamped line keeps the geometry
+              identical everywhere; the full range lives in the title. */}
+          <div className="p-meta" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flexWrap: 'nowrap', width: '100%' }}>
             <span className="chip" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
               <FlagMark country={p.country} size={16} />
               <span className="chip-txt">{countryName(p.country)}</span>
             </span>
-            <span className="p-price" style={{ fontSize: '0.8rem' }}>
+            <span
+              className="p-price"
+              title={productPriceText(p, t)}
+              style={{ fontSize: '0.8rem', display: 'block', width: '100%', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+            >
               {productPriceText(p, t)}
             </span>
           </div>
