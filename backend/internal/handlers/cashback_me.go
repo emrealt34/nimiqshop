@@ -228,4 +228,3 @@ func (h *Handlers) BurnWalletBalance(ctx *fasthttp.RequestCtx) {
 	}
 	writeSnapshot(snapshot, false, false, 0)
 }
-

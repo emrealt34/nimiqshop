@@ -33,17 +33,16 @@ export function ensureLib(name: string): Promise<void> {
 }
 
 if (typeof window !== 'undefined') {
-  // Warm ONLY the wallet SDK. HubApi is needed by the header (wallet connect)
-  // on every screen, so it is worth having early. The QR encoder is not:
-  // it is 54 KB (more than half of it dead weight on any page that shows no
-  // code) and only the pay screen, the lightning invoice block and the order
-  // page ask for it. Those callers `ensureLib('qrcode')` themselves, on the
-  // render that actually needs a QR, so an idle warm here would just be bytes
-  // every visitor pays for on every screen — Lighthouse measured exactly that
-  // as unused JavaScript on the home page.
+  // Warm ONLY the wallet SDK after the visitor first interacts with the page
+  // (pointerdown / keydown / touchstart), never during initial page load — an
+  // eager idle load during startup costs 27 KB of unused JS in Lighthouse.
   const warm = () => {
+    window.removeEventListener('pointerdown', warm);
+    window.removeEventListener('keydown', warm);
+    window.removeEventListener('touchstart', warm);
     ensureLib('HubApi').catch(() => {});
   };
-  if ('requestIdleCallback' in window) (window as any).requestIdleCallback(warm, { timeout: 2500 });
-  else setTimeout(warm, 1200);
+  window.addEventListener('pointerdown', warm, { once: true, passive: true });
+  window.addEventListener('keydown', warm, { once: true });
+  window.addEventListener('touchstart', warm, { once: true, passive: true });
 }

@@ -205,4 +205,3 @@ func cashbackUserIndexPrefix(userID string) []byte {
 
 // metaRatingAggregateKey is the single key holding the global RatingAggregate.
 const metaRatingAggregateKey = "meta:rating_aggregate"
-

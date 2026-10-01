@@ -210,7 +210,7 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
     <link rel="icon" type="image/png" sizes="64x64" href={`${assetBase}/img/icon-64.png?v=nim-favicon-2`} />
     <link rel="icon" type="image/png" sizes="512x512" href={`${assetBase}/img/icon-512.png?v=nim-favicon-2`} />
     <link rel="apple-touch-icon" href={`${assetBase}/img/apple-touch-icon.png?v=nim-favicon-2`} />
-    <link rel="preconnect" href="https://cdn.cryptorefills.com" crossorigin />
+    <link rel="dns-prefetch" href="https://cdn.cryptorefills.com" />
     {apiOrigin && <link rel="preconnect" href={apiOrigin} crossorigin />}
     {apiOrigin && <link rel="dns-prefetch" href={apiOrigin} />}
     {/* Preload the two faces the first paint needs. The href is the *hashed* URL Vite
@@ -230,7 +230,7 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
         });
       </script>
     )}
-    <script is:inline src={`${assetBase}/config.js`} defer></script>
+    <script is:inline src={`${assetBase}/config.js`} defer fetchpriority="low"></script>
     {/* Wallet SDK is NOT loaded here. src/lib/vendorLoad.ts injects it with
         ensureLib('HubApi') and already warms it on idle; the eager deferred tag
         that used to sit at this spot was a second copy of the same 11 KB on

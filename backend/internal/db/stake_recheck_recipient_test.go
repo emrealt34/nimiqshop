@@ -134,4 +134,3 @@ func TestBurnCashbackDestinationRoutesToBurnWallet(t *testing.T) {
 		t.Errorf("recipient = %q, want burn wallet %q", rows[0].Recipient, BurnNIMAddress)
 	}
 }
-

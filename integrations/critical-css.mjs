@@ -85,33 +85,56 @@ function alwaysInline(rule) {
   return false;
 }
 
-const LOADER = `/* css-late.js — apply the deferred stylesheet after the page has painted.
-   Built by integrations/critical-css.mjs; see that file for why this is not an
-   inline onload handler.
-
-   Timing matters twice over. Applying the sheet the moment it arrives can put
-   it BACK on the critical path: Chrome will hold the first paint for a
-   stylesheet whose media has just started matching, so a sheet that landed
-   before the first frame delayed LCP by ~500 ms on the deployed site instead of
-   saving it. Waiting for the window load event instead guarantees the first
-   frame is already on screen, while still applying the sheet long before a
-   visitor can open a modal — and before the islands hydrate, so
-   hydration-rendered markup is never styled from the critical half alone. */
+const buildLoader = (islandScriptBody) => `/* css-late.js — apply the deferred stylesheet and hydrate islands after first paint. */
 (function () {
-  var link = document.getElementById('${LINK_ID}');
-  if (!link) return;
-  function apply() { link.media = 'all'; }
-  function when() {
-    if (link.sheet) apply();
-    else link.addEventListener('load', apply);
+  var ready = false;
+  var queue = [];
+  function runQueue() {
+    while (queue.length) {
+      var fn = queue.shift();
+      try { fn(); } catch (e) {}
+    }
   }
-  if (document.readyState === 'complete') when();
-  else window.addEventListener('load', when);
-})();
-`;
+  function flush() {
+    if (ready) return;
+    ready = true;
+    var link = document.getElementById('${LINK_ID}');
+    if (link) {
+      var dh = link.getAttribute('data-href');
+      if (dh && !link.getAttribute('href')) link.setAttribute('href', dh);
+      var done = false;
+      function finish() {
+        if (done) return;
+        done = true;
+        link.media = 'all';
+        runQueue();
+      }
+      if (link.sheet) finish();
+      else {
+        link.addEventListener('load', finish, { once: true });
+        link.addEventListener('error', finish, { once: true });
+        setTimeout(finish, 150);
+      }
+    } else {
+      runQueue();
+    }
+  }
+  function schedule() {
+    setTimeout(flush, 180);
+  }
+  if (document.readyState === 'complete') schedule();
+  else window.addEventListener('load', schedule, { once: true });
 
-const ASTRO_IDLE_ORIG = `"requestIdleCallback"in window?window.requestIdleCallback(i,s):setTimeout(i,s.timeout||200)`;
-const ASTRO_IDLE_DEFERRED = `var run=()=>requestAnimationFrame(()=>setTimeout(()=>{"requestIdleCallback"in window?window.requestIdleCallback(i,s):setTimeout(i,1)},40));document.readyState==="complete"?run():window.addEventListener("load",run,{once:!0})`;
+  var l = function (n) {
+    var i = async function () { await (await n())(); };
+    if (ready) setTimeout(i, 1);
+    else queue.push(i);
+  };
+  (self.Astro || (self.Astro = {})).idle = l;
+  window.dispatchEvent(new Event('astro:idle'));
+})();
+${islandScriptBody}
+`;
 
 export default function criticalCss() {
   let outDir;
@@ -143,15 +166,43 @@ export default function criticalCss() {
         let inlineBytes = 0;
         let prefixes = new Set();
         const rewritten = new Map();
+        let islandScriptBody = '';
 
         for (const file of htmlFiles) {
           const html = await readFile(file, 'utf8');
+          for (const m of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) {
+            if (m[1].includes('customElements.define("astro-island"')) {
+              islandScriptBody = m[1];
+              break;
+            }
+          }
           const styles = [...html.matchAll(/<style(?:\s[^>]*)?>([\s\S]*?)<\/style>/gi)];
           if (!styles.length) continue;
           const biggest = styles.reduce((a, b) => (b[1].length > a[1].length ? b : a));
           if (biggest[1].length < 4096) continue; // the 59-byte astro-island stub
 
           const root = postcss.parse(biggest[1]);
+          const htmlNoStyle = html.replace(biggest[0], '');
+          const pageClasses = new Set(['in-nimiq-pay', 'active', 'open', 'dark', 'light', 'tabbar', 'tab-ico', 'tab-lbl', 'nav-badge']);
+          for (const cm of htmlNoStyle.matchAll(/class="([^"]*)"/g)) {
+            for (const c of cm[1].split(/\s+/)) if (c) pageClasses.add(c);
+          }
+          const pageIds = new Set(['tabbar-root']);
+          for (const im of htmlNoStyle.matchAll(/id="([^"]*)"/g)) {
+            if (im[1]) pageIds.add(im[1]);
+          }
+          const selectorMatchesPage = (sel) => {
+            if (!sel) return true;
+            for (const part of sel.split(',')) {
+              const clsMatches = [...part.matchAll(/\.([a-zA-Z0-9_-]+)/g)].map((m) => m[1]);
+              const idMatches = [...part.matchAll(/#([a-zA-Z0-9_-]+)/g)].map((m) => m[1]);
+              if (clsMatches.every((c) => pageClasses.has(c)) && idMatches.every((i) => pageIds.has(i))) {
+                return true;
+              }
+            }
+            return false;
+          };
+          let seenRootVars = false;
 
           /**
            * Split a container into the two halves. At-rules are rebuilt around
@@ -177,8 +228,12 @@ export default function criticalCss() {
               }
               if (node.type !== 'rule' && node.type !== 'atrule') return;
               const text = node.toString();
+              if (node.type === 'rule' && node.selector === ':root' && !context && text.includes('--bg:')) {
+                if (seenRootVars) return;
+                seenRootVars = true;
+              }
               const key = `${context.replace(/ \| $/, '')}\u0000${norm(node.selector || '')}`;
-              if (node.type === 'atrule' || alwaysInline(node) || !deferrable.has(key)) {
+              if (node.type === 'atrule' || alwaysInline(node) || (!deferrable.has(key) && selectorMatchesPage(node.selector))) {
                 keep.push(text);
                 inlineBytes += text.length;
               } else {
@@ -206,27 +261,43 @@ export default function criticalCss() {
           return;
         }
 
+        const loaderCode = buildLoader(islandScriptBody);
         const deferredCss = [...deferred.keys()].join('\n');
         const cssHash = createHash('sha256').update(deferredCss).digest('hex').slice(0, 8);
-        const jsHash = createHash('sha256').update(LOADER).digest('hex').slice(0, 8);
+        const jsHash = createHash('sha256').update(loaderCode).digest('hex').slice(0, 8);
         const cssName = `full.${cssHash}.css`;
         const jsName = `css-late.${jsHash}.js`;
         await writeFile(join(outDir, ASSET_DIR, cssName), deferredCss);
-        await writeFile(join(outDir, ASSET_DIR, jsName), LOADER);
+        await writeFile(join(outDir, ASSET_DIR, jsName), loaderCode);
 
         for (const [file, { html, styleBlock, inline, prefix }] of rewritten) {
           const cssUrl = `${prefix}${ASSET_DIR}/${cssName}`;
           const jsUrl = `${prefix}${ASSET_DIR}/${jsName}`;
           const replacement =
             `<style>${inline}</style>` +
-            `<link id="${LINK_ID}" rel="stylesheet" href="${cssUrl}" media="print">` +
-            `<script defer src="${jsUrl}"></script>` +
+            `<link id="${LINK_ID}" rel="stylesheet" media="print" data-href="${cssUrl}">` +
+            `<script defer fetchpriority="low" src="${jsUrl}"></script>` +
             `<noscript><link rel="stylesheet" href="${cssUrl}"></noscript>`;
           const nextHtml = html
             .replace(styleBlock, replacement)
-            .replaceAll(ASTRO_IDLE_ORIG, ASTRO_IDLE_DEFERRED);
+            .replace(/<script>([\s\S]*?)<\/script>/g, (full, body) => {
+              if (body.includes('.idle=') && body.includes('astro:idle')) return '';
+              if (body.includes('customElements.define("astro-island"')) return '';
+              return full;
+            });
           await writeFile(file, nextHtml);
         }
+
+        try {
+          const cfgPath = join(outDir, 'config.js');
+          const rawCfg = await readFile(cfgPath, 'utf8');
+          const minCfg = rawCfg
+            .replace(/\/\*[\s\S]*?\*\//g, '')
+            .replace(/^\s*\/\/.*$/gm, '')
+            .replace(/\n\s*\n+/g, '\n')
+            .trim() + '\n';
+          await writeFile(cfgPath, minCfg);
+        } catch { /* optional config.js minification */ }
 
         const kb = (n) => `${(n / 1024).toFixed(1)} KB`;
         const pages = rewritten.size;

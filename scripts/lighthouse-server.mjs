@@ -21,6 +21,7 @@
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve } from 'node:path';
+import { brotliCompressSync, gzipSync } from 'node:zlib';
 
 const ROOT = resolve(process.cwd(), 'dist');
 const PORT = Number(process.env.PORT || 8791);
@@ -58,15 +59,29 @@ function stubPayload(pathname) {
   return {};
 }
 
-async function send(res, status, body, type = 'application/json; charset=utf-8') {
-  res.writeHead(status, {
+const COMPRESSIBLE = /^(text\/|application\/(javascript|json|xml)|image\/svg\+xml)/;
+
+async function send(req, res, status, body, type = 'application/json; charset=utf-8') {
+  const headers = {
     'content-type': type,
     'cache-control': 'no-store',
     // The production host is behind Cloudflare; the stub must not become a
     // caching variable in the measurement.
     vary: 'accept-encoding',
-  });
-  res.end(body);
+  };
+  let payload = typeof body === 'string' ? Buffer.from(body) : body;
+  const ae = String(req.headers['accept-encoding'] || '');
+  if (COMPRESSIBLE.test(type) && payload.length > 256) {
+    if (/\bbr\b/.test(ae)) {
+      payload = brotliCompressSync(payload);
+      headers['content-encoding'] = 'br';
+    } else if (/\bgzip\b/.test(ae)) {
+      payload = gzipSync(payload);
+      headers['content-encoding'] = 'gzip';
+    }
+  }
+  res.writeHead(status, headers);
+  res.end(payload);
 }
 
 const server = createServer(async (req, res) => {
@@ -74,26 +89,26 @@ const server = createServer(async (req, res) => {
   const pathname = decodeURIComponent(url.pathname);
 
   if (pathname.startsWith('/api/')) {
-    return send(res, 200, JSON.stringify(stubPayload(pathname)));
+    return send(req, res, 200, JSON.stringify(stubPayload(pathname)));
   }
 
   // Path traversal guard: everything resolves inside dist/.
   const rel = normalize(pathname).replace(/^(\.\.[/\\])+/, '').replace(/^\/+/, '');
   let file = join(ROOT, rel);
-  if (!file.startsWith(ROOT)) return send(res, 403, '{"error":"forbidden"}');
+  if (!file.startsWith(ROOT)) return send(req, res, 403, '{"error":"forbidden"}');
 
   try {
     const info = await stat(file).catch(() => null);
     if (!info || info.isDirectory()) file = join(file, 'index.html');
     const body = await readFile(file);
-    return send(res, 200, body, TYPES[extname(file).toLowerCase()] || 'application/octet-stream');
+    return send(req, res, 200, body, TYPES[extname(file).toLowerCase()] || 'application/octet-stream');
   } catch {
     // GitHub Pages-style 404 page, like the production host.
     try {
       const body = await readFile(join(ROOT, '404.html'));
-      return send(res, 404, body, TYPES['.html']);
+      return send(req, res, 404, body, TYPES['.html']);
     } catch {
-      return send(res, 404, 'not found', 'text/plain; charset=utf-8');
+      return send(req, res, 404, 'not found', 'text/plain; charset=utf-8');
     }
   }
 });

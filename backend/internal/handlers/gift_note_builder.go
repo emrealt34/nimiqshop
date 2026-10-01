@@ -33,17 +33,17 @@ const stakeValidatorAddress = "NQ49 N8MB XYCR XBUP 404C KXKK L49M A7BT F082"
 func (h *Handlers) BuildGiftNoteFromQuote(q db.Quote, lang string) mailtrap.GiftNote {
 	faceValue, currency, product := adminQuoteRenderFields(q)
 	note := mailtrap.GiftNote{
-		Recipient:     mailtrap.Address{Email: strings.TrimSpace(q.CustomerEmail)},
-		Anonymous:     q.Anonymous,
-		SiteName:      h.Cfg.SiteName(),
-		ProductLabel:  product + " · " + faceValue + " " + currency,
-		Message:       q.GiftMessage,
-		OrderID:       q.ID,
-		PurchasedAt:   q.CreatedAt,
-		ShopURL:       h.Cfg.SiteURL(),
-		SupportURL:    h.Cfg.SiteURL() + "/support",
-		Delivery:      giftNoteDelivery(q),
-		Lang:          lang,
+		Recipient:    mailtrap.Address{Email: strings.TrimSpace(q.CustomerEmail)},
+		Anonymous:    q.Anonymous,
+		SiteName:     h.Cfg.SiteName(),
+		ProductLabel: product + " · " + faceValue + " " + currency,
+		Message:      q.GiftMessage,
+		OrderID:      q.ID,
+		PurchasedAt:  q.CreatedAt,
+		ShopURL:      h.Cfg.SiteURL(),
+		SupportURL:   h.Cfg.SiteURL() + "/support",
+		Delivery:     giftNoteDelivery(q),
+		Lang:         lang,
 	}
 	if !q.Anonymous {
 		if q.UserID != "" {

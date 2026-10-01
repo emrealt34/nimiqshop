@@ -409,4 +409,3 @@ func (h *Handlers) SiteConfig(ctx *fasthttp.RequestCtx) {
 		"burn_nim_address":         h.Cfg.BurnNimAddress,
 	})
 }
-

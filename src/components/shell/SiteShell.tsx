@@ -23,7 +23,6 @@ import { NimiqPayInstallDialog } from '../ui/NimiqPayInstallDialog';
 import { loginWithHub, loginWithNimiqPay, prefetchHubLogin, initHubRedirectHandling, friendlyHubError } from '../../lib/hub';
 import { listQuotes, listOrders } from '../../lib/api';
 import { siteName } from '../../lib/config';
-import { openCartSheet } from '../cart/CartSheet';
 import { useRouteKey, useRouter } from '../../lib/router';
 import { getTheme, setTheme, type Theme } from '../../lib/theme';
 import { useT, t as i18nT } from '../../i18n';
@@ -170,7 +169,9 @@ function CartButton() {
       className="cart-btn"
       aria-label={t('nav.cart')}
       style={{ position: 'relative' }}
-      onClick={() => openCartSheet({ openSheet })}
+      onClick={() => {
+        import('../cart/CartSheet').then((m) => m.openCartSheet({ openSheet }));
+      }}
     >
       <Icon name="bag" size={20} />
       {count > 0 && <span className="cart-badge">{count}</span>}
