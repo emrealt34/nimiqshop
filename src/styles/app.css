@@ -3266,3 +3266,16 @@ html { overflow-x: clip; }
 [data-theme="dark"] .lang-menu button:hover { background: var(--surface-3); }
 [data-theme="dark"] .lang-menu button[aria-current="true"] { background: var(--gold-soft); }
 [data-theme="dark"] .lang-toggle { color: var(--ink); }
+
+/* Centered main nav (>=1200px): the spacer's job is pinning the controls
+   when the nav is hidden; once the nav renders, let the free space split
+   evenly around it instead of piling up on the right, so SHOP…SUPPORT sit
+   visually centred between the brand and the control cluster. */
+@media (min-width: 1200px) {
+  .topbar-inner { position: relative; }
+  /* Absolute centre of the bar itself: neighbour margins (brand spacing,
+     control-cluster gap) can no longer skew the optical centre, and the
+     spacer keeps pinning the controls to the right edge. fitText still
+     shrinks the labels if a language ever outgrows the free space. */
+  .mainnav { display: flex; position: absolute; left: 50%; transform: translateX(-50%); margin: 0; }
+}

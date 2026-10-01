@@ -122,6 +122,46 @@ const browser = await chromium.launch({ args: ['--no-sandbox'] });
   await ctx.close();
 }
 
+/* ------------------------------------------------ 7) topbar nav centering */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await ctx.newPage();
+  await page.goto(BASE + '/', { waitUntil: 'load' });
+  await page.waitForFunction(() => document.documentElement.getAttribute('data-app-ready') === '1', null, { timeout: 20000 }).catch(() => {});
+  const m = await page.evaluate(() => {
+    const nav = document.querySelector('.mainnav');
+    const inner = document.querySelector('.topbar-inner');
+    const brand = inner.firstElementChild;
+    const controls = document.querySelector('.topbar-spacer')?.nextElementSibling;
+    if (!nav || !brand || !controls) return null;
+    const nb = nav.getBoundingClientRect();
+    const bb = brand.getBoundingClientRect();
+    const cb = controls.getBoundingClientRect();
+    const ib = inner.getBoundingClientRect();
+    return {
+      offCenter: +((nb.left + nb.width / 2) - (ib.left + ib.width / 2)).toFixed(1),
+      clearLeft: nb.left > bb.right,
+      clearRight: nb.right < cb.left,
+    };
+  });
+  check('7 nav optically centered in the bar', !!m && Math.abs(m.offCenter) <= 2, m ? `off-center ${m.offCenter}px` : 'missing nodes');
+  check('7b nav clears brand and controls at 1280', !!m && m.clearLeft && m.clearRight, '');
+  await page.setViewportSize({ width: 1200, height: 900 });
+  await page.waitForTimeout(400);
+  const m2 = await page.evaluate(() => {
+    const nav = document.querySelector('.mainnav');
+    const inner = document.querySelector('.topbar-inner');
+    const brand = inner.firstElementChild;
+    const controls = document.querySelector('.topbar-spacer')?.nextElementSibling;
+    const nb = nav.getBoundingClientRect();
+    const bb = brand.getBoundingClientRect();
+    const cb = controls.getBoundingClientRect();
+    return { clearLeft: nb.left > bb.right, clearRight: nb.right < cb.left };
+  });
+  check('7c no overlap at the 1200px breakpoint', m2.clearLeft && m2.clearRight, '');
+  await ctx.close();
+}
+
 await browser.close();
 console.log(fails === 0 ? '\nSTOREFRONT UI: ALL CHECKS PASSED' : `\nSTOREFRONT UI: ${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
