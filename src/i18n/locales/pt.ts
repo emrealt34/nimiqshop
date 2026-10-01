@@ -34,6 +34,7 @@ const pt = {
 
   account: {
     connect: 'Conectar carteira',
+    connectShort: 'Conectar',
     connectedVia: 'Conectado via Nimiq {{hub}}',
     hub: 'Hub',
     pay: 'Pay',

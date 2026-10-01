@@ -34,6 +34,7 @@ const fr = {
 
   account: {
     connect: 'Connecter le portefeuille',
+    connectShort: 'Connecter',
     connectedVia: 'Connecté via Nimiq {{hub}}',
     hub: 'Hub',
     pay: 'Pay',

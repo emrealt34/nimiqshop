@@ -36,6 +36,7 @@ const tr = {
 
   account: {
     connect: 'Cüzdan bağla',
+    connectShort: 'Bağlan',
     connectedVia: 'Nimiq {{hub}} ile bağlı',
     hub: 'Hub',
     pay: 'Pay',

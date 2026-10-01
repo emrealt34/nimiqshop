@@ -2188,6 +2188,7 @@ label.oos-toggle > span {
   flex: 0 0 auto;
 }
 .topbar-inner > .btn { white-space: nowrap; }
+.topbar .btn-label-short { display: none; }
 .topbar .acct-menu {
   max-width: calc(100vw - 24px);
 }
@@ -2205,7 +2206,9 @@ label.oos-toggle > span {
   gap: 8px;
 }
 .topbar-inner[data-fit-tight="1"] .btn .btn-label,
-.topbar-inner[data-fit-tight="2"] .btn .btn-label {
+.topbar-inner[data-fit-tight="2"] .btn .btn-label,
+.topbar-inner[data-fit-tight="1"] .btn .btn-label-short,
+.topbar-inner[data-fit-tight="2"] .btn .btn-label-short {
   display: none;
 }
 .topbar-inner[data-fit-tight="1"] .btn.btn-gold,
@@ -2272,11 +2275,25 @@ label.oos-toggle > span {
     gap: 6px;
   }
   .topbar .brand {
+    /* Grows into the spacer's slack (the nav is gone below 1000px, so the
+       spacer only parks the controls right) and shrinks only when the row
+       is genuinely out of room — the wordmark then re-fits its type instead
+       of wrapping or clipping (user: logo yazısı küçülsün, kaybolmasın). */
     flex: 1 1 auto;
     overflow: hidden;
     gap: 6px;
     font-size: 1.15rem;
+    /* The desktop cap (min(38vw,360px)) is 163px at 430vw — it clipped the
+       wordmark even with free space in the row. Phones have no nav to
+       protect; the controls are flex-none and the brand shrinks first when
+       the row is genuinely tight. */
+    max-width: none;
   }
+  /* Below 1000px there is no nav to park: the spacer's only job is pushing
+     the controls right. Letting the brand take ALL the slack (spacer grow 0)
+     keeps the controls right-parked AND gives the wordmark every free pixel
+     — a 1px shortfall still painted an ellipsis over the last character. */
+  .topbar-spacer { flex-grow: 0; }
   .topbar .brand img {
     width: 40px;
     height: 40px;
@@ -2290,47 +2307,77 @@ label.oos-toggle > span {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  /* Phones get one break opportunity, after the dot: 360px cannot show
-     "shop.<host>" on one line at a readable size once the four icon controls
-     have taken their share, and a two-line wordmark beats a truncated one. */
-  .topbar #site-wordmark {
-    white-space: normal;
-  }
-  .topbar #site-wordmark .wm-head,
-  .topbar #site-wordmark .wm-tail {
-    display: inline-block;
+  /* Phones: the wordmark now SHRINKS ITS TYPE instead of wrapping onto two
+     lines. The old wrap permission absorbed the row overflow, which kept the
+     runtime row-budget from ever seeing a tight row — so the long French
+     connect label never compacted either (user: "logo yazısı hiçbir şekilde
+     küçülmez"). One line + fluid size; ellipsis and the runtime data-fit
+     re-fit remain as last resorts. */
+  .topbar .brand { font-size: clamp(0.82rem, 0.55rem + 1.5vw, 1.15rem); }
+  .topbar #site-wordmark { white-space: nowrap; }
+  .topbar .btn.btn-gold { padding: 7px 9px; gap: 5px; }
+  /* The connect label yields by shrinking, not by staying full-size next to
+     a wrapped logo: ~10.9px here, ellipsized only if a locale is extreme. */
+  .topbar .btn.btn-gold .btn-label { display: none; }
+  .topbar .btn.btn-gold .btn-label-short {
+    display: inline;
+    font-size: 0.72rem;
+    max-width: min(34vw, 160px);
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
   }
 }
 
-@media (max-width: 480px) {
-  /* Profile remains a clear avatar button; address, chevron and long connect
-     copy yield before they can push the cart or the viewport rightward. */
+/* The band above phones gets the same treatment one step gentler: long
+   locales (FR "Connecter le portefeuille") shrink before they crowd.
+   (561px floor: this block sits AFTER the <=560 block in the file, so an
+   open-ended max-width:700 would override the phone step.) */
+@media (min-width: 561px) and (max-width: 700px) {
+  .topbar .btn.btn-gold { padding: 8px 10px; gap: 6px; }
+  .topbar .btn.btn-gold .btn-label { font-size: 0.74rem; letter-spacing: 0; }
+}
+
+@media (max-width: 560px) {
+  /* Compact 40px controls across the whole phone band: every pixel here goes
+     to the wordmark, which re-fits its type instead of wrapping or clipping
+     (user: "buton yazısı, logo yazısı küçülsün"). The globe glyph yields too
+     — the flag alone still reads as the language control. */
+  /* !important: Icon writes an inline display on its svg. */
+  .topbar .lang-toggle svg:first-of-type { display: none !important; }
   .topbar .acct-btn {
-    width: 44px;
-    min-width: 44px;
-    height: 44px;
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
     padding: 4px;
     gap: 0;
     justify-content: center;
   }
+  .topbar .cart-btn,
+  .topbar .theme-toggle {
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+  }
+  .topbar .lang-toggle { height: 40px; padding: 0 8px; }
+}
+
+@media (max-width: 480px) {
+  /* Profile remains a clear avatar button; address, chevron and the connect
+     copy yield before they can push the cart or the viewport rightward. */
   .topbar .acct-btn .addr,
   .topbar .acct-btn > svg {
     display: none !important;
   }
   .topbar .btn.btn-gold {
-    min-width: 44px;
-    width: 44px;
+    min-width: 40px;
+    width: 40px;
     padding: 8px;
     gap: 0;
   }
-  .topbar .btn.btn-gold .btn-label {
+  .topbar .btn.btn-gold .btn-label,
+  .topbar .btn.btn-gold .btn-label-short {
     display: none !important;
-  }
-  .topbar .cart-btn {
-    width: 44px;
-    min-width: 44px;
-    height: 44px;
   }
 }
 

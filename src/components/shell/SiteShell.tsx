@@ -273,6 +273,10 @@ function AccountArea() {
       <span className="btn btn-gold btn-sm" aria-hidden="true" style={{ visibility: 'hidden', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
         <Icon name="nimiq" size={18} />
         <span className="btn-label">{t('account.connect')}</span>
+        {/* Phones swap to the short label instead of clipping the long one:
+            "Connecter le portefeuille" can never fit a 500px row legibly,
+            "Connecter" can. The aria-label keeps the full sentence. */}
+        <span className="btn-label-short" aria-hidden="true">{t('account.connectShort')}</span>
       </span>
     );
   }
@@ -307,6 +311,7 @@ function AccountArea() {
       >
         <Icon name="nimiq" size={18} />
         <span className="btn-label">{t('account.connect')}</span>
+        <span className="btn-label-short" aria-hidden="true">{t('account.connectShort')}</span>
       </button>
     );
   }

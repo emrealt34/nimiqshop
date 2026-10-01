@@ -152,7 +152,33 @@ const browser = await chromium.launch({ args: ['--no-sandbox'] });
   }
 }
 
-/* ------------------------------------------------ 8) topbar nav centering */
+/* ------------------------------------------------ 8) topbar phone fit (long locale) */
+{
+  for (const w of [500, 430]) {
+    const ctx = await browser.newContext({ viewport: { width: w, height: 800 } });
+    const page = await ctx.newPage();
+    await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
+    await page.evaluate(() => { localStorage.setItem('nimshop.lang', 'fr'); });
+    await page.goto(BASE + '/', { waitUntil: 'load' });
+    await page.waitForFunction(() => document.documentElement.getAttribute('data-app-ready') === '1', null, { timeout: 20000 }).catch(() => {});
+    await page.waitForTimeout(900);
+    const m = await page.evaluate(() => {
+      const inner = document.querySelector('.topbar-inner');
+      const wm = document.querySelector('#site-wordmark');
+      if (!inner || !wm) return null;
+      const r = wm.getBoundingClientRect();
+      return {
+        rowFits: inner.scrollWidth <= inner.clientWidth + 1,
+        wmOneLine: r.height < parseFloat(getComputedStyle(wm).lineHeight) * 1.6,
+        wmFull: wm.scrollWidth <= wm.clientWidth + 1,
+      };
+    });
+    check(`8 topbar FR row fits, wordmark one full line @${w}`, !!m && m.rowFits && m.wmOneLine && m.wmFull, m ? JSON.stringify(m) : 'missing');
+    await ctx.close();
+  }
+}
+
+/* ------------------------------------------------ 9) topbar nav centering */
 {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await ctx.newPage();
@@ -174,8 +200,8 @@ const browser = await chromium.launch({ args: ['--no-sandbox'] });
       clearRight: nb.right < cb.left,
     };
   });
-  check('8 nav optically centered in the bar', !!m && Math.abs(m.offCenter) <= 2, m ? `off-center ${m.offCenter}px` : 'missing nodes');
-  check('8b nav clears brand and controls at 1280', !!m && m.clearLeft && m.clearRight, '');
+  check('9 nav optically centered in the bar', !!m && Math.abs(m.offCenter) <= 2, m ? `off-center ${m.offCenter}px` : 'missing nodes');
+  check('9b nav clears brand and controls at 1280', !!m && m.clearLeft && m.clearRight, '');
   await page.setViewportSize({ width: 1200, height: 900 });
   await page.waitForTimeout(400);
   const m2 = await page.evaluate(() => {
@@ -188,7 +214,7 @@ const browser = await chromium.launch({ args: ['--no-sandbox'] });
     const cb = controls.getBoundingClientRect();
     return { clearLeft: nb.left > bb.right, clearRight: nb.right < cb.left };
   });
-  check('8c no overlap at the 1200px breakpoint', m2.clearLeft && m2.clearRight, '');
+  check('9c no overlap at the 1200px breakpoint', m2.clearLeft && m2.clearRight, '');
   await ctx.close();
 }
 

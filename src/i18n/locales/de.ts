@@ -34,6 +34,7 @@ const de = {
 
   account: {
     connect: 'Wallet verbinden',
+    connectShort: 'Verbinden',
     connectedVia: 'Verbunden über Nimiq {{hub}}',
     hub: 'Hub',
     pay: 'Pay',
