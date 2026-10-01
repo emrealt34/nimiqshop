@@ -21,6 +21,14 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # Hourly catalog refresh: sync-catalog.mjs pulls /v2/brands for every shop
+  # country straight from CryptoRefills (partner-header auth, no secret) and
+  # the build below bakes it into the static site, so the storefront's brand
+  # grids never depend on the Go backend being alive. A failed sync keeps the
+  # committed snapshot (continue-on-error) — a supplier wobble must neither
+  # blank the shop nor stop a deploy.
+  schedule:
+    - cron: "17 * * * *"
 
 permissions: {}
 
@@ -82,6 +90,10 @@ jobs:
           package-manager-cache: false
 
       - run: npm ci --no-audit --no-fund
+
+      - name: Refresh the static catalog snapshot (CryptoRefills direct)
+        continue-on-error: true
+        run: node scripts/sync-catalog.mjs
 
       - name: Test same-origin API proxy
         run: npm run test:pages-proxy

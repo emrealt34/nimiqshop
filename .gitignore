@@ -48,3 +48,5 @@ __pycache__/
 /.lighthouseci/
 /sbom.cdx.json
 /go-benchmarks.txt
+!public/data/
+!public/data/**

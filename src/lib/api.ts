@@ -6,6 +6,7 @@ import { supplierProblemMessage } from './supplierProblems';
  * backend sends them.
  */
 import { CFG, siteName } from './config';
+import { asset } from './asset';
 import { getLang, t as tr } from '../i18n';
 import { uuid as uuid2 } from './format';
 import { canonicalIntent, purchaseIntentPayload, loadOrCreateIntent, saveIntentQuote, releaseIntentForQuote } from './checkoutIntent';
@@ -301,11 +302,76 @@ const catQS = (kind: string, country?: string, test?: boolean) => {
   if (test) p.set('test', '1');
   return '/catalog/brands?' + p.toString();
 };
+/* ---- Static catalog snapshot — the storefront's first source -------------
+ * scripts/sync-catalog.mjs pulls /v2/brands from CryptoRefills hourly (Pages
+ * deploy cron) and commits a seed, so `public/data/catalog/brands/*.json`
+ * is plain static edge content: it survives a dead backend, which the old
+ * /api-only path did not (shopapi down = empty shop). The kind filter the
+ * Go handler applied server-side (filterBrandCategories) is mirrored here
+ * byte-for-byte in predicate terms; /api stays as the fallback for a country
+ * with no snapshot file and for ?test=1 admin probes.
+ * Note: admin catalog rules (hidden families etc.) are server-side, so the
+ * static path shows the supplier's live listing unfiltered — same as what
+ * the supplier's own storefront shows. */
+async function staticBrands(country?: string): Promise<{ country_code?: string; categories: any[] } | null> {
+  if (typeof fetch !== 'function') return null;
+  const raw = String(country || '').toUpperCase().slice(0, 2);
+  const file = raw.length === 2 ? raw : '_global';
+  try {
+    const res = await fetch(asset(`/data/catalog/brands/${file}.json`), {
+      cache: 'default',
+      headers: { Accept: 'application/json' },
+    });
+    if (!res.ok) return null;
+    const j = await res.json();
+    return j && Array.isArray(j.categories) ? j : null;
+  } catch {
+    return null;
+  }
+}
+/** Mirror of the backend's filterBrandCategories predicate. */
+function filterKind(json: { categories: any[] }, kind: string) {
+  const out = (json.categories || []).filter((c) => {
+    let match = c?.kind === kind || c?.category === kind || (c?.category === 'e-sim' && kind === 'esim');
+    if (kind === 'mobile_recharge' && c?.category === 'e-sim') match = false;
+    return match;
+  });
+  return { categories: out };
+}
+
 // One canonical endpoint: /catalog/brands?kind=giftcard|mobile_recharge|esim
-export const listGiftCards = (country?: string, test?: boolean) => api(catQS('giftcard', country, test));
-export const listTopups = (country?: string, test?: boolean) => api(catQS('mobile_recharge', country, test));
-export const listEsims = (country?: string, test?: boolean) => api(catQS('esim', country, test));
-export const searchProducts = (q: string, country?: string) => api(`/catalog/search?q=${encodeURIComponent(q)}${country ? '&country=' + encodeURIComponent(country) : ''}`);
+export const listGiftCards = async (country?: string, test?: boolean) => {
+  if (!test) { const s = await staticBrands(country); if (s) return filterKind(s, 'giftcard'); }
+  return api(catQS('giftcard', country, test));
+};
+export const listTopups = async (country?: string, test?: boolean) => {
+  if (!test) { const s = await staticBrands(country); if (s) return filterKind(s, 'mobile_recharge'); }
+  return api(catQS('mobile_recharge', country, test));
+};
+export const listEsims = async (country?: string, test?: boolean) => {
+  if (!test) { const s = await staticBrands(country); if (s) return filterKind(s, 'esim'); }
+  return api(catQS('esim', country, test));
+};
+export const searchProducts = async (q: string, country?: string) => {
+  const query = String(q || '').toLowerCase().trim();
+  if (query && query.length <= 100) {
+    const s = await staticBrands(country);
+    if (s) {
+      // Same row shape and 50-row cap as the backend's /catalog/search.
+      const rows: Array<{ family: string; kind: string; category: string; country_code?: string }> = [];
+      outer: for (const c of s.categories || []) {
+        for (const b of c.brands || []) {
+          if (String(b.family || '').toLowerCase().includes(query)) {
+            rows.push({ family: b.family, kind: c.kind, category: c.category, country_code: b.country_code || s.country_code });
+            if (rows.length >= 50) break outer;
+          }
+        }
+      }
+      return rows;
+    }
+  }
+  return api(`/catalog/search?q=${encodeURIComponent(q)}${country ? '&country=' + encodeURIComponent(country) : ''}`);
+};
 
 const PROD_CACHE_PREFIX = 'nim_prod:v2:';
 const PROD_CACHE_TTL_MS = 5 * 60 * 1000;

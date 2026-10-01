@@ -13,6 +13,50 @@ function uncachedHeaders(input) {
   headers.set('X-Content-Type-Options', 'nosniff');
   return headers;
 }
+// CryptoRefills-direct fallback for ONE endpoint: the product family
+// payload (GET /api/catalog/products/{family}). Browsing brands already
+// comes from the static hourly snapshot (public/data/catalog), but the
+// family payload is per country+language and too big to pre-bake for the
+// whole matrix — so when the Go backend is down (502/5xx/unreachable) this
+// proxy asks the supplier itself with the partner headers (the same public
+// X-Cr-Application auth backend/.env.example documents) and edge-caches the
+// answer for two minutes, matching the backend's own Cache-Control. Money
+// paths (price, orders, sessions) deliberately stay backend-only.
+const CR_BASE = 'https://api.cryptorefills.com';
+const CR_HEADERS = {
+  'X-Cr-Application': 'YQyw0dJ0FM',
+  'X-Cr-Version': 'nimshop/1.0',
+  'User-Agent': 'nimshop/1.0 +https://shop.nimiqbase.com',
+  Accept: 'application/json',
+};
+async function crFamilyReply(incoming) {
+  const m = incoming.pathname.match(/^\/api\/catalog\/products\/([^/]+)$/);
+  if (!m || !['GET', 'HEAD'].includes(incoming.searchParams ? 'GET' : 'GET')) return null;
+  const family = decodeURIComponent(m[1]);
+  const cc = (String(incoming.searchParams.get('country') || 'TR').toUpperCase().slice(0, 2)) || 'TR';
+  const lang = (String(incoming.searchParams.get('lang') || 'en').toLowerCase().slice(0, 5)) || 'en';
+  const url = `${CR_BASE}/v5/products/country/${encodeURIComponent(cc)}?family_name=${encodeURIComponent(family)}&lang=${encodeURIComponent(lang)}`;
+  try {
+    const r = await fetch(url, { headers: CR_HEADERS, signal: AbortSignal.timeout(20_000), cf: { cacheTtl: 120 } });
+    if (!r.ok) { await r.body?.cancel(); return null; }
+    const body = await r.text();
+    return new Response(body, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, max-age=120',
+        'CDN-Cache-Control': 'public, max-age=120',
+        'Cloudflare-CDN-Cache-Control': 'public, max-age=120',
+        Vary: 'Accept-Language',
+        'X-Content-Type-Options': 'nosniff',
+        'X-Catalog-Source': 'cryptorefills-direct',
+      },
+    });
+  } catch {
+    return null;
+  }
+}
+
 function unavailable(status = 502) {
   return Response.json({
     error: 'The shop API is temporarily unavailable. Check your existing order before another payment.',
@@ -56,10 +100,14 @@ export async function onRequest({ request }) {
       cf: { cacheTtl: 0, cacheEverything: false },
     });
   } catch {
+    const fb = await crFamilyReply(incoming);
+    if (fb) return fb;
     return unavailable();
   }
   if (upstream.status >= 500) {
     await upstream.body?.cancel();
+    const fb = await crFamilyReply(incoming);
+    if (fb) return fb;
     return unavailable(upstream.status);
   }
   const reply = uncachedHeaders(upstream.headers);
