@@ -610,6 +610,7 @@ const pt = {
     calcBoostApprox: ' · ≈ {{pct}}',
     calcFromMin: ' · a partir de {{nim}} NIM',
     calcLoyaltyMultiplier: 'Multiplicador de fidelidade',
+    calcTotalRate: 'Taxa total de cashback',
     calcAdd: 'Adicionar',
     calcStake: 'Fazer stake',
     calcAssumptions: 'Pressupostos',

@@ -333,6 +333,13 @@ export function CashbackCalculator({
           <dt>{t('cashback.calcLoyaltyMultiplier')}</dt>
           <dd>×{r.loyaltyMultiplier.toFixed(2)}</dd>
         </div>
+        {/* The line the whole card builds towards: base + boost, after the
+            loyalty multiplier, as ONE effective rate of the order value —
+            so nobody has to add the pieces above by hand. */}
+        <div>
+          <dt style={{ color: 'var(--ink)', fontWeight: 800 }}>{t('cashback.calcTotalRate')}</dt>
+          <dd style={{ color: 'var(--stamp)', fontWeight: 900, fontSize: 'var(--fs-md)' }}>{pctText(r.effectivePct)}</dd>
+        </div>
       </dl>
 
       {canUse && (

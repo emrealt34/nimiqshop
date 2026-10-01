@@ -619,6 +619,7 @@ const en = {
     calcBoostApprox: ' · ≈ {{pct}}',
     calcFromMin: ' · from {{nim}} NIM',
     calcLoyaltyMultiplier: 'Loyalty multiplier',
+    calcTotalRate: 'Total cashback rate',
     calcAdd: 'Add',
     calcStake: 'Stake',
     calcAssumptions: 'Assumptions',

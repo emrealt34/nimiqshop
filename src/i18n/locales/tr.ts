@@ -611,6 +611,7 @@ const tr = {
     calcBoostApprox: ' · ≈ {{pct}}',
     calcFromMin: ' · {{nim}} NIM’den itibaren',
     calcLoyaltyMultiplier: 'Sadakat çarpanı',
+    calcTotalRate: 'Toplam cashback oranı',
     calcAdd: 'Ekle',
     calcStake: 'Stake et',
     calcAssumptions: 'Varsayımlar',

@@ -611,7 +611,7 @@ export function CashbackView() {
       {params ? (
         <>
         {program?.degraded && (
-          <div role="status" style={{ display: 'flex', gap: 6, alignItems: 'flex-start', margin: '0 0 8px', padding: '7px 10px', borderRadius: 'var(--r-m)', background: 'var(--gold-grad-soft)', border: '1px solid var(--line)', fontSize: 'var(--fs-xs)', lineHeight: 1.4, color: 'var(--ink)' }}>
+          <div role="status" style={{ display: 'flex', gap: 6, alignItems: 'flex-start', margin: '16px 0 8px', padding: '7px 10px', borderRadius: 'var(--r-m)', background: 'var(--gold-grad-soft)', border: '1px solid var(--line)', fontSize: 'var(--fs-xs)', lineHeight: 1.4, color: 'var(--ink)' }}>
             <Icon name="info" size={13} style={{ flex: '0 0 auto', marginTop: 1, color: 'var(--gold-600)' }} />
             <span>{t('cashback.programDegraded')}</span>
           </div>
