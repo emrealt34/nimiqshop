@@ -1,0 +1,17 @@
+{
+ "generated_at": "2026-10-01T13:11:17.045Z",
+ "nim": {
+  "usd_per_nim": 0.0002978681531150315,
+  "sources": 3,
+  "spread_bps": 180,
+  "via": "oracle"
+ },
+ "btc": {
+  "usd_per_btc": 83550.8,
+  "sources": 4,
+  "spread_bps": 7,
+  "via": "oracle"
+ },
+ "fx": "156 currencies from backend/internal/catalog/fx.go",
+ "fallbacks": []
+}

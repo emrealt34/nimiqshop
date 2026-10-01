@@ -329,6 +329,22 @@ async function staticBrands(country?: string): Promise<{ country_code?: string; 
     return null;
   }
 }
+/** Static market snapshot (scripts/sync-market.mjs, hourly): the NIM/BTC
+ *  price and the FX table as edge files, so a page load never waits on the
+ *  Go backend for a number that changes a few percent a day. Shapes are
+ *  byte-compatible with /market/nim-rate and /market/fx. */
+async function staticMarket(name: 'fx' | 'nim-rate'): Promise<Record<string, any> | null> {
+  if (typeof fetch !== 'function') return null;
+  try {
+    const res = await fetch(asset(`/data/market/${name}.json`), { cache: 'default', headers: { Accept: 'application/json' } });
+    if (!res.ok) return null;
+    const j = await res.json();
+    return j && typeof j === 'object' ? j : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Mirror of the backend's filterBrandCategories predicate. */
 function filterKind(json: { categories: any[] }, kind: string) {
   const out = (json.categories || []).filter((c) => {
@@ -587,6 +603,13 @@ export const getFXRates = async (opts: { force?: boolean } = {}): Promise<Record
       /* ignore */
     }
   }
+  const stFx = await staticMarket('fx');
+  if (stFx && stFx.usd_per_unit) {
+    try {
+      sessionStorage.setItem(FX_CACHE_KEY, JSON.stringify({ ...stFx, fetched_at: now }));
+    } catch {}
+    return stFx;
+  }
   try {
     const fresh = await api('/market/fx');
     if (fresh && fresh.usd_per_unit) {
@@ -616,6 +639,13 @@ export const getNimRate = async (opts: { force?: boolean; timeoutMs?: number } =
     } catch {
       /* ignore */
     }
+  }
+  const stNim = await staticMarket('nim-rate');
+  if (stNim && stNim.usd_per_nim) {
+    try {
+      sessionStorage.setItem(NIM_CACHE_KEY, JSON.stringify({ ...stNim, fetched_at: now }));
+    } catch {}
+    return stNim;
   }
   try {
     const fresh = await api('/market/nim-rate', { timeoutMs: opts.timeoutMs || 8000 });

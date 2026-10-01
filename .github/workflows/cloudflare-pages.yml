@@ -91,9 +91,15 @@ jobs:
 
       - run: npm ci --no-audit --no-fund
 
-      - name: Refresh the static catalog snapshot (CryptoRefills direct)
+      # Catalog AND market prices in the same hourly run: neither the brand
+      # grids nor the NIM/BTC price may depend on the Go backend at page-load
+      # time. Each script keeps the previous file when its sources fail, and
+      # a fully-down supplier/backend must not stop the deploy.
+      - name: Refresh static catalog + market snapshots
         continue-on-error: true
-        run: node scripts/sync-catalog.mjs
+        run: |
+          node scripts/sync-catalog.mjs || echo "::warning::catalog sync failed — keeping committed snapshot"
+          node scripts/sync-market.mjs || echo "::warning::market sync failed — keeping committed snapshot"
 
       - name: Test same-origin API proxy
         run: npm run test:pages-proxy
