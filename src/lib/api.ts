@@ -327,10 +327,18 @@ function staticFresh(j: any): boolean {
   return age <= STATIC_MAX_AGE_MS;
 }
 
+const _staticInflight = new Map<string, Promise<{ country_code?: string; categories: any[] } | null>>();
 async function staticBrands(country?: string): Promise<{ country_code?: string; categories: any[] } | null> {
   if (typeof fetch !== 'function') return null;
   const raw = String(country || '').toUpperCase().slice(0, 2);
   const file = raw.length === 2 ? raw : '_global';
+  const flying = _staticInflight.get(file);
+  if (flying) return flying;
+  const p = staticBrandsFetch(file).finally(() => _staticInflight.delete(file));
+  _staticInflight.set(file, p);
+  return p;
+}
+async function staticBrandsFetch(file: string): Promise<{ country_code?: string; categories: any[] } | null> {
   try {
     const res = await fetch(asset(`/data/catalog/brands/${file}.json`), {
       cache: 'default',

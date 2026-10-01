@@ -23,6 +23,26 @@ import { useToast } from '../AppProviders';
 import { useInNimiqPay, openInNimiqPay } from '../../lib/miniapp';
 import { NimiqPayInstallDialog } from '../ui/NimiqPayInstallDialog';
 import { siteName } from '../../lib/config';
+import { getShelfSeed, shelfSeedFresh, type ShelfSeed } from '../../lib/shelfSeed';
+import { prefetchRoute } from '../../lib/router';
+
+/** Build-time shelf seed: SSR reads the module singleton (set by Base.astro),
+ *  the client reads the inlined window.__SHELF_SEED — same bytes, so the
+ *  hydrated tree matches the server-rendered cards. */
+function seedOf(): ShelfSeed | null {
+  const w = typeof window !== 'undefined' ? (window as unknown as { __SHELF_SEED?: ShelfSeed }).__SHELF_SEED : null;
+  const s = w || getShelfSeed();
+  return shelfSeedFresh(s) ? s : null;
+}
+function seedMaps(): Record<string, Product[]> {
+  const s = seedOf();
+  if (!s) return { gift_card: [], phone_refill: [], esim: [] };
+  return {
+    gift_card: (s.maps.gift_card as Product[]) || [],
+    phone_refill: (s.maps.phone_refill as Product[]) || [],
+    esim: (s.maps.esim as Product[]) || [],
+  };
+}
 import { useT } from '../../i18n';
 import { pagePath } from '../../lib/asset';
 
@@ -58,7 +78,7 @@ export function HomePage() {
   const { t } = useT();
   const inPay = useInNimiqPay();
   const { toast } = useToast();
-  const [catalogs, setCatalogs] = useState<Record<string, Product[]>>({ gift_card: [], phone_refill: [], esim: [] });
+  const [catalogs, setCatalogs] = useState<Record<string, Product[]>>(seedMaps);
   const [activeCat, setActiveCat] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<Product[] | null>(null);
@@ -121,7 +141,8 @@ export function HomePage() {
     setLoadError(null);
     setShelfNote('');
     const cached = readCachedCatalog(c);
-    setCatalogs(cached || { gift_card: [], phone_refill: [], esim: [] });
+    const seed = seedOf();
+    setCatalogs(cached || (seed && seed.country === c ? seedMaps() : { gift_card: [], phone_refill: [], esim: [] }));
     setBusy(true);
     const results = await Promise.allSettled([listGiftCards(c, false), listTopups(c, false), listEsims(c, false)]);
     if (!current()) return;
@@ -414,7 +435,7 @@ export function HomePage() {
               }
             />
           ) : (
-            <ProductGrid products={items} onBuy={toast} />
+            <ProductGrid products={items} onBuy={toast} allowWarm={!busy} />
           )}
         </div>
       </div>
@@ -571,10 +592,48 @@ function CountryPicker({ country, onChange }: { country: string; onChange: (code
   }
 }
 
-function ProductGrid({ products, onBuy }: { products: Product[]; onBuy: (msg: string, k?: 'info') => void }) {
+function ProductGrid({ products, onBuy, allowWarm }: { products: Product[]; onBuy: (msg: string, k?: 'info') => void; allowWarm: boolean }) {
   const { t } = useT();
+  const wrapRef = useRef<HTMLDivElement>(null);
+  // Warm the family payload + route chunk for cards the shopper can already
+  // see, so tapping one opens a product page whose data is in cache. Capped
+  // and idle-scheduled: this must never compete with the paint it speeds up.
+  useEffect(() => {
+    const root = wrapRef.current;
+    // Gate: while the country switch is still in flight the visible cards may
+    // be the build-time seed of a DIFFERENT country — warming those would
+    // fetch a catalog snapshot nobody asked for. Warm once busy clears.
+    if (!root || !allowWarm || typeof IntersectionObserver === 'undefined') return;
+    // Set when the effect tears down (country switch, filter change): any
+    // warm already queued via setTimeout is dropped instead of fetching a
+    // family for cards that are no longer on screen.
+    let cancelled = false;
+    const io = new IntersectionObserver((entries) => {
+      for (const en of entries) {
+        if (!en.isIntersecting) continue;
+        const a = en.target as HTMLAnchorElement;
+        io.unobserve(a);
+        if (warmedCards.has(a)) continue;
+        warmedCards.add(a);
+        if (warmedCards.size > 24) return;
+        const href = a.getAttribute('href') || '';
+        const u = new URL(href, location.href);
+        const id = u.searchParams.get('id');
+        const cc = u.searchParams.get('country');
+        if (id) {
+          window.setTimeout(() => {
+            if (cancelled) return;
+            getProduct(id, cc || undefined).catch(() => {});
+            prefetchRoute('/product');
+          }, 0);
+        }
+      }
+    }, { rootMargin: '150px' });
+    root.querySelectorAll('a.product-card[href]').forEach((a) => io.observe(a));
+    return () => { cancelled = true; io.disconnect(); };
+  }, [products, allowWarm]);
   return (
-    <div className="grid products fade-in">
+    <div ref={wrapRef} className="grid products fade-in">
       {products.map((p) => (
         <a
           key={p.id + '|' + p.country}
@@ -583,6 +642,13 @@ function ProductGrid({ products, onBuy }: { products: Product[]; onBuy: (msg: st
           aria-label={t('home.viewProduct', { name: p.name })}
           onMouseEnter={() => getProduct(p.id, p.country).catch(() => {})}
           onFocus={() => getProduct(p.id, p.country).catch(() => {})}
+          onPointerDown={() => {
+            // Touch devices never hover: the press is the first intent we
+            // get, and it lands ~100-300 ms before the click navigation —
+            // enough for the family payload and the route chunk to arrive.
+            getProduct(p.id, p.country).catch(() => {});
+            prefetchRoute('/product');
+          }}
           onClick={(e) => {
             if (p.in_stock === false) {
               e.preventDefault();
@@ -613,6 +679,9 @@ function ProductGrid({ products, onBuy }: { products: Product[]; onBuy: (msg: st
     </div>
   );
 }
+
+/** Cards whose payload we already warmed this pageview. */
+const warmedCards = new Set<HTMLAnchorElement>();
 
 function ProductThumb({ p, oos = false }: { p: Product; oos?: boolean }) {
   const { t } = useT();

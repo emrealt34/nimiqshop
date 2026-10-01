@@ -8,6 +8,10 @@ import '../styles/app.css';
 import '../styles/fixes.css';
 import '../styles/accessibility.css';
 import type { ShellKey } from '../components/shell/SiteShell';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { flattenBrands } from '../lib/catalog';
+import { setShelfSeed, type ShelfSeed } from '../lib/shelfSeed';
 
 interface Props {
   title: string;
@@ -17,9 +21,12 @@ interface Props {
    *  React routes carry their own titleKey; this one is applied by the static
    *  localiser so the tab follows the language too. */
   titleKey?: string;
+  /** Inline the build-time shelf seed (default-country catalog) so the home
+   *  grid paints with real cards in the first frame. Home page only. */
+  shelfSeed?: boolean;
   /** Extra head tags (JSON-LD, OG, etc.) passed via <Fragment set:html> not needed — use slots. */
 }
-const { title, description, activeKey, titleKey } = Astro.props;
+const { title, description, activeKey, titleKey, shelfSeed = false } = Astro.props;
 const siteName = 'shop.nimiqbase.com';
 
 // --- Locale ----------------------------------------------------------------
@@ -31,6 +38,28 @@ const siteName = 'shop.nimiqbase.com';
 // React then hydrates on top with the identical choice, so there is no flash
 // of the wrong language.
 const initialLang = 'en';
+
+// ---- Shelf seed (home page, build time) ----------------------------------
+// Reads the committed/hourly catalog snapshot for the default country and
+// flattens it exactly like the live path, so SSR cards === client seed cards.
+// Missing snapshot (fresh clone before the first sync) simply means no seed.
+let seedPayload: ShelfSeed | null = null;
+if (shelfSeed) {
+  try {
+    const raw = readFileSync(join(process.cwd(), 'public', 'data', 'catalog', 'brands', 'TR.json'), 'utf8');
+    const j = JSON.parse(raw);
+    const CAP = 48; // per kind: enough to fill several screens, small in HTML
+    const maps = {
+      gift_card: flattenBrands({ categories: (j.categories || []).filter((c: any) => c.kind === 'giftcard' || c.category === 'giftcard') }, 'TR').slice(0, CAP),
+      phone_refill: flattenBrands({ categories: (j.categories || []).filter((c: any) => (c.kind === 'mobile_recharge' || c.category === 'mobile_recharge') && c.category !== 'e-sim') }, 'TR').slice(0, CAP),
+      esim: flattenBrands({ categories: (j.categories || []).filter((c: any) => c.category === 'e-sim') }, 'TR').slice(0, CAP),
+    };
+    seedPayload = { country: 'TR', at: String(j.generated_at || new Date().toISOString()), maps };
+    setShelfSeed(seedPayload);
+  } catch {
+    seedPayload = null;
+  }
+}
 
 // ---- Content Security Policy --------------------------------------------
 //
@@ -229,6 +258,30 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
         } catch (e) {}
       })();
     </script>
+    {/* Start the saved-country catalog + market snapshots during HTML parse,
+        so they are already in the HTTP cache when React asks for them after
+        hydration; preconnect warms the logo CDN TLS handshake for the grid. */}
+    <script is:inline define:vars={{ assetBase }}>
+      (function () {
+        try {
+          var cc = (localStorage.getItem('nimshop_country') || '').trim().toUpperCase().slice(0, 2);
+          var base = typeof assetBase === 'string' ? assetBase : '';
+          var files = [
+            base + '/data/catalog/brands/' + (cc || 'TR') + '.json',
+            base + '/data/market/fx.json',
+            base + '/data/market/nim-rate.json',
+          ];
+          for (var i = 0; i < files.length; i += 1) {
+            var l = document.createElement('link');
+            l.rel = 'preload'; l.as = 'fetch'; l.href = files[i];
+            document.head.appendChild(l);
+          }
+          var pc = document.createElement('link');
+          pc.rel = 'preconnect'; pc.href = 'https://cdn.cryptorefills.com';
+          document.head.appendChild(pc);
+        } catch (e) {}
+      })();
+    </script>
     <meta
       name="description"
       content={description || "Buy gift cards, mobile top-ups and eSIMs with NIM via BTC Lightning in Nimiq Pay. No internal balance, direct CryptoRefills payment, and open source."}
@@ -288,6 +341,12 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
         }
       })();
     </script>
+    {seedPayload && (
+      <script
+        is:inline
+        set:html={`window.__SHELF_SEED=${JSON.stringify(seedPayload).replace(/</g, '\\u003c')};`}
+      />
+    )}
   </head>
   <body>
     <a class="skip-link" href="#page-content" data-i18n="stat.skipToContent">Skip to content</a>
