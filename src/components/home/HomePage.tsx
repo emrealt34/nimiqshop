@@ -692,6 +692,14 @@ function ProductThumb({ p, oos = false }: { p: Product; oos?: boolean }) {
     <div style={{ position: 'relative' }}>
       <UnifiedThumb src={p.logo_url} alt={p.name} bg={p.bg_color || 'rgb(255,255,255)'} />
       {oos && <div className="oos" style={{ position: 'absolute', inset: 0, zIndex: 2, display: 'grid', placeItems: 'center', background: 'var(--scrim, rgba(20, 16, 12, 0.78))', color: 'var(--on-scrim, #FFF6E8)', fontWeight: 900, letterSpacing: '0.14em', textTransform: 'uppercase', fontSize: 'var(--fs-sm)' }}>{t('shop.outOfStock')}</div>}
+      {/* e-money families: tell the buyer up front that the provider may ask
+          for identity verification. Absolute strip on the tile — zero layout
+          shift, visible even under the sold-out scrim (zIndex 3). */}
+      {p.is_e_money && (
+        <div className="kyc-badge" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 3, padding: '2px 3px', background: 'rgba(16, 12, 9, 0.74)', color: '#FFF6E8', fontSize: '0.56rem', lineHeight: 1.2, fontWeight: 800, letterSpacing: '0.03em', textAlign: 'center', textTransform: 'uppercase' }}>
+          {t('home.kycBadge')}
+        </div>
+      )}
     </div>
   );
 }

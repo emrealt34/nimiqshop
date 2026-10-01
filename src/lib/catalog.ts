@@ -25,6 +25,10 @@ export type Product = {
   range: { min: number; max: number; step: number; currency: string } | null;
   images: { large?: string };
   product_type: string;
+  /** True when any supplier brand of this family sits in the e-money
+   *  category — prepaid card products where the provider may ask for
+   *  identity verification. Grid + product page show a KYC notice. */
+  is_e_money: boolean;
 };
 
 /**
@@ -92,6 +96,7 @@ function normalizeBrand(brand: any, country = 'US'): Product | null {
     range: minParsed.value > 0 && maxParsed.value > 0 ? { min: minParsed.value, max: maxParsed.value, step: 1, currency } : null,
     images: logo ? { large: logo } : {},
     product_type: brand.product_type || 'digital',
+    is_e_money: String(brand.category || '').toLowerCase() === 'e-money',
   };
 }
 
@@ -165,6 +170,9 @@ export function flattenBrands(data: any, country = 'US'): Product[] {
       // Preserve rep's parsed values, but ensure stock reflects merged.
       p.is_out_of_stock = !anyInStock;
       p.in_stock = anyInStock;
+      // Any e-money variant flags the merged card (e.g. PCS Mastercard lives
+      // in both e-commerce and e-money).
+      p.is_e_money = distinct.some((b: any) => String(b.category || '').toLowerCase() === 'e-money');
       (p as any)._fanOutCount = distinct.length;
       (p as any)._brandIds = distinct.map((b) => b.brand_id);
       out.push(p);

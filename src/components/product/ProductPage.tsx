@@ -149,6 +149,8 @@ type ProductDetail = {
   packages: Pkg[] | null;
   range: { min: number; max: number; step: number; currency: string } | null;
   in_stock: boolean;
+  /** e-money family: provider may request identity verification (KYC). */
+  is_e_money?: boolean;
   logo_url: string;
   images: { large?: string };
   /** Supplier copy, or '' when the translated fallback key below is used. */
@@ -235,6 +237,7 @@ function familyToProduct(family: any, fallbackId: string, countryParam: string):
     packages: packages.length ? packages : null,
     range,
     in_stock: !family.is_out_of_stock,
+    is_e_money: String(family.category || '').toLowerCase() === 'e-money',
     logo_url: logo,
     images: logo ? { large: logo } : {},
     ...descriptionOf(marketing, countryParam, kind, familyName),
@@ -280,6 +283,9 @@ function familiesToProduct(families: any[], fallbackId: string, countryParam: st
   const detail = familyToProduct(mergedFamily, fallbackId, countryParam);
   if (detail) {
     (detail as any)._families = families;
+    // ANY e-money variant flags the merged detail (base may be the
+    // non-e-money duplicate of the same family).
+    detail.is_e_money = families.some((f: any) => String(f?.category || '').toLowerCase() === 'e-money');
   }
   return detail;
 }
@@ -756,11 +762,22 @@ export function ProductPage() {
           <span className="btn-label">{t('nav.shop')}</span>
         </a>
         <div className="pd-top">
-          <div className="pd-image">
+          <div className="pd-image" style={{ position: 'relative' }}>
             <UnifiedThumb src={product.logo_url || ''} alt={product.name} bg={product.bg_color || 'rgb(255,255,255)'} />
+            {product.is_e_money && (
+              <div className="kyc-badge" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 3, padding: '3px 6px', background: 'rgba(16, 12, 9, 0.74)', color: '#FFF6E8', fontSize: '0.62rem', lineHeight: 1.2, fontWeight: 800, letterSpacing: '0.03em', textAlign: 'center', textTransform: 'uppercase' }}>
+                {t('home.kycBadge')}
+              </div>
+            )}
           </div>
           <div className="pd-info">
             <h1 style={{ margin: '0 0 8px', fontSize: 'clamp(1.3rem, 1.2rem + 1vw, 1.8rem)', lineHeight: 1.2, wordBreak: 'break-word' }}>{product.name}</h1>
+            {product.is_e_money && (
+              <div className="kyc-note" role="note" style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', margin: '0 0 10px', padding: '8px 10px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--stroke, rgba(128, 128, 128, 0.25))', fontSize: 'var(--fs-sm)', lineHeight: 1.4 }}>
+                <span aria-hidden="true" style={{ fontWeight: 900, flex: '0 0 auto' }}>ⓘ</span>
+                <span>{t('productPage.kycNotice')}</span>
+              </div>
+            )}
             <div className="chips-row" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
               <span className="chip" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                 {t(chips.hero)}

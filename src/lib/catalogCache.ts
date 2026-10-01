@@ -4,7 +4,10 @@
  */
 import type { Product } from './catalog';
 
-const PREFIX = 'nimshop_cat_v1:';
+// v2: cached maps are normalized Product objects; v1 entries predate the
+// is_e_money flag, so bump the key to make badges appear without waiting
+// for the 24 h TTL (refetch is the cheap static snapshot anyway).
+const PREFIX = 'nimshop_cat_v2:';
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 export type CatalogMap = Record<string, Product[]>;
