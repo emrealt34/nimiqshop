@@ -77,7 +77,10 @@ export function ComeBackBanner({
         <span className="strong">{labelNode}</span>
         {textNode != null ? <> {textNode}</> : null}
       </span>
-      <span className="come-back-cta" data-fit="wrap">{t('ui.comeBackCta')}</span>
+      {/* No data-fit here: the runtime wrap escape injected an inline
+          white-space that broke the pill into three lines on phones. The
+          CTA is short in every locale; CSS nowrap + ellipsis is enough. */}
+      <span className="come-back-cta">{t('ui.comeBackCta')}</span>
     </a>
   );
 }

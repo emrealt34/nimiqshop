@@ -122,7 +122,35 @@ const browser = await chromium.launch({ args: ['--no-sandbox'] });
   await ctx.close();
 }
 
-/* ------------------------------------------------ 7) topbar nav centering */
+/* ------------------------------------------------ 7) come-back banner rail */
+{
+  for (const [w, h] of [[390, 844], [1280, 900]]) {
+    const ctx = await browser.newContext({ viewport: { width: w, height: h } });
+    const page = await ctx.newPage();
+    await page.goto(BASE + '/', { waitUntil: 'load' });
+    await page.waitForFunction(() => document.documentElement.getAttribute('data-app-ready') === '1', null, { timeout: 20000 }).catch(() => {});
+    await page.waitForTimeout(800);
+    const m = await page.locator('.come-back').first().evaluate((el) => {
+      const svg = el.querySelector('svg');
+      const txt = el.querySelector('.come-back-txt');
+      const cta = el.querySelector('.come-back-cta');
+      if (!svg || !txt || !cta) return null;
+      const r = (e) => e.getBoundingClientRect();
+      const mid = (e) => (r(e).top + r(e).bottom) / 2;
+      const ctaCs = getComputedStyle(cta);
+      return {
+        beside: r(svg).right <= r(txt).left + 2 && r(cta).left >= r(txt).right - 2,
+        ctaOneLine: r(cta).height <= parseFloat(ctaCs.lineHeight || '16') * 2.2,
+        height: Math.round(r(el).height),
+        verticallyCentered: Math.abs(mid(svg) - mid(el)) < r(el).height / 2 && Math.abs(mid(cta) - mid(el)) < r(el).height / 2,
+      };
+    });
+    check(`7 banner rail side-by-side @${w}`, !!m && m.beside && m.ctaOneLine && m.verticallyCentered && m.height <= 110, m ? JSON.stringify(m) : 'missing');
+    await ctx.close();
+  }
+}
+
+/* ------------------------------------------------ 8) topbar nav centering */
 {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await ctx.newPage();
@@ -144,8 +172,8 @@ const browser = await chromium.launch({ args: ['--no-sandbox'] });
       clearRight: nb.right < cb.left,
     };
   });
-  check('7 nav optically centered in the bar', !!m && Math.abs(m.offCenter) <= 2, m ? `off-center ${m.offCenter}px` : 'missing nodes');
-  check('7b nav clears brand and controls at 1280', !!m && m.clearLeft && m.clearRight, '');
+  check('8 nav optically centered in the bar', !!m && Math.abs(m.offCenter) <= 2, m ? `off-center ${m.offCenter}px` : 'missing nodes');
+  check('8b nav clears brand and controls at 1280', !!m && m.clearLeft && m.clearRight, '');
   await page.setViewportSize({ width: 1200, height: 900 });
   await page.waitForTimeout(400);
   const m2 = await page.evaluate(() => {
@@ -158,7 +186,7 @@ const browser = await chromium.launch({ args: ['--no-sandbox'] });
     const cb = controls.getBoundingClientRect();
     return { clearLeft: nb.left > bb.right, clearRight: nb.right < cb.left };
   });
-  check('7c no overlap at the 1200px breakpoint', m2.clearLeft && m2.clearRight, '');
+  check('8c no overlap at the 1200px breakpoint', m2.clearLeft && m2.clearRight, '');
   await ctx.close();
 }
 

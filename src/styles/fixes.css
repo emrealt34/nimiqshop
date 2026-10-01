@@ -280,10 +280,15 @@ html.in-nimiq-pay #main.page {
   .how-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 .come-back {
+  /* One horizontal rail at every width: icon | text | CTA side by side.
+     flex-wrap:wrap used to drop the icon onto its own row whenever the
+     sentence's max-content exceeded the row (always on phones), stacking
+     three rows and bloating the banner past its box. Now only the TEXT
+     wraps internally; the rail shape never breaks. */
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 8px 14px;
+  gap: 8px 12px;
   padding: 12px 14px;
   margin-bottom: 16px;
   border-radius: 14px;
@@ -292,7 +297,7 @@ html.in-nimiq-pay #main.page {
   color: inherit;
   text-decoration: none;
 }
-.come-back > svg { flex: 0 0 auto; }
+.come-back > svg { flex: 0 0 auto; align-self: center; }
 .come-back-txt { flex: 1 1 auto; min-width: 0; }
 .come-back-cta {
   flex: 0 0 auto;
@@ -459,6 +464,9 @@ html.in-nimiq-pay #main.page {
   .how-n { width: 22px; height: 22px; font-size: 0.75rem; }
   .come-back { padding: 8px 10px; margin-bottom: 10px; font-size: 0.85rem; }
   .come-back-txt { min-width: 0; }
+  /* CTA stays a compact pill on the right instead of a full-width third
+     row, keeping the banner a two-column rail on phones. */
+  .come-back-cta { width: auto; margin-left: 0; }
   .toolbar { margin: 10px 0 8px; }
   .toolbar.filters { gap: 8px; }
   .toolbar.filters .field { flex: 1 1 140px; min-width: 0; }
@@ -473,7 +481,7 @@ html.in-nimiq-pay #main.page {
   .pd .row.mt-3 { flex-wrap: wrap; }
   .pd .row.mt-3 .btn { min-width: 0; }
   #main.page { padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
-  .come-back-cta { margin-left: 0; width: 100%; }
+  .come-back-cta { margin-left: 0; width: auto; }
   .sheet-backdrop {
     align-items: flex-end;
     padding: 0;
@@ -2031,9 +2039,11 @@ label.oos-toggle > span {
   .come-back {
     padding: 8px 9px;
     gap: 6px;
-    /* On a phone the rail may break: the CTA drops to its own line rather than
-       being squeezed into a column too narrow for its own text. */
-    flex-wrap: wrap;
+    /* The rail NEVER breaks on phones either: icon | text | CTA stay side by
+       side and only the SENTENCE wraps inside its own column. Letting the
+       container wrap stacked three rows (icon / text / full-width CTA) and
+       bloated the banner past its box — reported as "yukarı ve aşağı taşmış". */
+    flex-wrap: nowrap;
   }
   .come-back > svg {
     width: 16px;
@@ -2042,11 +2052,20 @@ label.oos-toggle > span {
   .come-back-txt {
     font-size: .76rem;
     line-height: 1.25;
+    /* Wrap internally instead of the desktop one-line ellipsis. */
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
   }
   .come-back-cta {
-    max-width: 42%;
-    padding: 5px 7px;
-    font-size: .64rem;
+    max-width: 48%;
+    padding: 5px 8px;
+    font-size: .66rem;
+    /* One-line pill: a three-line CTA bubble looked broken next to the
+       wrapping sentence. Never shrink the pill itself — the sentence
+       column (min-width:0) is the one that gives. */
+    white-space: nowrap;
+    flex: 0 0 auto;
   }
   .cb-form-row.quick-stake-form-row {
     gap: 5px;
