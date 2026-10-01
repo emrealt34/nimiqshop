@@ -698,7 +698,8 @@ function ProductThumb({ p, oos = false }: { p: Product; oos?: boolean }) {
           the card on every logo colour. Absolute: zero layout shift, visible
           even under the sold-out scrim (zIndex 3). */}
       {p.is_e_money && (
-        <div className="kyc-badge" style={{ position: 'absolute', left: 6, bottom: 6, zIndex: 3, padding: '2.5px 8px', borderRadius: 'var(--pill)', background: 'var(--gold-400)', color: 'var(--on-gold)', border: '1.5px solid var(--line-strong)', boxShadow: '2px 2px 0 rgba(78, 61, 40, 0.35)', fontSize: '0.62rem', lineHeight: 1.25, fontWeight: 900, letterSpacing: '0.04em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+        <div className="kyc-badge" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 6, zIndex: 3, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 'var(--pill)', background: 'linear-gradient(180deg, var(--gold-300), var(--gold-500))', color: 'var(--on-gold)', border: '1.5px solid var(--line-strong)', boxShadow: 'inset 0 1px 0 rgba(255, 246, 232, 0.45), 2px 2px 0 rgba(78, 61, 40, 0.35)', fontSize: '0.62rem', lineHeight: 1.25, fontWeight: 900, letterSpacing: '0.05em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+          <Icon name="shield" size={11} style={{ strokeWidth: 2.6 }} />
           {t('home.kycBadge')}
         </div>
       )}

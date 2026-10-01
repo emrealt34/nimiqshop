@@ -765,7 +765,8 @@ export function ProductPage() {
           <div className="pd-image" style={{ position: 'relative' }}>
             <UnifiedThumb src={product.logo_url || ''} alt={product.name} bg={product.bg_color || 'rgb(255,255,255)'} />
             {product.is_e_money && (
-              <div className="kyc-badge" style={{ position: 'absolute', left: 8, bottom: 8, zIndex: 3, padding: '4px 12px', borderRadius: 'var(--pill)', background: 'var(--gold-400)', color: 'var(--on-gold)', border: '1.5px solid var(--line-strong)', boxShadow: '2px 2px 0 rgba(78, 61, 40, 0.35)', fontSize: '0.72rem', lineHeight: 1.25, fontWeight: 900, letterSpacing: '0.04em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+              <div className="kyc-badge" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 8, zIndex: 3, display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 13px', borderRadius: 'var(--pill)', background: 'linear-gradient(180deg, var(--gold-300), var(--gold-500))', color: 'var(--on-gold)', border: '1.5px solid var(--line-strong)', boxShadow: 'inset 0 1px 0 rgba(255, 246, 232, 0.45), 2px 2px 0 rgba(78, 61, 40, 0.35)', fontSize: '0.72rem', lineHeight: 1.25, fontWeight: 900, letterSpacing: '0.05em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+                <Icon name="shield" size={13} style={{ strokeWidth: 2.6 }} />
                 {t('home.kycBadge')}
               </div>
             )}
