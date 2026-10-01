@@ -133,6 +133,7 @@ function Brand() {
           width={40}
           height={40}
           decoding="async"
+          fetchPriority="low"
           aria-hidden="true"
           style={{ display: 'block', borderRadius: '6px' }}
           onError={() => setLogoFailed(true)}

@@ -24,6 +24,7 @@ export function NimMark({ size = 16, className = '', style }: { size?: number; c
       width={size}
       height={h}
       decoding="async"
+      fetchPriority="low"
       className={className}
       style={{
         flexShrink: 0,

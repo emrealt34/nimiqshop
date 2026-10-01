@@ -97,6 +97,7 @@ export function Icon({
         width={size}
         height={h}
         decoding="async"
+        fetchPriority="low"
         className={className}
         style={{
           display: 'inline-block',

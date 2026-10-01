@@ -884,14 +884,17 @@ function ProgrammeUnavailable({
 
 /** The real NIM symbol — the same public asset the rest of the site uses. */
 export function NimiqLogo({ size = 24 }: { size?: number }) {
+  const h = Math.round(size * 0.9);
   return (
     <img
       src={asset("/img/nimiq-hexagon.png?v=40")}
       alt=""
       width={size}
-      height={size}
+      height={h}
+      decoding="async"
+      fetchPriority="low"
       aria-hidden="true"
-      style={{ display: 'inline-block', verticalAlign: '-0.15em', flex: 'none' }}
+      style={{ display: 'inline-block', verticalAlign: '-0.15em', flex: 'none', objectFit: 'contain' }}
     />
   );
 }
