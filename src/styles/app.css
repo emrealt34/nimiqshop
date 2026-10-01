@@ -2395,8 +2395,13 @@ label.gift-toggle.inline{ display:flex; flex-direction:row; align-items:center}
  *     is wider than the identicon chip and overflowed the viewport below
  *     380px (visible on the admin console). Hide the label, keep the icon. */
 @media (max-width: 640px) {
+  /* Buttons grow to share the bar's full width (no dead strip on the right
+     when the labels are short) but never shrink below their content —
+     min-width:max-content turns a too-narrow bar into a horizontal scroller
+     instead of squeezed/clipped tabs. fixes.css repeats this with !important;
+     keep the two in sync. */
   .seg { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .seg button, .seg .seg-item { flex: 0 0 auto; white-space: nowrap; scroll-snap-align: start; }
+  .seg button, .seg .seg-item { flex: 1 1 0; min-width: max-content; white-space: nowrap; scroll-snap-align: start; }
 }
 @media (max-width: 520px) {
   .feed-side { flex: 1 1 100%; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }

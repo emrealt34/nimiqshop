@@ -3,6 +3,7 @@ import react from '@astrojs/react';
 import { proxyApi, proxyOptionsFromEnv } from './scripts/proxy.mjs';
 import { servedConfigSource } from './scripts/public-url.mjs';
 import cspInlineHashes from './integrations/csp-inline-hashes.mjs';
+import dictPreloadMap from './integrations/dict-preload-map.mjs';
 import criticalCss from './integrations/critical-css.mjs';
 
 // Static output (SSG). No server. The only "server" concerns are the same
@@ -11,11 +12,16 @@ import criticalCss from './integrations/critical-css.mjs';
 export default defineConfig({
   output: 'static',
   base: process.env.PUBLIC_BASE || '/',
-  // react() renders the app; cspInlineHashes() runs after the build to replace
-  // the script-src placeholder in every page with real SHA-256 hashes of the
-  // inline scripts that were actually emitted. Order does not matter — it is a
-  // build:done hook — but it must be present, or the placeholder ships as-is.
-  integrations: [react(), criticalCss(), cspInlineHashes()],
+  // react() renders the app; dictPreloadMap() and cspInlineHashes() run after
+  // the build: the first replaces the __DICT_PRELOAD_MAP__ placeholder in
+  // every page with the real {lang: dictionary-chunk-URL} map (so the
+  // pre-paint script can modulepreload the visitor's language), the second
+  // replaces the script-src placeholder with real SHA-256 hashes of the
+  // inline scripts that were actually emitted. ORDER MATTERS: the map lands
+  // INSIDE an inline script, so it must be substituted before that script's
+  // bytes are hashed — cspInlineHashes() must stay last. Both must be
+  // present, or their placeholders ship as-is.
+  integrations: [react(), criticalCss(), dictPreloadMap(), cspInlineHashes()],
   site: 'https://shop.nimiqbase.com',
   // The floating Astro dev-toolbar badge overlays checkout buttons on phone
   // widths (the shop is used inside Nimiq Pay on mobile). It is a dev-only

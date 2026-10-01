@@ -22,10 +22,13 @@ export function AppRoot({ activeKey, children }: { activeKey: ShellKey; children
   // (No pre-hydration footer handling here any more: the pages are
   // server-rendered, so there is no empty-content frame to hide it for.)
   //
-  // Hydration beacon. The island hydrates on idle (see the pages' client:idle),
-  // so "the HTML is there" and "the app answers clicks" are two different
-  // moments; this attribute marks the second one. tests/e2e waits for it before
-  // interacting, and it costs one attribute write.
+  // Hydration beacon. The islands hydrate immediately (the pages use
+  // client:load — client:idle postponed applying the visitor's saved
+  // language/theme/country until the main thread happened to go quiet, which
+  // read as "the page opens with no settings and then changes"), but "the
+  // HTML is there" and "the app answers clicks" are still two different
+  // moments; this attribute marks the second one. tests/e2e waits for it
+  // before interacting, and it costs one attribute write.
   useEffect(() => {
     initStaticI18n();
     initFit();

@@ -368,7 +368,14 @@ html.in-nimiq-pay #main.page {
     -webkit-overflow-scrolling: touch !important;
   }
   .seg button, .seg .seg-item {
-    flex: 0 0 auto !important;
+    /* 1 1 0 instead of 0 0 auto: with short labels (four home tabs under
+       480px) the buttons only took their content width and the framed bar
+       kept a dead empty strip on the right — the row looked broken on
+       phones. Equal grow makes the buttons share the full width like a
+       proper segmented control; min-width:max-content still prevents
+       squeezing, so genuinely overflowing rows (five-tab order filters on
+       narrow screens) keep scrolling horizontally instead of wrapping. */
+    flex: 1 1 0 !important;
     min-width: max-content !important;
     max-width: none !important;
     padding: 8px 14px !important;
@@ -433,7 +440,14 @@ html.in-nimiq-pay #main.page {
   .kf-pkg { display: none; }
   .hero { padding-top: 14px; padding-bottom: 8px; }
   .hero h1 { font-size: clamp(1.28rem, 6.2vw, 1.7rem); line-height: 1.18; margin-bottom: 8px; }
+  /* The <br> between the two hero sentences is hidden to keep the compact
+     phone hero, but the h1's two text nodes then touch each other with no
+     whitespace at all — "…top-ups & eSIMs.Pay with NIM…" (reported as the
+     words looking glued together on phones). Re-insert the missing word
+     space as a pseudo-element so the sentences stay separate without paying
+     for the br's forced line break. Desktop keeps the real <br>. */
   .hero h1 br { display: none; }
+  .hero h1 .gold-text::before { content: ' '; }
   .hero .lede { font-size: 0.9rem; margin: 0 0 10px; }
   .hero-actions { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
   .hero-actions .btn { width: 100%; justify-content: center; min-height: 44px; }

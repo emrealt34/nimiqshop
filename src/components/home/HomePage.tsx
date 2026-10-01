@@ -78,16 +78,38 @@ export function HomePage() {
   const mountAlive = useRef(true);
   const catalogRequest = useRef(0);
 
-  // Restore saved country
+  // The visitor's saved country is read during the first CLIENT render, not
+  // inside an effect. The effect-only version restored it one render late, so
+  // opening the shop fetched the SSR-default 'TR' shelf first, painted it, and
+  // only then switched to the saved country — a visible flip plus a wasted
+  // catalog round trip on every load ("settings arrive after the page does").
+  //
+  // The `country` STATE still starts at 'TR': this is a static build, the
+  // server always renders that default, and the hydration render must match
+  // the server HTML byte for byte (rendering the saved value in the
+  // initializer would fail hydration and rebuild the whole island). Reading
+  // into a ref keeps the render identical while letting the effects below act
+  // on the saved value from the very first commit.
+  const savedCountry = useRef<string | null>(null);
+  if (savedCountry.current === null) {
+    let v = '';
+    if (typeof window !== 'undefined') {
+      try {
+        const s = localStorage.getItem('nimshop_country');
+        if (s && /^[A-Za-z]{2}$/.test(s)) v = s.toUpperCase();
+      } catch {}
+    }
+    savedCountry.current = v; // '' = nothing saved (or server render)
+  }
+
+  // Restore saved country — runs before the shelf-load effect in the same
+  // commit, so the first fetch already targets the right country.
   useEffect(() => {
     mountAlive.current = true;
-    try {
-      const saved = localStorage.getItem('nimshop_country');
-      if (saved && /^[A-Za-z]{2}$/.test(saved)) {
-        setCountry(saved.toUpperCase());
-        userChoseCountry.current = true;
-      }
-    } catch {}
+    if (savedCountry.current) {
+      userChoseCountry.current = true;
+      setCountry(savedCountry.current);
+    }
     return () => {
       mountAlive.current = false;
     };
@@ -126,7 +148,19 @@ export function HomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => { void loadCatalogs(country); }, [country, loadCatalogs]);
+  const firstShelfLoad = useRef(true);
+  useEffect(() => {
+    // First mount only: when a saved country exists but the restore effect's
+    // setCountry has not committed yet, skip the SSR-default shelf — the
+    // restore effect (declared above) already ran in this commit and this
+    // effect re-fires with the saved country immediately. Every later run
+    // (manual picks, geo-suggest) loads normally.
+    if (firstShelfLoad.current) {
+      firstShelfLoad.current = false;
+      if (savedCountry.current && savedCountry.current !== country) return;
+    }
+    void loadCatalogs(country);
+  }, [country, loadCatalogs]);
 
   useEffect(() => {
     getFXRates().then((r) => {
@@ -202,7 +236,15 @@ export function HomePage() {
       <section className="hero container fade-in">
         <div>
           <h1>
-            {t('home.heroTitle1')}
+            {/* The {' '} is a real DOM space, not decoration: under 719px the
+                CSS hides the <br> (compact phone hero), and without a space of
+                its own the two sentences physically run together —
+                "…top-ups & eSIMs.Pay with NIM…" — on screen, in innerText and
+                for screen readers. On desktop it is an invisible trailing
+                space before the line break. fixes.css mirrors it with a
+                .gold-text::before safety net; adjacent whitespace collapses,
+                so only one space ever renders. */}
+            {t('home.heroTitle1')}{' '}
             <br />
             <span className="gold-text">{t('home.heroTitle2')}</span>
           </h1>

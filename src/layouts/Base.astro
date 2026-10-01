@@ -85,6 +85,17 @@ const cspScriptSrc = isDev
 const cspConnectExtra = isDev
   ? ' http://localhost:8084 http://127.0.0.1:8084 https://*.trycloudflare.com'
   : '';
+// Dictionary preload map — in production builds the token below is replaced,
+// after the build, with a JSON object mapping every non-English language to
+// the URL of its built dictionary chunk (integrations/dict-preload-map.mjs).
+// The pre-paint language bootstrap uses it to attach a <link
+// rel="modulepreload"> for the visitor's language BEFORE any bundle runs, so
+// the strings are already in the module cache when React hydrates and the
+// language flip is effectively immediate instead of a second round trip.
+// That integration MUST run before cspInlineHashes() so the CSP hashes the
+// final bytes of the script it lands in. Dev builds have no hashed chunks to
+// point at; the empty map simply disables the preload there.
+const dictPreloadMap = isDev ? '{}' : '__DICT_PRELOAD_MAP__';
 // `frame-ancestors` is deliberately NOT in the <meta> policy.
 //
 // The directive only has meaning when the policy arrives as an HTTP header —
@@ -135,7 +146,7 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
       chain and picks the identical code, so there is zero flash of the
       wrong language.
     -->
-    <script is:inline>
+    <script is:inline define:vars={{ dictPreloadMap }}>
       (function () {
         try {
           var SUPPORTED = { en: 1, es: 1, de: 1, fr: 1, pt: 1, tr: 1 };
@@ -174,6 +185,27 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
           var lang = readQuery() || readCookie() || readStorage() || readNav() || 'en';
           document.documentElement.setAttribute('lang', lang);
           document.documentElement.setAttribute('data-lang', lang);
+          // Warm the dictionary chunk for this language while the HTML is
+          // still parsing. Non-English dictionaries are lazy chunks that
+          // React only imports after hydration; without this the visitor's
+          // language lands one round trip late and the page visibly flips
+          // from English. `dictPreloadMap` is injected by define:vars:
+          // production builds emit the placeholder string, which
+          // integrations/dict-preload-map.mjs replaces (quotes included)
+          // with the real {lang: url} object literal after the build; dev
+          // builds ship the string '{}'. The typeof check accepts both
+          // shapes, and the nested try means a stale/absent map can never
+          // break the language attributes above.
+          try {
+            var DICT = typeof dictPreloadMap === 'string' ? JSON.parse(dictPreloadMap) : (dictPreloadMap || {});
+            var dictHref = DICT && DICT[lang];
+            if (dictHref && document.head) {
+              var pre = document.createElement('link');
+              pre.rel = 'modulepreload';
+              pre.href = dictHref;
+              document.head.appendChild(pre);
+            }
+          } catch (e2) {}
         } catch (e) {
           // If anything throws (private mode, etc.) leave the build default.
         }
