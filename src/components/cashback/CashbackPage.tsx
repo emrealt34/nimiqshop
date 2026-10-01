@@ -504,16 +504,14 @@ export function CashbackView() {
             )}
           </div>
           <div className="small muted mt-1">
-            {authed === null
-              ? t('cashback.heroChecking')
-              : !authed
-                ? t('cashback.heroStakePrompt', { pct: pct(stakerBaseBps), max: String(params?.max_boost_percent ?? '?') })
-                : stakedHere
-                  ? t('cashback.heroStaked', {
-                      nim: fmtStakeNIM(mine?.stake_nim || 0),
-                      loyalty: (mine?.loyalty_days || 0) > 0 ? t('cashback.heroLoyalty', { days: String(mine?.loyalty_days) }) : '',
-                    })
-                  : t('cashback.heroNoStake', { pct: pct(stakerBaseBps), max: String(params?.max_boost_percent ?? '?') })}
+            {!authed
+              ? t('cashback.heroStakePrompt', { pct: pct(stakerBaseBps), max: String(params?.max_boost_percent ?? '?') })
+              : stakedHere
+                ? t('cashback.heroStaked', {
+                    nim: fmtStakeNIM(mine?.stake_nim || 0),
+                    loyalty: (mine?.loyalty_days || 0) > 0 ? t('cashback.heroLoyalty', { days: String(mine?.loyalty_days) }) : '',
+                  })
+                : t('cashback.heroNoStake', { pct: pct(stakerBaseBps), max: String(params?.max_boost_percent ?? '?') })}
           </div>
         </div>
 
@@ -855,16 +853,20 @@ function ProgrammeUnavailable({
         <Icon name="spark" size={16} /> {t('cashback.calcTitle')}
       </div>
       <div className="small muted" style={{ margin: '2px 0 8px' }}>
-        {loadError ? t('cashback.progLoadErr') : t('cashback.progNone')}
+        {t('cashback.progLoadErr')}
       </div>
       <div className="xs faint">
         {t('cashback.progPublic')}
       </div>
-      {loadError && (
-        <button type="button" className="btn btn-sm mt-2" onClick={onRetry} disabled={busy}>
-          <Icon name="refresh" size={14} /> {busy ? t('actions.loading') : t('common.tryAgain')}
-        </button>
-      )}
+      <button
+        type="button"
+        className="btn btn-sm mt-2"
+        onClick={onRetry}
+        disabled={busy || !loadError}
+        style={loadError ? undefined : { visibility: 'hidden' }}
+      >
+        <Icon name="refresh" size={14} /> {busy ? t('actions.loading') : t('common.tryAgain')}
+      </button>
     </div>
   );
 }
