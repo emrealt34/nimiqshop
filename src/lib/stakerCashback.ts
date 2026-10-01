@@ -19,7 +19,7 @@
  * so the UI can never promise a rate the server would not pay.
  */
 import { getCashbackRate, getPoolStake, refreshPoolStake } from './api';
-import { fmtCashbackNIM, estimateCashbackNIM } from './cashback';
+import { fmtCashbackNIM, estimateCashbackNIM, cachedCashbackBps } from './cashback';
 import { t as tr } from '../i18n';
 
 export const LUNA_PER_NIM = 100_000;
@@ -85,11 +85,18 @@ export type StakerProgram = {
   program: StakeCashbackProgram | null;
   /**
    * True when GET /api/cashback/rate could not be read at all (backend down,
-   * network, CORS). The page must then SAY so and offer a retry — it must
-   * never paper over the gap with invented programme numbers, because every
+   * network, CORS). The calculator then runs on the LAST KNOWN programme from
+   * the session cache, or — with no cache at all — on the published default
+   * programme the Go backend itself ships (stakeledger.Defaults), and the
+   * page shows a small honest note. It no longer hides behind an error wall:
+   * the maths needs no backend (programme params + static NIM rate), and the
+   * money path (quotes/orders) still reads live values server-side.
+   * Every
    * figure the calculator prints would then be fiction.
    */
   loadError?: boolean;
+  /** Programme read failed; numbers are last-known or published defaults. */
+  degraded?: boolean;
 };
 
 /** The signed-in buyer's standing from /api/poolstake/me. */
@@ -185,6 +192,26 @@ function normLedger(l: any): StakerLedgerCard | null {
   };
 }
 
+/**
+ * The programme numbers the Go backend ships as its own defaults
+ * (backend/internal/stakeledger/params.go `Defaults`, MaxBoostBps→percent,
+ * admin/models.go DefaultStakerCashbackBps). Mirrored here so the PUBLIC
+ * calculator keeps working with zero backend: a live or cached response
+ * always wins, this is only the floor. Keep in sync with the Go side.
+ */
+const BUNDLED_PROGRAM: StakeCashbackProgram = {
+  max_boost_percent: 10, // MaxBoostBps 1000 / 100
+  min_stake_nim: 100,
+  daily_cap_usd: 50,
+  monthly_cap_usd: 500,
+  ramp_days: 1825,
+  display_basis_usd: 100,
+  ledger_max_usd: 10,
+  credit_share: 0.8,
+  loyalty_start: 0.5,
+  carry_share: 0.1,
+};
+
 /** The programme description from /api/cashback/rate. Never throws. */
 export async function loadStakerProgram(): Promise<StakerProgram> {
   const cached = readCache<StakerProgram>(PROGRAM_KEY, PROGRAM_TTL_MS);
@@ -210,9 +237,16 @@ export async function loadStakerProgram(): Promise<StakerProgram> {
     writeCache(PROGRAM_KEY, out);
     return out;
   } catch {
-    // A cached answer is better than nothing; a bare failure flag is better
-    // than a silently empty page.
-    return cached || { enabled: false, baseBps: 0, stakerBaseBps: 0, validator: '', program: null, loadError: true };
+    // Backend unreachable. The calculator's maths is fully determined by the
+    // programme params + the static NIM rate, so keep it running: last known
+    // programme first (any age), then the published default programme. The
+    // in-app stake CTA stays hidden in the bundled branch (empty validator),
+    // so no transaction can ever target a guessed address.
+    const stale = cached || readCache<StakerProgram>(PROGRAM_KEY, Number.POSITIVE_INFINITY);
+    const base = stale && stale.program
+      ? stale
+      : { enabled: false, baseBps: cachedCashbackBps(), stakerBaseBps: 100, validator: '', program: BUNDLED_PROGRAM };
+    return { ...base, loadError: true, degraded: true };
   }
 }
 

@@ -579,6 +579,7 @@ const es = {
     codeRemove: 'Quitar código',
     codeAppliedToast: '{{code}} aplicado: solo se aplicará su {{pct}}% de cashback.',
     calcTitle: 'Calculadora',
+    programDegraded: 'El servidor del programa no responde ahora: la calculadora muestra los valores publicados por defecto. En el pago siempre se aplican tasas en vivo.',
     calcIntro: 'Mueve los controles: lo que recuperarías cada mes, en NIM. Sin cuenta.',
     calcToggleTitle: 'Compara con no hacer stake',
     calcToggleOff: 'Sin stake — 0% en cada pedido',

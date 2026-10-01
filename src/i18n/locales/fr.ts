@@ -579,6 +579,7 @@ const fr = {
     codeRemove: 'Supprimer le code',
     codeAppliedToast: '{{code}} appliqué — seul son cashback de {{pct}}% s’appliquera.',
     calcTitle: 'Calculateur',
+    programDegraded: 'Serveur du programme injoignable pour le moment — la calculatrice affiche les valeurs publiées par défaut. Le paiement applique toujours les taux en direct.',
     calcIntro: 'Faites glisser les curseurs — ce que vous récupéreriez chaque mois, en NIM. Sans compte.',
     calcToggleTitle: 'Comparez avec l’absence de staking',
     calcToggleOff: 'Pas de staking — 0% sur chaque commande',

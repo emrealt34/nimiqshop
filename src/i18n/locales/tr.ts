@@ -580,6 +580,7 @@ const tr = {
     codeRemove: 'Kodu kaldır',
     codeAppliedToast: '{{code}} uygulandı — yalnızca %{{pct}} cashback’i geçerli olur.',
     calcTitle: 'Hesaplayıcı',
+    programDegraded: 'Program sunucusuna şu an ulaşılamıyor — hesaplayıcı yayınlanan varsayılan program değerlerini gösteriyor. Ödemede her zaman canlı oranlar geçerlidir.',
     calcIntro: 'Kaydırıcıları sürükleyin — her ay NIM olarak ne geri alacağınızı görün. Hesap gerekmez.',
     calcToggleTitle: 'Hiç stake etmemekle karşılaştır',
     calcToggleOff: 'Stake yok — her siparişte %0',

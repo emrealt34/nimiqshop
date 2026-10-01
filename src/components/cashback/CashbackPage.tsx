@@ -604,9 +604,18 @@ export function CashbackView() {
         before a visitor has a wallet or an account — nothing on this card
         reads the session. Its numbers come from the live, unauthenticated
         programme (GET /api/cashback/rate); when that read fails the card
-        says so and offers a retry instead of printing invented defaults.
+        keeps working on the last-known / published default programme and
+        says so in one honest line — the maths needs no backend, and the
+        money path still quotes live server-side.
       */}
       {params ? (
+        <>
+        {program?.degraded && (
+          <div role="status" style={{ display: 'flex', gap: 6, alignItems: 'flex-start', margin: '0 0 8px', padding: '7px 10px', borderRadius: 'var(--r-m)', background: 'var(--gold-grad-soft)', border: '1px solid var(--line)', fontSize: 'var(--fs-xs)', lineHeight: 1.4, color: 'var(--ink)' }}>
+            <Icon name="info" size={13} style={{ flex: '0 0 auto', marginTop: 1, color: 'var(--gold-600)' }} />
+            <span>{t('cashback.programDegraded')}</span>
+          </div>
+        )}
         <CashbackCalculator
           program={params}
           baseBps={baseBps}
@@ -615,6 +624,7 @@ export function CashbackView() {
           myLoyaltyDays={stakedHere ? mine?.loyalty_days : undefined}
           onUseAmount={useCalcAmount}
         />
+        </>
       ) : (
         <ProgrammeUnavailable loadError={!!program?.loadError} busy={retrying} onRetry={retryProgram} />
       )}

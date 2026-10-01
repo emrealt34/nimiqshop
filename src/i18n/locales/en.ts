@@ -588,6 +588,7 @@ const en = {
     codeRemove: 'Remove code',
     codeAppliedToast: '{{code}} applied — only its {{pct}}% cashback will apply.',
     calcTitle: 'Calculator',
+    programDegraded: 'Programme server unreachable right now — the calculator is showing the published default programme values. Checkout always quotes live rates.',
     calcIntro: 'Drag the sliders — what you would get back each month, in NIM. No account needed.',
     calcToggleTitle: 'Compare with not staking at all',
     calcToggleOff: 'Not staking — 0% on every order',

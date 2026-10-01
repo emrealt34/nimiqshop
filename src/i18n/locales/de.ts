@@ -579,6 +579,7 @@ const de = {
     codeRemove: 'Code entfernen',
     codeAppliedToast: '{{code}} angewendet — es gilt nur sein Cashback von {{pct}}%.',
     calcTitle: 'Rechner',
+    programDegraded: 'Programmserver gerade nicht erreichbar — der Rechner zeigt die veröffentlichten Standard-Programmwerte. Beim Checkout gelten immer Live-Werte.',
     calcIntro: 'Schiebe die Regler — was du monatlich in NIM zurückbekommst. Kein Konto nötig.',
     calcToggleTitle: 'Vergleiche mit gar keinem Staking',
     calcToggleOff: 'Kein Staking — 0% bei jeder Bestellung',
