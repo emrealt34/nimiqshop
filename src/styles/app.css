@@ -46,7 +46,7 @@
   --gold-600: #8A5E0B;
   --gold-grad: var(--gold-400);
   --gold-grad-soft: rgba(201, 138, 27, 0.14);
-  --on-gold: #FFF6E8;
+  --on-gold: #2A1F10;
 
   /* Semantic (name-compatible; kraft-tuned) */
   --teal: var(--green);    --teal-soft: var(--green-soft);
@@ -470,7 +470,7 @@ p { margin: 0 0 1em; }
 .btn-gold { background: var(--stamp); border-color: var(--stamp); color: var(--on-stamp); }
 .btn-gold:hover { background: var(--stamp-600); }
 .btn-ghost { background: var(--surface-1); border-color: var(--line-strong); }
-.btn-outline { background: transparent; border-style: dashed; border-color: var(--stamp); color: var(--stamp); box-shadow: none; }
+.btn-outline { background: transparent; border-style: dashed; border-color: var(--stamp); color: var(--text-alert, var(--stamp)); box-shadow: none; }
 .btn-outline:hover { background: var(--stamp-soft); }
 .btn-sm { padding: 7px 14px; font-size: var(--fs-sm); min-height: 44px; } /* B3 FIX: was 38px */
 .btn-lg { padding: 14px 30px; font-size: 1.08rem; min-height: 54px; }
@@ -775,7 +775,7 @@ input[type="range"]::-moz-range-track {
   padding: 5px 12px;
   font-size: var(--fs-xs);
   font-weight: 800;
-  color: var(--ink-dim);
+  color: var(--text-chip, var(--ink-dim));
   white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis;
 }
 
@@ -2177,7 +2177,7 @@ a.product-card:hover { text-decoration: none; }
 
 /* ================= session additions (builds 54-111) ================= */
 /* ================= session additions (up to build 111) ================= */
-:root{ --bg:#E7DAC0; --bg-2:#DFD1B2; --surface-1:#F6EFDC; --surface-2:#EFE4C6; --surface-3:#E6D7B5; --line:rgba(78, 61, 40, 0.24); --line-dash:rgba(78, 61, 40, 0.45); --line-strong:#4E3D28; --ink:#4E3D28; --ink-dim:#7C6A4E; --ink-faint:#786446; --stamp:#C7481D; --stamp-600:#A83A16; --stamp-soft:rgba(199, 72, 29, 0.12); --on-stamp:#FFF6E8; --green:#3E6B4F; --green-600:#2F5540; --green-soft:rgba(62, 107, 79, 0.12); --gold-300:#DDA32E; --gold-400:#C98A1B; --gold-500:#A8730F; --gold-600:#8A5E0B; --gold-grad:var(--gold-400); --gold-grad-soft:rgba(201, 138, 27, 0.14); --on-gold:#FFF6E8; --teal:var(--green); --teal-soft:var(--green-soft); --blue:#4E6172; --blue-soft:rgba(78, 97, 114, 0.12); --orange:#C7661C; --orange-soft:rgba(199, 102, 28, 0.12); --red:#B4471C; --red-soft:rgba(180, 71, 28, 0.11); --purple:#7A5C8F; --purple-soft:rgba(122, 92, 143, 0.12); --font:"NunitoLocal", "Nunito Fallback", "Nunito", ui-rounded, "SF Pro Rounded", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif; --font-serif:"FrauncesLocal", "Fraunces Fallback", Georgia, "Iowan Old Style", "Times New Roman", serif; --font-mono:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; --fs-xs:0.75rem; --fs-sm:0.855rem; --fs-md:1rem; --fs-lg:clamp(1.05rem, 1rem + 0.4vw, 1.25rem); --fs-xl:clamp(1.3rem, 1.1rem + 1.2vw, 1.8rem); --fs-2xl:clamp(1.6rem, 1.2rem + 2.2vw, 2.6rem); --fs-hero:clamp(2.1rem, 1.5rem + 3.4vw, 3.5rem); --r-s:6px; --r-m:8px; --r-l:10px; --r-xl:14px; --pill:999px; --container:min(1160px, 100% - clamp(24px, 6vw, 64px)); --header-h:64px; --tabbar-h:60px; --sat:env(safe-area-inset-top, 0px); --sab:env(safe-area-inset-bottom, 0px); --sal:env(safe-area-inset-left, 0px); --sar:env(safe-area-inset-right, 0px); --ease:cubic-bezier(0.22, 0.9, 0.28, 1); --shadow-1:3px 3px 0 rgba(78, 61, 40, 0.22); --shadow-2:5px 5px 0 rgba(78, 61, 40, 0.24); --shadow-pop:6px 8px 0 rgba(78, 61, 40, 0.16); --tape:rgba(222, 203, 150, 0.85); --tape-edge:rgba(78, 61, 40, 0.28)}
+:root{ --bg:#E7DAC0; --bg-2:#DFD1B2; --surface-1:#F6EFDC; --surface-2:#EFE4C6; --surface-3:#E6D7B5; --line:rgba(78, 61, 40, 0.24); --line-dash:rgba(78, 61, 40, 0.45); --line-strong:#4E3D28; --ink:#4E3D28; --ink-dim:#7C6A4E; --ink-faint:#786446; --stamp:#C7481D; --stamp-600:#A83A16; --stamp-soft:rgba(199, 72, 29, 0.12); --on-stamp:#FFF6E8; --green:#3E6B4F; --green-600:#2F5540; --green-soft:rgba(62, 107, 79, 0.12); --gold-300:#DDA32E; --gold-400:#C98A1B; --gold-500:#A8730F; --gold-600:#8A5E0B; --gold-grad:var(--gold-400); --gold-grad-soft:rgba(201, 138, 27, 0.14); --on-gold:#2A1F10; --teal:var(--green); --teal-soft:var(--green-soft); --blue:#4E6172; --blue-soft:rgba(78, 97, 114, 0.12); --orange:#C7661C; --orange-soft:rgba(199, 102, 28, 0.12); --red:#B4471C; --red-soft:rgba(180, 71, 28, 0.11); --purple:#7A5C8F; --purple-soft:rgba(122, 92, 143, 0.12); --font:"NunitoLocal", "Nunito Fallback", "Nunito", ui-rounded, "SF Pro Rounded", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif; --font-serif:"FrauncesLocal", "Fraunces Fallback", Georgia, "Iowan Old Style", "Times New Roman", serif; --font-mono:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; --fs-xs:0.75rem; --fs-sm:0.855rem; --fs-md:1rem; --fs-lg:clamp(1.05rem, 1rem + 0.4vw, 1.25rem); --fs-xl:clamp(1.3rem, 1.1rem + 1.2vw, 1.8rem); --fs-2xl:clamp(1.6rem, 1.2rem + 2.2vw, 2.6rem); --fs-hero:clamp(2.1rem, 1.5rem + 3.4vw, 3.5rem); --r-s:6px; --r-m:8px; --r-l:10px; --r-xl:14px; --pill:999px; --container:min(1160px, 100% - clamp(24px, 6vw, 64px)); --header-h:64px; --tabbar-h:60px; --sat:env(safe-area-inset-top, 0px); --sab:env(safe-area-inset-bottom, 0px); --sal:env(safe-area-inset-left, 0px); --sar:env(safe-area-inset-right, 0px); --ease:cubic-bezier(0.22, 0.9, 0.28, 1); --shadow-1:3px 3px 0 rgba(78, 61, 40, 0.22); --shadow-2:5px 5px 0 rgba(78, 61, 40, 0.24); --shadow-pop:6px 8px 0 rgba(78, 61, 40, 0.16); --tape:rgba(222, 203, 150, 0.85); --tape-edge:rgba(78, 61, 40, 0.28)}
 *, *::before, *::after{ box-sizing:border-box}
 @media (prefers-reduced-motion:reduce){ *, *::before, *::after{ animation-duration:0.01ms !important; animation-iteration-count:1 !important; transition:none !important} }
 .mainnav{ display:none; gap:4px; margin-left:8px}
@@ -2840,7 +2840,7 @@ html { overflow-x: clip; }
   gap: 2px;
 }
 .cb-wallet-redirect-inline-copy strong { color: var(--ink, #3e2f1c); font-size: .78rem; }
-.cb-wallet-redirect-inline-copy small { color: var(--ink-dim, #7c6a4e); font-size: .69rem; line-height: 1.3; }
+.cb-wallet-redirect-inline-copy small { color: var(--text-chip, #6e5c43); font-size: .69rem; line-height: 1.3; }
 .cb-wallet-redirect-inline-icon {
   display: inline-grid;
   place-items: center;
@@ -2923,7 +2923,7 @@ html { overflow-x: clip; }
   --gold-grad: var(--gold-400);
   --gold-grad-soft: rgba(201, 138, 27, 0.20);
   --gold-soft: rgba(201, 138, 27, 0.18);
-  --on-gold: #FFF6E8;
+  --on-gold: #2A1F10;
 
   --blue: #6F8FA8;
   --blue-soft: rgba(111, 143, 168, 0.20);

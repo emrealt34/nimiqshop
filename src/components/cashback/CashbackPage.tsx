@@ -61,7 +61,6 @@ import { Icon } from '../ui/Icon';
 import { CashbackCalculator } from './CashbackCalculator';
 import { RecentCashbackList } from './RecentCashbackList';
 import { CashbackImpactSection } from './CashbackImpactSection';
-import { SkeletonLines } from '../ui/uiKit';
 import { useSheet, useToast } from '../AppProviders';
 import { useSession } from '../../lib/useSession';
 import { useInNimiqPay } from '../../lib/miniapp';
@@ -466,18 +465,6 @@ export function CashbackView() {
 
   /* --------------------------------------------------------------- render */
 
-  if (!program) {
-    return (
-      <div className="container">
-        <Header />
-        <CashbackFeeNotice example="nim" />
-        <div className="card mt-2">
-          <SkeletonLines n={4} />
-        </div>
-      </div>
-    );
-  }
-
   const walletGuide = walletStakeGuide(validator);
 
   function showWalletRedirect() {
@@ -631,7 +618,7 @@ export function CashbackView() {
           onUseAmount={useCalcAmount}
         />
       ) : (
-        <ProgrammeUnavailable loadError={!!program.loadError} busy={retrying} onRetry={retryProgram} />
+        <ProgrammeUnavailable loadError={!!program?.loadError} busy={retrying} onRetry={retryProgram} />
       )}
 
       {/* ------------------------------------------------- stake / manage */}

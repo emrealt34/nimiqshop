@@ -238,7 +238,8 @@ export default function criticalCss() {
                 seenRootVars = true;
               }
               const key = `${context.replace(/ \| $/, '')}\u0000${norm(node.selector || '')}`;
-              if (node.type === 'atrule' || alwaysInline(node) || (!deferrable.has(key) && selectorMatchesPage(node.selector))) {
+              const isPageCritical = /\.(?:cb-|pt-)/.test(node.selector || '');
+              if (node.type === 'atrule' || alwaysInline(node) || ((!deferrable.has(key) || isPageCritical) && selectorMatchesPage(node.selector))) {
                 keep.push(text);
                 inlineBytes += text.length;
               } else {
