@@ -107,6 +107,12 @@ const ALWAYS_INLINE_SELECTORS = [
 function alwaysInline(rule) {
   if (rule.selector === ':root') return true;
   if (rule.selector.includes('font-face')) return true;
+  // Image/box geometry (aspect-ratio, object-fit) exists ONLY to keep a box
+  // at its intended shape — exactly the properties whose late arrival made
+  // logos paint at intrinsic size and cards/grid visibly re-shape when the
+  // deferred sheet flipped. Wherever they live (thumbs, feed rows, cart
+  // rows, product hero), they are first-paint rules by nature.
+  if (rule.type === 'rule' && /aspect-ratio\s*:|object-fit\s*:/.test(rule.toString())) return true;
   // Theme rules ship inline, ALL of them. The capture tour walks the pages in
   // the default (light) theme, so every `[data-theme=dark] …` rule lands in
   // neverMatched and gets deferred — and the deferred sheet only flips on
@@ -239,6 +245,32 @@ export default function criticalCss() {
           };
           let seenRootVars = false;
 
+          /** Cascade-integrity guard. The sheet carries duplicate sections
+           *  (readable + minified), so one selector can exist twice. If one
+           *  copy stays inline and its twin goes deferred, the deferred copy
+           *  sits LATER in the document and out-ranks the inline one after
+           *  the flip — the grid re-columned 5->6 mid-load from exactly this.
+           *  Pass 1 records which (context, selector) keys land on each
+           *  side; pass 2 keeps every copy of a selector that would have
+           *  been split, so a selector lives in exactly one sheet. */
+          const ruleKey = (node, context) => `${context.replace(/ \| $/, '')}\u0000${norm(node.selector || '')}`;
+          const willKeepRule = (node, context) => {
+            const key = ruleKey(node, context);
+            const isPageCritical = /\.(?:cb-|pt-)/.test(node.selector || '');
+            return alwaysInline(node) || ((!deferrable.has(key) || isPageCritical) && selectorMatchesPage(node.selector));
+          };
+          const keepKeys = new Set();
+          const moveKeys = new Set();
+          const scan = (container, context) => {
+            container.each((node) => {
+              if (node.type === 'atrule' && /keyframes|font-face/.test(node.name)) return;
+              if (node.type === 'atrule' && node.nodes) { scan(node, `${context}@${node.name} ${node.params} | `); return; }
+              if (node.type !== 'rule') return;
+              (willKeepRule(node, context) ? keepKeys : moveKeys).add(ruleKey(node, context));
+            });
+          };
+          scan(root, '');
+
           /**
            * Split a container into the two halves. At-rules are rebuilt around
            * whichever of their children stayed, because dropping the `@media`
@@ -279,9 +311,9 @@ export default function criticalCss() {
                 if (seenRootVars) return;
                 seenRootVars = true;
               }
-              const key = `${context.replace(/ \| $/, '')}\u0000${norm(node.selector || '')}`;
-              const isPageCritical = /\.(?:cb-|pt-)/.test(node.selector || '');
-              if (node.type === 'atrule' || alwaysInline(node) || ((!deferrable.has(key) || isPageCritical) && selectorMatchesPage(node.selector))) {
+              const key = ruleKey(node, context);
+              const splitAcrossSheets = keepKeys.has(key) && moveKeys.has(key);
+              if (node.type === 'atrule' || willKeepRule(node, context) || splitAcrossSheets) {
                 keep.push(text);
                 inlineBytes += text.length;
               } else {

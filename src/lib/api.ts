@@ -313,6 +313,20 @@ const catQS = (kind: string, country?: string, test?: boolean) => {
  * Note: admin catalog rules (hidden families etc.) are server-side, so the
  * static path shows the supplier's live listing unfiltered — same as what
  * the supplier's own storefront shows. */
+/** A static snapshot older than this is considered stale: the hourly Pages
+ *  cron (or the deploy itself) may have been broken for a while, and a
+ *  half-day-old price/catalog is worse than a live round trip to the API.
+ *  Owner's rule: static first, but never trust a snapshot older than 12 h —
+ *  past that, fall through to /api automatically. */
+const STATIC_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+function staticFresh(j: any): boolean {
+  const at = Date.parse(String(j?.generated_at || ''));
+  if (!Number.isFinite(at)) return false; // untimestamped snapshot: not trustworthy
+  const age = Date.now() - at;
+  if (age < 0) return -age <= 60_000; // tolerate a minute of clock skew
+  return age <= STATIC_MAX_AGE_MS;
+}
+
 async function staticBrands(country?: string): Promise<{ country_code?: string; categories: any[] } | null> {
   if (typeof fetch !== 'function') return null;
   const raw = String(country || '').toUpperCase().slice(0, 2);
@@ -324,7 +338,7 @@ async function staticBrands(country?: string): Promise<{ country_code?: string; 
     });
     if (!res.ok) return null;
     const j = await res.json();
-    return j && Array.isArray(j.categories) ? j : null;
+    return j && Array.isArray(j.categories) && staticFresh(j) ? j : null;
   } catch {
     return null;
   }
@@ -339,7 +353,7 @@ async function staticMarket(name: 'fx' | 'nim-rate'): Promise<Record<string, any
     const res = await fetch(asset(`/data/market/${name}.json`), { cache: 'default', headers: { Accept: 'application/json' } });
     if (!res.ok) return null;
     const j = await res.json();
-    return j && typeof j === 'object' ? j : null;
+    return j && typeof j === 'object' && staticFresh(j) ? j : null;
   } catch {
     return null;
   }
