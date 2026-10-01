@@ -459,7 +459,19 @@ html.in-nimiq-pay #main.page {
   .hero-actions .btn { width: 100%; justify-content: center; min-height: 44px; }
   .hero-cashback { display: none !important; }
   .how-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 4px auto 10px; }
-  .how-step { flex-direction: column; align-items: center; text-align: center; padding: 8px 6px; gap: 4px; }
+  .how-step {
+    flex-direction: column;
+    align-items: center;
+    /* Vertically centre the content so a one-line step and a two-line step
+       look like siblings inside the equal-height boxes (the top-stuck copy
+       in the short card read as "eşit değil / taşmış"). */
+    justify-content: center;
+    text-align: center;
+    padding: 8px 6px;
+    gap: 4px;
+  }
+  /* Even two-line wraps instead of "Pay with NIM ·" / "BTC Lightning". */
+  .how-step .strong { text-wrap: balance; overflow-wrap: break-word; }
   .how-step .small { display: none; }
   .how-n { width: 22px; height: 22px; font-size: 0.75rem; }
   .come-back { padding: 8px 10px; margin-bottom: 10px; font-size: 0.85rem; }

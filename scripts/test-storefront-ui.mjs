@@ -52,21 +52,23 @@ const browser = await chromium.launch({ args: ['--no-sandbox'] });
     const heights = [...new Set(els.map((e) => Math.round(e.getBoundingClientRect().height)))];
     const metas = els.map((e) => {
       const meta = e.querySelector('.p-meta');
+      const name = e.querySelector('.p-name');
       const price = e.querySelector('.p-price');
       const cs = price ? getComputedStyle(price) : null;
       return {
-        rows: meta ? meta.children.length : 0,
+        chipOnlyMeta: meta ? meta.children.length === 1 : false,
+        priceUnderName: name && price ? name.nextElementSibling === price : false,
         priceOneLine: price ? price.getBoundingClientRect().height < parseFloat(cs.lineHeight) * 1.6 : false,
       };
     });
     return {
       heights,
-      allTwoRowMeta: metas.every((m) => m.rows === 2),
-      allOneLinePrice: metas.every((m) => m.priceOneLine),
+      allTwoRowMeta: metas.every((m) => m.chipOnlyMeta),
+      allOneLinePrice: metas.every((m) => m.priceOneLine && m.priceUnderName),
     };
   });
   check('3 uniform card heights', geo.heights.length === 1, `heights=${geo.heights.join(',')}`);
-  check('3b meta = chip row + one-line price on every card', geo.allTwoRowMeta && geo.allOneLinePrice, '');
+  check('3b price under name + chip-only meta on every card', geo.allTwoRowMeta && geo.allOneLinePrice, '');
 
   const geo2 = await page.evaluate(() => [...new Set([...document.querySelectorAll('a.product-card')].map((e) => Math.round(e.getBoundingClientRect().height)))]);
   check('3c geometry stable over time', JSON.stringify(geo2) === JSON.stringify(geo.heights), geo2.join(','));

@@ -660,23 +660,21 @@ function ProductGrid({ products, onBuy, allowWarm }: { products: Product[]; onBu
           <div className="p-name" title={p.name}>
             {p.name}
           </div>
-          {/* Meta is a FIXED two-row stack on every card: country chip on
-              row 1, price on row 2. A wrapped price line used to stretch one
-              card (Pasha Fencer's denomination-style range) and, because the
-              grid row grows to the tallest card, left the neighbours with a
-              floating meta block. One clamped line keeps the geometry
-              identical everywhere; the full range lives in the title. */}
+          {/* Price sits DIRECTLY under the product name on every card (user
+              request, Getir example), one clamped line so a denomination-style
+              range can never stretch a card again; the full range lives in
+              the title. The dashed separator + country chip anchor below. */}
+          <span
+            className="p-price"
+            title={productPriceText(p, t)}
+            style={{ fontSize: '0.85rem', display: 'block', width: '100%', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', margin: '2px 0 8px' }}
+          >
+            {productPriceText(p, t)}
+          </span>
           <div className="p-meta" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flexWrap: 'nowrap', width: '100%' }}>
             <span className="chip" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
               <FlagMark country={p.country} size={16} />
               <span className="chip-txt">{countryName(p.country)}</span>
-            </span>
-            <span
-              className="p-price"
-              title={productPriceText(p, t)}
-              style={{ fontSize: '0.8rem', display: 'block', width: '100%', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
-            >
-              {productPriceText(p, t)}
             </span>
           </div>
         </a>
