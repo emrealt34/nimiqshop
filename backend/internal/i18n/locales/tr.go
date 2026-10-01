@@ -4,7 +4,6 @@ package locales
 var Tr = map[string]string{
 	"email.subjectAnonymous": "Sana bir hediye gönderildi 🎁",
 	"email.subjectNamed":     "Sana bir hediye geldi 🎁",
-	"email.subjectTree":      " — ve bir ağaç dikildi 🌳",
 
 	"email.youGotAGift":        "Bir hediye aldın.",
 	"email.anonymousLine":      "Biri sana {{site}} üzerinden bir hediye gönderdi — gönderen anonim kalmayı seçti.",
@@ -14,8 +13,6 @@ var Tr = map[string]string{
 	"email.sent":               "Gönderilme",
 	"email.theirMessage":       "Mesajları:",
 	"email.noMessage":          "Hediyeye kişisel bir mesaj eklenmemiş.",
-	"email.giftGivesBackTitle": "Karşılık veren bir hediye.",
-	"email.giftGivesBackBody":  "{{site}} üzerinden satın alan gönderen cashback'ini bağışlamayı seçti — yani hediyenle birlikte OneTreePlanted aracılığıyla bir ağaç dikiliyor. {{site}}'nin aylık bağış ödemeleri Polygonscan üzerinde herkese açık.",
 	"email.whereIs":            "{{item}} nerede?",
 	"email.deliveryCard":       "Kod, iş ortağımız CryptoRefills tarafından bu adrese ayrı olarak gönderilir; spam klasörüne düşebilir. Güvenliğin için kod hiçbir zaman mağazanın websitesinde gösterilmez ve bu e-postaya dahil edilmez.",
 	"email.deliveryTopup":      "Kredi, iş ortağımız CryptoRefills tarafından doğrudan telefon numarana yüklenir. Girilecek bir kod ya da kullanılacak bir kupon yok — henüz numarada görünmüyorsa destek operatörden takip edebilir.",
@@ -37,7 +34,6 @@ var Tr = map[string]string{
 	"email.preheader.anon":     "Birisi (anonim) sana {{site}} üzerinden bir hediye gönderdi",
 	"email.preheader.named":    "Birisi sana {{site}} üzerinden bir hediye gönderdi",
 	"email.preheader.product":  " — {{product}}",
-	"email.preheader.tree":     " ve bir ağaç dikiliyor",
 	"email.preheader.end":      ". Nelerin geldiğini ve nerede bulacağını burada gör.",
 	"email.fromAnon":           "{{site}} üzerinden anonim birinden",
 	"email.fromNamed":          "{{site}} üzerinden",

@@ -263,8 +263,8 @@ func TestPublicEndpoints(t *testing.T) {
 		{"GET", "/api/cashback/code?code=NOPE", 404},
 		{"GET", "/api/ratings/summary", 200},
 		{"GET", "/api/activity", 200},
-		{"GET", "/api/trees", 200},
-		{"GET", "/api/trees/donation-balance", 200},
+		{"GET", "/api/cashback/leaderboard", 200},
+		{"GET", "/api/cashback/burn-balance", 200},
 		{"GET", "/api/track/does-not-exist", 404},
 		{"GET", "/api/auth/session", 200},
 		{"GET", "/api/quotes", 401},
@@ -320,16 +320,13 @@ func TestShopperFlowTestMode(t *testing.T) {
 		t.Fatalf("session address %q != %q", got, address)
 	}
 
-	for _, path := range []string{"/api/account/limits", "/api/account/notifications", "/api/cashback/me", "/api/trees/me", "/api/poolstake/me", "/api/quotes", "/api/orders"} {
+	for _, path := range []string{"/api/account/limits", "/api/account/notifications", "/api/cashback/me", "/api/poolstake/me", "/api/quotes", "/api/orders"} {
 		if res := s.do(http.MethodGet, path, nil, auth); res.status != 200 {
 			t.Errorf("GET %s: %d %s", path, res.status, truncate(res.body))
 		}
 	}
 	if res := s.do(http.MethodPut, "/api/account/notifications", map[string]any{"order_ready": true, "cashback": false}, auth); res.status >= 500 {
 		t.Errorf("PUT notifications: %d %s", res.status, res.body)
-	}
-	if res := s.do(http.MethodPost, "/api/trees/me/prefs", map[string]any{"plant_trees": true}, auth); res.status >= 500 {
-		t.Errorf("POST trees prefs: %d %s", res.status, res.body)
 	}
 
 	// Validation errors first.
@@ -526,7 +523,7 @@ func TestAdminConsole(t *testing.T) {
 		"/api/admin/quotes", "/api/admin/transactions", "/api/admin/manual-review", "/api/admin/notification/status",
 		"/api/admin/oracle", "/api/admin/settings/cashback", "/api/admin/stake-ledger", "/api/admin/audit",
 		"/api/admin/catalog-rules", "/api/admin/catalog/brands?country=US", "/api/admin/catalog/products/test-steam?country=US",
-		"/api/admin/support/tickets", "/api/admin/trees/settlements",
+		"/api/admin/support/tickets",
 	}
 	for _, p := range gets {
 		if res := s.do(http.MethodGet, p, nil, admin); res.status != 200 {

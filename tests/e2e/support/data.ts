@@ -6,7 +6,7 @@ export const BASE = '/nimiqshop/';
 
 export const ROUTES = [
   '/', '/cart', '/product', '/orders', '/order', '/profile', '/activity',
-  '/support', '/track', '/admin', '/cashback', '/plant-trees',
+  '/support', '/track', '/admin', '/cashback',
 ] as const;
 
 /** Every screen the responsive deep scan visits (route + query variants). */
@@ -19,7 +19,7 @@ export const SCREENS: { name: string; url: string }[] = [
   { name: 'not-found', url: '/this-page-does-not-exist' },
 ];
 
-export const NAV_ROUTES = ['/activity', '/orders', '/cashback', '/plant-trees', '/support'] as const;
+export const NAV_ROUTES = ['/activity', '/orders', '/cashback', '/support'] as const;
 
 export const LANGS = ['en', 'tr', 'de', 'fr', 'pt', 'es'] as const;
 export type Lang = (typeof LANGS)[number];

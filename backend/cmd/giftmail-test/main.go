@@ -79,10 +79,9 @@ func main() {
 		Recipient:              mailtrap.Address{Email: to},
 		GifterNimiqAddress:     "NQ08 D44A 44B9 0F77 2E22 8C13 C345 6FBD XKH9", // sample
 		GifterIdenticonDataURI: strings.TrimSpace(os.Getenv("GIFT_IDENTICON")),
-		TreesDonation:          true,
 		SiteName:               "shop.nimiqbase.com",
 		ProductLabel:           "Turkcell · 100 TRY top-up",
-		Message:                "I topped you up on shop.nimiqbase.com and chose to donate the cashback to plant a tree. 📞🌳",
+		Message:                "I topped you up on shop.nimiqbase.com! 📞",
 		OrderID:                fmt.Sprintf("GIFTTEST-%d", time.Now().Unix()),
 		PurchasedAt:            time.Now().UTC(),
 		ShopURL:                "https://shop.nimiqbase.com",

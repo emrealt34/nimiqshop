@@ -92,13 +92,12 @@ func (st StakerStake) EffectiveBaseBps(operatorBase int) int {
 // stake and ledgerParams are passed in rather than looked up here on
 // purpose: this runs inside an open Badger write transaction, and a pool
 // API call or a settings read in here would hold it for a round trip.
-// CashbackEnrichment carries runtime config (tree-planting address and the
+// CashbackEnrichment carries runtime config (burn wallet address and the
 // stablecoin-vs-NIM cashback multiplier) into the enqueue path.
-// TreeAddr == "" disables tree routing; all cashback goes to the buyer.
 // StableMult is applied to the final cashback Luna amount for stablecoin orders
 // (default 0.5 = 50% of the NIM rate, as publicly disclosed).
 type CashbackEnrichment struct {
-	TreeAddr   string
+	BurnAddr   string
 	StableMult float64
 }
 
@@ -190,20 +189,18 @@ func enqueueCashbackOnFulfill(tx *badger.Txn, q *Quote, stake StakerStake, ledge
 	base := stake.EffectiveBaseBps(settings.EffectiveCashbackBps())
 	stakerBase := stake.Staked && stake.BaseBps > 0 && base == stake.BaseBps
 
-	// Resolve cashback destination: buyer wallet (default) or tree planting.
-	dest := q.CashbackDestination
-	if dest == "" {
-		// Fall back to reading prefs stored on user (written via the API).
-		var prefs TreeUserPrefs
-		if e := getJSON(tx, treeUserPrefsKey(q.UserID), &prefs); e == nil && prefs.Destination == TreeDestTrees {
-			dest = TreeDestTrees
-		} else {
-			dest = TreeDestCashback
-		}
+	// Resolve cashback destination: buyer wallet (default) or burn wallet.
+	dest := strings.ToLower(strings.TrimSpace(q.CashbackDestination))
+	if dest != CashbackDestBurn {
+		dest = CashbackDestWallet
 	}
 	recipientAddr := addr
-	if dest == TreeDestTrees && enrich.TreeAddr != "" {
-		recipientAddr = enrich.TreeAddr
+	if dest == CashbackDestBurn {
+		if strings.TrimSpace(enrich.BurnAddr) != "" {
+			recipientAddr = strings.TrimSpace(enrich.BurnAddr)
+		} else {
+			recipientAddr = BurnNIMAddress
+		}
 	}
 
 	// The ledger boost rate for this wallet at the quote's price. 0 when
@@ -282,11 +279,7 @@ func enqueueCashbackOnFulfill(tx *badger.Txn, q *Quote, stake StakerStake, ledge
 		skip = "product NIM price unknown — refused to guess"
 	default:
 		if recipientAddr == "" {
-			if dest == TreeDestTrees {
-				skip = "tree planting address unavailable"
-			} else {
-				skip = "buyer address unavailable"
-			}
+			skip = "buyer address unavailable"
 		} else if err := nimiq.ValidateAddress(recipientAddr); err != nil {
 			skip = "recipient address invalid"
 		} else {
@@ -323,8 +316,8 @@ func enqueueCashbackOnFulfill(tx *badger.Txn, q *Quote, stake StakerStake, ledge
 		if cb.AmountLuna < 1 {
 			skip = "cashback rounds to 0 Luna"
 		} else {
-			if dest == TreeDestTrees {
-				cb.Memo = cashback.TreeMemo(cashback.NIMFromLuna(cb.AmountLuna), q.ProductID)
+			if dest == CashbackDestBurn {
+				cb.Memo = cashback.BurnMemo(cashback.NIMFromLuna(cb.AmountLuna), q.ProductID)
 			} else {
 				cb.Memo = cashback.Memo(cashback.NIMFromLuna(cb.AmountLuna), q.ProductID)
 			}
@@ -400,7 +393,7 @@ func (s *Store) ReconcileStakerCashback(address string, stake StakerStake, now t
 		// NIM rate the buyer was never promised.
 		mult := 1.0
 		if q, qerr := s.GetQuote(row.QuoteID); qerr == nil && q.PaymentMethod == "usdt_polygon" {
-			if m := s.treeEnrich().StableMult; m > 0 && m < 1 {
+			if m := s.cashbackEnrich().StableMult; m > 0 && m < 1 {
 				mult = m
 			}
 		}
@@ -422,8 +415,8 @@ func (s *Store) ReconcileStakerCashback(address string, stake StakerStake, now t
 			// exact case this reconcile exists to prevent. Pay the buyer's own
 			// (now-verified staked) wallet, or the tree address for a tree row.
 			reviveRecipient := u.NimiqAddress
-			if row.CashbackDestination == TreeDestTrees {
-				reviveRecipient = strings.TrimSpace(s.treeEnrich().TreeAddr)
+			if row.CashbackDestination == CashbackDestBurn {
+				reviveRecipient = strings.TrimSpace(s.cashbackEnrich().BurnAddr)
 			}
 			if reviveRecipient == "" || nimiq.ValidateAddress(reviveRecipient) != nil {
 				// No valid recipient to pay: leave the row skipped rather than
@@ -447,8 +440,8 @@ func (s *Store) ReconcileStakerCashback(address string, stake StakerStake, now t
 				cb.StakeReconciled = true
 				cb.SkipReason = ""
 				cb.LastError = ""
-				if cb.CashbackDestination == TreeDestTrees {
-					cb.Memo = cashback.TreeMemo(cashback.NIMFromLuna(cb.AmountLuna), cb.ProductID)
+				if cb.CashbackDestination == CashbackDestBurn {
+					cb.Memo = cashback.BurnMemo(cashback.NIMFromLuna(cb.AmountLuna), cb.ProductID)
 				} else {
 					cb.Memo = cashback.Memo(cashback.NIMFromLuna(cb.AmountLuna), cb.ProductID)
 				}
@@ -537,10 +530,30 @@ func (s *Store) ReconcileStakerCashback(address string, stake StakerStake, now t
 
 // UserCashbackTotals sums a buyer's cashback: paid (on-chain) vs still in flight.
 func (s *Store) UserCashbackTotals(userID string) (paidLuna, pendingLuna int64, paidCount, pendingCount int, err error) {
+	sum, err := s.GetUserCashbackSummary(userID)
+	return sum.PaidLuna, sum.PendingLuna, sum.PaidCount, sum.PendingCount, err
+}
+
+// UserCashbackSummary holds a single user's lifetime cashback & burn breakdown.
+type UserCashbackSummary struct {
+	PaidLuna     int64
+	PendingLuna  int64
+	BurnedLuna   int64
+	WalletLuna   int64
+	PaidCount    int
+	PendingCount int
+	BurnedCount  int
+	WalletCount  int
+	LastDest     string
+}
+
+func (s *Store) GetUserCashbackSummary(userID string) (UserCashbackSummary, error) {
+	var out UserCashbackSummary
 	if userID == "" {
-		return 0, 0, 0, 0, nil
+		return out, nil
 	}
-	err = s.View(func(tx *badger.Txn) error {
+	var latestTime time.Time
+	err := s.View(func(tx *badger.Txn) error {
 		return scanIndex(tx, cashbackUserIndexPrefix(userID), 0, func(id string) error {
 			var cb Cashback
 			if e := getJSON(tx, cashbackKey(id), &cb); e != nil {
@@ -549,18 +562,219 @@ func (s *Store) UserCashbackTotals(userID string) (paidLuna, pendingLuna int64, 
 				}
 				return e
 			}
+			if cb.CreatedAt.After(latestTime) && (cb.CashbackDestination == CashbackDestBurn || cb.CashbackDestination == CashbackDestWallet) {
+				latestTime = cb.CreatedAt
+				out.LastDest = cb.CashbackDestination
+			}
 			switch cb.Status {
 			case CashbackPaid:
-				paidLuna += cb.AmountLuna
-				paidCount++
+				out.PaidLuna += cb.AmountLuna
+				out.PaidCount++
 			case CashbackQueued, CashbackSending, CashbackBroadcast:
-				pendingLuna += cb.AmountLuna
-				pendingCount++
+				out.PendingLuna += cb.AmountLuna
+				out.PendingCount++
+			default:
+				return nil
+			}
+			if cb.CashbackDestination == CashbackDestBurn {
+				out.BurnedLuna += cb.AmountLuna
+				out.BurnedCount++
+			} else {
+				out.WalletLuna += cb.AmountLuna
+				out.WalletCount++
 			}
 			return nil
 		})
 	})
-	return
+	if out.LastDest == "" {
+		out.LastDest = CashbackDestWallet
+	}
+	return out, err
+}
+
+// CashbackPublicTotals holds global aggregate cashback & burn stats across all orders.
+type CashbackPublicTotals struct {
+	TotalNIM      float64 `json:"total_nim"`
+	PaidNIM       float64 `json:"paid_nim"`
+	PendingNIM    float64 `json:"pending_nim"`
+	BurnedNIM     float64 `json:"burned_nim"`
+	BurnedPaidNIM float64 `json:"burned_paid_nim"`
+	WalletNIM     float64 `json:"wallet_nim"`
+	TotalUSD      float64 `json:"total_usd"`
+	BurnedUSD     float64 `json:"burned_usd"`
+	Orders        int     `json:"orders"`
+	BurnedOrders  int     `json:"burned_orders"`
+	Earners       int     `json:"earners"`
+}
+
+// CashbackLeaderRow is one entry on the public cashback & burn leaderboard.
+type CashbackLeaderRow struct {
+	Rank      int     `json:"rank"`
+	User      string  `json:"user"`
+	TotalNIM  float64 `json:"total_nim"`
+	BurnedNIM float64 `json:"burned_nim"`
+	WalletNIM float64 `json:"wallet_nim"`
+	Orders    int     `json:"orders"`
+}
+
+func isoWeekBucket(t time.Time) string {
+	y, w := t.UTC().ISOWeek()
+	return fmt.Sprintf("%04dW%02d", y, w)
+}
+
+// CashbackLeaderboardAndTotals scans active/paid cashback records to compute
+// global totals (all-time) and the top N earners for the requested time bucket
+// ("all", "week:YYYYWww", or "month:YYYY-MM").
+func (s *Store) CashbackLeaderboardAndTotals(bucket string, limit int) (CashbackPublicTotals, []CashbackLeaderRow, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	var totals CashbackPublicTotals
+	earnersSeen := map[string]bool{}
+	type agg struct {
+		user      string
+		totalLuna int64
+		burnLuna  int64
+		walLuna   int64
+		orders    int
+	}
+	byUser := map[string]*agg{}
+
+	err := s.View(func(tx *badger.Txn) error {
+		for _, st := range []string{CashbackPaid, CashbackQueued, CashbackSending, CashbackBroadcast} {
+			if err := scanIndex(tx, cashbackStatusIndexPrefix(st), 0, func(id string) error {
+				var cb Cashback
+				if e := getJSON(tx, cashbackKey(id), &cb); e != nil {
+					if errors.Is(e, ErrNotFound) {
+						return nil
+					}
+					return e
+				}
+				if cb.AmountLuna <= 0 {
+					return nil
+				}
+				nim := float64(cb.AmountLuna) / cashback.LunaPerNIM
+				isBurn := cb.CashbackDestination == CashbackDestBurn
+
+				totals.TotalNIM += nim
+				totals.Orders++
+				if st == CashbackPaid {
+					totals.PaidNIM += nim
+				} else {
+					totals.PendingNIM += nim
+				}
+				if isBurn {
+					totals.BurnedNIM += nim
+					totals.BurnedOrders++
+					if st == CashbackPaid {
+						totals.BurnedPaidNIM += nim
+					}
+				} else {
+					totals.WalletNIM += nim
+				}
+				uidKey := cb.UserID
+				if uidKey == "" {
+					uidKey = cb.Recipient
+				}
+				if uidKey != "" && !earnersSeen[uidKey] {
+					earnersSeen[uidKey] = true
+					totals.Earners++
+				}
+
+				// Check time bucket filter for the leaderboard
+				ts := cb.CreatedAt.UTC()
+				if strings.HasPrefix(bucket, "week:") {
+					if "week:"+isoWeekBucket(ts) != bucket {
+						return nil
+					}
+				} else if strings.HasPrefix(bucket, "month:") {
+					if "month:"+ts.Format("2006-01") != bucket {
+						return nil
+					}
+				}
+
+				if uidKey == "" {
+					return nil
+				}
+				// Respect quote anonymity on the public leaderboard
+				anon := false
+				if cb.QuoteID != "" {
+					var q Quote
+					if err := getJSON(tx, quoteKey(cb.QuoteID), &q); err == nil && q.Anonymous {
+						anon = true
+					}
+				}
+				displayUser := ""
+				if !anon {
+					if cb.UserID != "" {
+						var u User
+						if err := getJSON(tx, userKey(cb.UserID), &u); err == nil && u.NimiqAddress != "" {
+							displayUser = u.NimiqAddress
+						}
+					}
+					if displayUser == "" && !isBurn {
+						displayUser = cb.Recipient
+					}
+				}
+				if anon || displayUser == "" {
+					displayUser = uidKey
+					if len(displayUser) > 8 {
+						displayUser = displayUser[:8]
+					}
+				}
+				key := uidKey
+				if anon {
+					key = "anon:" + uidKey
+				}
+				row := byUser[key]
+				if row == nil {
+					row = &agg{user: displayUser}
+					byUser[key] = row
+				}
+				row.totalLuna += cb.AmountLuna
+				if isBurn {
+					row.burnLuna += cb.AmountLuna
+				} else {
+					row.walLuna += cb.AmountLuna
+				}
+				row.orders++
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return totals, nil, err
+	}
+
+	list := make([]*agg, 0, len(byUser))
+	for _, v := range byUser {
+		list = append(list, v)
+	}
+	for i := 0; i < len(list); i++ {
+		for j := i + 1; j < len(list); j++ {
+			if list[j].totalLuna > list[i].totalLuna {
+				list[i], list[j] = list[j], list[i]
+			}
+		}
+	}
+	if len(list) > limit {
+		list = list[:limit]
+	}
+	out := make([]CashbackLeaderRow, 0, len(list))
+	for i, r := range list {
+		out = append(out, CashbackLeaderRow{
+			Rank:      i + 1,
+			User:      r.user,
+			TotalNIM:  float64(r.totalLuna) / cashback.LunaPerNIM,
+			BurnedNIM: float64(r.burnLuna) / cashback.LunaPerNIM,
+			WalletNIM: float64(r.walLuna) / cashback.LunaPerNIM,
+			Orders:    r.orders,
+		})
+	}
+	return totals, out, nil
 }
 
 func (s *Store) GetCashback(id string) (Cashback, error) {
@@ -730,15 +944,6 @@ func (s *Store) MarkCashbackPaid(id, txHash string) error {
 	})
 }
 
-// LinkCashbackTreeContribution records that a paid cashback row produced a
-// tree contribution (so auditors can trace the chain).
-func (s *Store) LinkCashbackTreeContribution(cashbackID, contribID string) error {
-	return s.patchCashback(cashbackID, func(cb *Cashback, _ *badger.Txn) error {
-		cb.TreeContributionID = contribID
-		return nil
-	})
-}
-
 func (s *Store) FailCashbackSend(id, reason string) error {
 	return s.patchCashback(id, func(cb *Cashback, tx *badger.Txn) error {
 		if cb.Status != CashbackSending {
@@ -882,7 +1087,7 @@ func (s *Store) QueueManualCashback(recipient, memo string, amountLuna int64, no
 		Memo:                memo,
 		Status:              CashbackQueued,
 		CashbackSource:      "manual",
-		CashbackDestination: TreeDestCashback,
+		CashbackDestination: CashbackDestWallet,
 		CreatedAt:           now.UTC(),
 		UpdatedAt:           now.UTC(),
 	}

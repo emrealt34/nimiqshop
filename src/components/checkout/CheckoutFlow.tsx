@@ -235,7 +235,7 @@ export function CheckoutFlow({
   const [phase, setPhase] = useState<Phase>({ kind: 'delivery' });
   const [, setDelivery] = useState<DeliveryInfo | null>(null);
   const [activeItems, setActiveItems] = useState<CartItem[]>(items);
-  const [siteCfg, setSiteCfg] = useState<{ enable_usdt?: boolean; tree_planting_enabled?: boolean; usdt_cashback_multiplier?: number; polygon_chain_id?: number } | null>(null);
+  const [siteCfg, setSiteCfg] = useState<{ enable_usdt?: boolean; burn_nim_address?: string; usdt_cashback_multiplier?: number; polygon_chain_id?: number } | null>(null);
   const flowRef = useRef<{ done: boolean; started: boolean }>({ done: false, started: false });
 
   useEffect(() => {

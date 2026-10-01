@@ -6,9 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"nimiqshop/internal/cashback"
 	"nimiqshop/internal/db"
-	"nimiqshop/internal/money"
 	"nimiqshop/internal/nimiq"
 	"nimiqshop/internal/safe"
 )
@@ -25,14 +23,13 @@ import (
 //  4. One row per quote (quote-id index) + one signed hex per row ⇒ a
 //     second payment is structurally impossible.
 type Worker struct {
-	Store       *db.Store
-	RPC         *nimiq.Client
-	SeedHex     string
-	NetworkID   byte
-	FeeLuna     int64
-	Enabled     bool
-	Interval    time.Duration
-	TreesPerUSD float64 // set by main; 0 disables tree contribution recording
+	Store     *db.Store
+	RPC       *nimiq.Client
+	SeedHex   string
+	NetworkID byte
+	FeeLuna   int64
+	Enabled   bool
+	Interval  time.Duration
 }
 
 func (w *Worker) Ready() bool {
@@ -163,11 +160,10 @@ func (w *Worker) tick(ctx context.Context) {
 
 func (w *Worker) confirm(ctx context.Context, cb db.Cashback) {
 	// TEST-CENTER ROW: no chain to ask — the simulated broadcast is
-	// "confirmed" immediately, through the same paid/trees path.
+	// "confirmed" immediately, through the same paid path.
 	if cb.TestMode {
 		if err := w.Store.MarkCashbackPaid(cb.ID, cb.TxHash); err == nil {
 			log.Printf("cashback: paid quote %s tx=%s luna=%d dest=%s (SIMULATED test payout)", cb.QuoteID, cb.TxHash, cb.AmountLuna, cb.CashbackDestination)
-			w.recordTreesIfTrees(cb)
 		}
 		return
 	}
@@ -188,7 +184,6 @@ func (w *Worker) confirm(ctx context.Context, cb db.Cashback) {
 	if confirmed {
 		if err := w.Store.MarkCashbackPaid(cb.ID, cb.TxHash); err == nil {
 			log.Printf("cashback: paid quote %s tx=%s luna=%d dest=%s", cb.QuoteID, cb.TxHash, cb.AmountLuna, cb.CashbackDestination)
-			w.recordTreesIfTrees(cb)
 		}
 		return
 	}
@@ -310,39 +305,6 @@ func (w *Worker) rebroadcast(ctx context.Context, cb db.Cashback) {
 	} else {
 		log.Printf("cashback: broadcast quote %s → %s luna=%d tx=%s memo=%q", cb.QuoteID, cb.Recipient, cb.AmountLuna, hash, cb.Memo)
 	}
-}
-
-// recordTreesIfTrees records the tree contribution for a PAID cashback row
-// that was routed to tree planting (shared by the real and simulated paths).
-func (w *Worker) recordTreesIfTrees(cb db.Cashback) {
-	if cb.CashbackDestination != db.TreeDestTrees || w.TreesPerUSD <= 0 {
-		return
-	}
-	// Compute the USD value of the cashback payout from the ACTUAL paid
-	// Luna amount — this honours partial promo-code caps and the
-	// stablecoin multiplier. cb.AmountLuna is the source of truth.
-	q, qerr := w.Store.GetQuote(cb.QuoteID)
-	usd := 0.0
-	nimPaid := cashback.NIMFromLuna(cb.AmountLuna)
-	if qerr == nil && q.NimUsdRate > 0 {
-		usd = nimPaid * q.NimUsdRate
-	} else if qerr == nil && q.ProductUSD > 0 && cb.Bps > 0 {
-		// Defensive fallback for quotes whose NIM rate snapshot could not be
-		// persisted (oracle outage at creation). Live quotes normally carry
-		// the snapshot; this only keeps tree accounting alive for those.
-		usd = float64(q.ProductUSD) / 1_000_000.0 * float64(cb.Bps) / 10000.0
-	}
-	if usd <= 0 {
-		return
-	}
-	con, terr := w.Store.RecordTreeContribution(cb.UserID, cb.QuoteID, cb.ProductID, cb.TxHash, money.FromFloat(usd), nimPaid, w.TreesPerUSD)
-	if terr != nil {
-		log.Printf("trees: record contribution for quote %s failed: %v", cb.QuoteID, terr)
-		return
-	}
-	log.Printf("trees: contribution recorded id=%s trees=%.4f quote=%s", con.ID, con.Trees, cb.QuoteID)
-	// link the cashback row to the contribution for audit
-	_ = w.Store.LinkCashbackTreeContribution(cb.ID, con.ID)
 }
 
 func alreadyOnChain(msg string) bool {

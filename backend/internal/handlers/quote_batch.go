@@ -122,10 +122,10 @@ func (h *Handlers) CreateQuoteBatch(ctx *fasthttp.RequestCtx) {
 		req.Network = PaymentNetworkNIM
 	}
 	dest := strings.ToLower(strings.TrimSpace(req.CashbackDestination))
-	if dest != db.TreeDestTrees {
-		dest = db.TreeDestCashback
+	if dest != db.CashbackDestBurn {
+		dest = db.CashbackDestWallet
 	}
-	// Stablecoin orders earn reduced cashback but still support donation.
+	// Stablecoin orders earn reduced cashback but still support burn.
 	// Codes/staker multipliers still apply; the 50% multiplier is applied at
 	// enqueue time (see IsStablecoinMethod), so nothing changes here.
 	req.CashbackDestination = dest

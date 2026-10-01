@@ -7,7 +7,6 @@ var En = map[string]string{
 	// --- Gift email subjects ---
 	"email.subjectAnonymous": "Someone sent you a gift 🎁",
 	"email.subjectNamed":     "A gift arrived for you 🎁",
-	"email.subjectTree":      " — and planted a tree 🌳",
 
 	// --- Gift email body ---
 	"email.youGotAGift":        "You received a gift.",
@@ -18,8 +17,6 @@ var En = map[string]string{
 	"email.sent":               "Sent",
 	"email.theirMessage":       "Their message:",
 	"email.noMessage":          "No personal message was left with the gift.",
-	"email.giftGivesBackTitle": "A gift that gives back.",
-	"email.giftGivesBackBody":  "By buying from {{site}}, the sender chose to donate their cashback — so alongside your gift a tree is being planted through OneTreePlanted. {{site}}'s monthly donation payouts are public on Polygonscan.",
 	"email.whereIs":            "Where is {{item}}?",
 	"email.deliveryCard":       "The code is sent to this address separately by our partner CryptoRefills; it may sit in the spam folder. For your security it is never shown on the shop's website and never included in this email.",
 	"email.deliveryTopup":      "The credit is applied to your phone number directly by our partner CryptoRefills. There is no code to enter and nothing to redeem — if it is not on the number yet, support can chase it with the operator.",
@@ -41,7 +38,6 @@ var En = map[string]string{
 	"email.preheader.anon":     "Someone (anonymous) sent you a gift via {{site}}",
 	"email.preheader.named":    "Someone sent you a gift via {{site}}",
 	"email.preheader.product":  " — {{product}}",
-	"email.preheader.tree":     ", and a tree is being planted",
 	"email.preheader.end":      ". Here is what arrived and where to find it.",
 	"email.fromAnon":           "from someone anonymous via {{site}}",
 	"email.fromNamed":          "via {{site}}",

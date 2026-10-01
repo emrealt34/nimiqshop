@@ -852,7 +852,7 @@ function payMethodLabel(q: any): string {
 }
 function cashbackLabel(q: any): ReactNode {
   const d = String(q?.cashback_destination || '').toLowerCase();
-  if (d === 'trees') return i18nT('orderPage.plantTrees');
+  if (d === 'burn') return i18nT('orderPage.burnNim');
   if (d === 'cashback') return <NimWalletLabel size={16} />;
   return null;
 }

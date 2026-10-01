@@ -26,12 +26,10 @@ export type ApiMode = 'ok' | 'down' | 'error500' | 'garbage' | 'empty' | 'slow';
 export type ApiOptions = {
   mode: ApiMode;
   authed: boolean;
-  trees: number;
-  planted: number;
   orders: number;
-  preference: 'trees' | 'cashback';
+  preference: 'burn' | 'cashback';
 };
-export const DEFAULT_API: ApiOptions = { mode: 'ok', authed: true, trees: 1234.5, planted: 12, orders: 37, preference: 'trees' };
+export const DEFAULT_API: ApiOptions = { mode: 'ok', authed: true, orders: 5, preference: 'cashback' };
 
 const ROUTES: { method: string; path: string }[] = backendRoutes();
 
@@ -75,20 +73,7 @@ function payload(p: string, method: string, o: ApiOptions): unknown {
     : { authed: false };
   if (p === '/auth/challenge') return { challenge: 'test-challenge', expires_at: now() + 300 };
   if (p === '/auth/logout' || p === '/presence') return { ok: true };
-  if (p === '/trees/me') return o.authed
-    ? { enabled: true, user_trees: o.trees, user_trees_planted: o.planted, user_orders: o.orders, preference: o.preference }
-    : { enabled: false };
-  if (p === '/trees/donation-balance') return { available: true, balance_nim: 125000, cached_at: iso(), stale: false };
-  if (p.startsWith('/trees')) return {
-    totals: { total_trees: 48211, funded_trees: 48211, planted_trees: 40000, pending_trees: 8211, total_usd: 48211, total_nim: 1e7, orders: 9120 },
-    leaderboard: [
-      { rank: 1, user: OTHER_ADDRESS, nimiq_address: OTHER_ADDRESS, trees: 5120, orders: 81 },
-      { rank: 2, user: ADDRESS, nimiq_address: ADDRESS, trees: o.trees, orders: o.orders },
-    ],
-    settlements: [{ id: 's1', month_bucket: '2026-08', amount_usdt: 812.5, trees_planted: 812, tx_hash: '0xabc', transaction_url: 'https://polygonscan.com/tx/0xabc' }],
-    trees_per_usd: 1,
-  };
-  if (p === '/site-config') return { trees_per_usd: 1, tree_donation_nim_address: OTHER_ADDRESS, cashback_pct: 2 };
+  if (p === '/site-config') return { burn_nim_address: ADDRESS, cashback_pct: 2 };
   if (p === '/market/nim-rate') return { usd: 0.0012, nim_usd: 0.0012, updated_at: iso() };
   if (p === '/market/fx') return { base: 'USD', rates: { EUR: 0.92, TRY: 41.2, GBP: 0.78 } };
   if (p === '/geo') return { country: 'TR' };
@@ -97,8 +82,30 @@ function payload(p: string, method: string, o: ApiOptions): unknown {
     cashback_code_enabled: false, staker_program_enabled: true, pool_validator_address: OTHER_ADDRESS, staker_tiers: [], staker_loyalty: [],
     stake_cashback: { max_boost_bps: 1000, max_boost_percent: 10, ledger_max_usd: 50, min_stake_nim: 1, daily_cap_usd: 5, monthly_cap_usd: 50, loyalty_start: 0.5, loyalty_ramp_days: 365, loyalty_ramp_years: 1, profit_credit_share: 0.5 },
   };
+  if (p === '/cashback/burn-balance') return { available: true, balance_nim: 450000, cached_at: iso(), stale: false };
+  if (p.startsWith('/cashback/leaderboard')) return {
+    bucket: 'all',
+    burn_address: ADDRESS,
+    totals: { total_nim: 1250000, paid_nim: 1200000, pending_nim: 50000, burned_nim: 450000, wallet_nim: 800000, orders: 9120 },
+    leaderboard: [
+      { rank: 1, user: OTHER_ADDRESS, total_nim: 51200, burned_nim: 15000, wallet_nim: 36200, orders: 81 },
+      { rank: 2, user: ADDRESS, total_nim: 1640, burned_nim: 500, wallet_nim: 1140, orders: o.orders },
+    ],
+  };
   if (p === '/cashback/me') return {
-    totals: { paid_nim: 1520, paid_count: 4, pending_nim: 120, pending_count: 1 },
+    totals: {
+      paid_nim: 1520,
+      paid_count: 4,
+      pending_nim: 120,
+      pending_count: 1,
+      earned_nim: 1640,
+      burned_nim: 500,
+      burned_count: 2,
+      wallet_nim: 1140,
+      wallet_count: 3,
+      orders: o.orders,
+      preference: o.preference,
+    },
     cashbacks: [
       { order_id: 'o1', status: 'paid', amount_nim: 380, paid_at: iso(2), created_at: iso(3) },
       { order_id: 'o2', status: 'pending', amount_nim: 120, paid_at: null, created_at: iso(1) },

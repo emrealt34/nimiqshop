@@ -22,9 +22,6 @@ import {
   adminGetStakeLedger,
   adminResetStakeLedger,
   adminListQuotes,
-  adminListTreeSettlements,
-  adminRecordTreeSettlement,
-  adminUpdateTreeSettlement,
 } from '../../lib/api';
 import { TestCenterCard } from './TestCenterCard';
 import { fmtNIM, formatWalletAddress } from '../../lib/format';
@@ -48,7 +45,7 @@ function badge(label: string, on: boolean, detail?: string) {
   );
 }
 
-type AdminSection = 'overview' | 'catalog' | 'test' | 'orders' | 'cashback' | 'trees' | 'people' | 'email';
+type AdminSection = 'overview' | 'catalog' | 'test' | 'orders' | 'cashback' | 'people' | 'email';
 
 type RuleOption = { value: string; label: string };
 
@@ -97,7 +94,6 @@ const ADMIN_SECTIONS: Array<{ id: AdminSection; label: string; hint: string; ico
   { id: 'test', label: 'Test center', hint: 'buy & fake-pay', icon: 'spark' },
   { id: 'orders', label: 'Orders', hint: 'cashback & tx', icon: 'receipt' },
   { id: 'cashback', label: 'Cashback', hint: 'rates & ledgers', icon: 'wallet' },
-  { id: 'trees', label: 'Trees', hint: 'settlements', icon: 'tree' },
   { id: 'people', label: 'People', hint: 'users & players', icon: 'user' },
   { id: 'email', label: 'Email', hint: 'Mailtrap tools', icon: 'send' },
 ];
@@ -1278,80 +1274,6 @@ function SessionCard({ me, onLoggedOut, onSignIn }: any) {
   );
 }
 
-function TreePayoutAdmin() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [status, setStatus] = useState<'paid'|'skipped'>('paid');
-  const [month, setMonth] = useState(new Date().toISOString().slice(0, 10));
-  const [amountLabel, setAmountLabel] = useState('USDT');
-  const [amountValue, setAmountValue] = useState('');
-  const [treesPlanted, setTreesPlanted] = useState('');
-  const [tx, setTx] = useState('');
-  const [transactionUrl, setTransactionUrl] = useState('');
-  const [nim, setNim] = useState('');
-  const [walletNim, setWalletNim] = useState('');
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
-  const [note, setNote] = useState('');
-  const [proofs, setProofs] = useState<{ data: string; caption: string }[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
-  // GET /api/admin/trees/settlements answers with a BARE JSON array
-  // (backend/internal/handlers/tree_handlers.go → writeJSON(ctx, 200, list)),
-  // while api() types every response as an object. Say what it really is, and
-  // don't let a non-array body land in array state.
-  const load = useCallback(async () => {
-    try {
-      const list = (await adminListTreeSettlements()) as unknown;
-      setRows(Array.isArray(list) ? (list as any[]) : []);
-    } catch {}
-  }, []);
-  useEffect(() => { load(); }, [load]);
-  const chooseProof = (files: FileList | null) => {
-    if (!files) return;
-    Array.from(files).forEach(file => {
-      if (file.type !== 'image/png' || file.size > 1500000) { setErr('Every proof must be a PNG smaller than 1.5 MB.'); return; }
-      const r = new FileReader(); r.onload = () => setProofs(prev => [...prev, { data: String(r.result || ''), caption: file.name.replace(/\.png$/i, '') }]); r.readAsDataURL(file);
-    });
-  };
-  const submit = async () => {
-    setErr(''); setBusy(true);
-    try {
-      const payload = { status, month_bucket: month, amount_usdt: amountLabel.trim().toUpperCase() === 'USDT' ? Number(amountValue || 0) : 0, amount_label: amountLabel, amount_value: amountValue, trees_planted: Number(treesPlanted || 0), tx_hash: tx, transaction_url: transactionUrl, amount_nim: Number(nim || 0), wallet_nim: Number(walletNim || 0), from_address: from, to_address: to, note, proof_images: proofs };
-      if (editingId) await adminUpdateTreeSettlement(editingId, payload); else await adminRecordTreeSettlement(payload);
-      setEditingId(null); setAmountValue(''); setTreesPlanted(''); setTx(''); setTransactionUrl(''); setNim(''); setWalletNim(''); setNote(''); setProofs([]); await load();
-    } catch (e) { setErr((e as Error).message || 'Could not save monthly payout'); } finally { setBusy(false); }
-  };
-  const editRow = (r: any) => { setEditingId(r.id); setMonth(r.month_bucket || ''); setStatus(r.status || 'paid'); setAmountLabel(r.amount_label || 'USDT'); setAmountValue(r.amount_value || String(r.amount_usdt || '')); setTreesPlanted(String(r.trees_planted || '')); setNim(String(r.amount_nim || '')); setWalletNim(String(r.wallet_nim || '')); setTx(r.tx_hash || ''); setTransactionUrl(r.transaction_url || r.polygonscan_url || ''); setFrom(r.from_address || ''); setTo(r.to_address || ''); setNote(r.note || ''); setProofs(r.proof_images || []); };
-  return <section className="card mt-2">
-    <div className="card-title"><Icon name="tree" size={16} /> Tree payouts</div>
-    <div className="small muted mb-2">Mark a paid month or record a skipped month. A skipped month stays visible with the pooled NIM and wallet total, so it is carried into the next month.</div>
-    <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-      <label className="field" style={{ flex: '1 1 150px' }}>Payout date / period<input className="input" type="date" value={month} onChange={e => setMonth(e.target.value)} /></label>
-      <label className="field" style={{ flex: '1 1 130px' }}>Result<select className="input" value={status} onChange={e => setStatus(e.target.value as any)}><option value="paid">Paid</option><option value="skipped">Skipped (&lt; $5)</option></select></label>
-      <label className="field" style={{ flex: '1 1 130px' }}>Pooled NIM<input className="input" type="number" min="0" step="any" value={nim} onChange={e => setNim(e.target.value)} placeholder="NIM" /></label>
-      <label className="field" style={{ flex: '1 1 130px' }}>Wallet total NIM<input className="input" type="number" min="0" step="any" value={walletNim} onChange={e => setWalletNim(e.target.value)} placeholder="for skipped month" /></label>
-    </div>
-    {status === 'paid' && <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-      <label className="field" style={{ flex: '1 1 130px' }}>Amount label<input className="input" value={amountLabel} onChange={e => setAmountLabel(e.target.value)} placeholder="USDT, EUR, NIM…" /></label>
-      <label className="field" style={{ flex: '1 1 130px' }}>Amount paid<input className="input" value={amountValue} onChange={e => setAmountValue(e.target.value)} placeholder="12.50" /></label>
-      <label className="field" style={{ flex: '1 1 130px' }}>Trees credited<input className="input" type="number" min="0" step="any" value={treesPlanted} onChange={e => setTreesPlanted(e.target.value)} placeholder="25" /></label>
-      <label className="field" style={{ flex: '2 1 260px' }}>Polygon transaction hash<input className="input" value={tx} onChange={e => setTx(e.target.value)} placeholder="Optional if direct link is used" /></label>
-      <label className="field" style={{ flex: '2 1 260px' }}>Direct transaction link<input className="input" type="url" value={transactionUrl} onChange={e => setTransactionUrl(e.target.value)} placeholder="https://polygonscan.com/tx/..." /></label>
-    </div>}
-    <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-      <label className="field" style={{ flex: '1 1 220px' }}>From wallet<input className="input" value={from} onChange={e => setFrom(e.target.value)} /></label>
-      <label className="field" style={{ flex: '1 1 220px' }}>OneTreePlanted wallet<input className="input" value={to} onChange={e => setTo(e.target.value)} /></label>
-      <label className="field" style={{ flex: '1 1 220px' }}>Note<input className="input" value={note} onChange={e => setNote(e.target.value)} placeholder="Optional" /></label>
-    </div>
-    <label className="field">Payment proof PNGs (multiple allowed)<input className="input" type="file" accept="image/png" multiple onChange={e => chooseProof(e.target.files)} /></label>
-    {proofs.length > 0 && <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>{proofs.map((p, i) => <div key={i} style={{ width: 220 }}><img src={p.data} alt="Payment proof preview" style={{ width: '100%', height: 120, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--line-dash)' }} /><input className="input mt-1" value={p.caption} placeholder="Caption for this image" onChange={e => setProofs(prev => prev.map((x, j) => j === i ? { ...x, caption: e.target.value } : x))} /><button className="btn btn-sm btn-ghost mt-1" onClick={() => setProofs(prev => prev.filter((_, j) => j !== i))}>Remove</button></div>)}</div>}
-    {err && <div className="alert error mt-1"><Icon name="alert" size={15} /> {err}</div>}
-    <button className="btn btn-gold mt-2" disabled={busy} onClick={submit}>{busy ? 'Saving…' : editingId ? 'Save payout changes' : status === 'skipped' ? 'Record skipped period' : 'Record paid period'}</button>
-    {rows.length > 0 && <div className="mt-2">{rows.slice(0, 12).map(r => <div key={r.id} className="row between small" style={{ borderTop: '1px solid var(--line-dash)', padding: '8px 0', gap: 8 }}><span><b>{r.month_bucket}</b> · {r.status === 'skipped' ? `Skipped · ${Number(r.amount_nim || 0).toFixed(2)} NIM` : `${r.amount_value || r.amount_usdt || ''} ${r.amount_label || 'USDT'} · ${Number(r.trees_planted || 0)} trees`}</span><button className="btn btn-sm btn-ghost" onClick={() => editRow(r)}>Edit</button>{r.proof_images?.[0]?.data && <img src={r.proof_images?.[0]?.data} alt="Proof" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 5 }} />}</div>)}</div>}
-  </section>;
-}
-
 export function AdminContent() {
   const [me, setMe] = useState<any>(null);
   const [ready, setReady] = useState(false);
@@ -1411,8 +1333,6 @@ export function AdminContent() {
         return <OrdersPanel />;
       case 'cashback':
         return <CashbackPanel />;
-      case 'trees':
-        return <TreePayoutAdmin />;
       case 'people':
         return <UsersPanel />;
       case 'email':
@@ -1447,7 +1367,7 @@ export function AdminContent() {
             <div className="strong">Operator console</div>
             <div className="small muted mt-1">
               Sign in to manage orders & quotes, direct email notifications, cashback & the stake
-              ledger, tree payouts, catalog rules and people. The support inbox is retired —
+              ledger, catalog rules and people. The support inbox is retired —
               buyers are routed to the FAQ and the supplier. Access uses a separate
               operator login — the customer wallet session is not enough.
             </div>

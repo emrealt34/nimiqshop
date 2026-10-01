@@ -110,6 +110,9 @@ const LOADER = `/* css-late.js — apply the deferred stylesheet after the page 
 })();
 `;
 
+const ASTRO_IDLE_ORIG = `"requestIdleCallback"in window?window.requestIdleCallback(i,s):setTimeout(i,s.timeout||200)`;
+const ASTRO_IDLE_DEFERRED = `var run=()=>requestAnimationFrame(()=>setTimeout(()=>{"requestIdleCallback"in window?window.requestIdleCallback(i,s):setTimeout(i,1)},40));document.readyState==="complete"?run():window.addEventListener("load",run,{once:!0})`;
+
 export default function criticalCss() {
   let outDir;
   return {
@@ -138,7 +141,6 @@ export default function criticalCss() {
         for await (const file of walk(outDir)) if (file.endsWith('.html')) htmlFiles.push(file);
 
         let inlineBytes = 0;
-        let deferredBytes = 0;
         let prefixes = new Set();
         const rewritten = new Map();
 
@@ -181,7 +183,6 @@ export default function criticalCss() {
                 inlineBytes += text.length;
               } else {
                 move.push(text);
-                deferredBytes += text.length;
               }
             });
             return { keep, move };
@@ -218,11 +219,13 @@ export default function criticalCss() {
           const jsUrl = `${prefix}${ASSET_DIR}/${jsName}`;
           const replacement =
             `<style>${inline}</style>` +
-            `<link rel="preload" as="style" href="${cssUrl}">` +
             `<link id="${LINK_ID}" rel="stylesheet" href="${cssUrl}" media="print">` +
             `<script defer src="${jsUrl}"></script>` +
             `<noscript><link rel="stylesheet" href="${cssUrl}"></noscript>`;
-          await writeFile(file, html.replace(styleBlock, replacement));
+          const nextHtml = html
+            .replace(styleBlock, replacement)
+            .replaceAll(ASTRO_IDLE_ORIG, ASTRO_IDLE_DEFERRED);
+          await writeFile(file, nextHtml);
         }
 
         const kb = (n) => `${(n / 1024).toFixed(1)} KB`;

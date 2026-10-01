@@ -90,19 +90,17 @@ func Memo(amountNIM float64, product string) string {
 	return prefix + p + suffix
 }
 
-// TreeMemo builds the memo used when cashback is being donated to tree planting.
-// "<X> NIM — cashback planted trees from <product> @ <site>"
-// Makes it clear on the block explorer that this transaction's cashback was
-// used to plant trees, not a regular cashback payout to the buyer.
-func TreeMemo(amountNIM float64, product string) string {
+// BurnMemo builds the memo used when cashback is burned to the Nimiq burn wallet.
+// "<X> NIM cashback -> burn from <product> @ <site>"
+func BurnMemo(amountNIM float64, product string) string {
 	amt := formatNIM(amountNIM)
 	product = strings.TrimSpace(product)
 	product = strings.ReplaceAll(product, "\n", " ")
-	// Pattern: "<amt> NIM cashback → trees from <product> @ <site>"
+	// Pattern: "<amt> NIM cashback -> burn from <product> @ <site>"
 	suffix := " @ " + shop()
-	prefix := amt + " NIM cashback -> trees from "
+	prefix := amt + " NIM cashback -> burn from "
 	if len(prefix)+len(suffix) >= MaxMemoBytes {
-		s := amt + " NIM plants trees @ " + shop()
+		s := amt + " NIM burned @ " + shop()
 		return clipBytes(s, MaxMemoBytes)
 	}
 	budget := MaxMemoBytes - len(prefix) - len(suffix)
@@ -110,7 +108,7 @@ func TreeMemo(amountNIM float64, product string) string {
 	if p == "" {
 		p = "purchase"
 		if len(prefix)+len(p)+len(suffix) > MaxMemoBytes {
-			return clipBytes(amt+" NIM plants trees @ "+shop(), MaxMemoBytes)
+			return clipBytes(amt+" NIM burned @ "+shop(), MaxMemoBytes)
 		}
 	}
 	return prefix + p + suffix

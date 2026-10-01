@@ -248,8 +248,8 @@ export function TestCenterCard() {
         <span>Test center — buy & fake-pay like a customer</span>
       </div>
       <div className="small muted mb-2">
-        Real catalog, real checkout pipeline, real state machine, real Mailtrap email — and the cashback engine, tree
-        contributions and wallet memo all RUN through the same pipeline. Only the payments are simulated: the purchase,
+        Real catalog, real checkout pipeline, real state machine, real Mailtrap email — and the cashback engine
+        and wallet memo all RUN through the same pipeline. Only the payments are simulated: the purchase,
         the cashback payout (<span className="mono">TESTTX-…</span>) and the memo broadcast. The only real side effect
         is the gift email to the address below.
       </div>
@@ -332,7 +332,7 @@ export function TestCenterCard() {
           <label>Cashback destination</label>
           <select className="input" value={cashbackDestination} onChange={(e) => setCashbackDestination(e.target.value)}>
             <option value="cashback">Buyer wallet</option>
-            <option value="trees">Trees 🌳</option>
+            <option value="burn">Burn 🔥</option>
           </select>
         </div>
         <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', marginTop: '14px' }}>
@@ -382,7 +382,7 @@ export function TestCenterCard() {
               <div>
                 <b>Cashback:</b> {quote.cashback.status}
                 {quote.cashback.amount_nim ? ` · ${quote.cashback.amount_nim} NIM` : ''}
-                {quote.cashback.destination === 'trees' ? ' · 🌳 trees' : ''}
+                {quote.cashback.destination === 'burn' ? ' · 🔥 burn' : ''}
                 {quote.cashback.tx_hash ? ` · ${String(quote.cashback.tx_hash).slice(0, 16)}` : ''}
                 {quote.cashback.skip_reason ? ` (${quote.cashback.skip_reason})` : ''}
                 {quote.cashback.test_mode && quote.cashback.status === 'paid' ? ' · simulated payout ✓' : ''}

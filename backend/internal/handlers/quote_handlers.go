@@ -52,8 +52,7 @@ type createQuoteRequest struct {
 	// PaymentMethod: "nimiq_pay" (default, BTC Lightning → Nimiq Pay) or
 	// "usdt_polygon" (direct USDT on Polygon at StableMult × NIM cashback rate).
 	PaymentMethod string `json:"payment_method,omitempty"`
-	// CashbackDestination: buyer's choice "cashback" (default) or "trees".
-	// Locked at quote time; only applies to nimiq_pay orders.
+	// CashbackDestination: buyer's choice "cashback" (default) or "burn".
 	CashbackDestination string `json:"cashback_destination,omitempty"`
 	// Anonymous keeps this purchase in the public activity feed while hiding
 	// the buyer wallet identity and payment transaction details. The buyer
@@ -166,11 +165,11 @@ func (h *Handlers) createQuoteInner(ctx *fasthttp.RequestCtx, userID string, req
 		req.Network = PaymentNetworkNIM
 		req.PaymentMethod = PaymentMethodNIM
 	}
-	// Cashback destination is locked per quote. "trees" is valid on both
+	// Cashback destination is locked per quote. "burn" is valid on both
 	// Nimiq Pay and USDT orders; anything else defaults to the buyer wallet.
 	dest := strings.ToLower(strings.TrimSpace(req.CashbackDestination))
-	if dest != db.TreeDestTrees {
-		dest = db.TreeDestCashback
+	if dest != db.CashbackDestBurn {
+		dest = db.CashbackDestWallet
 	}
 	req.CashbackDestination = dest
 	// Normalize and bind the caller's intent BEFORE any fallible supplier or

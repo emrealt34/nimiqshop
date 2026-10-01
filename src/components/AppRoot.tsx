@@ -10,6 +10,8 @@ import { CartProvider } from '../lib/cartStore';
 import { SiteShell, type ShellKey } from './shell/SiteShell';
 import { Router } from '../lib/router';
 import { I18nProvider } from '../i18n';
+import { initStaticI18n } from '../lib/staticI18n';
+import { initFit } from '../lib/fitText';
 
 /** TEST MODE has exactly ONE customer-visible difference: the single
  * "Pay test" button at the payment spot on the real pay screen (checkout +
@@ -25,6 +27,8 @@ export function AppRoot({ activeKey, children }: { activeKey: ShellKey; children
   // moments; this attribute marks the second one. tests/e2e waits for it before
   // interacting, and it costs one attribute write.
   useEffect(() => {
+    initStaticI18n();
+    initFit();
     document.documentElement.setAttribute('data-app-ready', '1');
   }, []);
   return (

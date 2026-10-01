@@ -39,8 +39,8 @@ func TestMemoByteLimitsAndUnicode(t *testing.T) {
 	t.Cleanup(func() { ShopName = old })
 	for length := 0; length < 100; length++ {
 		ShopName = strings.Repeat("s", length)
-		for _, product := range []string{"", "item", "gift\ncard", strings.Repeat("🌳", 100), strings.Repeat("a", 200)} {
-			for _, makeMemo := range []func(float64, string) string{Memo, TreeMemo} {
+		for _, product := range []string{"", "item", "gift\ncard", strings.Repeat("🔥", 100), strings.Repeat("a", 200)} {
+			for _, makeMemo := range []func(float64, string) string{Memo, BurnMemo} {
 				got := makeMemo(12.34, product)
 				if len(got) > MaxMemoBytes || !utf8.ValidString(got) || strings.Contains(got, "\n") || got == "" {
 					t.Errorf("invalid memo for host length %d: %q (%d bytes)", length, got, len(got))

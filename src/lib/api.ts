@@ -411,18 +411,6 @@ export const createQuoteBatch = (items: unknown[], email?: string, key?: string,
 /* ---------------- Site config (feature flags) ---------------- */
 export const getSiteConfig = () => api('/site-config');
 
-/* ---------------- Tree planting ---------------- */
-export const getTrees = (bucket: 'week'|'month'|'all'|string = 'all') => api('/trees?bucket=' + bucket);
-export const getMyTrees = () => api('/trees/me', { auth: true });
-export const setTreePrefs = (destination: 'cashback'|'trees') =>
-  api('/trees/me/prefs', { method: 'POST', auth: true, body: { destination } });
-export const adminListTreeSettlements = () => api('/admin/trees/settlements');
-export const adminRecordTreeSettlement = (body: {
-  month_bucket?: string; amount_usdt?: number; amount_label?: string; amount_value?: string; trees_planted?: number; tx_hash?: string; transaction_url?: string;
-  from_address?: string; to_address?: string; note?: string;
-  status?: 'paid'|'skipped'; amount_nim?: number; wallet_nim?: number; proof_image?: string; proof_images?: { data: string; caption?: string }[];
-}) => api('/admin/trees/settlements', { method: 'POST', body });
-export const adminUpdateTreeSettlement = (id: string, body: Parameters<typeof adminRecordTreeSettlement>[0]) => api('/admin/trees/settlements/' + encodeURIComponent(id), { method: 'PUT', body });
 export const listQuotes = () => api('/quotes', { auth: true });
 export const getQuote = async (id: string) => {
   const out = await api(`/quotes/${encodeURIComponent(id)}`, { auth: true });
@@ -509,6 +497,9 @@ export const validateCashbackCode = (code: string, orderUSD = 0) => api(`/cashba
 export const getPoolStake = () => api('/poolstake/me', { auth: true });
 /** The buyer's own cashback ledger: lifetime totals + individual payouts. */
 export const getMyCashback = () => api('/cashback/me', { auth: true });
+export const getCashbackLeaderboard = (bucket: 'week' | 'month' | 'all' | string = 'all') =>
+  api('/cashback/leaderboard?bucket=' + encodeURIComponent(bucket));
+export const getBurnBalance = () => api('/cashback/burn-balance');
 export const refreshPoolStake = () => api('/poolstake/refresh', { method: 'POST', auth: true });
 
 /* ---------------- FX / NIM rate (sessionStorage cached) ---------------- */

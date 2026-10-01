@@ -66,7 +66,6 @@ const imports: Record<string, () => Promise<unknown>> = {
   '/track': () => import('../components/track/TrackPage'),
   '/admin': () => import('../components/admin/AdminPage'),
   '/cashback': () => import('../components/cashback/CashbackPage'),
-  '/plant-trees': () => import('../components/trees/PlantTreesPage'),
 };
 
 const PAGES: Record<string, ComponentType> = {
@@ -81,7 +80,6 @@ const PAGES: Record<string, ComponentType> = {
   '/track': lazy(() => imports['/track']().then((m: any) => ({ default: m.TrackView }))),
   '/admin': lazy(() => imports['/admin']().then((m: any) => ({ default: m.AdminContent }))),
   '/cashback': lazy(() => imports['/cashback']().then((m: any) => ({ default: m.CashbackView }))),
-  '/plant-trees': lazy(() => imports['/plant-trees']().then((m: any) => ({ default: m.PlantTreesView }))),
 };
 
 // `titleKey` points at a pageTitle.* entry — the tab title follows the
@@ -103,7 +101,6 @@ export const ROUTES: Route[] = [
   { path: '/track', key: 'track', titleKey: 'pageTitle.track', comp: PAGES['/track'] },
   { path: '/admin', key: 'none', titleKey: 'pageTitle.admin', comp: PAGES['/admin'] },
   { path: '/cashback', key: 'cashback', titleKey: 'pageTitle.cashback', comp: PAGES['/cashback'] },
-  { path: '/plant-trees', key: 'plant-trees', titleKey: 'pageTitle.plantTrees', comp: PAGES['/plant-trees'] },
 ];
 
 /** Fallback path per shell key — only used during SSR (no window there). */
@@ -117,7 +114,6 @@ const KEY_PATH: Record<ShellKey, string> = {
   track: '/track',
   order: '/order',
   cashback: '/cashback',
-  'plant-trees': '/plant-trees',
   none: '/admin',
 };
 

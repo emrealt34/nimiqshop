@@ -10,12 +10,12 @@ test.describe('real Nimiq identicons @smoke', () => {
   test('the vendored identicon library loads from under the base path', async ({ page }) => {
     const loaded: string[] = [];
     page.on('response', (r) => { if (/\/vendor\/identicons/.test(r.url())) loaded.push(`${r.status()} ${new URL(r.url()).pathname}`); });
-    await open(page, path('/plant-trees'));
+    await open(page, path('/cashback'));
     await expect.poll(() => loaded.length, { timeout: 8000 }).toBeGreaterThan(0);
     for (const l of loaded) expect(l).toMatch(/^200 \/nimiqshop\/vendor\//);
   });
 
-  for (const route of ['/plant-trees', '/profile', '/']) {
+  for (const route of ['/cashback', '/profile', '/']) {
     test(`${route}: every identicon on screen is a generated Nimiq identicon`, async ({ page }) => {
       await open(page, path(route));
       await page.waitForTimeout(1500);
@@ -34,7 +34,7 @@ test.describe('real Nimiq identicons @smoke', () => {
   }
 
   test('same address → same identicon, different address → different identicon', async ({ page }) => {
-    await open(page, path('/plant-trees'));
+    await open(page, path('/profile'));
     const sigs = await page.evaluate(async (addr) => {
       // @ts-ignore — the vendored ESM, loaded the same way the app loads it
       const mod = await import(/* @vite-ignore */ '/nimiqshop/vendor/identicons.module.js');

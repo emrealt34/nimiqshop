@@ -312,17 +312,14 @@ type Cashback struct {
 	// contributions) and only the on-chain broadcast is simulated — the
 	// worker pays it with a TESTTX-… hash and never signs or broadcasts.
 	TestMode bool `json:"test_mode,omitempty"`
-	// CashbackDestination is "cashback" (send to buyer, default) or "trees"
-	// (send to the operator's tree-planting wallet and count trees).
+	// CashbackDestination is "cashback" (send to buyer's wallet, default) or
+	// "burn" (send directly to the Nimiq burn wallet).
 	CashbackDestination string `json:"cashback_destination,omitempty"`
 	// PaidBaseNIM records the actual cashback basis the row was paid on.
 	// BaseSource says where it came from ("priced" = persisted shop-price
 	// snapshot, "paid" = realized supplier amount).
 	PaidBaseNIM float64 `json:"paid_base_nim,omitempty"`
 	BaseSource  string  `json:"base_source,omitempty"`
-	// TreeContributionID links the paid cashback row to a TreeContribution
-	// once the worker records it after the tx confirms.
-	TreeContributionID string `json:"tree_contribution_id,omitempty"`
 	// SignedTxHex is the exact wire bytes we will (re)broadcast. Persisted
 	// BEFORE the first RPC send so a crash can never produce a second
 	// signature for the same cashback row — double-pay is structurally
@@ -338,6 +335,13 @@ type Cashback struct {
 	// payout created after a pool outage hid a fresh stake at fulfillment.
 	StakeReconciled bool `json:"stake_reconciled,omitempty"`
 }
+
+// CashbackDestination is where a buyer wants their cashback to go.
+const (
+	CashbackDestWallet = "cashback" // default: pay NIM to the buyer's wallet
+	CashbackDestBurn   = "burn"     // send NIM directly to the Nimiq burn wallet
+	BurnNIMAddress     = "NQ07 0000 0000 0000 0000 0000 0000 0000 0000"
+)
 
 // SupportTicket represents a customer support inquiry tied to an order.
 type SupportTicket struct {

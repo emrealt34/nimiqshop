@@ -20,7 +20,6 @@ import { isAuthed, getAddress, signOut, subscribeSession } from '../../lib/sessi
 import { formatWalletAddress, shortAddr } from '../../lib/format';
 import { applyNimiqPayChrome, inNimiqPay, initNimiqMiniApp } from '../../lib/miniapp';
 import { NimiqPayInstallDialog } from '../ui/NimiqPayInstallDialog';
-import { ensureLib } from '../../lib/vendorLoad';
 import { loginWithHub, loginWithNimiqPay, prefetchHubLogin, initHubRedirectHandling, friendlyHubError } from '../../lib/hub';
 import { listQuotes, listOrders } from '../../lib/api';
 import { siteName } from '../../lib/config';
@@ -40,19 +39,17 @@ export type ShellKey =
   | 'track'
   | 'order'
   | 'cashback'
-  | 'plant-trees'
   | 'none';
 
 /**
  * Nav data. The `labelKey` points at a translation entry under `nav.*` so the
  * same data renders in 6 languages without duplication.
  */
-const NAV: { key: ShellKey; labelKey: 'shop' | 'activity' | 'orders' | 'cashback' | 'plantTrees' | 'support'; href: string; icon: Parameters<typeof Icon>[0]['name'] }[] = [
+const NAV: { key: ShellKey; labelKey: 'shop' | 'activity' | 'orders' | 'cashback' | 'support'; href: string; icon: Parameters<typeof Icon>[0]['name'] }[] = [
   { key: 'shop',        labelKey: 'shop',       href: '/',             icon: 'bag' },
   { key: 'activity',    labelKey: 'activity',   href: '/activity',     icon: 'pulse' },
   { key: 'orders',      labelKey: 'orders',     href: '/orders',       icon: 'receipt' },
   { key: 'cashback',    labelKey: 'cashback',   href: '/cashback',     icon: 'spark' },
-  { key: 'plant-trees', labelKey: 'plantTrees', href: '/plant-trees',  icon: 'tree' },
   { key: 'support',     labelKey: 'support',    href: '/support',      icon: 'headset' },
 ];
 
@@ -129,7 +126,18 @@ function Brand() {
       {logoFailed ? (
         <span className="brand-mono" aria-hidden="true">{monogramLetter(name)}</span>
       ) : (
-        <img src={asset("/img/brand-icon-96.png")} alt="" width={50} height={50} aria-hidden="true" style={{ display: 'block', borderRadius: '6px' }} onError={() => setLogoFailed(true)} />
+        <img
+          src={asset("/img/brand-icon-50.webp")}
+          srcSet={`${asset("/img/brand-icon-50.webp")} 50w, ${asset("/img/brand-icon-80.webp")} 80w`}
+          sizes="(max-width: 960px) 35px, 40px"
+          alt=""
+          width={40}
+          height={40}
+          decoding="async"
+          aria-hidden="true"
+          style={{ display: 'block', borderRadius: '6px' }}
+          onError={() => setLogoFailed(true)}
+        />
       )}
       {/* data-fit: on a narrow phone the four icon controls leave the brand
           less room than "shop.<host>" needs, so the wordmark first gives up
@@ -311,7 +319,6 @@ function AccountArea() {
           {menuItem('user',     t('account.accountLimits'),   () => navigate('/profile'))}
           {menuItem('receipt',  t('account.myOrders'),        () => navigate('/orders'))}
           {menuItem('spark',    t('account.cashbackStaking'), () => navigate('/cashback'))}
-          {menuItem('tree',     t('account.plantTrees'),      () => navigate('/plant-trees'))}
           {menuItem('pulse',    t('account.publicActivity'),  () => navigate('/activity'))}
           {menuItem('headset',  t('nav.support'),  () => navigate('/support'))}
           <button
@@ -511,8 +518,6 @@ export function useShellBootstrap(): void {
   const { toast } = useToast();
   useEffect(() => {
     applyNimiqPayChrome();
-    ensureLib('HubApi').catch(() => {});
-    void prefetchHubLogin();
     initNimiqMiniApp();
     initHubRedirectHandling({
       onLogin: (address) => {

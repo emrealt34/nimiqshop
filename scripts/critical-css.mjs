@@ -51,7 +51,6 @@ const PAGES = [
   '/order/',
   '/track/',
   '/cashback/',
-  '/plant-trees/',
   '/profile/',
   '/activity/',
   '/support/',

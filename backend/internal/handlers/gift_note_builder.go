@@ -42,7 +42,6 @@ func (h *Handlers) BuildGiftNoteFromQuote(q db.Quote, lang string) mailtrap.Gift
 		PurchasedAt:   q.CreatedAt,
 		ShopURL:       h.Cfg.SiteURL(),
 		SupportURL:    h.Cfg.SiteURL() + "/support",
-		TreesDonation: q.CashbackDestination == db.TreeDestTrees,
 		Delivery:      giftNoteDelivery(q),
 		Lang:          lang,
 	}

@@ -363,16 +363,5 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
         window.addEventListener('orientationchange', function () { setTimeout(onResize, 150); }, { passive: true });
       })();
     </script>
-    <script>
-      // Translates the static shell (skip link, footer credit, GitHub label and
-      // the static 404 page) and keeps it in sync with the language switcher.
-      import { initStaticI18n } from '../lib/staticI18n';
-      // …and re-fits every width-budgeted label (header nav, wordmark, tab bar,
-      // come-back banner) after a language switch, a resize or a late font, so
-      // a longer translation can never stay ellipsized.
-      import { initFit } from '../lib/fitText';
-      initStaticI18n();
-      initFit();
-    </script>
   </body>
 </html>

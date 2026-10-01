@@ -227,6 +227,7 @@ export function rememberLightningPayment(invoice: string, context?: Record<strin
 
 /* ---------------- Redirect result recovery (mobile) ---------------- */
 export function initHubRedirectHandling({ onLogin }: { onLogin?: (address: string) => void }): void {
+  if (!loadPending(LOGIN_KEY) && !loadPending(PAY_KEY)) return;
   (async () => {
     try {
       await loadHubApi();

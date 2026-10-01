@@ -60,6 +60,7 @@ import { AppRoot } from '../AppRoot';
 import { Icon } from '../ui/Icon';
 import { CashbackCalculator } from './CashbackCalculator';
 import { RecentCashbackList } from './RecentCashbackList';
+import { CashbackImpactSection } from './CashbackImpactSection';
 import { SkeletonLines } from '../ui/uiKit';
 import { useSheet, useToast } from '../AppProviders';
 import { useSession } from '../../lib/useSession';
@@ -115,6 +116,13 @@ type MyCashback = {
     paid_count: number;
     pending_nim: number;
     pending_count: number;
+    earned_nim?: number;
+    burned_nim?: number;
+    burned_count?: number;
+    wallet_nim?: number;
+    wallet_count?: number;
+    orders?: number;
+    preference?: string;
   };
   cashbacks: CashbackRow[];
   ledger?: StakerLedgerCard;
@@ -123,7 +131,7 @@ type MyCashback = {
 const pct = pctLabel;
 
 import { useT, rich } from '../../i18n';
-import { asset, pagePath } from '../../lib/asset';
+import { asset } from '../../lib/asset';
 
 type WalletGuide = ReturnType<typeof walletStakeGuide>;
 
@@ -576,18 +584,6 @@ export function CashbackView() {
         )}
       </div>
 
-      {/* ------------------------------------- plant trees CTA */}
-      <a href={pagePath("/plant-trees")} className="card mt-2" style={{ display:'block', textDecoration:'none', background:'linear-gradient(135deg, rgba(22,163,74,0.10), rgba(16,185,129,0.06))', border:'1px solid rgba(22,163,74,0.25)' }}>
-        <div style={{ display:'flex', gap:12, alignItems:'center' }}>
-          <span style={{ fontSize: 32, lineHeight:1 }}>🌳</span>
-          <div style={{ flex:1, minWidth:0 }}>
-            <div className="strong" style={{ color:'var(--green)' }}>{t('cashback.treesCtaTitle')}</div>
-            <div className="small muted mt-1">{t('cashback.treesCtaBody')}</div>
-          </div>
-          <Icon name="chevron" size={16} />
-        </div>
-      </a>
-
       {/* --------------------------------------------------- how it works */}
       {params && (
         <div className="cb-steps mt-2">
@@ -820,6 +816,9 @@ export function CashbackView() {
         </div>
       ))}
 
+      {/* ------------------------------------------------------ burn stats, cashback card & leaderboard */}
+      <CashbackImpactSection authed={authed === true} myTotals={ledger?.totals || null} />
+
       {/* ------------------------------------------------------ fine print */}
       <details className="cb-details cb-fineprint mt-2">
         <summary className="small strong">
@@ -890,7 +889,7 @@ export function NimiqLogo({ size = 24 }: { size?: number }) {
       src={asset("/img/nimiq-hexagon.png?v=128")}
       alt=""
       width={size}
-      height={Math.round(size * 0.9)}
+      height={size}
       aria-hidden="true"
       style={{ display: 'inline-block', verticalAlign: '-0.15em', flex: 'none' }}
     />

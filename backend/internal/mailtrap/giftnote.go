@@ -69,9 +69,6 @@ type GiftNote struct {
 	// are admitted; anything else is dropped so config cannot turn the email
 	// into a tracking beacon. Optional.
 	GifterIdenticonDataURI string
-	// TreesDonation is true when the buyer chose to route their cashback to the
-	// tree-planting destination. When set, the note says so out loud.
-	TreesDonation bool
 	// SiteName renders "from your friend at shop.nimiqbase.com". Optional.
 	SiteName string
 	// ProductLabel is the human item name, e.g. "Steam · 50 USD" or
@@ -188,9 +185,6 @@ func (n GiftNote) Build(cfg Config) (Message, error) {
 			subject = tr("email.subjectAnonymous")
 		} else {
 			subject = tr("email.subjectNamed")
-		}
-		if n.TreesDonation {
-			subject += tr("email.subjectTree")
 		}
 	}
 
@@ -317,13 +311,6 @@ func (n GiftNote) textBody(site, product, message string) string {
 	} else {
 		b.WriteString("\nNo personal message was left with the gift.\n")
 	}
-	if n.TreesDonation {
-		b.WriteString("\nA gift that gives back:\n")
-		b.WriteString("By buying from " + site + ", The sender" +
-			" chose to donate their cashback — so alongside your gift a tree is being " +
-			"planted through OneTreePlanted. " + site +
-			"'s monthly donation payouts are public on Polygonscan.\n")
-	}
 	b.WriteString("\nWhere is " + n.itemWord() + "?\n")
 	b.WriteString(wrap(n.deliveryLine(), 76) + "\n")
 	if u := safeURL(n.ShopURL); u != "" {
@@ -366,9 +353,6 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 	pre := preWho + " sent you a gift via " + site
 	if product != "" {
 		pre += " — " + product
-	}
-	if n.TreesDonation {
-		pre += ", and a tree is being planted"
 	}
 	pre += ". Here is what arrived and where to find it."
 	// spacer entities pad the snippet so trailing UI text never shows
@@ -461,25 +445,6 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 		b.WriteString("          </tr>")
 	} else {
 		b.WriteString(`<tr><td class="px-card" style="padding:0 26px 6px 26px;color:#8a7f72;font-size:14px;font-family:` + emailFont + `">No personal message was left with the gift.</td></tr>`)
-	}
-	b.WriteString("\n")
-
-	// ---- donation callout (the emotional core) -----------------------------
-	if n.TreesDonation {
-		b.WriteString("\n          <tr>\n")
-		b.WriteString(`            <td class="px-card" style="padding:0 26px 16px 26px">` + "\n")
-		b.WriteString(`              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#e8f3e4;border:1px solid #cfe3c6;border-radius:12px">` + "\n")
-		b.WriteString("                <tr>\n")
-		b.WriteString(`                  <td style="padding:14px 16px;font-size:14px;line-height:1.55;color:#2f5b2a;font-family:` + emailFont + `">` + "\n")
-		b.WriteString(`<span style="font-size:20px">🌳</span>&nbsp;<strong>A gift that gives back.</strong><br>` + "\n")
-		b.WriteString(`                    By buying from ` + esc(site) + `, The sender chose to donate their cashback — so alongside` + "\n")
-		b.WriteString(`                    your gift a tree is being planted through <strong>OneTreePlanted</strong>.` + "\n")
-		b.WriteString(`                    Every month ` + esc(site) + `&rsquo;s donation payouts are public on Polygonscan.` + "\n")
-		b.WriteString("                  </td>\n")
-		b.WriteString("                </tr>\n")
-		b.WriteString("              </table>\n")
-		b.WriteString("            </td>\n")
-		b.WriteString("          </tr>")
 	}
 	b.WriteString("\n")
 

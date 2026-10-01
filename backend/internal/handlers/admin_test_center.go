@@ -120,8 +120,8 @@ func (h *Handlers) AdminTestPurchase(ctx *fasthttp.RequestCtx) {
 		coin, network = PaymentCoinUSDT, PaymentNetworkStable
 	}
 	dest := strings.ToLower(strings.TrimSpace(req.CashbackDestination))
-	if dest != db.TreeDestTrees {
-		dest = db.TreeDestCashback
+	if dest != db.CashbackDestBurn {
+		dest = db.CashbackDestWallet
 	}
 
 	// Gift note: same canonicalization as the checkout (channel is email —

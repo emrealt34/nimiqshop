@@ -4,7 +4,6 @@ package locales
 var Pt = map[string]string{
 	"email.subjectAnonymous": "Alguém te enviou um presente 🎁",
 	"email.subjectNamed":     "Chegou um presente para você 🎁",
-	"email.subjectTree":      " — e plantou uma árvore 🌳",
 
 	"email.youGotAGift":        "Você recebeu um presente.",
 	"email.anonymousLine":      "Alguém enviou isto para você via {{site}} — o remetente escolheu permanecer anônimo.",
@@ -14,8 +13,6 @@ var Pt = map[string]string{
 	"email.sent":               "Enviado",
 	"email.theirMessage":       "A mensagem deles:",
 	"email.noMessage":          "Nenhuma mensagem pessoal foi deixada com o presente.",
-	"email.giftGivesBackTitle": "Um presente que retribui.",
-	"email.giftGivesBackBody":  "Ao comprar no {{site}}, o remetente escolheu doar o cashback — junto com seu presente, uma árvore está sendo plantada por meio da OneTreePlanted. Os pagamentos mensais de doação da {{site}} são públicos na Polygonscan.",
 	"email.whereIs":            "Onde está {{item}}?",
 	"email.deliveryCard":       "O código é enviado separadamente para este endereço pelo nosso parceiro CryptoRefills; pode estar na pasta de spam. Por segurança, ele nunca é mostrado no site da loja nem incluído neste e-mail.",
 	"email.deliveryTopup":      "O crédito é aplicado diretamente ao seu número de telefone pelo nosso parceiro CryptoRefills. Não há código a inserir nem nada a resgatar — se ainda não estiver no número, o suporte pode cobrar a operadora.",
@@ -37,7 +34,6 @@ var Pt = map[string]string{
 	"email.preheader.anon":     "Alguém (anônimo) enviou um presente para você via {{site}}",
 	"email.preheader.named":    "Alguém enviou um presente para você via {{site}}",
 	"email.preheader.product":  " — {{product}}",
-	"email.preheader.tree":     ", e uma árvore está sendo plantada",
 	"email.preheader.end":      ". Aqui está o que chegou e onde encontrar.",
 	"email.fromAnon":           "de alguém anônimo via {{site}}",
 	"email.fromNamed":          "via {{site}}",

@@ -1517,7 +1517,6 @@ func (h *Handlers) AdminSendTestEmail(ctx *fasthttp.RequestCtx) {
 		Recipient:              mailtrap.Address{Email: to},
 		GifterNimiqAddress:     "NQ08 D44A 44B9 0F77 2E22 8C13 C345 6FBD XKH9",
 		GifterIdenticonDataURI: sampleIdenticonDataURI(),
-		TreesDonation:          true,
 		SiteName:               h.Cfg.SiteName(),
 		ProductLabel:           productLabel,
 		Message:                message,

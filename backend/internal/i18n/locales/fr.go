@@ -4,7 +4,6 @@ package locales
 var Fr = map[string]string{
 	"email.subjectAnonymous": "Quelqu'un vous a envoyé un cadeau 🎁",
 	"email.subjectNamed":     "Un cadeau est arrivé pour vous 🎁",
-	"email.subjectTree":      " — et a planté un arbre 🌳",
 
 	"email.youGotAGift":        "Vous avez reçu un cadeau.",
 	"email.anonymousLine":      "Quelqu'un vous a envoyé ceci via {{site}} — l'expéditeur a choisi de rester anonyme.",
@@ -14,8 +13,6 @@ var Fr = map[string]string{
 	"email.sent":               "Envoyé",
 	"email.theirMessage":       "Leur message :",
 	"email.noMessage":          "Aucun message personnel n'a été joint au cadeau.",
-	"email.giftGivesBackTitle": "Un cadeau qui rend au monde.",
-	"email.giftGivesBackBody":  "En achetant sur {{site}}, l'expéditeur a choisi de donner son cashback — avec votre cadeau, un arbre est donc planté via OneTreePlanted. Les versements mensuels de dons de {{site}} sont publics sur Polygonscan.",
 	"email.whereIs":            "Où est {{item}} ?",
 	"email.deliveryCard":       "Le code est envoyé séparément à cette adresse par notre partenaire CryptoRefills ; il peut se trouver dans les courriers indésirables. Pour votre sécurité, il n'est jamais affiché sur le site de la boutique ni inclus dans cet e-mail.",
 	"email.deliveryTopup":      "Le crédit est appliqué directement à votre numéro de téléphone par notre partenaire CryptoRefills. Il n'y a aucun code à saisir ni rien à échanger — s'il n'est pas encore sur le numéro, le support peut le relancer auprès de l'opérateur.",
@@ -37,7 +34,6 @@ var Fr = map[string]string{
 	"email.preheader.anon":     "Quelqu'un (anonyme) vous a envoyé un cadeau via {{site}}",
 	"email.preheader.named":    "Quelqu'un vous a envoyé un cadeau via {{site}}",
 	"email.preheader.product":  " — {{product}}",
-	"email.preheader.tree":     ", et un arbre est planté",
 	"email.preheader.end":      ". Voici ce qui est arrivé et où le trouver.",
 	"email.fromAnon":           "de quelqu'un d'anonyme via {{site}}",
 	"email.fromNamed":          "via {{site}}",

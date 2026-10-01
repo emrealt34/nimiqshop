@@ -6,7 +6,7 @@
 import { test, expect, open, contentText } from './support/fixtures';
 import { NOT_FOUND_MARK, path } from './support/data';
 
-const UNDER_TEST = ['/', '/cart', '/product?id=p1', '/orders', '/order?id=o1', '/profile', '/activity', '/cashback', '/plant-trees', '/support', '/track?order=o1'];
+const UNDER_TEST = ['/', '/cart', '/product?id=p1', '/orders', '/order?id=o1', '/profile', '/activity', '/cashback', '/support', '/track?order=o1'];
 
 for (const mode of ['down', 'error500', 'garbage', 'empty', 'slow'] as const) {
   test.describe(`API ${mode} @smoke`, () => {

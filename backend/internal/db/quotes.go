@@ -424,7 +424,7 @@ func (s *Store) transitionQuote(id, to string, mutate func(*Quote, *badger.Txn) 
 			if err = publishToFeed(tx, &q); err != nil {
 				return err
 			}
-			if err = enqueueCashbackOnFulfill(tx, &q, stake, ledgerParams, s.treeEnrich()); err != nil {
+			if err = enqueueCashbackOnFulfill(tx, &q, stake, ledgerParams, s.cashbackEnrich()); err != nil {
 				return err
 			}
 			// The buyer was not VERIFIABLY staked at delivery time (no

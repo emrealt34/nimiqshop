@@ -28,7 +28,7 @@ func TestGiftBuildDeliveryAndAnonymity(t *testing.T) {
 		for _, delivery := range []string{DeliveryCard, DeliveryEsim, DeliveryTopUp} {
 			n := GiftNote{Recipient: Address{Email: "recipient@example.com", Name: "Recipient"}, Anonymous: anonymous,
 				GifterNimiqAddress: "nq12-abcd-efgh", GifterIdenticonDataURI: "https://tracker.invalid/pixel",
-				TreesDonation: true, SiteName: "Fixture Shop", ProductLabel: "<Premium & Gift>", Message: "<script>alert(1)</script>\nEnjoy & share!",
+				SiteName: "Fixture Shop", ProductLabel: "<Premium & Gift>", Message: "<script>alert(1)</script>\nEnjoy & share!",
 				ShopURL: "https://shop.example.com/", SupportURL: "https://shop.example.com/support", StakeValidatorAddress: "nq00-validator",
 				OrderID: "order-42", PurchasedAt: time.Date(2026, 9, 30, 12, 0, 0, 0, time.UTC), Delivery: delivery}
 			m, err := n.Build(Config{Category: "fixture"})
@@ -38,7 +38,7 @@ func TestGiftBuildDeliveryAndAnonymity(t *testing.T) {
 			if len(m.To) != 1 || m.To[0] != n.Recipient || m.Category != "fixture-gift" || m.OrderID != "order-42" || m.CustomVariables["kind"] != "gift_note" || m.CustomVariables["product"] != n.ProductLabel {
 				t.Fatalf("metadata: %+v", m)
 			}
-			for _, fragment := range []string{"order-42", "30 Sep 2026", "OneTreePlanted", "<Premium & Gift>", "<script>alert(1)</script>"} {
+			for _, fragment := range []string{"order-42", "30 Sep 2026", "<Premium & Gift>", "<script>alert(1)</script>"} {
 				if !strings.Contains(m.Text, fragment) {
 					t.Errorf("text missing %q", fragment)
 				}

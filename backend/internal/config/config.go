@@ -160,23 +160,10 @@ type Config struct {
 	USDTCoin               string // "USDT"
 	USDTCashbackMultiplier float64
 
-	// --- Tree planting (cashback donation) ---
-	// When a buyer selects "Plant trees" as their cashback destination the
-	// cashback NIM is sent to TreePlantingNimAddress instead of their wallet.
-	// At month end the admin manually swaps that NIM to USDT on Polygon,
-	// sends it to OneTreePlanted and records the polygon tx hash — the
-	// /api/trees page links straight to PolygonScan for full transparency.
-	TreePlantingEnabled    bool
-	TreePlantingNimAddress string
-	// TreesPerUSD: how many trees 1 USD plants via OneTreePlanted (default 1).
-	TreesPerUSD float64
-	// Polygon RPC + USDT contract for transparency lookups and Polygonscan
-	// links.
-	PolygonRPCURL      string
-	PolygonScanBaseURL string // e.g. https://polygonscan.com
-	TreeUSDTRecipient  string // the Polygon USDT address admin sends from (for reference)
-	TreeUSDTReceiver   string // OneTreePlanted's USDT address on Polygon (or our forward wallet)
-	PolygonChainID     int
+	// --- Cashback burn destination ---
+	// When a buyer selects "Burn" as their cashback destination, the cashback
+	// NIM is sent directly to the Nimiq burn wallet instead of their wallet.
+	BurnNimAddress string
 
 	// --- Edge hardening & scale envelope (internal/httpx) ---
 	// Every one of these is a knob on the DDoS/throughput posture of the
@@ -707,15 +694,8 @@ func Load() Config {
 		USDTCoin:               env("USDT_COIN", "USDT"),
 		USDTCashbackMultiplier: envFloat("USDT_CASHBACK_MULTIPLIER", 0.5),
 
-		// Tree planting / cashback donation
-		TreePlantingEnabled:    envBool("TREE_PLANTING_ENABLED", false),
-		TreePlantingNimAddress: strings.TrimSpace(os.Getenv("TREE_PLANTING_NIM_ADDRESS")),
-		TreesPerUSD:            envFloat("TREES_PER_USD", 1.0),
-		PolygonRPCURL:          strings.TrimRight(os.Getenv("POLYGON_RPC_URL"), "/"),
-		PolygonScanBaseURL:     strings.TrimRight(env("POLYGONSCAN_BASE_URL", "https://polygonscan.com"), "/"),
-		TreeUSDTRecipient:      strings.TrimSpace(os.Getenv("TREE_USDT_SENDER_ADDRESS")),
-		TreeUSDTReceiver:       strings.TrimSpace(os.Getenv("TREE_USDT_RECEIVER_ADDRESS")),
-		PolygonChainID:         envInt("POLYGON_CHAIN_ID", 137),
+		// Cashback burn wallet destination
+		BurnNimAddress: strings.TrimSpace(env("BURN_NIM_ADDRESS", "NQ07 0000 0000 0000 0000 0000 0000 0000 0000")),
 
 		// --- Edge hardening & scale envelope ---
 		MaxInFlight:              envIntOrZero("MAX_IN_FLIGHT_REQUESTS", 0),
@@ -1000,19 +980,6 @@ func (c Config) Validate() error {
 	}
 	if _, err := cashbackcode.ParseTable(c.CashbackCodes); err != nil {
 		return fmt.Errorf("CASHBACK_CODES: %w", err)
-	}
-	if c.TreePlantingEnabled {
-		if c.TreePlantingNimAddress == "" {
-			return fmt.Errorf("TREE_PLANTING_ENABLED requires TREE_PLANTING_NIM_ADDRESS")
-		}
-		if c.TreesPerUSD <= 0 {
-			return fmt.Errorf("TREES_PER_USD must be positive (default 1 tree per $1)")
-		}
-	}
-	if c.PolygonRPCURL != "" {
-		if err := httpsURL("POLYGON_RPC_URL", c.PolygonRPCURL); err != nil {
-			return err
-		}
 	}
 
 	// --- Edge hardening & scale envelope ---

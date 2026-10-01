@@ -4,7 +4,6 @@ package locales
 var De = map[string]string{
 	"email.subjectAnonymous": "Jemand hat dir ein Geschenk geschickt 🎁",
 	"email.subjectNamed":     "Ein Geschenk ist für dich angekommen 🎁",
-	"email.subjectTree":      " — und hat einen Baum gepflanzt 🌳",
 
 	"email.youGotAGift":        "Du hast ein Geschenk erhalten.",
 	"email.anonymousLine":      "Jemand hat dir dies über {{site}} geschickt — der Absender möchte anonym bleiben.",
@@ -14,8 +13,6 @@ var De = map[string]string{
 	"email.sent":               "Gesendet",
 	"email.theirMessage":       "Nachricht des Absenders:",
 	"email.noMessage":          "Dem Geschenk wurde keine persönliche Nachricht beigefügt.",
-	"email.giftGivesBackTitle": "Ein Geschenk, das zurückgibt.",
-	"email.giftGivesBackBody":  "Beim Kauf über {{site}} hat der Absender sein Cashback gespendet — zusammen mit deinem Geschenk wird also ein Baum über OneTreePlanted gepflanzt. Die monatlichen Spendenauszahlungen von {{site}} sind auf Polygonscan öffentlich einsehbar.",
 	"email.whereIs":            "Wo ist {{item}}?",
 	"email.deliveryCard":       "Der Code wird separat von unserem Partner CryptoRefills an diese Adresse gesendet; er kann im Spam-Ordner liegen. Aus Sicherheitsgründen wird er niemals auf der Shop-Website angezeigt und ist nicht in dieser E-Mail enthalten.",
 	"email.deliveryTopup":      "Das Guthaben wird von unserem Partner CryptoRefills direkt auf deine Telefonnummer geladen. Es gibt keinen Code einzugeben und nichts einzulösen — falls es noch nicht auf der Nummer ist, kann der Support es beim Betreiber nachverfolgen.",
@@ -37,7 +34,6 @@ var De = map[string]string{
 	"email.preheader.anon":     "Jemand (anonym) hat dir über {{site}} ein Geschenk geschickt",
 	"email.preheader.named":    "Jemand hat dir über {{site}} ein Geschenk geschickt",
 	"email.preheader.product":  " — {{product}}",
-	"email.preheader.tree":     ", und ein Baum wird gepflanzt",
 	"email.preheader.end":      ". Hier ist, was angekommen ist und wo du es findest.",
 	"email.fromAnon":           "von jemandem anonym über {{site}}",
 	"email.fromNamed":          "über {{site}}",

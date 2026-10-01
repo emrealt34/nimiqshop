@@ -113,17 +113,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("db init: %v", err)
 	}
-	// Wire cashback runtime enrichment: tree-planting donation address +
+	// Wire cashback runtime enrichment: burn wallet address +
 	// Stablecoin cashback multiplier (USDT payers earn multiplier × NIM rate).
-	if cfg.TreePlantingEnabled && cfg.TreePlantingNimAddress != "" {
-		store.SetCashbackEnrichment(cfg.TreePlantingNimAddress, cfg.USDTCashbackMultiplier)
-		log.Printf("trees: cashback donation armed (%s, %.2f trees/USD)", cfg.TreePlantingNimAddress, cfg.TreesPerUSD)
-	} else {
-		store.SetCashbackEnrichment("", cfg.USDTCashbackMultiplier)
-		if cfg.TreePlantingEnabled {
-			log.Printf("trees: TREE_PLANTING_ENABLED=true but no TREE_PLANTING_NIM_ADDRESS — tree routing disabled until set")
-		}
-	}
+	store.SetCashbackEnrichment(cfg.BurnNimAddress, cfg.USDTCashbackMultiplier)
 	log.Printf("usdt: Polygon rail enabled — USDT cashback multiplier=%.0f%% of NIM rate", cfg.USDTCashbackMultiplier*100)
 	defer func() {
 		// Closing Badger flushes pending writes; skipping it can leave
@@ -276,38 +268,8 @@ func main() {
 		Store: store, RPC: nimiq.NewClient(cfg.NimiqRPCURL, cfg.NimiqRPCURL2),
 		SeedHex: cfg.CashbackWalletSeed, NetworkID: netID,
 		FeeLuna: int64(cfg.CashbackFeeLuna), Enabled: cfg.CashbackEnabled,
-		TreesPerUSD: cfg.TreesPerUSD,
 	}
 	cbWorker.Run(ctx)
-
-	// Startup banner for the tree donation wallet. It is a PUBLIC receiving
-	// address (no key on the server by design — payouts are signed offline by
-	// the wallet owner), but the operator should still see WHICH address is
-	// collecting and how much NIM it holds, right next to the cashback banner.
-	if cfg.TreePlantingNimAddress != "" {
-		if treeAddr, err := nimiq.PrettyAddress(cfg.TreePlantingNimAddress); err != nil {
-			log.Printf("trees: invalid TREE_PLANTING_NIM_ADDRESS %q: %v", cfg.TreePlantingNimAddress, err)
-		} else {
-			state := "disabled"
-			if cfg.TreePlantingEnabled {
-				state = "armed"
-			}
-			log.Printf("trees: donation wallet %s (%s — payouts are signed offline by the wallet owner)", treeAddr, state)
-			if treeRPC := cbWorker.RPC; treeRPC != nil {
-				safe.Go("trees:balance-banner", func() {
-					defer safe.Guard("trees:balance", nil)
-					bctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-					defer cancel()
-					luna, err := treeRPC.GetAccountBalance(bctx, treeAddr)
-					if err != nil {
-						log.Printf("trees: donation wallet %s balance unavailable: %v", treeAddr, err)
-						return
-					}
-					log.Printf("trees: donation wallet %s balance: %.5f NIM (%d luna)", treeAddr, float64(luna)/100_000, luna)
-				})
-			}
-		}
-	}
 
 	// 1-Luna WALLET MEMO channel. Until now this package existed but was
 	// never constructed — settlement.NotifyFn stayed nil, so the "your
@@ -902,6 +864,8 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 	r.GET("/api/site", wrap(publicCached(3600, 86400, h.PublicSite)))
 	r.GET("/api/site-config", wrap(publicCached(300, 3600, h.SiteConfig)))
 	r.GET("/api/cashback/rate", wrap(publicCached(300, 1800, h.PublicCashbackRate)))
+	r.GET("/api/cashback/leaderboard", wrap(publicCached(60, 600, h.CashbackLeaderboard)))
+	r.GET("/api/cashback/burn-balance", wrap(publicCached(60, 300, h.BurnWalletBalance)))
 	// Echoes per-account redemption state for the code being looked up.
 	r.GET("/api/cashback/code", tiered(tPromo, pinPrivate(h.PublicCashbackCode)))
 	r.GET("/api/cashback/me", authed(h.CashbackMe))
@@ -924,14 +888,6 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 	r.GET("/api/account/notifications", authed(h.GetNotificationPrefs))
 	r.PUT("/api/account/notifications", authedTiered(aWrite, h.SetNotificationPrefs))
 
-	// Tree planting (cashback → OneTreePlanted donation)
-	r.GET("/api/trees/donation-balance", wrap(publicCached(60, 600, h.TreeDonationBalance)))
-	r.GET("/api/trees", wrap(publicCached(300, 1800, h.TreePublic)))
-	r.GET("/api/trees/me", authed(h.TreeMe))
-	r.POST("/api/trees/me/prefs", authedTiered(aWrite, h.TreeSetPrefs))
-	r.GET("/api/admin/trees/settlements", adminOnly(h.AdminListTreeSettlements))
-	r.POST("/api/admin/trees/settlements", adminOnly(h.AdminRecordTreeSettlement))
-	r.PUT("/api/admin/trees/settlements/{id}", adminOnly(h.AdminUpdateTreeSettlement))
 	// DEV-only free test products; not a customer payment rail.
 	r.POST("/api/test/buy", authedTiered(aCheckout, h.TestBuy))
 	r.POST("/api/quotes/{id}/payment-launch", authedTiered(aWrite, h.PaymentLaunch))

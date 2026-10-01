@@ -1,10 +1,10 @@
 /**
- * The downloadable impact-card PNG (canvas export). fillText() is
+ * The downloadable cashback-card PNG (canvas export). fillText() is
  * instrumented so every string's measured box is checked: nothing leaves the
- * receipt paper, nothing overlaps — every language × every tree-count size.
+ * receipt paper, nothing overlaps — every language × preference.
  */
 import { test, expect, open } from './support/fixtures';
-import { LANGS, TREE_COUNTS, path } from './support/data';
+import { LANGS, path } from './support/data';
 import type { Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 
@@ -31,7 +31,7 @@ async function instrument(page: Page) {
 }
 
 async function exportPng(page: Page) {
-  await open(page, path('/plant-trees'));
+  await open(page, path('/cashback'));
   await page.locator('section.pt-impact .pt-actions .btn').first().click();
   const img = page.locator('.pt-overlay img').first();
   await expect(img).toBeVisible({ timeout: 10_000 });
@@ -40,9 +40,9 @@ async function exportPng(page: Page) {
 }
 
 for (const lang of LANGS) {
-  for (const trees of TREE_COUNTS) {
-    test.describe(`PNG · ${lang} · ${trees} trees`, () => {
-      test.use({ lang, api: { trees, planted: trees > 20 ? 12 : 0 }, viewport: { width: 1280, height: 900 } });
+  for (const preference of ['cashback', 'burn'] as const) {
+    test.describe(`PNG · ${lang} · ${preference}`, () => {
+      test.use({ lang, api: { preference }, viewport: { width: 1280, height: 900 } });
       test('every string on the receipt, nothing overlaps, brand fonts', async ({ page }) => {
         await instrument(page);
         const img = await exportPng(page);
@@ -66,7 +66,7 @@ for (const lang of LANGS) {
         expect(drawn.some((d) => d.font.includes('NunitoLocal'))).toBe(true);
         expect(await page.evaluate(() => (window as any).__strokes)).toBeGreaterThanOrEqual(8);
         const png = await img.evaluate((i: HTMLImageElement) => { const c = document.createElement('canvas'); c.width = i.naturalWidth; c.height = i.naturalHeight; c.getContext('2d')!.drawImage(i, 0, 0); return c.toDataURL('image/png'); });
-        await test.info().attach(`impact-${lang}-${trees}.png`, { body: Buffer.from(png.split(',')[1], 'base64'), contentType: 'image/png' });
+        await test.info().attach(`cashback-${lang}-${preference}.png`, { body: Buffer.from(png.split(',')[1], 'base64'), contentType: 'image/png' });
       });
     });
   }
@@ -77,7 +77,7 @@ test.describe('PNG download & share @smoke', () => {
   test('Download gives a real PNG file', async ({ page }) => {
     await exportPng(page);
     const [dl] = await Promise.all([page.waitForEvent('download'), page.locator('.pt-overlay-actions a[download]').click()]);
-    expect(dl.suggestedFilename()).toBe('nimshop-impact-card.png');
+    expect(dl.suggestedFilename()).toBe('nimshop-cashback-card.png');
     const buf = readFileSync((await dl.path())!);
     expect(buf.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
     expect(buf.length).toBeGreaterThan(20_000);
@@ -93,11 +93,9 @@ test.describe('PNG download & share @smoke', () => {
     await expect.poll(() => page.evaluate(() => (window as any).__shared)).not.toBeNull();
     const s = await page.evaluate(() => (window as any).__shared);
     expect(s.files).toHaveLength(1);
-    expect(s.files[0]).toMatchObject({ name: 'nimshop-impact-card.png', type: 'image/png' });
+    expect(s.files[0]).toMatchObject({ name: 'nimshop-cashback-card.png', type: 'image/png' });
   });
   test('exporting twice works and revokes the old blob', async ({ page }) => {
-    // Record revocations: Firefox may still resolve a revoked blob: URL inside
-    // the same document for a while, so "does it still load" is not portable.
     await page.addInitScript(() => {
       const w = window as any; w.__revoked = [];
       const orig = URL.revokeObjectURL.bind(URL);

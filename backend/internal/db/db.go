@@ -89,9 +89,9 @@ type Store struct {
 	ledgerMu     sync.RWMutex
 	ledgerParams ledgerParamsFn
 
-	// treeEnrichment holds the tree-planting NIM address (set at boot).
-	treeMu         sync.RWMutex
-	treeEnrichment CashbackEnrichment
+	// cashbackEnrichment holds the burn NIM address and stablecoin multiplier (set at boot).
+	enrichMu           sync.RWMutex
+	cashbackEnrichment CashbackEnrichment
 
 	// Write-path counters, exported through HealthSnapshot. A rising
 	// write_conflicts rate is the earliest visible sign of a hot key; a
@@ -108,25 +108,31 @@ type Store struct {
 	closed atomic.Bool
 }
 
-// SetCashbackEnrichment configures runtime cashback tweaks (tree-planting
-// address, stablecoin cashback multiplier). Empty TreeAddr disables tree
-// routing; StableMult <= 0 or >= 1 disables the stablecoin reduction.
-func (s *Store) SetCashbackEnrichment(treeAddr string, stableMult float64) {
-	s.treeMu.Lock()
-	s.treeEnrichment = CashbackEnrichment{TreeAddr: treeAddr, StableMult: stableMult}
-	s.treeMu.Unlock()
+// SetCashbackEnrichment configures runtime cashback tweaks (burn wallet
+// address, stablecoin cashback multiplier). Empty BurnAddr defaults to the
+// canonical Nimiq burn wallet; StableMult <= 0 or >= 1 disables the stablecoin reduction.
+func (s *Store) SetCashbackEnrichment(burnAddr string, stableMult float64) {
+	if strings.TrimSpace(burnAddr) == "" {
+		burnAddr = BurnNIMAddress
+	}
+	s.enrichMu.Lock()
+	s.cashbackEnrichment = CashbackEnrichment{BurnAddr: burnAddr, StableMult: stableMult}
+	s.enrichMu.Unlock()
 }
 
-func (s *Store) treeEnrich() CashbackEnrichment {
-	s.treeMu.RLock()
-	defer s.treeMu.RUnlock()
-	return s.treeEnrichment
+func (s *Store) cashbackEnrich() CashbackEnrichment {
+	s.enrichMu.RLock()
+	defer s.enrichMu.RUnlock()
+	e := s.cashbackEnrichment
+	if strings.TrimSpace(e.BurnAddr) == "" {
+		e.BurnAddr = BurnNIMAddress
+	}
+	return e
 }
 
-// TreeEnrichment returns the boot-configured cashback enrichment (tree
-// planting address + stablecoin cashback multiplier). Exported for callers
-// outside the db package.
-func (s *Store) TreeEnrichment() CashbackEnrichment { return s.treeEnrich() }
+// GetCashbackEnrichment returns the boot-configured cashback enrichment (burn
+// wallet address + stablecoin cashback multiplier).
+func (s *Store) GetCashbackEnrichment() CashbackEnrichment { return s.cashbackEnrich() }
 
 // SetStakerLookupDetailed installs the pool resolver. The pool's answer —
 // stake, staked, and its cashback base — is applied verbatim; passing nil

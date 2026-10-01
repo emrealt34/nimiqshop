@@ -36,7 +36,7 @@ export type AppConfig = {
 };
 
 const DEFAULTS: AppConfig = {
-  API_BASE: 'https://shopapi.nimiqbase.com/api',
+  API_BASE: '/api',
   SITE_HOST: 'shop.nimiqbase.com',
   FRONTEND_URL: 'https://shop.nimiqbase.com',
   HUB_URL: 'https://hub.nimiq.com',
@@ -55,7 +55,11 @@ export function readAppConfig(): AppConfig {
   return Object.assign({ ...DEFAULTS }, injected || {});
 }
 
-export const CFG: AppConfig = readAppConfig();
+export const CFG: AppConfig = new Proxy({ ...DEFAULTS }, {
+  get(_target, prop: string) {
+    return readAppConfig()[prop];
+  },
+});
 
 /**
  * isTestMode resolves whether the CURRENT ORDER is a simulated one.

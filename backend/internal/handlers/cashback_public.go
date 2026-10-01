@@ -140,7 +140,7 @@ func (h *Handlers) usdtMultFor(q db.Quote) float64 {
 	if paymentMethodOf(q) != PaymentMethodUSDT {
 		return 1
 	}
-	enrich := h.Store.TreeEnrichment()
+	enrich := h.Store.GetCashbackEnrichment()
 	if enrich.StableMult > 0 && enrich.StableMult <= 1 {
 		return enrich.StableMult
 	}

@@ -94,6 +94,6 @@ export type DeliveryInfo = {
   email: string;
   phones: Map<unknown, string>;
   paymentMethod?: 'nimiq_pay' | 'usdt_polygon';
-  cashbackDestination?: 'cashback' | 'trees';
+  cashbackDestination?: 'cashback' | 'burn';
   anonymous?: boolean;
 };

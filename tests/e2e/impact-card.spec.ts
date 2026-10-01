@@ -1,6 +1,6 @@
 /**
- * "Your impact card" on /plant-trees — responsive layout across widths ×
- * languages × tree counts. Regression guard for buttons overflowing on
+ * "Your cashback card" on /cashback — responsive layout across widths ×
+ * languages × preferences. Regression guard for buttons overflowing on
  * 320px, rows drifting out of alignment, clipped labels.
  */
 import { test, expect, open, overflowingChildren, clippedText, hasHorizontalScroll } from './support/fixtures';
@@ -9,13 +9,13 @@ import { LANGS, path } from './support/data';
 const CARD = 'section.pt-impact';
 const ROWS = ['.pt-impact-metrics-label', '.pt-impact-metrics', '.pt-impact-status', '.pt-impact-share-head', '.pt-actions'];
 
-for (const trees of [0, 1234.5, 1234567]) {
+for (const preference of ['cashback', 'burn'] as const) {
   for (const width of [320, 390, 768, 1280]) {
     for (const lang of LANGS) {
-      test.describe(`impact card · ${trees} trees · ${width}px · ${lang}`, () => {
-        test.use({ viewport: { width, height: 900 }, lang, api: { trees, planted: trees > 20 ? 12 : 0 } });
+      test.describe(`cashback card · ${preference} · ${width}px · ${lang}`, () => {
+        test.use({ viewport: { width, height: 900 }, lang, api: { preference } });
         test('no overflow, clipping or misalignment', async ({ page }) => {
-          await open(page, path('/plant-trees'));
+          await open(page, path('/cashback'));
           const card = page.locator(CARD).first();
           await expect(card).toBeVisible();
           await card.scrollIntoViewIfNeeded();
@@ -39,12 +39,12 @@ for (const trees of [0, 1234.5, 1234567]) {
   }
 }
 
-test.describe('impact card · signed out @smoke', () => {
+test.describe('cashback card · signed out @smoke', () => {
   test.use({ api: { authed: false } });
   for (const width of [320, 1280]) {
     test(`${width}px shows the connect prompt without overflow`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
-      await open(page, path('/plant-trees'));
+      await open(page, path('/cashback'));
       await expect(page.locator(`${CARD} .pt-impact-empty`)).toBeVisible();
       expect(await overflowingChildren(page, CARD)).toEqual([]);
     });
