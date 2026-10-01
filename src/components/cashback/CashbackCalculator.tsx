@@ -18,6 +18,14 @@ import { FALLBACK_RAMP_DAYS, fmtStakeNIM, pctLabel, type StakeCashbackProgram } 
 import { NimUnit } from './CashbackPage';
 import { useT } from '../../i18n';
 
+/**
+ * Stake slider range, per operator request: 100K → 1B NIM. This is the
+ * CALCULATOR's presentation range only — the real staking minimum stays
+ * programme.min_stake_nim (100 NIM), which the stake flow and the backend's
+ * accrual (stakeledger MinStakeNIM) keep enforcing. 0 remains reachable via
+ * the "not staked" toggle so the no-stake scenario stays comparable.
+ */
+const STAKE_MIN_CALC = 100_000;
 const STAKE_MAX = 1_000_000_000;
 /** Monthly order value slider, NIM: 1K → 10M. */
 const SPEND_MIN = 1_000;
@@ -86,7 +94,8 @@ export function CashbackCalculator({
   onUseAmount?: (nim: number) => void;
 }) {
   const stakeMin = Math.max(1, program.min_stake_nim || 100);
-  const [stake, setStake] = useState<number>(() => (myStakeNIM && myStakeNIM > 0 ? myStakeNIM : 10_000));
+  const [stake, setStake] = useState<number>(() =>
+    myStakeNIM && myStakeNIM > 0 ? clampStake(myStakeNIM, STAKE_MIN_CALC) : STAKE_MIN_CALC);
   const [stakeText, setStakeText] = useState<string>('');
   const [spend, setSpend] = useState<number>(SPEND_MIN);
   const [spendText, setSpendText] = useState<string>('');
@@ -108,7 +117,7 @@ export function CashbackCalculator({
   }, []);
 
   useEffect(() => {
-    if (myStakeNIM && myStakeNIM > 0) setStake(myStakeNIM);
+    if (myStakeNIM && myStakeNIM > 0) setStake(clampStake(myStakeNIM, STAKE_MIN_CALC));
   }, [myStakeNIM]);
   useEffect(() => {
     if (myLoyaltyDays !== undefined) setLoyalty(Math.max(0, myLoyaltyDays));
@@ -189,7 +198,7 @@ export function CashbackCalculator({
                 }}
                 onBlur={() => {
                   const n = parseNim(stakeText);
-                  if (!Number.isNaN(n)) setStake(clampStake(n, stakeMin));
+                  if (!Number.isNaN(n)) setStake(clampStake(n, STAKE_MIN_CALC));
                   setStakeText('');
                 }}
               />
@@ -201,15 +210,15 @@ export function CashbackCalculator({
             min={0}
             max={1000}
             step={1}
-            value={stakedOff ? 0 : Math.round(valueToSlider(stake, stakeMin, STAKE_MAX) * 1000)}
+            value={stakedOff ? 0 : Math.round(valueToSlider(stake, STAKE_MIN_CALC, STAKE_MAX) * 1000)}
             onChange={(e) => {
               setStakeText('');
-              setStake(sliderToValue(Number(e.target.value) / 1000, stakeMin, STAKE_MAX));
+              setStake(sliderToValue(Number(e.target.value) / 1000, STAKE_MIN_CALC, STAKE_MAX));
             }}
             aria-label={t('cashback.calcStakeSlider')}
           />
           <span className="cb-slider-foot">
-            <span className="xs faint">{fmtStakeNIM(stakeMin)} NIM</span>
+            <span className="xs faint">{fmtStakeNIM(STAKE_MIN_CALC)} NIM</span>
             <span className="xs faint">{stakedOff ? t('cashback.calcNoStakeSmall') : ''}</span>
             <span className="xs faint">1B NIM</span>
           </span>
