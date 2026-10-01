@@ -85,12 +85,15 @@
 /vendor/*
   Cache-Control: public, max-age=31536000, immutable
 
-# Icons and product imagery are NOT content-hashed (they are referenced by
-# stable paths like /img/icon-512.png), so they get a long-but-finite TTL with
-# revalidation rather than "immutable" — an operator swapping a logo should not
-# have to wait a year or cache-bust by hand.
+# /img/* is versioned BY CONVENTION: every reference that may ever change
+# carries a ?v= tag (icons: ?v=nim-favicon-2 / ?v=nim-brand-1, flags:
+# ?v=nim-flags-1, hexagon: ?v=40), and a query string is a new cache key, so
+# the origin file itself can be cached immutable for a year. PageSpeed was
+# flagging the old 7-day TTL on every repeat visit; swapping artwork now means
+# bumping the constant next to the reference (one grep away) instead of
+# waiting out a TTL.
 /img/*
-  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+  Cache-Control: public, max-age=31536000, immutable
 
 # The offline fallback catalog is a build artifact refreshed on deploy; a day
 # is long enough to matter and short enough to self-correct.

@@ -99,7 +99,9 @@ function normalise(country?: string | null): string {
 }
 
 function srcFor(stage: Stage, cc: string): string {
-  return stage === 'local' ? asset(`/img/flags/${cc}.svg`) : `https://flagcdn.com/${cc}.svg`;
+  // The ?v= tag is what lets _headers serve /img/* as immutable: swapping
+  // flag artwork means bumping it (see scripts/fetch-flags.mjs).
+  return stage === 'local' ? asset(`/img/flags/${cc}.svg?v=nim-flags-1`) : `https://flagcdn.com/${cc}.svg`;
 }
 
 export interface FlagHexProps {

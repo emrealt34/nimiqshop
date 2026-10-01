@@ -388,12 +388,27 @@ export function Router({
   const onInitial = loc.path === initialNorm;
   // Unknown routes (direct load OR client navigation) get a designed 404 —
   // never a silent Home and never a blank content area.
+  //
+  // SUSPENSE LIVES ONLY AROUND THE LAZY BRANCH. Wrapping the initial page in
+  // a boundary made the static build serialise it as a *pending* boundary
+  // (`<!--$?-->` + the skeleton fallback, real content streamed in a hidden
+  // div whose swap script sits at the END of the island): the browser painted
+  // the skeleton frame first and jumped to the real page when the swap ran —
+  // measured 0.082 CLS (the footer travelling) plus a ~450 ms LCP render
+  // delay, because the LCP heading was not in the first paint at all. The
+  // initial document needs no boundary: its page element is already loaded
+  // (it is what the server rendered), so nothing can suspend. Client
+  // navigations load their page chunk on demand and keep the fallback.
   let pageNode: ReactNode;
   if (!route) pageNode = <NotFound />;
   else if (onInitial) pageNode = initialPage;
   else {
     const Comp = route.comp;
-    pageNode = <Comp />;
+    pageNode = (
+      <Suspense fallback={<RouteFallback />}>
+        <Comp />
+      </Suspense>
+    );
   }
 
   const value = useMemo<RouterValue>(
@@ -404,11 +419,9 @@ export function Router({
   const content = <>
       {shell}
       <div id="page-content" tabIndex={-1}>
-      <Suspense fallback={<RouteFallback />}>
         {/* keyed by path+query so a new ?id=… remounts the page and re-reads it */}
         <Fragment key={loc.path + loc.search}>{pageNode}</Fragment>
         <RouteFocus />
-      </Suspense>
       </div>
     </>;
   return (

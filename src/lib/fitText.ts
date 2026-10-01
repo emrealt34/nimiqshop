@@ -181,95 +181,187 @@ function gapBetween(container: HTMLElement, items: HTMLElement[]): number {
   return total / Math.max(1, items.length - 1);
 }
 
-/**
- * Fit one rail: all items share a single font size, none of them may clip.
- * The first step is model-based — text width is linear in font size, while the
- * paddings and gaps around it are fixed — and every following step is a real
- * measurement, so two or three steps are usually all it takes.
- */
-function fitGroup(container: HTMLElement) {
+/* ---------------------------------------------------------------------------
+ * BATCHED FITTING
+ *
+ * The first version of this module fitted every rail and every label in its
+ * own little loop: write a size, measure, write, measure. A measurement taken
+ * right after a style write forces the browser to recompute layout
+ * synchronously (the "forced reflow" PageSpeed insight), and with ~15 fitted
+ * elements, up to five steps each and three relax rounds, a single pass
+ * produced dozens of synchronous layout flushes (~60 ms attributed on a
+ * phone, together with the resize handler).
+ *
+ * The state machine below runs the SAME algorithm with the DOM access
+ * synchronised: each step is one WRITE phase (apply the pending sizes of all
+ * active targets) followed by one READ phase (measure all active targets),
+ * so a step costs a single layout flush instead of one per element. A target
+ * drops out the moment its own loop would have broken, so the fitted sizes
+ * are unchanged.
+ * ------------------------------------------------------------------------- */
+
+interface GroupFit {
+  container: HTMLElement;
+  items: HTMLElement[];
+  base: number;
+  floor: number;
+  room: number;
+  size: number;
+  text: number;
+  ell: boolean;
+  active: boolean;
+  pending: number | null;
+}
+
+interface SingleFit {
+  el: HTMLElement;
+  base: number;
+  floor: number;
+  mode: string | null;
+  size: number;
+  box: number;
+  /** textWidth() of the current step — read in the read phase, used in compute. */
+  textWidthCache: number;
+  ell: boolean;
+  active: boolean;
+  pending: number | null;
+}
+
+export function makeGroupFit(container: HTMLElement): GroupFit | null {
   const items = Array.from(container.querySelectorAll<HTMLElement>('[data-fit-item]'));
-  if (!items.length) return;
+  if (!items.length) return null;
+  return { container, items, base: 0, floor: 0, room: 0, size: 0, text: 0, ell: false, active: false, pending: null };
+}
 
-  items.forEach((item) => { freeze(item); item.style.removeProperty('font-size'); });
-  const avail = contentBox(container);
-  if (!(avail > 0)) return;
+export function makeSingleFit(el: HTMLElement): SingleFit {
+  return { el, base: 0, floor: 0, mode: el.getAttribute('data-fit'), size: 0, box: 0, textWidthCache: 0, ell: false, active: false, pending: null };
+}
 
-  const base = pxOf(getComputedStyle(items[0]).fontSize, 12);
-  const floor = fitFloor(container, base);
-  container.setAttribute(FIT_BASE, base.toFixed(2));
-  const gaps = gapBetween(container, items) * (items.length - 1);
-  const fixed = gaps + items.reduce((sum, item) => sum + padX(item), 0);
-  const room = avail - fixed;
+/* ---- WRITE phases: style mutations only, never a read afterwards -------- */
 
-  let size = base;
-  for (let step = 0; step < MAX_STEPS; step += 1) {
-    const text = items.reduce((sum, item) => sum + textWidth(item), 0);
-    if (!items.some((item) => ellipsized(item))) break;
-    if (size <= floor) break;
+function resetGroups(gs: GroupFit[]) {
+  for (const g of gs) {
+    g.items.forEach((item) => { freeze(item); item.style.removeProperty('font-size'); });
+    g.active = true;
+    g.pending = null;
+  }
+}
+
+function resetSingles(ss: SingleFit[]) {
+  for (const f of ss) {
+    freeze(f.el);
+    f.el.style.removeProperty('font-size');
+    f.el.style.removeProperty('white-space');
+    f.el.style.removeProperty('overflow-wrap');
+    f.active = true;
+    f.pending = null;
+  }
+}
+
+function writePending(gs: GroupFit[], ss: SingleFit[]) {
+  for (const g of gs) {
+    if (g.pending !== null) { const size = g.pending; g.items.forEach((item) => setSize(item, size)); g.pending = null; }
+  }
+  for (const f of ss) {
+    if (f.pending !== null) { setSize(f.el, f.pending); f.pending = null; }
+  }
+}
+
+/* ---- READ phases: measurements only, never a write in between ----------- */
+
+function measureGroups(gs: GroupFit[]) {
+  for (const g of gs) {
+    if (!g.active) continue;
+    const avail = contentBox(g.container);
+    if (!(avail > 0)) { g.active = false; continue; }
+    const base = pxOf(getComputedStyle(g.items[0]).fontSize, 12);
+    const gaps = gapBetween(g.container, g.items) * (g.items.length - 1);
+    const fixed = gaps + g.items.reduce((sum, item) => sum + padX(item), 0);
+    g.base = base;
+    g.floor = fitFloor(g.container, base);
+    g.room = avail - fixed;
+    g.size = base;
+    g.container.setAttribute(FIT_BASE, base.toFixed(2));
+  }
+}
+
+function measureSingles(ss: SingleFit[]) {
+  for (const f of ss) {
+    if (!f.active) continue;
+    f.base = pxOf(getComputedStyle(f.el).fontSize, 12);
+    f.floor = fitFloor(f.el, f.base);
+    f.mode = f.el.getAttribute('data-fit');
+    f.size = f.base;
+    f.textWidthCache = 0;
+  }
+}
+
+function readStep(gs: GroupFit[], ss: SingleFit[]) {
+  for (const g of gs) {
+    if (!g.active) continue;
+    g.text = g.items.reduce((sum, item) => sum + textWidth(item), 0);
+    g.ell = g.items.some((item) => ellipsized(item));
+  }
+  for (const f of ss) {
+    if (!f.active) continue;
+    f.ell = ellipsized(f.el);
+    // Only pay for the width measurement when a shrink is actually possible.
+    f.box = f.ell && f.size > f.floor ? contentBox(f.el) : 0;
+    if (f.box) f.textWidthCache = textWidth(f.el);
+  }
+}
+
+/* ---- COMPUTE: pure maths, decides the next write ------------------------ */
+
+function computeStep(gs: GroupFit[], ss: SingleFit[]) {
+  for (const g of gs) {
+    if (!g.active) continue;
+    if (!g.ell || g.size <= g.floor) { g.active = false; continue; }
     // Headroom left for the text: what the rail has minus the fixed parts.
-    const target = room > 0 && text > 0 ? base * (room / text) * RELAX : floor;
-    const next = Math.max(floor, Math.min(size - 0.05, target));
-    if (!(next < size)) break;
-    size = next;
-    items.forEach((item) => { setSize(item, size); });
+    const target = g.room > 0 && g.text > 0 ? g.base * (g.room / g.text) * RELAX : g.floor;
+    const next = Math.max(g.floor, Math.min(g.size - 0.05, target));
+    if (!(next < g.size)) { g.active = false; continue; }
+    g.size = next;
+    g.pending = next;
   }
-
-  // Remember what the rail had to settle for: the row budget below uses it to
-  // tell "the labels shrank a little" from "the labels had to shrink so far
-  // that the row should take its compact shape instead".
-  container.setAttribute(FIT_BASE, base.toFixed(2));
-  container.setAttribute(FIT_SIZE, size.toFixed(2));
-}
-
-/**
- * Fit one label. mode "wrap" (data-fit="wrap") falls back to wrapping when the
- * shrink floor is not enough, so no text is ever lost.
- */
-function fitSingle(el: HTMLElement) {
-  freeze(el);
-  el.style.removeProperty('font-size');
-  el.style.removeProperty('white-space');
-  el.style.removeProperty('overflow-wrap');
-
-  const base = pxOf(getComputedStyle(el).fontSize, 12);
-  const floor = fitFloor(el, base);
-  const mode = el.getAttribute('data-fit');
-
-  let size = base;
-  for (let step = 0; step < MAX_STEPS; step += 1) {
-    if (!ellipsized(el)) return;
-    if (size <= floor) break;
-    const next = Math.max(floor, Math.min(size - 0.05, base * (contentBox(el) / textWidth(el)) * RELAX));
-    if (!(next < size)) break;
-    size = next;
-    setSize(el, size);
-  }
-
-  // Still too long at the floor and wrapping is allowed → let it wrap, and if
-  // that is not enough either (one long word in a tab-bar cell) break the word
-  // rather than cut it: a small label is readable, an ellipsized one is not.
-  if (mode === 'wrap' && ellipsized(el)) {
-    el.style.setProperty('white-space', 'normal', 'important');
-    if (ellipsized(el)) el.style.setProperty('overflow-wrap', 'anywhere', 'important');
+  for (const f of ss) {
+    if (!f.active) continue;
+    if (!f.ell || f.size <= f.floor) { f.active = false; continue; }
+    const tw = f.textWidthCache || 1;
+    const next = Math.max(f.floor, Math.min(f.size - 0.05, f.base * (f.box / tw) * RELAX));
+    if (!(next < f.size)) { f.active = false; continue; }
+    f.size = next;
+    f.pending = next;
   }
 }
 
-/**
- * True while any rail still shows an ellipsized item. A 1px tolerance here on
- * purpose: the row must only take its compact shape for a *visible* cut, not
- * for the sub-pixel rounding every long label has.
- */
+/** mode "wrap" (data-fit="wrap") falls back to wrapping when the shrink floor
+ *  is not enough, so no text is ever lost; one long word in a tab-bar cell
+ *  breaks rather than gets cut. Two extra read/write pairs, batched. */
+function wrapFallback(ss: SingleFit[]) {
+  const wrappers = ss.filter((f) => f.mode === 'wrap');
+  if (!wrappers.length) return;
+  for (const f of wrappers) f.ell = ellipsized(f.el);
+  const first = wrappers.filter((f) => f.ell);
+  if (!first.length) return;
+  for (const f of first) f.el.style.setProperty('white-space', 'normal', 'important');
+  for (const f of first) f.ell = ellipsized(f.el);
+  for (const f of first) {
+    if (f.ell) f.el.style.setProperty('overflow-wrap', 'anywhere', 'important');
+  }
+}
+
+/** True while any rail still shows an ellipsized item. A 1px tolerance here on
+ *  purpose: the row must only take the compact shape for a *visible* cut, not
+ *  for the sub-pixel rounding every long label has. */
 function railClipped(): boolean {
   return Array.from(document.querySelectorAll<HTMLElement>('[data-fit-group]')).some((group) =>
     Array.from(group.querySelectorAll<HTMLElement>('[data-fit-item]')).some((item) => ellipsized(item, 1)));
 }
 
-/**
- * True while a rail had to shrink past SQUEEZE_AT of its base size to fit.
- * Nine-pixel links are not a fit, they are a surrender — the row gives them
- * room instead (icon-only wallet button, tighter gaps).
- */
+/** True while a rail had to shrink past SQUEEZE_AT of its base size to fit.
+ *  Nine-pixel links are not a fit, they are a surrender — the row gives them
+ *  room instead (icon-only wallet button, tighter gaps). */
 function railSqueezed(): boolean {
   return Array.from(document.querySelectorAll<HTMLElement>('[data-fit-group]')).some((group) => {
     const base = pxOf(group.getAttribute(FIT_BASE), 0);
@@ -283,13 +375,37 @@ function rowOutOfRoom(): boolean {
   return railClipped() || railSqueezed();
 }
 
-/** Run the rails and the single labels to a settled state. */
-function relax(groups: HTMLElement[], singles: HTMLElement[]) {
+/** One relax: two full rounds (rails + labels) plus a rails-only round, the
+ *  same pass count the per-element loops used. Rounds restart from the CSS
+ *  base size, so a pass stays idempotent and labels can grow back. */
+function relax(gs: GroupFit[], ss: SingleFit[]) {
   for (let round = 0; round < 2; round += 1) {
-    groups.forEach(fitGroup);
-    singles.forEach(fitSingle);
+    resetGroups(gs);
+    resetSingles(ss);
+    measureGroups(gs);
+    measureSingles(ss);
+    for (let step = 0; step < MAX_STEPS; step += 1) {
+      if (!gs.some((g) => g.active) && !ss.some((f) => f.active)) break;
+      readStep(gs, ss);
+      computeStep(gs, ss);
+      writePending(gs, ss);
+    }
+    wrapFallback(ss);
   }
-  groups.forEach(fitGroup);
+  resetGroups(gs);
+  measureGroups(gs);
+  for (let step = 0; step < MAX_STEPS; step += 1) {
+    if (!gs.some((g) => g.active)) break;
+    readStep(gs, []);
+    computeStep(gs, []);
+    writePending(gs, []);
+  }
+  // Only rails that were actually measured carry a settled size; a hidden rail
+  // (nav below its breakpoint) must not advertise 0.00 — railSqueezed() reads
+  // this attribute and 0 would mask a real squeeze from an earlier pass.
+  for (const g of gs) {
+    if (g.base > 0) g.container.setAttribute(FIT_SIZE, g.size.toFixed(2));
+  }
 }
 
 /**
@@ -337,7 +453,9 @@ export function fitNow() {
 
   // 1. the roomy state: how the row looks with everything it has
   rows.forEach((row) => row.removeAttribute(TIGHT));
-  relax(groups, singles);
+  const gStates = groups.map(makeGroupFit).filter((g): g is GroupFit => g !== null);
+  const sStates = singles.map(makeSingleFit);
+  relax(gStates, sStates);
 
   // 2. a rail that cannot fit — or that had to shrink past its squeeze point —
   //    means the row is out of room. Tighten one step at a time and stop as
@@ -346,7 +464,7 @@ export function fitNow() {
   //    from the roomy measurement, so it is stable from pass to pass.
   for (let level = 1; level <= MAX_TIGHT && rowOutOfRoom(); level += 1) {
     rows.forEach((row) => row.setAttribute(TIGHT, String(level)));
-    relax(groups, singles);
+    relax(gStates, sStates);
   }
   thawSoon();
 }

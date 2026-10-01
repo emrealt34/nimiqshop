@@ -803,11 +803,16 @@ input[type="range"]::-moz-range-track {
 .note-box.info{ background:var(--blue-soft); border-color:rgba(78, 97, 114, 0.4); color:var(--ink-on-blue)}
 @media (max-width:480px){ .note-box{ padding:8px 10px; font-size:0.75rem; gap:7px} }
 
-/* ---------- 11. Modal / bottom sheet ---------- */
+/* ---------- 11. Modal / bottom sheet ----------
+   STACKING: overlays sit at 1000 — above every piece of chrome (topbar 80,
+   tabbar 60/100, menus 60-80) and below toasts (1100). They used to live at
+   100, the same value the tabbar takes under 900px, so on phones the bar
+   painted over the open sheet ("elements on top of the overlay"). Components
+   must NOT pin their own z-index inline; this class is the single authority. */
 .overlay {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: 1000;
   background: rgba(62, 46, 26, 0.5);
   -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
@@ -887,7 +892,9 @@ input[type="range"]::-moz-range-track {
 /* ---------- 12. Toasts ---------- */
 .toasts {
   position: fixed;
-  z-index: 200;
+  /* Above overlays (1000): a toast must be readable on top of an open sheet.
+     Same value as .toast-stack in fixes.css — the two names coexist. */
+  z-index: 1100;
   left: 50%;
   transform: translateX(-50%);
   bottom: calc(var(--tabbar-h) + var(--sab) + 14px);
@@ -2201,14 +2208,16 @@ a.product-card:hover { text-decoration: none; }
 .order-card .thumb.thumb-bp{ width:104px; height:104px} /* SIZE-PARITY FIX: order-list thumbs match the cart tile (104px) */
 .thumb.thumb-detail.thumb-bp{ width:104px !important; height:104px !important}
 @keyframes pulse-dot{ 50%{ opacity:0.25} }
-.overlay{ position:fixed; inset:0; z-index:100; background:rgba(62, 46, 26, 0.5); -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px); display:none; align-items:flex-end; justify-content:center; padding:0}
-@media (min-width:720px){ .overlay{ align-items:center; padding:24px} }
-.sheet{ position:relative; width:100%; max-height:calc(100dvh - var(--sat) - 12px); background:var(--surface-1); border-radius:var(--r-xl) var(--r-xl) 0 0; border:2px solid var(--line-strong); border-bottom:0; display:flex; flex-direction:column; overflow:hidden; animation:sheet-up 0.28s var(--ease); padding-bottom:var(--sab); box-shadow:var(--shadow-2)}
-@media (min-width:720px){ .sheet{ max-width:560px; max-height:min(86dvh, 860px); border-radius:var(--r-xl); border-bottom:2px solid var(--line-strong)} .sheet.wide{ max-width:720px} }
+/* NOTE: the duplicate .overlay/.sheet definitions that used to sit here were
+   removed. Two same-specificity copies of a selector are a cascade landmine:
+   the critical-css split can land the base copy in one sheet and the @media
+   override in the other (or reorder them inside the deferred sheet), which
+   is exactly how the desktop dialog ended up glued to the bottom edge.
+   Section 11 above is the single definition. */
 @keyframes sheet-up{ from{ transform:translateY(46px); opacity:0.4} }
 @keyframes fade{ from{ opacity:0} }
 @keyframes pop{ from{ transform:scale(0.96); opacity:0} }
-.toasts{ position:fixed; z-index:200; left:50%; transform:translateX(-50%); bottom:calc(var(--tabbar-h) + var(--sab) + 14px); display:flex; flex-direction:column; gap:8px; width:min(430px, calc(100vw - 28px)); pointer-events:none}
+.toasts{ position:fixed; z-index:1100; left:50%; transform:translateX(-50%); bottom:calc(var(--tabbar-h) + var(--sab) + 14px); display:flex; flex-direction:column; gap:8px; width:min(430px, calc(100vw - 28px)); pointer-events:none}
 @media (min-width:900px){ .toasts{ bottom:26px} }
 @keyframes toast-in{ from{ transform:translateY(14px); opacity:0} }
 @keyframes toast-out{ to{ transform:translateY(10px); opacity:0} }

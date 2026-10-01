@@ -33,7 +33,9 @@ export function NimiqPayInstallDialog({ onClose }: { onClose: () => void }) {
       aria-modal="true"
       aria-label={t('login.payInstallTitle')}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-      style={{ zIndex: 80 }}
+      /* No inline z-index: .overlay (app.css section 11) is the single
+         stacking authority for overlays (1000, above the tabbar). An inline
+         zIndex:80 here used to drop this dialog UNDER the mobile tabbar. */
     >
       <div className="sheet" style={{ maxWidth: 460 }}>
         <div className="sheet-head" style={{ justifyContent: 'flex-end' }}>

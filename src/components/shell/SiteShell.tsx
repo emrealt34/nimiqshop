@@ -127,7 +127,7 @@ function Brand() {
       ) : (
         <img
           src={asset("/img/brand-icon-50.webp")}
-          srcSet={`${asset("/img/brand-icon-50.webp")} 50w, ${asset("/img/brand-icon-80.webp")} 80w`}
+          srcSet={`${asset("/img/brand-icon-50.webp?v=nim-brand-1")} 50w, ${asset("/img/brand-icon-80.webp?v=nim-brand-1")} 80w`}
           sizes="(max-width: 960px) 35px, 40px"
           alt=""
           width={40}

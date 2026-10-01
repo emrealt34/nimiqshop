@@ -79,10 +79,21 @@ const norm = (text) => text.replace(/\s+/g, ' ').trim();
  * Rules whose absence would be visible in the first frame no matter what the
  * tour saw, or that are not matched by any element at all.
  */
+/** Interactive chrome that must never wait for the deferred sheet. Overlays,
+ *  sheets, menus and the bars only appear on interaction — usually after the
+ *  flip, but a flip that races (slow network, blocked request) left them
+ *  unstyled, and the deferred sheet's own rule order once inverted the
+ *  `.overlay` cascade (base rule after its @media override → the desktop
+ *  dialog stuck to the bottom edge). A few KB in the first paint buys
+ *  "chrome is always correct, whenever it opens". */
+const ALWAYS_INLINE_SELECTORS = [
+  '.overlay', '.sheet', '.sheet-backdrop', '.toast', '.toasts', '.toast-stack',
+  '.tabbar', '.topbar', '.acct-menu', '.country-pop',
+];
 function alwaysInline(rule) {
   if (rule.selector === ':root') return true;
   if (rule.selector.includes('font-face')) return true;
-  return false;
+  return ALWAYS_INLINE_SELECTORS.some((sel) => (rule.selector || '').includes(sel));
 }
 
 const buildLoader = (islandScriptBody) => `/* css-late.js — apply the deferred stylesheet and hydrate islands after first paint. */
@@ -167,6 +178,7 @@ export default function criticalCss() {
         let prefixes = new Set();
         const rewritten = new Map();
         let islandScriptBody = '';
+        let repCss = '';
 
         for (const file of htmlFiles) {
           const html = await readFile(file, 'utf8');
@@ -251,6 +263,12 @@ export default function criticalCss() {
 
           const { keep, move } = split(root, '');
           for (const text of move) if (!deferred.has(text)) deferred.set(text, true);
+          // Remember one representative copy of the source sheet: the deferred
+          // file is re-emitted in THIS order at the end (see deferredCss),
+          // because deduping across pages in walk order once inverted a
+          // same-specificity cascade (a @media override landed before its base
+          // rule and silently lost).
+          if (!repCss || /(^|\/)index\.html$/.test(file)) repCss = biggest[1];
           const inline = keep.join('\n');
           // Resolve the asset prefix from a URL the page already carries, so a
           // non-root `base` (GitHub Pages) works without duplicating Astro's
@@ -268,7 +286,21 @@ export default function criticalCss() {
         }
 
         const loaderCode = buildLoader(islandScriptBody);
-        const deferredCss = [...deferred.keys()].join('\n');
+        // Re-emit the deferred rules in SOURCE order. The set was deduped
+        // across pages in filesystem walk order, which is unrelated to the
+        // cascade: a base rule and its same-specificity @media override can
+        // end up inverted in the deferred sheet, and the override then loses
+        // forever (measured once for real: the desktop overlay centering).
+        // Every page carries the same full sheet, so positions in one
+        // representative copy give the canonical order; rules absent from it
+        // keep their first-seen order at the end (stable sort).
+        const deferredCss = [...deferred.keys()]
+          .sort((a, b) => {
+            const ia = repCss.indexOf(a);
+            const ib = repCss.indexOf(b);
+            return (ia === -1 ? Number.MAX_SAFE_INTEGER : ia) - (ib === -1 ? Number.MAX_SAFE_INTEGER : ib);
+          })
+          .join('\n');
         const cssHash = createHash('sha256').update(deferredCss).digest('hex').slice(0, 8);
         const jsHash = createHash('sha256').update(loaderCode).digest('hex').slice(0, 8);
         const cssName = `full.${cssHash}.css`;
