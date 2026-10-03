@@ -54,7 +54,7 @@ export function collectFindings(report) {
 }
 
 function main() {
-  let raw = '';
+  let raw;
   try {
     raw = execFileSync('npm', ['audit', '--json'], { encoding: 'utf8', maxBuffer: 128 * 1024 * 1024 });
   } catch (err) {

@@ -190,7 +190,7 @@ func (h *Handlers) FXRefreshNow() (int, time.Time, error) {
 	if err != nil {
 		return 0, time.Time{}, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return 0, time.Time{}, fmt.Errorf("fx feed: HTTP %d", resp.StatusCode)
 	}
