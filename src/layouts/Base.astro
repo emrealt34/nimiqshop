@@ -61,6 +61,11 @@ if (shelfSeed) {
   }
 }
 
+// The market the build's shelf seed belongs to; the boot script hides that grid
+// for a visitor whose market is known to be different (see the market hold below
+// and the CSS block in app.css).
+const seedCountry = String((seedPayload && (seedPayload as { country?: string }).country) || 'TR');
+
 // ---- Content Security Policy --------------------------------------------
 //
 // The CSP used to be one hardcoded string that shipped the development
@@ -317,7 +322,7 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
         the backend through the Cloudflare tunnel, so a geo lookup would resolve
         the tunnel egress (or a VPN), not the buyer. Self-contained on purpose:
         an is:inline script has its own scope, so it re-reads what it needs. */}
-    <script is:inline define:vars={{ assetBase }}>
+    <script is:inline define:vars={{ assetBase, seedCountry }}>
       (function () {
         try {
           var two = /^[a-z]{2}$/;
@@ -354,7 +359,7 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
           }
           var base = typeof assetBase === 'string' ? assetBase : '';
           var files = [
-            base + '/data/catalog/brands/' + (cc || 'TR') + '.json',
+            base + '/data/catalog/brands/' + (cc || seedCountry || 'TR') + '.json',
             base + '/data/market/fx.json',
             base + '/data/market/nim-rate.json',
           ];
@@ -366,6 +371,23 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
           var pc = document.createElement('link');
           pc.rel = 'preconnect'; pc.href = 'https://cdn.cryptorefills.com';
           document.head.appendChild(pc);
+
+          // MARKET HOLD — the server-rendered grid is the build's own market
+          // (the shelf seed). A visitor whose market we already know to be
+          // different must not see those brands for a beat: measured, a US
+          // visitor saw "Amazon.com.tr" from 74 ms to 734 ms and THEN the US
+          // shelf. The stylesheet hides the seeded cards (the grid keeps its
+          // height, min-height:62vh) and pulses the shop's hexagon instead;
+          // HomePage removes the attribute in the same commit that puts the
+          // visitor's own catalog on screen. Same pattern and same 5 s safety
+          // timeout as the language hold above — a JS-less visitor never gets
+          // the attribute at all.
+          var sc = typeof seedCountry === 'string' ? seedCountry : '';
+          if (cc && sc && cc !== sc) {
+            var r = document.documentElement;
+            r.setAttribute('data-market-hold', '');
+            setTimeout(function () { r.removeAttribute('data-market-hold'); }, 5000);
+          }
         } catch (e) {}
       })();
     </script>

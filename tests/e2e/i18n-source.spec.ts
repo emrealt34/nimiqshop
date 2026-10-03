@@ -132,7 +132,18 @@ test.describe('outside Nimiq Pay', () => {
   });
 
   test('the market follows the device region, and no IP lookup happens', async ({ page, requests }) => {
-    await page.addInitScript({ content: FRESH + deviceLocale('de-DE') });
+    await page.addInitScript({ content: FRESH + deviceLocale('de-DE') + `
+      // What the visitor could actually read, sampled from the first tick.
+      window.__seen = [];
+      (function () {
+        var iv = setInterval(function () {
+          var m = document.body && /Amazon[.\w]*/.exec(document.body.innerText);
+          var brand = m ? m[0] : '';
+          if (brand && window.__seen.indexOf(brand) < 0) window.__seen.push(brand);
+        }, 20);
+        setTimeout(function () { clearInterval(iv); }, 4000);
+      })();
+    ` });
     const shelfFiles: string[] = [];
     page.on('request', (r) => { const u = r.url(); if (u.includes('/data/catalog/brands/')) shelfFiles.push(u); });
     await open(page, path('/'));
@@ -140,5 +151,11 @@ test.describe('outside Nimiq Pay', () => {
     await expect.poll(() => shelfFiles.some((u) => u.endsWith('/brands/DE.json'))).toBe(true);
     // …and the IP-based country suggestion is gone for good.
     expect(requests.filter((r) => r.includes('/geo')), 'no /api/geo call').toEqual([]);
+    // The server-rendered grid is the build's own market (TR). A de-DE visitor
+    // must never read those brands — the market hold covers them until the
+    // German shelf is on screen — and it must be released, not left stuck.
+    const seen = await page.evaluate(() => (window as any).__seen as string[]);
+    expect(seen.some((b) => b.endsWith('.com.tr')), `no Turkish brands were ever readable (saw ${JSON.stringify(seen)})`).toBe(false);
+    expect(await page.getAttribute('html', 'data-market-hold')).toBeNull();
   });
 });

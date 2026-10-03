@@ -94,6 +94,11 @@ export function HomePage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [shelfNote, setShelfNote] = useState('');
   const [busy, setBusy] = useState(true);
+  // Which country's catalog is on screen right now. Together with `busy` it is
+  // what releases Base.astro's market hold (the seeded grid is the build's own
+  // market, see the CSS block) — released in the commit that shows the
+  // visitor's own shelf, never before.
+  const [loadedCountry, setLoadedCountry] = useState('');
   const userChoseCountry = useRef(false);
   const mountAlive = useRef(true);
   const catalogRequest = useRef(0);
@@ -160,7 +165,9 @@ export function HomePage() {
     setShelfNote('');
     const cached = readCachedCatalog(c);
     const seed = seedOf();
-    setCatalogs(cached || (seed && seed.country === c ? seedMaps() : { gift_card: [], phone_refill: [], esim: [] }));
+    const instant = cached || (seed && seed.country === c ? seedMaps() : { gift_card: [], phone_refill: [], esim: [] });
+    setCatalogs(instant);
+    if (catalogHasItems(instant)) setLoadedCountry(c);
     setBusy(true);
     const results = await Promise.allSettled([listGiftCards(c, false), listTopups(c, false), listEsims(c, false)]);
     if (!current()) return;
@@ -178,6 +185,7 @@ export function HomePage() {
     if (!current()) return;
     setCatalogs(merged);
     setBusy(false);
+    if (catalogHasItems(merged)) setLoadedCountry(c);
     if (!missing.length) writeCachedCatalog(c, merged);
     else if (catalogHasItems(merged)) {
       setShelfNote(t('home.shelfNote'));
@@ -202,6 +210,14 @@ export function HomePage() {
     }
     void loadCatalogs(country);
   }, [country, loadCatalogs]);
+
+  // Release Base.astro's market hold: the visitor's own shelf is on screen.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const root = document.documentElement;
+    if (!root.hasAttribute('data-market-hold')) return;
+    if (!busy && loadedCountry && loadedCountry === country) root.removeAttribute('data-market-hold');
+  }, [busy, loadedCountry, country]);
 
   useEffect(() => {
     getFXRates().then((r) => {

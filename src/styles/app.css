@@ -270,6 +270,33 @@ html[data-i18n-hold]::after {
   0%, 100% { opacity: 0.25; transform: scale(0.88); }
   50% { opacity: 1; transform: scale(1); }
 }
+
+/* ---------- Boot market hold (set by Base.astro, released by HomePage) ----------
+   The server-rendered grid is the build's own market (window.__SHELF_SEED). For
+   a visitor whose market is already known to be different — the device region
+   says so — those cards are the wrong country's brands, so Base.astro marks the
+   document and HomePage drops the mark in the same commit that shows the right
+   catalog. The seeded cards are only hidden, never removed: the grid keeps its
+   min-height, so nothing collapses and the page does not move. Same hexagon as
+   the language hold, so the two read as one deliberate loading state. */
+html[data-market-hold] #gridWrap { position: relative; }
+html[data-market-hold] #gridWrap > * { visibility: hidden; }
+html[data-market-hold] #gridWrap::after {
+  content: "";
+  position: absolute;
+  top: 21vh;
+  left: 50%;
+  width: 34px;
+  height: 38px;
+  margin: -19px 0 0 -17px;
+  background: var(--gold-400, #C98A1B);
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  animation: i18n-hold-pulse 1.05s var(--ease) infinite;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-market-hold] #gridWrap::after { animation: none; opacity: 0.75; }
+}
 @media (prefers-reduced-motion: reduce) {
   html[data-i18n-hold]::after { animation: none; opacity: 0.75; }
 }
