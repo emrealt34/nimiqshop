@@ -253,6 +253,11 @@ export async function open(page: Page, url: string) {
     null,
     { timeout: 20_000 },
   );
+  // Non-English visitors are held behind the boot loader until their own
+  // strings are committed (Base.astro → src/i18n). Never measure or click a
+  // page that is still held — and let a stuck hold fail loudly here instead of
+  // quietly emptying the text-based assertions in i18n-ui.spec.
+  await page.waitForFunction(() => !document.documentElement.hasAttribute('data-i18n-hold'), null, { timeout: 20_000 });
   await page.waitForTimeout(300);
   return res;
 }

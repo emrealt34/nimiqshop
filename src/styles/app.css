@@ -239,6 +239,40 @@ body {
 }
 
 img, svg, canvas { display: block; max-width: 100%; }
+
+/* ---------- Boot language hold (set by Base.astro, released by src/i18n) ----------
+   A static build always serves English HTML, so a non-English visitor used to
+   watch the whole page flip language the moment React hydrated. Base.astro now
+   sets data-i18n-hold before paint and the i18n module removes it in the same
+   commit that carries the visitor's own strings. Until then the body is not
+   painted and a language-neutral hexagon pulses on the shop background: a
+   short, deliberate loading state instead of a visible language change. Only
+   non-English visitors are ever held, and two independent timeouts (the boot
+   script's plus this stylesheet being CSS-only, i.e. harmless without JS)
+   guarantee the page can never stay hidden. */
+html[data-i18n-hold] { background: var(--bg); }
+html[data-i18n-hold] body { visibility: hidden; }
+html[data-i18n-hold]::after {
+  content: "";
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 34px;
+  height: 38px;
+  margin: -19px 0 0 -17px;
+  background: var(--gold-400, #C98A1B);
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  animation: i18n-hold-pulse 1.05s var(--ease) infinite;
+  z-index: 4000;
+  pointer-events: none;
+}
+@keyframes i18n-hold-pulse {
+  0%, 100% { opacity: 0.25; transform: scale(0.88); }
+  50% { opacity: 1; transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-i18n-hold]::after { animation: none; opacity: 0.75; }
+}
 button, input, select, textarea { font: inherit; color: inherit; }
 a { color: var(--stamp-ink); text-decoration: none; }
 a:hover { text-decoration: underline; }

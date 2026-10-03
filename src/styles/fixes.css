@@ -3199,3 +3199,31 @@ input[type="range"]:focus-visible { outline: 2px solid var(--stamp); outline-off
    kraft card, which is fine for decorative body copy but too low for these
    12px uppercase labels and their sub-line. --ink-dim is 4.5:1. */
 .act-tile-label, .act-tile-sub, .act-tile .xs.faint { color: var(--ink-dim); }
+
+/* ---------- Mobile scrolling robustness (2026-10-03) ----------
+   Three independent hazards made "the page won't scroll down" on phones:
+
+   1. (Measured and rejected: pan-y on the range input.) Kept for the record
+      so nobody re-adds it — see the NOTE below.
+   2. Fixed chrome. The top bar and the bottom tab bar sit above the scroll
+      viewport; a vertical drag starting on them did nothing at all, so a thumb
+      resting on the bottom bar felt like a frozen page (on a phone that dead
+      zone is ~20 % of the screen). pan-y lets those drags scroll the page;
+      taps still hit the buttons.
+   3. body{overflow-x:hidden} creates a SECOND scroll container on iOS Safari,
+      a long-standing scroll-freeze / rubber-band trap. `clip` hides the same
+      overflow without creating one; older engines keep `hidden` behaviour
+      through the @supports fallback order below (app.css sets hidden first). */
+/* NOTE: the range input itself must keep its native touch-action. pan-y
+   looked tempting, but Chromium then stops treating a horizontal drag as a
+   slider gesture at all (measured: the thumb froze) — trading a scroll
+   annoyance for a broken price control. Chromium already scrolls the page on
+   a vertical drag that starts on the slider; the fixed bars below are the
+   dead zone that actually bit users. */
+.topbar,
+.tabbar {
+  touch-action: pan-y pinch-zoom;
+}
+@supports (overflow: clip) {
+  body { overflow-x: clip; }
+}

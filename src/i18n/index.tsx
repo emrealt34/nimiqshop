@@ -60,7 +60,7 @@
  *   runs before paint and writes <html lang> using the same chain so the
  *   first paint is correct before React hydrates.
  */
-import React, { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import en from './locales/en';
 
@@ -399,13 +399,20 @@ export function I18nProvider({ children, initial }: { children: ReactNode; initi
   const pinned = isValidCode(initial) ? initial : null;
   const [lang, setLangState] = useState<LangCode>(pinned ?? DEFAULT_LANG);
   const [dictTick, setDictTick] = useState(0);
+  // The language this tree is ALLOWED to announce and persist. Until detection
+  // has run, the pinned English render is a hydration placeholder, not a
+  // choice: announcing it wrote data-lang="en" (and the stored cookie/locale —
+  // the backend reads that cookie for email language!) on every load, which is
+  // what the visitor saw as the page "changing language" a moment after it
+  // appeared. `null` = nothing adopted yet, so nothing to announce.
+  const adopted = useRef<LangCode | null>(pinned);
 
   // Adopt the visitor's requested language once the hydrated tree is committed.
   // Mount-only by design: every later change goes through setLang().
   useEffect(() => {
     if (pinned) return;
-    const detected = detectLang();
-    if (detected !== lang) setLangState(detected);
+    adopted.current = detectLang();
+    if (adopted.current !== lang) setLangState(adopted.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -415,11 +422,28 @@ export function I18nProvider({ children, initial }: { children: ReactNode; initi
     return () => { alive = false; };
   }, [lang]);
 
-  // Keep the global singleton (and the static Astro shell) in sync.
+  // Keep the global singleton (and the static Astro shell) in sync. Only the
+  // ADOPTED language gets announced/persisted — the pinned boot render is
+  // skipped, so English never overwrites the visitor's own choice while their
+  // dictionary chunk is still in flight.
   useEffect(() => {
+    if (lang !== adopted.current) return;
     if (dictLoaded(lang)) applyLang(lang, true);
     else void loadDict(lang).then(() => applyLang(lang, true));
   }, [lang]);
+
+  // Release Base.astro's pre-paint hold for non-English visitors. Timing is the
+  // whole point: this effect runs AFTER the commit that carries the translated
+  // strings (the dictionary is in memory and `dictTick` re-rendered the tree),
+  // so the first frame the visitor can see is already in their language — no
+  // English flash, no half-translated hybrid. If hydration never gets this far
+  // the boot script's own timeout releases the page.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (lang === adopted.current && dictLoaded(lang)) {
+      document.documentElement.removeAttribute('data-i18n-hold');
+    }
+  }, [lang, dictTick]);
 
   // Keep two tabs of the same shop in sync.
   useEffect(() => {
