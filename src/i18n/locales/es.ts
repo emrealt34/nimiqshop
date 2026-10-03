@@ -1216,6 +1216,7 @@ const es = {
     packageFallback: 'Paquete',
     amountRange: 'Rango de importe',
     nimEstimate: 'Estimación en NIM',
+    nimPriceQuoted: 'Precio en NIM',
     nimPriceLoading: 'Cargando precio en NIM…',
     typeAmount: 'O escribe el importe ({{ccy}})',
     customAmountAria: 'Importe personalizado en {{ccy}}',

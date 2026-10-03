@@ -1216,6 +1216,7 @@ const de = {
     packageFallback: 'Paket',
     amountRange: 'Betragsbereich',
     nimEstimate: 'NIM-Schätzung',
+    nimPriceQuoted: 'NIM-Preis',
     nimPriceLoading: 'NIM-Preis wird geladen …',
     typeAmount: 'Oder Betrag eingeben ({{ccy}})',
     customAmountAria: 'Eigener Betrag in {{ccy}}',

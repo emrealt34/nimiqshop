@@ -1056,7 +1056,7 @@ function RangeChooser({
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div className="xs faint">{bandIsLive ? t('productPage.nimEstimate') : t('productPage.nimEstimate')}</div>
+          <div className="xs faint">{bandIsLive ? t('productPage.nimPriceQuoted') : t('productPage.nimEstimate')}</div>
           <div className="strong nim-price" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
             <img src={asset("/img/nimiq-hexagon.png?v=40")} alt="NIM" width={14} height={14} style={{ borderRadius: 2, verticalAlign: 'middle' }} />
             <span>{nimMin} - {nimMax}</span>

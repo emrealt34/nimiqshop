@@ -1216,6 +1216,7 @@ const pt = {
     packageFallback: 'Pacote',
     amountRange: 'Intervalo de montante',
     nimEstimate: 'Estimativa NIM',
+    nimPriceQuoted: 'Preço em NIM',
     nimPriceLoading: 'A carregar preço em NIM…',
     typeAmount: 'Ou escreva o montante ({{ccy}})',
     customAmountAria: 'Montante personalizado em {{ccy}}',

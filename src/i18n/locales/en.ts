@@ -1225,6 +1225,7 @@ const en = {
     packageFallback: 'Package',
     amountRange: 'Amount range',
     nimEstimate: 'NIM estimate',
+    nimPriceQuoted: 'NIM price',
     nimPriceLoading: 'NIM price loading…',
     typeAmount: 'Or type the amount ({{ccy}})',
     customAmountAria: 'Custom amount in {{ccy}}',
