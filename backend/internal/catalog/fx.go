@@ -20,10 +20,10 @@ import (
 
 // usdPerUnit maps ISO-4217 code → how many USD one unit is worth
 // (approximate, curated; materially stale entries refreshed 2026-10-03
-//
-//	against open.er-api.com — the rate only feeds the admin's USD price
-//	CAP and pre-quote display estimates, never an actual charge: a real
-//	order is priced from the supplier's own validated amount).
+// against open.er-api.com). This rate only feeds the admin's USD price
+// CAP and the pre-quote display estimate — never an actual charge: a real
+// order is priced from the supplier's own validated amount and the live
+// oracle BTC rate (see quotedUSD in internal/handlers/quote_money.go).
 var usdPerUnit = map[string]float64{
 	"AED": 0.272, "AFN": 0.014, "ALL": 0.011, "AMD": 0.0026, "ANG": 0.555,
 	"AOA": 0.0011, "ARS": 0.0006565614, "AUD": 0.65, "AWG": 0.555, "AZN": 0.588,
