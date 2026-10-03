@@ -19,7 +19,7 @@ export function NetBanner() {
     const on = () => {
       setOnline(true);
       setFlash(true);
-      // DevSkim: ignore DS172411 — setTimeout is called with a closure, never a string; no untrusted data is evaluated.
+      // DS172411 (setTimeout): closure only, never a string — no untrusted data is evaluated.
       setTimeout(() => setFlash(false), 2200);
     };
     const off = () => setOnline(false);

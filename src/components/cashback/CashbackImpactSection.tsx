@@ -178,7 +178,7 @@ export function CashbackImpactSection({
     if (!burnAddress) return;
     if (Clipboard.copy(burnAddress)) {
       setBurnAddressCopied(true);
-      // DevSkim: ignore DS172411 — setTimeout is called with a closure, never a string; no untrusted data is evaluated.
+      // DS172411 (setTimeout): closure only, never a string — no untrusted data is evaluated.
       setTimeout(() => setBurnAddressCopied(false), 2200);
     }
   };
@@ -257,7 +257,7 @@ export function CashbackImpactSection({
   const copyShare = () => {
     if (Clipboard.copy(shareText)) {
       setCopied(true);
-      // DevSkim: ignore DS172411 — setTimeout is called with a closure, never a string; no untrusted data is evaluated.
+      // DS172411 (setTimeout): closure only, never a string — no untrusted data is evaluated.
       setTimeout(() => setCopied(false), 2200);
     }
   };
@@ -989,7 +989,7 @@ export function CashbackImpactSection({
                 onClick={() => {
                   if (Clipboard.copy(shareText)) {
                     setCopied(true);
-                    // DevSkim: ignore DS172411 — setTimeout is called with a closure, never a string; no untrusted data is evaluated.
+                    // DS172411 (setTimeout): closure only, never a string — no untrusted data is evaluated.
                     setTimeout(() => setCopied(false), 2200);
                   }
                 }}

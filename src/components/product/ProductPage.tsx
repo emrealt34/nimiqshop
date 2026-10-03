@@ -479,6 +479,7 @@ export function ProductPage() {
         setSupplierPrice(price);
         setPriceState({ key: 'productPage.priceChecked' });
         // Drop the old figure as soon as its freshness expires, before refetch.
+        // DS172411 (setTimeout): closure only, never a string — no untrusted data is evaluated.
         timer = setTimeout(() => { setSupplierPrice(null); setPriceState({ key: 'productPage.priceRefreshing' }); check(); }, remaining);
       } catch (e: any) {
         if (!alive) return;

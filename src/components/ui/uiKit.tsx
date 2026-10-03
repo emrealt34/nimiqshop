@@ -103,12 +103,12 @@ export function NimAmount({ q, fallback }: { q: any; fallback?: string | null })
           if (!alive) return;
           const n = nimAmountFor(q, m);
           if (n > 0) setText(`≈ ${fmtNIM(n, 0)} NIM`);
-          // DevSkim: ignore DS172411 — setTimeout is called with a closure, never a string; no untrusted data is evaluated.
+          // DS172411 (setTimeout): closure only, never a string — no untrusted data is evaluated.
           else if (i < 4) setTimeout(() => attempt(i + 1), 2000);
           else setText(fallback || nimFallbackText());
         })
         .catch(() => {
-          // DevSkim: ignore DS172411 — setTimeout is called with a closure, never a string; no untrusted data is evaluated.
+          // DS172411 (setTimeout): closure only, never a string — no untrusted data is evaluated.
           if (i < 4) setTimeout(() => attempt(i + 1), 2000);
           else setText(fallback || nimFallbackText());
         });
@@ -300,7 +300,7 @@ export function CopyButton({ getText, label }: { getText: string | (() => string
         // ever shows after a real copy.
         if (Clipboard.copy(String(text ?? ''))) {
           setCopied(true);
-          // DevSkim: ignore DS172411 — setTimeout is called with a closure, never a string; no untrusted data is evaluated.
+          // DS172411 (setTimeout): closure only, never a string — no untrusted data is evaluated.
           setTimeout(() => setCopied(false), 1400);
         }
       }}

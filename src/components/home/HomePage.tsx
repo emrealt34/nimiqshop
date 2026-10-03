@@ -216,6 +216,7 @@ export function HomePage() {
     const term = searchTerm.trim();
     setSearchResults(null);
     if (!term) return;
+    // DS172411 (setTimeout): closure only, never a string — no untrusted data is evaluated.
     const timer = setTimeout(async () => {
       try {
         const res = await searchProducts(term, country);
@@ -621,7 +622,7 @@ function ProductGrid({ products, onBuy, allowWarm }: { products: Product[]; onBu
         const id = u.searchParams.get('id');
         const cc = u.searchParams.get('country');
         if (id) {
-          // DevSkim: ignore DS172411 — setTimeout is called with a closure, never a string; no untrusted data is evaluated.
+          // DS172411 (setTimeout): closure only, never a string — no untrusted data is evaluated.
           window.setTimeout(() => {
             if (cancelled) return;
             getProduct(id, cc || undefined).catch(() => {});

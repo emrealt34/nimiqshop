@@ -54,6 +54,142 @@ const LINK_ID = 'late-css';
 /** Astro hashes into `_assets/`; keep the same shape so the CDN headers apply. */
 const ASSET_DIR = '_assets';
 
+/**
+ * Small, quote-aware HTML tag scanner.
+ *
+ * This file used to locate `<style>`, `<script>` and `</body>` with regular
+ * expressions. CodeQL's js/bad-tag-filter and
+ * js/incomplete-multi-character-sanitization rules flagged that, and the
+ * findings are fair: `[^>]*` breaks on a `>` inside an attribute value, one
+ * replacement pass cannot express nesting, and these rewrites run over the
+ * HTML we actually ship. Scanning is explicit instead — the tag name is
+ * matched case-insensitively (ASCII fold), and the tag end is found with
+ * quote awareness, so attribute values cannot truncate a match.
+ */
+const CH_LT = 60;
+const CH_GT = 62;
+const CH_SLASH = 47;
+
+/** ASCII case-insensitive compare of `html` at `at` against a lowercase literal. */
+function eqFoldAt(html, at, lower) {
+  if (at + lower.length > html.length) return false;
+  for (let i = 0; i < lower.length; i++) {
+    if ((html.charCodeAt(at + i) | 0x20) !== lower.charCodeAt(i)) return false;
+  }
+  return true;
+}
+
+/** True for the whitespace bytes that may follow a tag name. */
+function isNameDelimiter(code) {
+  return code === CH_GT || code === CH_SLASH || code === 32 || code === 9 || code === 10 || code === 13 || code === 12 || Number.isNaN(code);
+}
+
+/** Index of the next `<name` open tag at or after `from`; -1 when there is none. */
+function findOpenTag(html, name, from = 0) {
+  for (let i = from; i + 1 < html.length; i++) {
+    if (html.charCodeAt(i) !== CH_LT || html.charCodeAt(i + 1) === CH_SLASH) continue;
+    if (!eqFoldAt(html, i + 1, name)) continue;
+    if (isNameDelimiter(html.charCodeAt(i + 1 + name.length))) return i;
+  }
+  return -1;
+}
+
+/** Index of the next `</name` close tag at or after `from`; -1 when there is none. */
+function findCloseTag(html, name, from = 0) {
+  for (let i = from; i + 1 < html.length; i++) {
+    if (html.charCodeAt(i) !== CH_LT || html.charCodeAt(i + 1) !== CH_SLASH) continue;
+    if (!eqFoldAt(html, i + 2, name)) continue;
+    if (isNameDelimiter(html.charCodeAt(i + 2 + name.length))) return i;
+  }
+  return -1;
+}
+
+/** Index just past the `>` that ends the tag starting at `start`; -1 if unclosed. */
+function tagEnd(html, start) {
+  let quote = 0;
+  for (let i = start + 1; i < html.length; i++) {
+    const c = html.charCodeAt(i);
+    if (quote) {
+      if (c === quote) quote = 0;
+      continue;
+    }
+    if (c === 34 || c === 39) {
+      quote = c; // " or '
+      continue;
+    }
+    if (c === CH_GT) return i + 1;
+  }
+  return -1;
+}
+
+/**
+ * Every `<name …>…</name>` pair as `{ start, bodyStart, bodyEnd, end }` byte
+ * offsets. Empty elements (`<name/>`) come back with an empty body. An
+ * unclosed tag simply ends the scan — the caller then treats the rest of the
+ * document as opaque rather than rewriting it.
+ */
+function scanTags(html, name) {
+  const pairs = [];
+  let i = findOpenTag(html, name);
+  while (i !== -1) {
+    const bodyStart = tagEnd(html, i);
+    if (bodyStart === -1) break;
+    if (html.charCodeAt(bodyStart - 2) === CH_SLASH) {
+      pairs.push({ start: i, bodyStart, bodyEnd: bodyStart, end: bodyStart });
+      i = findOpenTag(html, name, bodyStart);
+      continue;
+    }
+    const close = findCloseTag(html, name, bodyStart);
+    if (close === -1) break;
+    const end = tagEnd(html, close);
+    if (end === -1) break;
+    pairs.push({ start: i, bodyStart, bodyEnd: close, end });
+    i = findOpenTag(html, name, end);
+  }
+  return pairs;
+}
+
+/**
+ * Drops the astro-island bootstrap and the idle-loading script (the critical
+ * CSS capture proves they are not needed for the first paint; both are
+ * re-added by the runtime when a React island actually hydrates). Every other
+ * script is kept byte-for-byte.
+ */
+function stripIslandScripts(html) {
+  const drop = scanTags(html, 'script').filter((t) => {
+    const body = html.slice(t.bodyStart, t.bodyEnd);
+    if (body.includes('.idle=') && body.includes('astro:idle')) return true;
+    return body.includes('customElements.define("astro-island"');
+  });
+  if (!drop.length) return html;
+  let out = '';
+  let at = 0;
+  for (const t of drop) {
+    out += html.slice(at, t.start);
+    at = t.end;
+  }
+  return out + html.slice(at);
+}
+
+/**
+ * Replaces the first literal `</body>` with `<template hidden></body>`.
+ *
+ * The marker keeps the document parseable while stopping the parser from
+ * auto-closing the body early — the late-CSS flip relies on the stylesheet
+ * link staying inside the body, and `<template>` content is inert, so the
+ * stray end tag is ignored instead of closing it. Matched literally (no
+ * attributes, exact tag), like the previous expression did.
+ */
+function hideBodyClose(html) {
+  for (let i = 0; i + 7 <= html.length; i++) {
+    if (html.charCodeAt(i) !== CH_LT || html.charCodeAt(i + 1) !== CH_SLASH) continue;
+    if (!eqFoldAt(html, i + 2, 'body')) continue;
+    if (html.charCodeAt(i + 6) !== CH_GT) continue;
+    return html.slice(0, i) + '<template hidden></body>' + html.slice(i + 7);
+  }
+  return html;
+}
+
 async function* walk(dir) {
   for (const entry of await readdir(dir)) {
     const full = join(dir, entry);
@@ -211,19 +347,23 @@ export default function criticalCss() {
 
         for (const file of htmlFiles) {
           const html = await readFile(file, 'utf8');
-          for (const m of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script\s*>/gi)) {
-            if (m[1].includes('customElements.define("astro-island"')) {
-              islandScriptBody = m[1];
+          for (const t of scanTags(html, 'script')) {
+            const body = html.slice(t.bodyStart, t.bodyEnd);
+            if (body.includes('customElements.define("astro-island"')) {
+              islandScriptBody = body;
               break;
             }
           }
-          const styles = [...html.matchAll(/<style(?:\s[^>]*)?>([\s\S]*?)<\/style>/gi)];
+          const styles = scanTags(html, 'style').map((t) => ({
+            raw: html.slice(t.start, t.end),
+            body: html.slice(t.bodyStart, t.bodyEnd),
+          }));
           if (!styles.length) continue;
-          const biggest = styles.reduce((a, b) => (b[1].length > a[1].length ? b : a));
-          if (biggest[1].length < 4096) continue; // the 59-byte astro-island stub
+          const biggest = styles.reduce((a, b) => (b.body.length > a.body.length ? b : a));
+          if (biggest.body.length < 4096) continue; // the 59-byte astro-island stub
 
-          const root = postcss.parse(biggest[1]);
-          const htmlNoStyle = html.replace(biggest[0], '');
+          const root = postcss.parse(biggest.body);
+          const htmlNoStyle = html.replace(biggest.raw, '');
           const pageClasses = new Set(['in-nimiq-pay', 'active', 'open', 'dark', 'light', 'tabbar', 'tab-ico', 'tab-lbl', 'nav-badge']);
           for (const cm of htmlNoStyle.matchAll(/class="([^"]*)"/g)) {
             for (const c of cm[1].split(/\s+/)) if (c) pageClasses.add(c);
@@ -330,7 +470,7 @@ export default function criticalCss() {
           // because deduping across pages in walk order once inverted a
           // same-specificity cascade (a @media override landed before its base
           // rule and silently lost).
-          if (!repCss || /(^|\/)index\.html$/.test(file)) repCss = biggest[1];
+          if (!repCss || /(^|\/)index\.html$/.test(file)) repCss = biggest.body;
           const inline = keep.join('\n');
           // Resolve the asset prefix from a URL the page already carries, so a
           // non-root `base` (GitHub Pages) works without duplicating Astro's
@@ -339,7 +479,7 @@ export default function criticalCss() {
           const prefix = m ? m[1] : '/';
           prefixes.add(prefix);
 
-          rewritten.set(file, { html, styleBlock: biggest[0], inline, prefix });
+          rewritten.set(file, { html, styleBlock: biggest.raw, inline, prefix });
         }
 
         if (!rewritten.size) {
@@ -378,14 +518,7 @@ export default function criticalCss() {
             `<link id="${LINK_ID}" rel="stylesheet" media="print" data-href="${cssUrl}">` +
             `<script defer fetchpriority="low" src="${jsUrl}"></script>` +
             `<noscript><link rel="stylesheet" href="${cssUrl}"></noscript>`;
-          const nextHtml = html
-            .replace(styleBlock, replacement)
-            .replace(/<script\b[^>]*>([\s\S]*?)<\/script\s*>/gi, (full, body) => {
-              if (body.includes('.idle=') && body.includes('astro:idle')) return '';
-              if (body.includes('customElements.define("astro-island"')) return '';
-              return full;
-            })
-            .replace(/<\/body>/i, '<template hidden></body>');
+          const nextHtml = hideBodyClose(stripIslandScripts(html.replace(styleBlock, replacement)));
           await writeFile(file, nextHtml);
         }
 

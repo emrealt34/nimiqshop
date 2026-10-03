@@ -19,10 +19,20 @@ permissions:
   contents: read
 
 jobs:
-  scan:
+  # Job id purposely stays `osv-scan`: GitHub keys a code-scanning analysis set
+  # by "<workflow file>:<job id>", and the alerts filed on 2026-09-30 live
+  # under `.github/workflows/osv-scanner.yml:osv-scan`. Renaming the job (or
+  # adding an explicit `category:` to the upload) would strand that set — the
+  # old alerts would never be re-evaluated, so fixed findings would sit open
+  # forever.
+  osv-scan:
     name: OSV dependency scan
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write # upload SARIF to code scanning
+      actions: read # codeql-action reads workflow metadata for the upload
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -43,3 +53,15 @@ jobs:
           path: osv-results.sarif
           if-no-files-found: warn
           retention-days: 7
+      # The scan is the security gate; this upload is what keeps the Security
+      # tab honest. Without it code-scanning alerts were written once and never
+      # re-evaluated: a dependency that later got patched stayed "open" because
+      # nothing re-reported it (that is exactly how pyjwt@2.13.0 lingered after
+      # the pin moved to 2.15.x). Runs under `always()` on purpose so failed
+      # scans still publish their findings.
+      - name: Upload SARIF to code scanning
+        if: always() && hashFiles('osv-results.sarif') != ''
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: osv-results.sarif
+          wait-for-processing: true

@@ -122,6 +122,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
   const toast = useCallback((text: string, kind: ToastKind = 'info', avatar?: ReactNode) => {
     const id = ++toastId.current;
     setToasts((prev) => [...prev, { id, text, kind, avatar }]);
+    // DS172411 (setTimeout): closure only, never a string — no untrusted data is evaluated.
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500);
   }, []);
 

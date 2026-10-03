@@ -179,6 +179,7 @@ function WalletRedirectSheet({ guide }: { guide: WalletGuide }) {
       openWallet();
       return;
     }
+    // DS172411 (setTimeout): closure only, never a string — no untrusted data is evaluated.
     const timer = window.setTimeout(() => setSeconds((n) => Math.max(0, n - 1)), 1000);
     return () => window.clearTimeout(timer);
   }, [seconds, openWallet]);

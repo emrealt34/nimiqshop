@@ -170,7 +170,7 @@ export function warmAllRoutes(): void {
   const start = () => {
     // Small batches with room between them: the main thread stays free for
     // whatever the visitor is actually doing.
-    // DevSkim: ignore DS172411 — setTimeout is called with a closure, never a string; no untrusted data is evaluated.
+    // DS172411 (setTimeout): closure only, never a string — no untrusted data is evaluated.
     ROUTES.forEach((r, i) => setTimeout(() => prefetchRoute(r.path), Math.floor(i / 3) * 1500));
   };
   const armed = () => {
