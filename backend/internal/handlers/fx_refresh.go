@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"strings"
@@ -86,8 +87,16 @@ func FXRefresherDisabled() bool {
 
 func fxEnv(key string) string { return strings.TrimSpace(os.Getenv(key)) }
 
-// ParseERRates extracts the rate map from an ER-API style body. Exported for
-// tests; a body that is not a successful USD-based payload is an error.
+// ParseERRates extracts the rate map from an ER-API style body and converts
+// it to this package's convention: USD per ONE unit of the currency.
+//
+// The feed quotes the opposite direction — "1 USD = 49.13 TRY" — so every
+// rate is inverted here, ONCE, at the boundary. Getting this backwards is a
+// silent 2400x error on TRY (it happened while writing this file and the
+// local smoke test caught it: /api/market/fx served 49.13 for TRY).
+//
+// Exported for tests; a body that is not a successful USD-based payload with
+// positive, finite rates is an error.
 func ParseERRates(body []byte) (map[string]float64, error) {
 	var payload erAPIRates
 	if err := json.Unmarshal(body, &payload); err != nil {
@@ -103,7 +112,19 @@ func ParseERRates(body []byte) (map[string]float64, error) {
 	if len(payload.Rates) == 0 {
 		return nil, fmt.Errorf("fx feed: no rates in payload")
 	}
-	return payload.Rates, nil
+	// units-per-USD -> USD-per-unit. A non-positive or non-finite quote
+	// cannot be inverted; drop it rather than emit an Inf/NaN into the table.
+	out := make(map[string]float64, len(payload.Rates))
+	for code, perUSD := range payload.Rates {
+		if perUSD <= 0 || math.IsNaN(perUSD) || math.IsInf(perUSD, 0) {
+			continue
+		}
+		out[strings.ToUpper(strings.TrimSpace(code))] = 1 / perUSD
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("fx feed: every rate was non-positive")
+	}
+	return out, nil
 }
 
 // StartFXRefresher launches the background FX refresher (idempotent). Called
