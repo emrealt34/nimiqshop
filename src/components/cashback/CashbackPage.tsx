@@ -64,7 +64,7 @@ import { CashbackImpactSection } from './CashbackImpactSection';
 import { useSheet, useToast } from '../AppProviders';
 import { useSession } from '../../lib/useSession';
 import { useInNimiqPay } from '../../lib/miniapp';
-import { getMyCashback, getNimRate, cachedNimRate } from '../../lib/api';
+import { getMyCashback, getNimRate, cachedNimRate, onRatesChange } from '../../lib/api';
 import {
   loadStakerProgram,
   clearStakerProgramCache,
@@ -295,8 +295,12 @@ export function CashbackView() {
         if (alive && Number(r?.usd_per_nim) > 0) setPrice(Number(r.usd_per_nim));
       })
       .catch(() => {});
+    const off = onRatesChange((r) => {
+      if (alive && Number(r.usd_per_nim) > 0) setPrice(Number(r.usd_per_nim));
+    });
     return () => {
       alive = false;
+      off();
     };
   }, []);
 

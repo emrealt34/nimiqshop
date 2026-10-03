@@ -11,7 +11,7 @@ import { ComeBackBanner } from '../ui/uiKit';
 import { flattenBrands, type Product } from '../../lib/catalog';
 import { UnifiedThumb } from '../ui/UnifiedThumb';
 import { orderedCountries } from '../../lib/countries';
-import { listGiftCards, listTopups, listEsims, searchProducts, getGeo, getProduct, getFXRates, cachedFX } from '../../lib/api';
+import { listGiftCards, listTopups, listEsims, searchProducts, getGeo, getProduct, getFXRates, cachedFX, onRatesChange } from '../../lib/api';
 import {
   catalogHasItems,
   readCachedCatalog,
@@ -187,6 +187,11 @@ export function HomePage() {
     getFXRates().then((r) => {
       if (mountAlive.current && r?.usd_per_unit) setFx(r.usd_per_unit);
     }).catch(() => {});
+    // Shelf prices are converted with the FX table; when the live API corrects
+    // the build-time snapshot, re-render with the corrected rates.
+    const off = onRatesChange((r) => {
+      if (mountAlive.current && r?.usd_per_unit) setFx(r.usd_per_unit);
+    });
     getGeo().then((geo) => {
       if (!mountAlive.current || userChoseCountry.current) return;
       const cc = String(geo?.country || '').toUpperCase();
@@ -195,6 +200,7 @@ export function HomePage() {
       setCountry(cc);
       setGeoNote(''); // removed per user request — no location note
     }).catch(() => {});
+    return off;
   }, []);
 
   const applyCountry = (code: string, manual: boolean) => {

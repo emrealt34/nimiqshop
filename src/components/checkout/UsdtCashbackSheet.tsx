@@ -25,7 +25,7 @@ import { CashbackFeeNotice } from './CashbackFeeNotice';
 import { useEffect, useState } from 'react';
 import type { CartItem } from '../../lib/cartStore';
 import { rowUSD } from '../../lib/cartStore';
-import { getNimRate } from '../../lib/api';
+import { getNimRate, onRatesChange } from '../../lib/api';
 import { estimateCashbackNIM, fmtCashbackNIM } from '../../lib/cashback';
 import { loadStakerProgram, loadMyStake, pctLabel, type MyStake, type StakerProgram } from '../../lib/stakerCashback';
 import { useSession } from '../../lib/useSession';
@@ -50,6 +50,14 @@ export function factorLabel(mult: number): string {
  */
 function useCartNIM(items: CartItem[]): number | null {
   const [nim, setNim] = useState<number | null>(null);
+  const [tick, setTick] = useState(0);
+  useEffect(
+    () =>
+      onRatesChange(() => {
+        setTick((n) => n + 1);
+      }),
+    []
+  );
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -72,7 +80,7 @@ function useCartNIM(items: CartItem[]): number | null {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items]);
+  }, [items, tick]);
   return nim;
 }
 

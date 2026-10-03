@@ -31,6 +31,14 @@
  * (/market/nim-rate and /market/fx), plus generated_at/sync markers; the
  * frontend (src/lib/api.ts) reads these files first and only falls back to
  * /api when a file is missing.
+ *
+ * WHY THAT IS STILL SAFE: this file is only as fresh as the last deploy, and
+ * the hourly Pages cron that runs it is a GitHub `schedule` — which this repo
+ * has measured slipping to 5-hour gaps. So the frontend no longer TRUSTS the
+ * snapshot for a number the buyer reads: it paints from it immediately and
+ * then reconciles against the live API at most once per 10 minutes per tab
+ * (src/lib/api.ts, onRatesChange). A late build costs a repaint, not a wrong
+ * price.
  */
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join, dirname } from 'node:path';

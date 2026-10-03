@@ -12,7 +12,7 @@ import { Icon } from '../ui/Icon';
 import { UnifiedThumb } from '../ui/UnifiedThumb';
 import { FlagMark } from '../ui/FlagMark';
 import { AppRoot } from '../AppRoot';
-import { friendlyApiMessage, getProduct, getNimRate, getFXRates, getProductPrice } from '../../lib/api';
+import { friendlyApiMessage, getProduct, getNimRate, getFXRates, getProductPrice, onRatesChange } from '../../lib/api';
 import { loadCashbackBps, cashbackEarnLine } from '../../lib/cashback';
 import { StakerCashbackLine } from '../staker/StakerCashback';
 import { brandMetaFor } from '../../lib/catalogMeta';
@@ -451,6 +451,19 @@ export function ProductPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // The displayed NIM price is coin_amount(BTC) x btc_usd / nim_usd. The market
+  // leg starts from the build-time snapshot (instant paint); when the live API
+  // corrects it, the number on screen follows. Prices the buyer reads must not
+  // stay pinned to whatever the last deploy baked.
+  useEffect(
+    () =>
+      onRatesChange((r) => {
+        if (Number(r.usd_per_nim) > 0) setNimUsd(Number(r.usd_per_nim));
+        if (Number(r.usd_per_btc) > 0) setBtcUsd(Number(r.usd_per_btc));
+      }),
+    []
+  );
 
   // Price checking is a GET, not /quotes and not order creation. A debounced,
   // short-lived result cannot outlive the selected brand/country/face value.

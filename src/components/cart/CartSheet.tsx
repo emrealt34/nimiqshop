@@ -12,7 +12,7 @@ import { useCart, readCart, saveCart, itemKey, cartPriceLabel, cartSubtitle, row
 import { UnifiedThumb } from '../ui/UnifiedThumb';
 import { useSheet, useToast } from '../AppProviders';
 import { COUNTRY_CCY, MAX_QTY, fmtMoney, fmtNIM } from '../../lib/format';
-import { getFXRates, getNimRate, getProduct } from '../../lib/api';
+import { getFXRates, getNimRate, getProduct, onRatesChange } from '../../lib/api';
 import { loadCashbackBps, cashbackEarnLine } from '../../lib/cashback';
 import { readAppliedCashbackCode, CASHBACK_CODE_EVENT } from '../../lib/cashbackCode';
 import { isAuthed } from '../../lib/session';
@@ -45,6 +45,10 @@ export function CartSheetContent({ close }: { close: () => void }) {
   const { toast } = useToast();
   const { openSheet, closeSheet } = useSheet();
   const [mode, setMode] = useState<Mode>('cart');
+  // Bumped when the live-rate reconciliation corrects the build-time snapshot;
+  // the totals effect depends on it, so the cart never shows a NIM figure
+  // computed from rates the market has moved away from.
+  const [rateTick, setRateTick] = useState(0);
   const [checkoutItems, setCheckoutItems] = useState<any[] | null>(null);
   const [totals, setTotals] = useState<{ nim: number; local: { amount: number; ccy: string } | null; usd: number; bps: number } | null>(null);
   const [cashbackCode, setCashbackCode] = useState(() => readAppliedCashbackCode());
@@ -118,7 +122,15 @@ export function CartSheetContent({ close }: { close: () => void }) {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items]);
+  }, [items, rateTick]);
+
+  useEffect(
+    () =>
+      onRatesChange(() => {
+        setRateTick((n) => n + 1);
+      }),
+    []
+  );
 
   useEffect(() => {
     const sync = () => setCashbackCode(readAppliedCashbackCode());

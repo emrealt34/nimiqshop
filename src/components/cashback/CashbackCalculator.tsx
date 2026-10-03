@@ -12,7 +12,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../ui/Icon';
-import { getNimRate, cachedNimRate } from '../../lib/api';
+import { getNimRate, cachedNimRate, onRatesChange } from '../../lib/api';
 import { estimateCashback, sliderToValue, valueToSlider } from '../../lib/cashbackCalc';
 import { FALLBACK_RAMP_DAYS, fmtStakeNIM, pctLabel, type StakeCashbackProgram } from '../../lib/stakerCashback';
 import { NimUnit } from './CashbackPage';
@@ -111,8 +111,12 @@ export function CashbackCalculator({
         if (alive && Number(r?.usd_per_nim) > 0) setPrice(Number(r.usd_per_nim));
       })
       .catch(() => {});
+    const off = onRatesChange((r) => {
+      if (alive && Number(r.usd_per_nim) > 0) setPrice(Number(r.usd_per_nim));
+    });
     return () => {
       alive = false;
+      off();
     };
   }, []);
 

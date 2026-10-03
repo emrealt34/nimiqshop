@@ -638,6 +638,98 @@ const FX_CACHE_TTL_MS = 5 * 60 * 1000;
 const NIM_CACHE_KEY = 'nim_market';
 const NIM_CACHE_TTL_MS = 5 * 60 * 1000;
 
+/**
+ * Live-rate reconciliation.
+ *
+ * The static snapshots in /data/market are baked by the hourly Pages deploy
+ * and are trusted for up to STATIC_MAX_AGE_MS. That is fine for painting fast,
+ * but it is NOT fine for a number the buyer reads: our displayed NIM price is
+ * coin_amount(BTC) x btc_usd / nim_usd, and while the BTC amount is pinned by
+ * the supplier at checkout, the market leg can be hours old when the deploy
+ * cadence slips (GitHub throttles its own schedule — measured 5-hour gaps in
+ * this repo). A stale leg means the screen shows a NIM figure that no wallet
+ * will charge.
+ *
+ * So: serve the snapshot immediately (never block on a sleeping backend) and
+ * then, at most once per RATE_RECONCILE_THROTTLE_MS per tab, ask the live API
+ * and hand any material difference to whoever is showing a price. If the
+ * backend is down, nothing changes — the same behaviour as before.
+ */
+const RATE_RECONCILE_THROTTLE_MS = 10 * 60 * 1000;
+const RATE_RECONCILE_EPSILON = 0.001; // 0.1% — below that, not worth a repaint
+const NIM_RECONCILE_KEY = 'nim_market_reconcile_at';
+const FX_RECONCILE_KEY = 'nim_fx_reconcile_at';
+
+type RatesListener = (rates: Record<string, any>) => void;
+const _ratesListeners = new Set<RatesListener>();
+
+/** Subscribe to corrected live rates; returns an unsubscribe function. */
+export function onRatesChange(cb: RatesListener): () => void {
+  _ratesListeners.add(cb);
+  return () => {
+    _ratesListeners.delete(cb);
+  };
+}
+
+function emitRates(rates: Record<string, any>): void {
+  for (const cb of Array.from(_ratesListeners)) {
+    try {
+      cb(rates);
+    } catch {
+      /* a listener must never break the price pipeline */
+    }
+  }
+}
+
+function relDiff(a: number, b: number): number {
+  const m = Math.max(Math.abs(a), Math.abs(b));
+  return m > 0 ? Math.abs(a - b) / m : 0;
+}
+
+/**
+ * Compare one served snapshot with the live API and publish the difference.
+ * Single-flight per document; silent on every failure path (offline, backend
+ * asleep, malformed body) — the snapshot already on screen stays untouched.
+ */
+const _reconcileInflight = new Map<string, Promise<void>>();
+function reconcileRates(name: 'fx' | 'nim-rate', served: Record<string, any> | null): void {
+  const flying = _reconcileInflight.get(name);
+  if (flying) return;
+  const task = (async () => {
+    const throttleKey = name === 'fx' ? FX_RECONCILE_KEY : NIM_RECONCILE_KEY;
+    const valueKey = name === 'fx' ? 'usd_per_unit' : 'usd_per_nim';
+    try {
+      const last = Number(sessionStorage.getItem(throttleKey) || 0);
+      if (Date.now() - last < RATE_RECONCILE_THROTTLE_MS) return;
+      sessionStorage.setItem(throttleKey, String(Date.now()));
+    } catch {
+      /* no sessionStorage: reconcile once per page view */
+    }
+    try {
+      const fresh: any = await api(name === 'fx' ? '/market/fx' : '/market/nim-rate', { timeoutMs: 5000 });
+      if (!fresh || !fresh[valueKey]) return;
+      const before = served && typeof served[valueKey] === 'number' ? served[valueKey] : null;
+      const after = typeof fresh[valueKey] === 'number' ? fresh[valueKey] : null;
+      if (before !== null && after !== null && relDiff(before, after) < RATE_RECONCILE_EPSILON) {
+        // Same number: still refresh the session cache so the next read is live.
+        try {
+          const cacheKey = name === 'fx' ? FX_CACHE_KEY : NIM_CACHE_KEY;
+          sessionStorage.setItem(cacheKey, JSON.stringify({ ...fresh, fetched_at: Date.now() }));
+        } catch {}
+        return;
+      }
+      try {
+        const cacheKey = name === 'fx' ? FX_CACHE_KEY : NIM_CACHE_KEY;
+        sessionStorage.setItem(cacheKey, JSON.stringify({ ...fresh, fetched_at: Date.now() }));
+      } catch {}
+      emitRates({ ...fresh, reconciled: true });
+    } catch {
+      /* keep the snapshot that is already on screen */
+    }
+  })().finally(() => _reconcileInflight.delete(name));
+  _reconcileInflight.set(name, task);
+}
+
 export const getFXRates = async (opts: { force?: boolean } = {}): Promise<Record<string, any>> => {
   const now = Date.now();
   if (!opts.force && typeof sessionStorage !== 'undefined') {
@@ -656,6 +748,7 @@ export const getFXRates = async (opts: { force?: boolean } = {}): Promise<Record
     try {
       sessionStorage.setItem(FX_CACHE_KEY, JSON.stringify({ ...stFx, fetched_at: now }));
     } catch {}
+    reconcileRates('fx', stFx); // paint now, correct in the background
     return stFx;
   }
   try {
@@ -693,6 +786,7 @@ export const getNimRate = async (opts: { force?: boolean; timeoutMs?: number } =
     try {
       sessionStorage.setItem(NIM_CACHE_KEY, JSON.stringify({ ...stNim, fetched_at: now }));
     } catch {}
+    reconcileRates('nim-rate', stNim); // paint now, correct in the background
     return stNim;
   }
   try {
