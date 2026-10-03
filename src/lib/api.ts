@@ -119,7 +119,6 @@ function cacheTtlFor(path: string): number {
   if (path.startsWith('/activity')) return 10 * 1000;
   if (path.startsWith('/ratings/')) return 60 * 1000;
   if (path.startsWith('/track/')) return 5 * 1000;
-  if (path.startsWith('/geo')) return 60 * 1000;
   return 0;
 }
 
@@ -611,7 +610,6 @@ export const adminUpdateSupportTicketStatus = (ticketId: string, status: string)
   api(`/admin/support/tickets/${encodeURIComponent(ticketId)}/status`, { method: 'POST', body: { status } });
 
 /* ---------------- Market / misc ---------------- */
-export const getGeo = () => api('/geo', { timeoutMs: 10000 });
 export const getActivity = (limit = 50) => api(`/activity?limit=${limit}`);
 export const trackOrder = (id: string) => api(`/track/${encodeURIComponent(id)}`);
 export const rateOrder = (id: string, rating: number) => api(`/orders/${encodeURIComponent(id)}/rate`, { method: 'POST', body: { rating }, auth: true });

@@ -169,12 +169,18 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
     <!--
       Boot-time language bootstrap (synchronous, runs before paint).
       The site is fully static — there is no per-request server to decide the
-      language at render time. This tiny script reads ?lang=, then the
-      `nimshop-lang` cookie, then `localStorage.nimshop.lang`, then
-      navigator.language, and rewrites <html lang>/data-lang BEFORE the
-      browser paints any text. React's I18nProvider later reads the same
-      chain and picks the identical code, so there is zero flash of the
-      wrong language.
+      language at render time. This tiny script rewrites <html lang>/data-lang
+      BEFORE the browser paints any text; React's I18nProvider later reads the
+      IDENTICAL chain (keep the two in sync: src/i18n detectLang) and picks the
+      same code, so there is zero flash of the wrong language.
+      The chain follows the SYSTEM — the device's own setting and, inside
+      Nimiq Pay, the host app's language — never a guess from the visitor's IP:
+        ?lang= → the visitor's own switcher pick (nimshop.lang.user) →
+        window.nimiqPay.language → the saved value (cookie, then
+        localStorage.nimshop.lang) → navigator.language → 'en'.
+      The host's "en" is Nimiq Pay's fallback for languages it does not ship
+      (Turkish is one), so when the device asks for a language we do serve,
+      that beats it (see readHost below).
     -->
     <script is:inline define:vars={{ dictPreloadMap }}>
       (function () {
@@ -212,7 +218,34 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
             } catch (e) {}
             return null;
           }
-          var lang = readQuery() || readCookie() || readStorage() || readNav() || 'en';
+          // The visitor's explicit switcher pick lives in its own slot, so an
+          // auto-detected value cannot outrank it (src/i18n writes the same
+          // key — keep the two in sync).
+          function readUserPick() {
+            try { return clean(localStorage.getItem('nimshop.lang.user')); }
+            catch (e) { return null; }
+          }
+          // Inside Nimiq Pay the host injects the user's app language before
+          // any script runs (docs: nimiq.dev/mini-apps/features/localization).
+          // It is the user's own choice for that app, so it outranks the
+          // device locale — except when the host fell back to its own default
+          // "en" for a language Nimiq Pay does not ship (Turkish is one) while
+          // the device asks for one we DO ship.
+          function readHost() {
+            try {
+              var p = window.nimiqPay;
+              return p && p.language ? clean(p.language) : null;
+            } catch (e) { return null; }
+          }
+          var queryLang = readQuery();
+          var userPick = readUserPick();
+          var hostLang = readHost();
+          var devLang = readNav();
+          var hostWins = hostLang && !(hostLang === 'en' && devLang && devLang !== 'en');
+          // Same order as detectLang() in src/i18n — ?lang → own pick → host →
+          // saved → device → English. No IP is consulted at any point.
+          var lang = queryLang || userPick || (hostWins ? hostLang : null)
+                  || readCookie() || readStorage() || devLang || 'en';
           document.documentElement.setAttribute('lang', lang);
           document.documentElement.setAttribute('data-lang', lang);
           // HOLD — the page is server-rendered in English (a static build has
@@ -277,11 +310,48 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
     </script>
     {/* Start the saved-country catalog + market snapshots during HTML parse,
         so they are already in the HTTP cache when React asks for them after
-        hydration; preconnect warms the logo CDN TLS handshake for the grid. */}
+        hydration; preconnect warms the logo CDN TLS handshake for the grid.
+        The market is the visitor's SAVED country when there is one, else their
+        own locale — the region ("tr-TR" → TR) and then the country the host /
+        device language usually means. Never an IP guess: the request reaches
+        the backend through the Cloudflare tunnel, so a geo lookup would resolve
+        the tunnel egress (or a VPN), not the buyer. Self-contained on purpose:
+        an is:inline script has its own scope, so it re-reads what it needs. */}
     <script is:inline define:vars={{ assetBase }}>
       (function () {
         try {
+          var two = /^[a-z]{2}$/;
+          var host = (function () {
+            try {
+              var p = window.nimiqPay;
+              var c = p && p.language ? String(p.language).trim().toLowerCase().slice(0, 2) : '';
+              return two.test(c) ? c : '';
+            } catch (e) { return ''; }
+          })();
+          var dev = (function () {
+            try {
+              var list = (navigator.languages && navigator.languages.length)
+                ? navigator.languages : [navigator.language];
+              for (var i = 0; i < list.length; i++) {
+                var c = String(list[i] || '').trim().toLowerCase().slice(0, 2);
+                if (two.test(c)) return c;
+              }
+            } catch (e) {}
+            return '';
+          })();
           var cc = (localStorage.getItem('nimshop_country') || '').trim().toUpperCase().slice(0, 2);
+          if (!/^[A-Z]{2}$/.test(cc)) {
+            var tags = (navigator.languages && navigator.languages.length)
+              ? navigator.languages : [navigator.language];
+            for (var ti = 0; ti < tags.length && !/^[A-Z]{2}$/.test(cc); ti++) {
+              var m2 = /^[a-z]{2,3}[-_]([a-z]{2})$/i.exec(String(tags[ti] || '').trim());
+              if (m2) cc = m2[1].toUpperCase();
+            }
+          }
+          if (!/^[A-Z]{2}$/.test(cc)) {
+            var byLang = { tr: 'TR', de: 'DE', fr: 'FR', es: 'ES', pt: 'PT' };
+            cc = byLang[host || dev] || '';
+          }
           var base = typeof assetBase === 'string' ? assetBase : '';
           var files = [
             base + '/data/catalog/brands/' + (cc || 'TR') + '.json',

@@ -11,7 +11,7 @@ import { ComeBackBanner } from '../ui/uiKit';
 import { flattenBrands, type Product } from '../../lib/catalog';
 import { UnifiedThumb } from '../ui/UnifiedThumb';
 import { orderedCountries } from '../../lib/countries';
-import { listGiftCards, listTopups, listEsims, searchProducts, getGeo, getProduct, getFXRates, cachedFX, onRatesChange } from '../../lib/api';
+import { listGiftCards, listTopups, listEsims, searchProducts, getProduct, getFXRates, cachedFX, onRatesChange } from '../../lib/api';
 import {
   catalogHasItems,
   readCachedCatalog,
@@ -19,6 +19,7 @@ import {
   type CatalogMap,
 } from '../../lib/catalogCache';
 import { countryName, parseCurrencyValue } from '../../lib/format';
+import { countryCandidates } from '../../lib/hostLang';
 import { useToast } from '../AppProviders';
 import { useInNimiqPay, openInNimiqPay } from '../../lib/miniapp';
 import { NimiqPayInstallDialog } from '../ui/NimiqPayInstallDialog';
@@ -94,7 +95,6 @@ export function HomePage() {
   const [shelfNote, setShelfNote] = useState('');
   const [busy, setBusy] = useState(true);
   const userChoseCountry = useRef(false);
-  const [geoNote, setGeoNote] = useState('');
   const mountAlive = useRef(true);
   const catalogRequest = useRef(0);
 
@@ -192,14 +192,17 @@ export function HomePage() {
     const off = onRatesChange((r) => {
       if (mountAlive.current && r?.usd_per_unit) setFx(r.usd_per_unit);
     });
-    getGeo().then((geo) => {
-      if (!mountAlive.current || userChoseCountry.current) return;
-      const cc = String(geo?.country || '').toUpperCase();
+    // Market default — the visitor's own locale, never their IP. The request
+    // reaches the backend through the Cloudflare tunnel, so a geo lookup would
+    // resolve the tunnel egress (or a VPN), not the buyer. Candidates come from
+    // src/lib/hostLang: the device region first ("tr-TR" → TR), then the
+    // country the Nimiq Pay / device language usually means; the first one the
+    // shop actually serves wins. /api/geo is deliberately not called any more.
+    if (!userChoseCountry.current) {
       const all = [...orderedCountries().popular, ...orderedCountries().rest];
-      if (!all.some(([code]) => code === cc)) return;
-      setCountry(cc);
-      setGeoNote(''); // removed per user request — no location note
-    }).catch(() => {});
+      const cc = countryCandidates().find((code) => all.some(([c]) => c === code));
+      if (cc && mountAlive.current) setCountry(cc);
+    }
     return off;
   }, []);
 
@@ -209,7 +212,6 @@ export function HomePage() {
     setCountry(code);
     if (manual) {
       userChoseCountry.current = true;
-      setGeoNote('');
       try { localStorage.setItem('nimshop_country', code); } catch {}
     }
     setSearchTerm('');
@@ -419,7 +421,6 @@ export function HomePage() {
               <span>{hideOutOfStock ? t('home.hideOos') : t('home.showOos')}</span>
             </label>
           </div>
-          {geoNote ? <span className="xs faint" id="geoNote">{geoNote}</span> : null}
         </div>
         {shelfNote && <div className="catalog-notice" role="status">
           <span>{shelfNote}</span>

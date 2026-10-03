@@ -190,6 +190,11 @@ export const test = base.extend<Fixtures>({
         document.cookie = `nimshop-lang=${l}; path=/; SameSite=Lax`;
         // same theme for every screenshot (the scanner toggles it while exploring)
         localStorage.setItem('nimshop.theme', sessionStorage.getItem('e2e.theme') || 'light');
+        // The home market is now the visitor's SAVED country, else their own
+        // locale — the IP-based /api/geo suggestion is gone (owner's call,
+        // 2026-10-03). Pin it to what the mocked catalog serves so the suite
+        // does not silently run against whatever locale the runner machine has.
+        localStorage.setItem('nimshop_country', 'TR');
         if (authed) {
           localStorage.setItem('nimshop.sess', JSON.stringify({ uid: 'u1', address, expiresAt: Math.floor(Date.now() / 1000) + 86400 }));
           localStorage.setItem('nimshop.addr', address);

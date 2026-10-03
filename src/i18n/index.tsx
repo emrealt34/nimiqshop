@@ -60,9 +60,10 @@
  *   runs before paint and writes <html lang> using the same chain so the
  *   first paint is correct before React hydrates.
  */
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import en from './locales/en';
+import { deviceLanguages, hostLanguage } from '../lib/hostLang';
 
 export type LangCode = 'en' | 'es' | 'de' | 'fr' | 'pt' | 'tr';
 
@@ -158,6 +159,14 @@ export function dictLoaded(code: LangCode): boolean {
 
 const STORAGE_KEY = 'nimshop.lang';
 const COOKIE_NAME = 'nimshop-lang';
+/**
+ * The visitor's OWN pick (the language switcher). Kept apart from the
+ * auto-detected value in STORAGE_KEY because the two mean different things:
+ * an explicit choice must survive a new device locale and the host app's
+ * language, while an auto-detected value must not outrank either of them.
+ * Written only by the switcher (setUserLang below); nothing auto-saves here.
+ */
+const USER_KEY = 'nimshop.lang.user';
 const DEFAULT_LANG: LangCode = 'en';
 
 const BY_CODE: Record<LangCode, LangMeta> = LANGS.reduce((acc, l) => {
@@ -288,21 +297,54 @@ function readStorage(): string | null {
   try { return localStorage.getItem(STORAGE_KEY); } catch { return null; }
 }
 
+/** The visitor's explicit switcher pick, when there is one. */
+function readUserPick(): string | null {
+  if (typeof localStorage === 'undefined') return null;
+  try { return localStorage.getItem(USER_KEY); } catch { return null; }
+}
+
+/** The device's system language (navigator.languages order), 2-letter. */
 function readNavigator(): string | null {
-  if (typeof navigator === 'undefined') return null;
-  const candidates = [...(navigator.languages || []), navigator.language].filter(Boolean) as string[];
-  for (const c of candidates) {
-    const base = c.slice(0, 2).toLowerCase();
+  for (const base of deviceLanguages()) {
     if (isValidCode(base)) return base;
   }
   return null;
 }
 
-/** Detect the best language without mutating any state — used on boot. */
+/**
+ * Detect the best language without mutating any state — used on boot.
+ *
+ * Order (2026-10-03, per the owner's call: follow the SYSTEM language, never a
+ * guess from the visitor's IP — nothing here reads geo):
+ *   1. ?lang=            a deliberate request (shared link, e2e run)
+ *   2. the visitor's own switcher pick: an explicit choice always stands
+ *   3. window.nimiqPay.language — inside Nimiq Pay the HOST's language is the
+ *      user's choice, so it outranks the device locale (docs:
+ *      nimiq.dev/mini-apps/features/localization). One deliberate exception:
+ *      the host falls back to its own default "en" for languages Nimiq Pay
+ *      does not ship (Turkish is one), so when the device asks for a language
+ *      we DO ship, that is the better answer than English.
+ *   4. a previously auto-detected value the shop saved (cookie first — it is
+ *      also what the backend reads for the email language)
+ *   5. the device's system language
+ *   6. what the server wrote on <html lang>, else English.
+ */
 export function detectLang(): LangCode {
-  for (const source of [readURL(), readCookie(COOKIE_NAME), readStorage(), readNavigator()]) {
+  const fromUrl = readURL();
+  if (isValidCode(fromUrl)) return fromUrl;
+
+  const picked = readUserPick();
+  if (isValidCode(picked)) return picked;
+
+  const host = hostLanguage();
+  const device = readNavigator();
+  if (isValidCode(host) && !(host === 'en' && device && device !== 'en')) return host;
+
+  for (const source of [readCookie(COOKIE_NAME), readStorage()]) {
     if (isValidCode(source)) return source;
   }
+  if (isValidCode(device)) return device;
+
   // SSR rendered <html lang="…"> reflects the server's Accept-Language/cookie
   // decision. It is already on the DOM; no inline global needed.
   if (typeof document !== 'undefined') {
@@ -364,7 +406,17 @@ function applyLang(code: LangCode, persist: boolean) {
  */
 export function setLang(code: LangCode): Promise<void> {
   if (!isValidCode(code)) code = DEFAULT_LANG;
+  setUserLang(code);
   return loadDict(code).then(() => { applyLang(code, true); });
+}
+
+/**
+ * Remember the visitor's explicit pick. Called by the switcher (setLang below)
+ * and by nothing else: the auto-detected value keeps living in STORAGE_KEY so
+ * a later device-locale or host-language change can still take over.
+ */
+export function setUserLang(code: LangCode) {
+  try { localStorage.setItem(USER_KEY, code); } catch {}
 }
 
 /** Subscribe to language changes outside React. Returns an unsubscribe fn. */
@@ -405,14 +457,25 @@ export function I18nProvider({ children, initial }: { children: ReactNode; initi
   // the backend reads that cookie for email language!) on every load, which is
   // what the visitor saw as the page "changing language" a moment after it
   // appeared. `null` = nothing adopted yet, so nothing to announce.
-  const adopted = useRef<LangCode | null>(pinned);
+  //
+  // STATE, not a ref (2026-10-03): with a ref, the announce effect below ran in
+  // the SAME commit as the adoption effect and compared the render's stale
+  // `lang` ("en") against a ref the sibling effect had just set to "tr" — so
+  // the guard passed and the pinned English render was announced, persisted AND
+  // released the pre-paint hold for one frame (measured: lang="en" from t≈269
+  // to t≈333 ms, hold up at 271 — an English flash for every first-time
+  // Turkish visitor, the exact thing this whole mechanism exists to prevent).
+  // As state, the first commit has lang="en" + adoptedLang=null → both effects
+  // return early, and every later value travels WITH its render.
+  const [adoptedLang, setAdoptedLang] = useState<LangCode | null>(pinned);
 
   // Adopt the visitor's requested language once the hydrated tree is committed.
   // Mount-only by design: every later change goes through setLang().
   useEffect(() => {
     if (pinned) return;
-    adopted.current = detectLang();
-    if (adopted.current !== lang) setLangState(adopted.current);
+    const detected = detectLang();
+    setAdoptedLang(detected);
+    if (detected !== lang) setLangState(detected);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -430,11 +493,10 @@ export function I18nProvider({ children, initial }: { children: ReactNode; initi
   // onwards every render IS the choice (switcher, other tab, `?lang=`), so the
   // effect follows it — that also keeps the two-tab storage sync working.
   useEffect(() => {
-    if (adopted.current === null) return;
-    adopted.current = lang;
+    if (adoptedLang === null || adoptedLang !== lang) return;
     if (dictLoaded(lang)) applyLang(lang, true);
     else void loadDict(lang).then(() => applyLang(lang, true));
-  }, [lang]);
+  }, [lang, adoptedLang]);
 
   // Release Base.astro's pre-paint hold for non-English visitors. Timing is the
   // whole point: this effect runs AFTER the commit that carries the translated
@@ -444,22 +506,28 @@ export function I18nProvider({ children, initial }: { children: ReactNode; initi
   // the boot script's own timeout releases the page.
   useEffect(() => {
     if (typeof document === 'undefined') return;
-    if (lang === adopted.current && dictLoaded(lang)) {
+    if (lang === adoptedLang && dictLoaded(lang)) {
       document.documentElement.removeAttribute('data-i18n-hold');
     }
-  }, [lang, dictTick]);
+  }, [lang, adoptedLang, dictTick]);
 
   // Keep two tabs of the same shop in sync.
   useEffect(() => {
+    // A language arriving from another tab (storage event) or from non-React
+    // code in this one (setLang, ?lang=) is a real choice: adopt it, or the
+    // announce effect above would keep comparing against a stale adoptedLang.
+    const adopt = (next: string | null) => {
+      if (!isValidCode(next)) return;
+      setAdoptedLang((cur) => (cur === next ? cur : next));
+      setLangState((cur) => (cur === next ? cur : next));
+    };
     const onStorage = (e: StorageEvent) => {
-      const next = e.newValue;
-      if (e.key === STORAGE_KEY && isValidCode(next) && next !== lang) setLangState(next);
+      if (e.key === STORAGE_KEY) adopt(e.newValue);
     };
     window.addEventListener('storage', onStorage);
-    // Also pick up changes from non-React callers in this tab.
-    const off = onLangChange((l) => { if (l !== lang) setLangState(l); });
+    const off = onLangChange((l) => adopt(l));
     return () => { window.removeEventListener('storage', onStorage); off(); };
-  }, [lang]);
+  }, []);
 
   const ctx = useMemo<I18nCtx>(() => ({
     lang,
@@ -467,6 +535,7 @@ export function I18nProvider({ children, initial }: { children: ReactNode; initi
     // wrong strings, it renders with English fallback and then swaps.
     setLang: (code: LangCode) => {
       const next = isValidCode(code) ? code : DEFAULT_LANG;
+      setUserLang(next);
       setLangState(next);
       void loadDict(next).then(() => applyLang(next, true));
     },

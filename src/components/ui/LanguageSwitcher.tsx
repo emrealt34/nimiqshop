@@ -36,10 +36,12 @@ export function LanguageSwitcher() {
   const [autoPicked, setAutoPicked] = useState(false);
 
   useEffect(() => {
-    // Remember whether the current language was auto-detected. If the user
-    // has explicitly chosen before, the storage key will be present.
+    // Was this language picked by the visitor, or worked out for them? The
+    // switcher writes `nimshop.lang.user` on an explicit choice; `nimshop.lang`
+    // (auto-detected, and what the backend reads back for emails) is not
+    // evidence of intent.
     try {
-      setAutoPicked(!localStorage.getItem('nimshop.lang'));
+      setAutoPicked(!localStorage.getItem('nimshop.lang.user'));
     } catch { /* no-op */ }
   }, []);
 

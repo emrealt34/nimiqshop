@@ -3,7 +3,8 @@
  * Official SDK: `init()` waits for the injected `window.nimiq` provider.
  */
 import { useEffect, useState } from 'react';
-import { init as initMiniAppSdk, getHostLanguage } from '@nimiq/mini-app-sdk';
+import { init as initMiniAppSdk } from '@nimiq/mini-app-sdk';
+import { hostLanguage as readHostLanguage } from './hostLang';
 
 export function inNimiqPay(): boolean {
   if (typeof window === 'undefined') return false;
@@ -94,12 +95,17 @@ export function getNimiqProvider(): unknown {
   return (window as unknown as { nimiq?: unknown }).nimiq || sdkProvider || null;
 }
 
+/**
+ * The host app's language, falling back to the device locale and then "en".
+ * One implementation for the whole app: src/lib/hostLang reads
+ * `window.nimiqPay.language` directly (the SDK's own getHostLanguage() is a
+ * one-line reader of exactly that field), which keeps the SDK out of the
+ * pre-paint path and out of the i18n entry bundle.
+ */
 export function hostLanguage(): string {
-  try {
-    return getHostLanguage() || (typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'en') || 'en';
-  } catch {
-    return 'en';
-  }
+  return readHostLanguage()
+    || (typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : '')
+    || 'en';
 }
 
 export function openInNimiqPay(onUnavailable?: (info: { isIOS: boolean; isAndroid: boolean; deeplink: string }) => void): string {
