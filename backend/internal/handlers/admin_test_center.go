@@ -227,14 +227,40 @@ func (h *Handlers) AdminTestPurchase(ctx *fasthttp.RequestCtx) {
 		Quantity: req.Quantity, Email: req.Email, PhoneNumber: req.PhoneNumber,
 		Coin: coin, PaymentMethod: method,
 	}
-	supplierRequest, _ := cryptorefills.MarshalCreateRequest(&cryptorefills.CreateOrderRequest{
+	supplierReq := &cryptorefills.CreateOrderRequest{
 		Deliveries: []cryptorefills.Delivery{{
 			BrandName: meta.BrandName, CountryCode: req.Country,
 			Denomination: denomLabel, BeneficiaryAccount: beneficiary,
 		}},
 		Payment: cryptorefills.OrderPayment{Type: "via", PaymentVia: "USER_WALLET", Coin: coin, Network: network},
 		Lang:    "en", // admin UI is English in supplier metadata; the email respects quote.Lang below.
-	})
+	}
+	if req.Email != "" {
+		supplierReq.Email = req.Email
+		supplierReq.User = &cryptorefills.OrderUser{Email: req.Email}
+	}
+	// The supplier sets the price, so the sandbox must ask it — exactly like a
+	// real checkout does. Before this call the panel could only offer a
+	// face-value guess (face currency -> USD via the FX table -> BTC), which
+	// runs a few percent under what the supplier actually charges, because the
+	// supplier's price carries its own FX and margin. Validation is read-only:
+	// no order is created, no money moves, and the simulated supplier still
+	// fulfils this quote below.
+	validateRes, err := h.CR.ValidateOrder(h.supplierContext(ctx), supplierReq)
+	if err != nil {
+		h.supplierError(ctx, err, "order could not be validated")
+		return
+	}
+	liveUSD, priceErr := quotedUSD(validateRes.CoinAmount, method, currentRates().btcUSD, faceUSD, faceUSD > 0)
+	if priceErr != nil {
+		writeError(ctx, fasthttp.StatusServiceUnavailable, priceErr.Error())
+		return
+	}
+	if rules.MaxFaceValueUSD > 0 && liveUSD > rules.MaxFaceValueUSD {
+		writeError(ctx, fasthttp.StatusForbidden, "orders above the current price cap are not accepted")
+		return
+	}
+	supplierRequest, _ := cryptorefills.MarshalCreateRequest(supplierReq)
 	testLang := i18n.ParseLangCtx(ctx)
 	i18n.SetCookieCtx(ctx, testLang)
 	q := db.Quote{
@@ -242,10 +268,14 @@ func (h *Handlers) AdminTestPurchase(ctx *fasthttp.RequestCtx) {
 		ProductID: req.ProductID, ProductCountry: req.Country,
 		Denomination: denomLabel, ProductValue: faceValue, ProductCurrency: faceCurrency, Quantity: req.Quantity,
 		Lines:          []db.QuoteLine{singleQuoteLine(inner, meta, denomLabel, beneficiary)},
-		IdempotencyKey: idem, ProductUSD: money.FromFloat(faceUSD),
+		IdempotencyKey: idem, ProductUSD: money.FromFloat(liveUSD),
 		RequestFingerprint: "admin-test-center/" + idem,
 		SupplierRequest:    supplierRequest,
-		EndUserIP:          loopback.IPv4.String(), EndUserAgent: "admin-test-center",
+		// Same two fields the customer quote carries: the supplier's own
+		// validated amount is the invoice truth, and every simulated artefact
+		// below (coin amount, NIM snapshot) is derived from it.
+		ValidatedCoinAmount: validateRes.CoinAmount,
+		EndUserIP:           loopback.IPv4.String(), EndUserAgent: "admin-test-center",
 		CustomerEmail: req.Email, PhoneNumber: req.PhoneNumber,
 		BeneficiaryAccount: beneficiary,
 		Coin:               coin, Network: network,
@@ -260,7 +290,7 @@ func (h *Handlers) AdminTestPurchase(ctx *fasthttp.RequestCtx) {
 	}
 	if snap := currentRates(); snap.nimUSD > 0 {
 		q.NimUsdRate = snap.nimUSD
-		q.EstimatedNIM = faceUSD / snap.nimUSD
+		q.EstimatedNIM = liveUSD / snap.nimUSD
 	}
 	// The operator sandbox keeps the production gate but is exempt from the
 	// quote-attempt ceiling: an operator testing a flow fifty times in a row
