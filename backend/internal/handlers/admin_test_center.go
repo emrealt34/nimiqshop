@@ -227,13 +227,25 @@ func (h *Handlers) AdminTestPurchase(ctx *fasthttp.RequestCtx) {
 		Quantity: req.Quantity, Email: req.Email, PhoneNumber: req.PhoneNumber,
 		Coin: coin, PaymentMethod: method,
 	}
+	delivery := cryptorefills.Delivery{
+		BrandName: meta.BrandName, CountryCode: req.Country,
+		Denomination: denomLabel, BeneficiaryAccount: beneficiary,
+	}
+	// A range product is selected by the amount the buyer typed: the supplier
+	// needs product_value to price THAT amount. Without it the delivery only
+	// says "range", which the supplier answers with OUT_OF_STOCK — the sandbox
+	// could not test a single range product. The customer paths already set
+	// this (quote_handlers.go, quote_batch.go); this one now matches them
+	// verbatim, including the forced "range" label the docs require.
+	if strings.EqualFold(denomLabel, "range") {
+		v := req.ProductValue
+		delivery.ProductValue = &v
+		delivery.Denomination = "range"
+	}
 	supplierReq := &cryptorefills.CreateOrderRequest{
-		Deliveries: []cryptorefills.Delivery{{
-			BrandName: meta.BrandName, CountryCode: req.Country,
-			Denomination: denomLabel, BeneficiaryAccount: beneficiary,
-		}},
-		Payment: cryptorefills.OrderPayment{Type: "via", PaymentVia: "USER_WALLET", Coin: coin, Network: network},
-		Lang:    "en", // admin UI is English in supplier metadata; the email respects quote.Lang below.
+		Deliveries: []cryptorefills.Delivery{delivery},
+		Payment:    cryptorefills.OrderPayment{Type: "via", PaymentVia: "USER_WALLET", Coin: coin, Network: network},
+		Lang:       "en", // admin UI is English in supplier metadata; the email respects quote.Lang below.
 	}
 	if req.Email != "" {
 		supplierReq.Email = req.Email
