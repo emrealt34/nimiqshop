@@ -2341,7 +2341,7 @@ label.oos-toggle > span {
 @media (max-width: 560px) {
   /* Compact 40px controls across the whole phone band: every pixel here goes
      to the wordmark, which re-fits its type instead of wrapping or clipping
-     (user: "buton yazısı, logo yazısı küçülsün"). The globe glyph yields too
+     (user: "shrink the CTA label and the wordmark"). The globe glyph yields too
      — the flag alone still reads as the language control. */
   /* !important: Icon writes an inline display on its svg. */
   .topbar .lang-toggle svg:first-of-type { display: none !important; }

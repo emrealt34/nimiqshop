@@ -40,9 +40,25 @@ func (h *Handlers) NIMRate(ctx *fasthttp.RequestCtx) {
 }
 
 func (h *Handlers) FXRates(ctx *fasthttp.RequestCtx) {
-	ctx.Response.Header.Set("Cache-Control", "public, max-age=3600")
-	writeJSON(ctx, fasthttp.StatusOK, map[string]interface{}{
+	// The table now follows the live market (see fx_refresh.go), so the old
+	// hour-long public cache would pin a stale snapshot on every edge. Ten
+	// minutes still absorbs the storefront's read burst while a refresh
+	// becomes visible quickly.
+	ctx.Response.Header.Set("Cache-Control", "public, max-age=600")
+	payload := map[string]interface{}{
 		"base":         "USD",
 		"usd_per_unit": catalog.FXTable(),
-	})
+	}
+	// Additive diagnostics: when the snapshot was observed, where it came
+	// from, and how many currencies it covers. Clients that only read
+	// usd_per_unit are unaffected.
+	if at, source, n := catalog.LiveFXStatus(); !at.IsZero() {
+		payload["live_observed_at"] = at.UTC().Format(time.RFC3339)
+		payload["live_source"] = source
+		payload["live_currencies"] = n
+		payload["live_age_seconds"] = int(time.Since(at).Seconds())
+	} else {
+		payload["live_source"] = source // "embedded": no successful fetch yet
+	}
+	writeJSON(ctx, fasthttp.StatusOK, payload)
 }

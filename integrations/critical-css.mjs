@@ -211,7 +211,7 @@ export default function criticalCss() {
 
         for (const file of htmlFiles) {
           const html = await readFile(file, 'utf8');
-          for (const m of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) {
+          for (const m of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script\s*>/gi)) {
             if (m[1].includes('customElements.define("astro-island"')) {
               islandScriptBody = m[1];
               break;
@@ -380,7 +380,7 @@ export default function criticalCss() {
             `<noscript><link rel="stylesheet" href="${cssUrl}"></noscript>`;
           const nextHtml = html
             .replace(styleBlock, replacement)
-            .replace(/<script>([\s\S]*?)<\/script>/g, (full, body) => {
+            .replace(/<script\b[^>]*>([\s\S]*?)<\/script\s*>/gi, (full, body) => {
               if (body.includes('.idle=') && body.includes('astro:idle')) return '';
               if (body.includes('customElements.define("astro-island"')) return '';
               return full;

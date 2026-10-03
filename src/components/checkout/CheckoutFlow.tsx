@@ -579,6 +579,7 @@ export function CheckoutFlow({
     try { onNavigateOrders(); } catch {}
     ensureOrders();
     window.setTimeout(ensureOrders, 80);
+    // DevSkim: ignore DS172411 — setTimeout is called with a closure, never a string; no untrusted data is evaluated.
     window.setTimeout(() => {
       if (typeof window !== 'undefined' && normalizePath(window.location.pathname) !== '/orders') {
         try { window.location.assign(pagePath('/orders')); } catch {}

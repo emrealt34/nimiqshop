@@ -241,6 +241,13 @@ func main() {
 	// oracle (see internal/handlers/market_rates.go).
 	h.StartRatesRefresher(ctx)
 
+	// FX refresher: the USD rate table behind the admin's price cap and the
+	// pre-quote display estimate follows the live market automatically (no
+	// more hand-edited rates). Stale beats wrong: a failed fetch keeps the
+	// previous snapshot, and the embedded baseline is the last resort. See
+	// internal/handlers/fx_refresh.go.
+	h.StartFXRefresher(ctx)
+
 	// Post-fulfillment stake re-ask: a buyer who was not verifiably staked
 	// at delivery time (wallet stake, pool index lag, pool blip) is
 	// re-queried from the shop's own pool every minute for an hour, and
@@ -785,6 +792,9 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 	r.GET("/api/admin/test-quote/{id}", adminOnly(h.AdminTestQuoteStatus))
 	r.GET("/api/admin/oracle", adminOnly(h.AdminOracleHealth))
 	r.POST("/api/admin/settings/margin", adminOnly(h.AdminUpdateMargin))
+	// Operator-triggered FX refresh (the background refresher runs every 6h;
+	// this is the "update the rates now" button). See internal/handlers/fx_refresh.go.
+	r.POST("/api/admin/settings/fx-refresh", adminOnly(h.AdminRefreshFX))
 	r.GET("/api/admin/settings/cashback", adminOnly(h.AdminGetCashback))
 	r.POST("/api/admin/settings/cashback", adminOnly(h.AdminUpdateCashback))
 	// Single-ledger staker programme: the parameter set is edited through

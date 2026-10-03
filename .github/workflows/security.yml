@@ -84,7 +84,12 @@ jobs:
           node-version: "24"
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
-      - run: npm audit --audit-level=high
+      # Gate on high/critical with a documented exception list
+      # (scripts/audit-gate.mjs). Plain `npm audit --audit-level=high` would
+      # stay red forever on an advisory with NO patched release, which is how
+      # real, fixable findings get ignored. Anything not listed there fails.
+      - name: npm audit (high/critical, documented exceptions only)
+        run: node scripts/audit-gate.mjs
 
   trivy:
     name: Trivy filesystem

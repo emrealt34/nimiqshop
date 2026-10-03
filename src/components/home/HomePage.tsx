@@ -621,6 +621,7 @@ function ProductGrid({ products, onBuy, allowWarm }: { products: Product[]; onBu
         const id = u.searchParams.get('id');
         const cc = u.searchParams.get('country');
         if (id) {
+          // DevSkim: ignore DS172411 — setTimeout is called with a closure, never a string; no untrusted data is evaluated.
           window.setTimeout(() => {
             if (cancelled) return;
             getProduct(id, cc || undefined).catch(() => {});

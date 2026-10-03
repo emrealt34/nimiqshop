@@ -3,7 +3,7 @@
 The production split is:
 
 | Piece | Where | URL |
-|---|---|---|
+| --- | --- | --- |
 | Frontend (static Astro build) | Cloudflare Pages project `nimshop` | <https://shop.nimiqbase.com> |
 | Backend (Go API + BadgerDB) | Railway service `zetas`, project `adventurous-motivation`, environment `production` | <https://zetas-production.up.railway.app> (port **8084**) |
 | Public API edge | Cloudflare Tunnel `83001ce9-d661-4eda-bd2f-f2de34ba295b` | <https://shopapi.nimiqbase.com> |
@@ -20,7 +20,7 @@ that did not come through the tunnel.
 Build/deploy settings (service → Settings):
 
 | Setting | Value | Why not the default |
-|---|---|---|
+| --- | --- | --- |
 | Builder | `RAILPACK` | The repo `Dockerfile` ends with `VOLUME ["/data"]`, which Railway rejects: `dockerfile invalid: docker VOLUME at Line 71 is not supported, use Railway Volumes`. Railpack ignores the Dockerfile entirely. |
 | Root Directory | `backend` | Only the Go module is built; the frontend ships from Pages. |
 | Build Command | `go build -tags timetzdata -ldflags="-s -w" -o out ./cmd/server` | Railpack otherwise builds the alphabetically first command, `./cmd/cashback-test`. |
@@ -36,7 +36,7 @@ Deploys are triggered by pushes to `main` (GitHub trigger
 
 ## 2. Environment variables that differ from `backend/.env.example`
 
-```
+```text
 SITE_HOST                 shop.nimiqbase.com
 PUBLIC_API_URL            https://shopapi.nimiqbase.com
 FRONTEND_URL              https://shop.nimiqbase.com
@@ -57,7 +57,7 @@ ADMIN_COOKIE_SECURE       true
 `PROXY_HEADER_MODE=forwarded`, not `cloudflare`: the request reaches the
 backend as
 
-```
+```text
 browser → Cloudflare edge → cloudflared (Orange Pi) → Railway edge → container
 ```
 
@@ -79,7 +79,7 @@ allowlist above covers Railway's private ranges and the request is served.
 
 Both features are server-to-server only; the pool sends no CORS headers.
 
-```
+```bash
 POOL_API_URL              https://api.nimiqbase.com
 POOL_VALIDATOR_ADDRESS    NQ49 N8MB XYCR XBUP 404C KXKK L49M A7BT F082
 POOL_FEED_API_KEY         <openssl rand -hex 32 — must equal GPOOL_FEED_API_KEY on the pool>

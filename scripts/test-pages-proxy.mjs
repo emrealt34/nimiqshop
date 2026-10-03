@@ -7,6 +7,17 @@ import { onRequest } from '../functions/api/[[path]].js';
 const shop = 'https://shop.nimiqbase.com';
 function req(path, init) { return new Request(shop + path, init); }
 
+// Test-only host check. Parsed rather than substring-matched so a lookalike
+// host (shopapi.nimiqbase.com.evil.test) can never be mistaken for the real
+// API — and CodeQL's js/incomplete-url-substring-sanitization stays quiet.
+function isShopApiUrl(u) {
+  try {
+    return new URL(u).hostname === 'shopapi.nimiqbase.com';
+  } catch {
+    return false;
+  }
+}
+
 test('browser defaults and Pages routing keep assets static', () => {
   const context = { window: {} };
   vm.runInNewContext(readFileSync('public/config.js', 'utf8'), context);
@@ -97,9 +108,9 @@ test('502 and network errors remain honest JSON failures, never success', async 
 
 test('backend down: catalog price falls back to CryptoRefills directly', async t => {
   let crUrl = '';
-  t.mock.method(globalThis, 'fetch', async (url, init) => {
+  t.mock.method(globalThis, 'fetch', async (url, _init) => {
     const u = String(url);
-    if (u.includes('shopapi.nimiqbase.com')) return new Response('down', { status: 502 });
+    if (isShopApiUrl(u)) return new Response('down', { status: 502 });
     crUrl = u;
     return new Response(JSON.stringify({ coin_amount: '0.00012345', coin: 'BTC', product_id: 'p1' }), {
       status: 200, headers: { 'Content-Type': 'application/json' },
@@ -118,7 +129,7 @@ test('backend down: catalog price falls back to CryptoRefills directly', async t
 test('backend down: bad supplier price is not served as a quote', async t => {
   t.mock.method(globalThis, 'fetch', async (url) => {
     const u = String(url);
-    if (u.includes('shopapi.nimiqbase.com')) return new Response('down', { status: 502 });
+    if (isShopApiUrl(u)) return new Response('down', { status: 502 });
     return new Response(JSON.stringify({ coin_amount: '-1', coin: 'BTC' }), { status: 200 });
   });
   const result = await onRequest({ request: req('/api/catalog/price?brand_name=X&country_code=TR&face_value=10') });

@@ -18,12 +18,16 @@ import (
 	"strings"
 )
 
-// usdPerUnit maps ISO-4217 code → how many USD one unit is worth
-// (approximate, curated; materially stale entries refreshed 2026-10-03
-// against open.er-api.com). This rate only feeds the admin's USD price
-// CAP and the pre-quote display estimate — never an actual charge: a real
-// order is priced from the supplier's own validated amount and the live
-// oracle BTC rate (see quotedUSD in internal/handlers/quote_money.go).
+// usdPerUnit is the FALLBACK baseline: ISO-4217 code → how many USD one
+// unit is worth, curated at build time. At runtime it is shadowed by the
+// live snapshot in fx_live.go (refreshed automatically by the backend's FX
+// refresher), so a stale entry here is only ever served before the first
+// successful fetch — the table no longer needs hand-editing to stay honest.
+//
+// The rate (baseline or live) only feeds the admin's USD price CAP and the
+// pre-quote display estimate — never an actual charge: a real order is
+// priced from the supplier's own validated amount and the live oracle BTC
+// rate (see quotedUSD in internal/handlers/quote_money.go).
 var usdPerUnit = map[string]float64{
 	"AED": 0.272, "AFN": 0.014, "ALL": 0.011, "AMD": 0.0026, "ANG": 0.555,
 	"AOA": 0.0011, "ARS": 0.0006565614, "AUD": 0.65, "AWG": 0.555, "AZN": 0.588,
@@ -63,7 +67,7 @@ var usdPerUnit = map[string]float64{
 // USD-equivalent. An unknown/empty code is treated as USD (1:1) — the
 // supplier's default currency — so a cap never wrongly hides catalog data.
 func ToUSD(amount float64, code string) float64 {
-	rate, ok := usdPerUnit[strings.ToUpper(strings.TrimSpace(code))]
+	rate, ok := fxRate(code)
 	if !ok {
 		return amount
 	}
@@ -76,14 +80,13 @@ func ToUSD(amount float64, code string) float64 {
 // to USD, so price-cap comparisons must SKIP them (fail open) instead of
 // treating the raw point count as dollars (which nuked whole families).
 func CurrencyKnown(code string) bool {
-	_, ok := usdPerUnit[strings.ToUpper(strings.TrimSpace(code))]
+	_, ok := fxRate(code)
 	return ok
 }
 
 // UsdPerUnit exposes the rate (tests / admin display).
 func UsdPerUnit(code string) (float64, bool) {
-	r, ok := usdPerUnit[strings.ToUpper(strings.TrimSpace(code))]
-	return r, ok
+	return fxRate(code)
 }
 
 // ParseDenominationLabel parses supplier monetary min/max fields. Checkout
@@ -207,18 +210,6 @@ func parseMoneyAmountRaw(s string) float64 {
 		return 0
 	}
 	return f
-}
-
-// FXTable returns a copy of the curated USD-per-unit rate table. The
-// /api/market/fx endpoint serves it so the FRONTEND converts local face
-// values with the SAME rates the backend cap filter uses — one source of
-// truth on both sides.
-func FXTable() map[string]float64 {
-	out := make(map[string]float64, len(usdPerUnit))
-	for k, v := range usdPerUnit {
-		out[k] = v
-	}
-	return out
 }
 
 // countryCurrency is the ISO-3166 -> ISO-4217 fallback used ONLY for

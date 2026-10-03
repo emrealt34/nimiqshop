@@ -1,0 +1,21 @@
+# OSV-Scanner configuration.
+#
+# An entry here is a documented exception, not a mute button: it must name a
+# real reason and an expiry date, after which the scanner fails again and the
+# exception has to be re-justified (or removed, because upstream patched it).
+#
+# See also scripts/audit-gate.mjs — the npm audit job carries the same single
+# exception so the two gates agree.
+
+[[IgnoredVulns]]
+id = "GHSA-ch52-4w7c-c8xp"
+ignoreUntil = 2027-01-31 # re-check when http-cache-semantics 4.2.1+ ships
+reason = """
+CVE-2026-93748 (http-cache-semantics <= 4.2.0, max-stale cross-user cache
+disclosure). No patched release exists: npm's latest is 4.2.0 and the
+advisory declares first_patched_version: none, so there is nothing to
+upgrade to. It arrives only through astro's build-time dependency tree; the
+deployed artifact is a static Astro build (HTML/CSS/JS) that never runs an
+HTTP cache. Dependabot carries the same alert (open, unfixable) as the
+permanent reminder. Remove this entry the moment a fixed release exists.
+"""
