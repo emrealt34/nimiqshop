@@ -49,13 +49,16 @@ window.APP_CONFIG = Object.assign(
     NETWORK: 'mainnet', // 'mainnet' | 'testnet'
 
     // Feature flags
-    // TEST MODE sandbox — ON by default, matches backend .env.example
-    // TEST_MODE=true. Normal users, normal flow, real everything — only the
-    // payments are simulated (checkout and the order page both show the same
-    // "Pay now — simulated" payment screen, plus a gold site banner). Go live
-    // by setting BOTH to false: TEST_MODE: false here and TEST_MODE=false in
-    // the backend .env.
-    TEST_MODE: true,
+    // TEST MODE sandbox — OFF in production. Normal users, normal flow, REAL
+    // payments: quotes attach real supplier invoices and the pay screen is the
+    // live one. The operator can still buy-and-fake-pay any catalog product
+    // from the admin console → "Test center" tab (Admin → ?section=test),
+    // which runs the same pipeline against a SIMULATED supplier and never
+    // touches CryptoRefills or moves money — that is the supported way to
+    // exercise the checkout, the gift email and the cashback worker on a live
+    // deployment. Flip BOTH this flag and the backend TEST_MODE env to true to
+    // sandbox the whole shop for customers instead.
+    TEST_MODE: false,
 
     // Links
     GITHUB_URL: 'https://github.com/emrealt34/nimiqshop',

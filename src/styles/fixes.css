@@ -2345,6 +2345,20 @@ label.oos-toggle > span {
      — the flag alone still reads as the language control. */
   /* !important: Icon writes an inline display on its svg. */
   .topbar .lang-toggle svg:first-of-type { display: none !important; }
+  /* The chip is a fixed 40px AVATAR control in this band, and only the avatar
+     fits inside it: the 2px border + 4px padding leave a 28px content box,
+     while the identicon (22) + two 6px gaps + chevron (14) need 48px. With
+     `justify-content: center` that overflow is symmetric, so the identicon
+     painted OUTSIDE the frame on the left and the chevron on the right — the
+     broken avatar the operator reported on a phone (481-560px: wider than the
+     480px breakpoint that hid the chevron, narrower than the 560px one that
+     fixed the width). The address is already unreadable here (flex shrinks it
+     to 0), so it and the chevron are hidden outright and `overflow: hidden`
+     guarantees no child can ever paint past the frame again. */
+  .topbar .acct-btn > svg,
+  .topbar .acct-btn .addr {
+    display: none !important;
+  }
   .topbar .acct-btn {
     width: 40px;
     min-width: 40px;
@@ -2352,6 +2366,7 @@ label.oos-toggle > span {
     padding: 4px;
     gap: 0;
     justify-content: center;
+    overflow: hidden;
   }
   .topbar .cart-btn,
   .topbar .theme-toggle {
