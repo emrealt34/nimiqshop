@@ -133,11 +133,11 @@ test.describe('outside Nimiq Pay', () => {
 
   test('the market follows the device region, and no IP lookup happens', async ({ page, requests }) => {
     await page.addInitScript({ content: FRESH + deviceLocale('de-DE') });
-    const statics: string[] = [];
-    page.on('request', (r) => { const u = r.url(); if (u.includes('/data/catalog/brands/')) statics.push(u); });
+    const shelfFiles: string[] = [];
+    page.on('request', (r) => { const u = r.url(); if (u.includes('/data/catalog/brands/')) shelfFiles.push(u); });
     await open(page, path('/'));
     // de-DE is a market we serve: the German shelf snapshot is what loads…
-    await expect.poll(() => statics.some((u) => u.endsWith('/brands/DE.json'))).toBe(true);
+    await expect.poll(() => shelfFiles.some((u) => u.endsWith('/brands/DE.json'))).toBe(true);
     // …and the IP-based country suggestion is gone for good.
     expect(requests.filter((r) => r.includes('/geo')), 'no /api/geo call').toEqual([]);
   });
