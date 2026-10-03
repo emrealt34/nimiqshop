@@ -422,12 +422,16 @@ export function I18nProvider({ children, initial }: { children: ReactNode; initi
     return () => { alive = false; };
   }, [lang]);
 
-  // Keep the global singleton (and the static Astro shell) in sync. Only the
-  // ADOPTED language gets announced/persisted — the pinned boot render is
-  // skipped, so English never overwrites the visitor's own choice while their
-  // dictionary chunk is still in flight.
+  // Keep the global singleton (and the static Astro shell) in sync. The first
+  // run is skipped for a non-pinned provider (`adopted` is still null: nothing
+  // has been detected, so the pinned English render must not be announced or
+  // persisted — that is what used to flip data-lang, the cookie and
+  // localStorage to "en" for a moment on every load). From the adoption
+  // onwards every render IS the choice (switcher, other tab, `?lang=`), so the
+  // effect follows it — that also keeps the two-tab storage sync working.
   useEffect(() => {
-    if (lang !== adopted.current) return;
+    if (adopted.current === null) return;
+    adopted.current = lang;
     if (dictLoaded(lang)) applyLang(lang, true);
     else void loadDict(lang).then(() => applyLang(lang, true));
   }, [lang]);
