@@ -122,14 +122,32 @@ export function HomePage() {
     savedCountry.current = v; // '' = nothing saved (or server render)
   }
 
-  // Restore saved country — runs before the shelf-load effect in the same
-  // commit, so the first fetch already targets the right country.
+  // The market for a visitor who has not chosen one: their own locale (device
+  // region, then the country the host/device language usually means) — never
+  // their IP. Computed once, during the first CLIENT render like savedCountry
+  // above, so the shelf effect below can already skip the SSR-default 'TR'
+  // fetch: a US visitor used to see the Turkish shelf for a beat and then the
+  // swap to theirs (measured: "Amazon.com.tr" before "Amazon.com"). On the
+  // server there is no navigator, so this is '' and the render is unchanged.
+  const marketDefault = useRef<string>('');
+  if (!marketDefault.current && typeof window !== 'undefined') {
+    try {
+      const all = [...orderedCountries().popular, ...orderedCountries().rest];
+      marketDefault.current = countryCandidates().find((code) => all.some(([c]) => c === code)) || '';
+    } catch { marketDefault.current = ''; }
+  }
+
+  // Restore the visitor's country — the saved one when they have chosen before,
+  // otherwise the locale-derived market. Runs before the shelf-load effect in
+  // the same commit, so the first fetch already targets the right country and
+  // no wrong shelf is ever painted. Only an explicit choice sets
+  // userChoseCountry (it must survive later renders; the locale default must not
+  // block a future change of the device region).
   useEffect(() => {
     mountAlive.current = true;
-    if (savedCountry.current) {
-      userChoseCountry.current = true;
-      setCountry(savedCountry.current);
-    }
+    const cc = savedCountry.current || marketDefault.current;
+    if (savedCountry.current) userChoseCountry.current = true;
+    if (cc) setCountry(cc);
     return () => {
       mountAlive.current = false;
     };
@@ -171,14 +189,16 @@ export function HomePage() {
 
   const firstShelfLoad = useRef(true);
   useEffect(() => {
-    // First mount only: when a saved country exists but the restore effect's
-    // setCountry has not committed yet, skip the SSR-default shelf — the
+    // First mount only: when the visitor's country (saved, or the locale-derived
+    // market) differs from the SSR default, skip the SSR-default shelf — the
     // restore effect (declared above) already ran in this commit and this
-    // effect re-fires with the saved country immediately. Every later run
-    // (manual picks, geo-suggest) loads normally.
+    // effect re-fires with the right country immediately. Saves the wasted
+    // round trip and the wrong-shelf flash. Every later run (manual picks)
+    // loads normally.
     if (firstShelfLoad.current) {
       firstShelfLoad.current = false;
-      if (savedCountry.current && savedCountry.current !== country) return;
+      const cc = savedCountry.current || marketDefault.current;
+      if (cc && cc !== country) return;
     }
     void loadCatalogs(country);
   }, [country, loadCatalogs]);
@@ -192,17 +212,6 @@ export function HomePage() {
     const off = onRatesChange((r) => {
       if (mountAlive.current && r?.usd_per_unit) setFx(r.usd_per_unit);
     });
-    // Market default — the visitor's own locale, never their IP. The request
-    // reaches the backend through the Cloudflare tunnel, so a geo lookup would
-    // resolve the tunnel egress (or a VPN), not the buyer. Candidates come from
-    // src/lib/hostLang: the device region first ("tr-TR" → TR), then the
-    // country the Nimiq Pay / device language usually means; the first one the
-    // shop actually serves wins. /api/geo is deliberately not called any more.
-    if (!userChoseCountry.current) {
-      const all = [...orderedCountries().popular, ...orderedCountries().rest];
-      const cc = countryCandidates().find((code) => all.some(([c]) => c === code));
-      if (cc && mountAlive.current) setCountry(cc);
-    }
     return off;
   }, []);
 
