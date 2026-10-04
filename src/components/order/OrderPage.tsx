@@ -66,8 +66,10 @@ import { SimulatedPayBlock } from '../checkout/SimulatedPayBlock';
 import { isTestMode } from '../../lib/config';
 import { UsdtPayBlock } from '../checkout/UsdtPayBlock';
 import { PaymentCountdown } from '../checkout/PaymentCountdown';
-import { deliverySummary, payRail, payActionLine, linesOf , coinAmountLabel } from '../../lib/deliveryCopy';
-import { hasLockedNim } from '../../lib/nim';
+import { deliverySummary, payRail, payActionLine, linesOf , coinAmountLabel, coinAmountLabelFor } from '../../lib/deliveryCopy';
+import { hasLockedNim, nimAmountText } from '../../lib/nim';
+import { StakerCashbackLine } from '../staker/StakerCashback';
+import { asset } from '../../lib/asset';
 import { useT, t as i18nT, type Translator } from '../../i18n';
 import { pagePath } from '../../lib/asset';
 
@@ -647,44 +649,82 @@ function PayNowCard({ q }: { q: any }) {
   // hides this card once the simulated payment settles.
   // Backend verdict first, static flag only as a fallback — see isTestMode().
   const testMode = isTestMode(q as Record<string, unknown>);
+  // Mirror of the checkout pay screen: same hero (big NIM + fee, you-get,
+  // delivery, local fiat), same collapsed summary — the order page must not
+  // invent a second, different recap (owner, 2026-10-04).
+  const nimBase = nimAmountText(q);
+  const localFiat = (() => { try { const { label } = quoteFaceValue(q); return label || ''; } catch { return ''; } })();
   return (
     <div className="card" style={{ borderColor: 'var(--stamp)', borderWidth: '2px', boxShadow: '3px 3px 0 rgba(199, 72, 29, 0.25)' }}>
-      <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <span style={{ color: 'var(--stamp)', display: 'inline-flex' }}>
-          <Icon name="clock" size={15} />
-        </span>
-        <span>{t('orderPage.payNowLive')}</span>
+      <div className="center mt-1">
+        <PaymentCountdown
+          expiresAt={q.payment_expiry || q.payment_expires_at}
+          onExpire={() => setExpired(true)}
+        />
       </div>
-      <PaymentCountdown
-        expiresAt={q.payment_expiry || q.payment_expires_at}
-        onExpire={() => setExpired(true)}
-      />
-      <dl className="pay-recap mt-1">
-        <div>
-          <dt>{t('orderPage.youPay')}</dt>
-          <dd>
-            {rail.isUsdt ? (
-              coinAmountLabel(q) || t('orderPage.amountShownBelow')
-            ) : (
-              <NimAmount q={q} fallback={t('orderPage.amountInNimiqPay')} />
-            )}
-          </dd>
+      <div className="pay-wait small muted mt-1 center" style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center' }}>
+        <div className="spinner" style={{ width: 14, height: 14 }} />
+        <span>{t('checkout.flowWaiting')}</span>
+      </div>
+      <div className="pay-hero mt-2">
+        <div className="pay-hero-label">{t('checkout.flowDirect')}</div>
+        <div className="pay-hero-amt">
+          {rail.isUsdt ? (
+            <span className="big-nim">{coinAmountLabel(q) || t('orderPage.amountShownBelow')}</span>
+          ) : nimBase ? (
+            <>
+              <img className="pay-nim-ico" src={asset("/img/nimiq-hexagon.png?v=40")} alt="NIM" width={22} height={22} style={{ borderRadius: 5 }} />
+              <span className="big-nim">{t('checkout.flowFeeSuffix', { amount: nimBase })}</span>
+            </>
+          ) : (
+            <span className="big-nim">{t('checkout.flowAmountInNimiqPay')}</span>
+          )}
         </div>
-        <div><dt>{t('orderPage.paymentMethod')}</dt><dd>{rail.label}</dd></div>
-        <div>
-          <dt>{t('orderPage.finalTotal')}</dt>
-          <dd>{rail.isUsdt ? t('orderPage.finalTotalUsdt', { coin: rail.short }) : (coinAmountLabel(q) || t('orderPage.amountNote'))}</dd>
+        <div className="pay-hero-youget">
+          <span className="xs faint">{t('checkout.flowYouGet')}</span>
+          <span className="strong pay-you-get">{selectedAmountLabel(q) || cleanProductLabel(q.product_id) || t('orderPage.instantDelivery')}</span>
         </div>
-        <div><dt>{t('orderPage.rowTo')}</dt><dd>{t('orderPage.toSupplier')}</dd></div>
-        <div><dt>{t('orderPage.youGet')}</dt><dd>{selectedAmountLabel(q) || cleanProductLabel(q.product_id) || t('orderPage.instantDelivery')}</dd></div>
-        <div><dt>{t('orderPage.rowDelivery')}</dt><dd>{del.sentence}</dd></div>
-        <div><dt>{t('orderPage.nextStep')}</dt><dd>{payActionLine(q, del)}</dd></div>
-      </dl>
-      {/* Closed by default, opened with "See details" (owner: the fee rule
-          should not shout at the buyer above the pay button). */}
+        {del && (
+          <div className="pay-hero-del small">
+            <Icon name={del.icon as any} size={14} /> {del.sentence}
+          </div>
+        )}
+        {localFiat && <div className="small muted" style={{ marginTop: 6, fontWeight: 700 }}>{localFiat}</div>}
+      </div>
+      {/* The full recap lives in the summary, exactly like the pay screen:
+          the visible card is the hero, the table opens on "See details". */}
       <details className="checkout-details-min">
-        <summary>{t('orderPage.seeDetails')}</summary>
-        <div style={{ marginTop: 8 }}><CashbackFeeNotice example={rail.isUsdt ? 'usdt' : 'nim'} /></div>
+        <summary>{t('checkout.flowDetailsSummary')}</summary>
+        <div style={{ marginTop: 8 }}>
+          <dl className="pay-recap">
+            <div>
+              <dt>{t('orderPage.youPay')}</dt>
+              <dd>
+                {rail.isUsdt ? (
+                  coinAmountLabel(q) || t('orderPage.amountShownBelow')
+                ) : (
+                  <NimAmount q={q} fallback={t('orderPage.amountInNimiqPay')} />
+                )}
+              </dd>
+            </div>
+            <div><dt>{t('orderPage.paymentMethod')}</dt><dd>{rail.label}</dd></div>
+            <div>
+              <dt>{t('orderPage.finalTotal')}</dt>
+              <dd>{rail.isUsdt ? t('orderPage.finalTotalUsdt', { coin: rail.short }) : (coinAmountLabelFor(q, 'BTC') || t('orderPage.amountNote'))}</dd>
+            </div>
+            <div><dt>{t('orderPage.rowTo')}</dt><dd>{t('orderPage.toSupplier')}</dd></div>
+            <div><dt>{t('orderPage.youGet')}</dt><dd>{selectedAmountLabel(q) || cleanProductLabel(q.product_id) || t('orderPage.instantDelivery')}</dd></div>
+            <div><dt>{t('orderPage.rowDelivery')}</dt><dd>{del.sentence}</dd></div>
+            <div><dt>{t('orderPage.nextStep')}</dt><dd>{payActionLine(q, del)}</dd></div>
+          </dl>
+          <div className="small muted mt-1">{t('checkout.flowNimEstimateNote')}</div>
+          <CashbackFeeNotice example={rail.isUsdt ? 'usdt' : 'nim'} />
+          <StakerCashbackLine quote={q} />
+          <div className="alert info mt-1" style={{ marginBottom: 0, display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <Icon name="bolt" size={18} />
+            <div className="small">{rail.note}</div>
+          </div>
+        </div>
       </details>
       {rail.isUsdt ? (
         <UsdtPayBlock quote={q} expired={expired} />

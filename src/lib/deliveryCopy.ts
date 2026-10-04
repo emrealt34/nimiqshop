@@ -361,8 +361,15 @@ export function coinAmountOf(q: any): string {
 
 /** "12.34 USDT", or '' when unknown. */
 export function coinAmountLabel(q: any): string {
+  return coinAmountLabelFor(q, 'USDT');
+}
+
+/** The coin column is USDT on the stablecoin rail but the supplier's BTC
+ *  invoice amount on the Lightning rail — labelling the latter "USDT" read as
+ *  a wrong currency on the order recap (owner, 2026-10-04). */
+export function coinAmountLabelFor(q: any, unit: 'USDT' | 'BTC'): string {
   const a = coinAmountOf(q);
-  return a ? `${a} USDT` : '';
+  return a ? `${a} ${unit}` : '';
 }
 
 /** Payment-screen helpers (moved here from the removed SimulatedPayScreen so
