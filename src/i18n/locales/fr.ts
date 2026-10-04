@@ -121,7 +121,6 @@ const fr = {
 
   product: {
     addToCart: 'Ajouter au panier',
-    feesDetails: 'Frais & cashback',
     buyNow: 'Acheter maintenant',
     denomination: 'Valeur',
     country: 'Pays',
@@ -1179,6 +1178,7 @@ const fr = {
 
   /* ---- productPage ---- */
   productPage: {
+    feesDetails: 'Frais & cashback',
     chipInstantEmail: '⚡ Livraison instantanée par e-mail',
     chipInstantTopup: '⚡ Recharge mobile instantanée',
     chipInstantEsim: '⚡ QR eSIM instantané',

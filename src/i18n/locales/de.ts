@@ -121,7 +121,6 @@ const de = {
 
   product: {
     addToCart: 'In den Warenkorb',
-    feesDetails: 'Gebühren & Cashback',
     buyNow: 'Jetzt kaufen',
     denomination: 'Wert',
     country: 'Land',
@@ -1179,6 +1178,7 @@ const de = {
 
   /* ---- productPage ---- */
   productPage: {
+    feesDetails: 'Gebühren & Cashback',
     chipInstantEmail: '⚡ Sofortige E-Mail-Lieferung',
     chipInstantTopup: '⚡ Sofortige Handy-Aufladung',
     chipInstantEsim: '⚡ Sofortiger eSIM-QR',

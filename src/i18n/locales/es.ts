@@ -121,7 +121,6 @@ const es = {
 
   product: {
     addToCart: 'Añadir al carrito',
-    feesDetails: 'Comisiones y cashback',
     buyNow: 'Comprar ahora',
     denomination: 'Valor',
     country: 'País',
@@ -1179,6 +1178,7 @@ const es = {
 
   /* ---- productPage ---- */
   productPage: {
+    feesDetails: 'Comisiones y cashback',
     chipInstantEmail: '⚡ Entrega instantánea por correo',
     chipInstantTopup: '⚡ Recarga instantánea',
     chipInstantEsim: '⚡ QR de eSIM instantáneo',

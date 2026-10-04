@@ -122,7 +122,6 @@ const tr = {
 
   product: {
     addToCart: 'Sepete ekle',
-    feesDetails: 'Ücretler ve cashback',
     buyNow: 'Hemen al',
     denomination: 'Miktar',
     country: 'Ülke',
@@ -1180,6 +1179,7 @@ const tr = {
 
   /* ---- productPage ---- */
   productPage: {
+    feesDetails: 'Ücretler ve cashback',
     chipInstantEmail: '⚡ Anında e-posta teslimatı',
     chipInstantTopup: '⚡ Anında telefon yüklemesi',
     chipInstantEsim: '⚡ Anında eSIM QR',

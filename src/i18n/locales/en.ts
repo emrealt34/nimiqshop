@@ -130,7 +130,6 @@ const en = {
 
   product: {
     addToCart: 'Add to cart',
-    feesDetails: 'Fees and cashback',
     buyNow: 'Buy now',
     denomination: 'Denomination',
     country: 'Country',
@@ -1188,6 +1187,7 @@ const en = {
 
   /* ---- productPage ---- */
   productPage: {
+    feesDetails: 'Fees and cashback',
     chipInstantEmail: '⚡ Instant email delivery',
     chipInstantTopup: '⚡ Instant phone top-up',
     chipInstantEsim: '⚡ Instant eSIM QR',

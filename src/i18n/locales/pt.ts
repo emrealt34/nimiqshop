@@ -121,7 +121,6 @@ const pt = {
 
   product: {
     addToCart: 'Adicionar ao carrinho',
-    feesDetails: 'Taxas e cashback',
     buyNow: 'Comprar agora',
     denomination: 'Valor',
     country: 'País',
@@ -1179,6 +1178,7 @@ const pt = {
 
   /* ---- productPage ---- */
   productPage: {
+    feesDetails: 'Taxas e cashback',
     chipInstantEmail: '⚡ Entrega instantânea por e-mail',
     chipInstantTopup: '⚡ Recarga instantânea',
     chipInstantEsim: '⚡ QR de eSIM instantâneo',
