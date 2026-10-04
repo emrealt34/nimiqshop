@@ -49,6 +49,14 @@ export type PayLightningOutcome =
   | { status: 'declined'; message: string }     // PERMISSION_DENIED
   | { status: 'invalid'; message: string }       // INVALID_REQUEST / INVALID_TRANSACTION
   | { status: 'unavailable'; message: string }   // not inside Nimiq Pay / no invoice
+  // The WALLET reported a network problem of its own (provider code -32000).
+  // It says nothing about the shop being reachable, so it must not be shown
+  // as such either — it gets its own copy.
+  | { status: 'network'; message: string }
+  // The SDK never reached the wallet at all: window.nimiq was missing or the
+  // handshake timed out (live repro 2026-10-04: the 8-second init). A
+  // wallet-connection state, never a shop outage.
+  | { status: 'noProvider'; message: string }
   | { status: 'error'; message: string };
 
 /** Outcomes after which the SAME invoice must never be submitted again. */
@@ -88,6 +96,8 @@ export async function payLightningInvoice(invoice: string): Promise<PayLightning
           return { status: 'unknown', message: error.message, hash: data.hash, swapId: data.swapId };
         case 'PERMISSION_DENIED':
           return { status: 'declined', message: error.message };
+        case 'NETWORK_ERROR':
+          return { status: 'network', message: error.message };
         case 'INVALID_REQUEST':
         case 'INVALID_TRANSACTION':
           return { status: 'invalid', message: error.message };
@@ -95,7 +105,15 @@ export async function payLightningInvoice(invoice: string): Promise<PayLightning
           return { status: 'error', message: error.message };
       }
     }
-    return { status: 'error', message: error instanceof Error ? error.message : String(error) };
+    const text = error instanceof Error ? error.message : String(error);
+    // The SDK never reached the wallet: window.nimiq was absent or the init
+    // handshake timed out ("Nimiq provider was not injected. Are you running
+    // inside a Nimiq app?"). That is a wallet-connection state; the shop was
+    // up the whole time (payment-launch answered 200 during the live repro).
+    if (/was not injected|not injected|timed out|timeout/i.test(text)) {
+      return { status: 'noProvider', message: text };
+    }
+    return { status: 'error', message: text };
   } finally {
     inFlight.delete(inv);
   }

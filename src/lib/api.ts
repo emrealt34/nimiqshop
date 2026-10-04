@@ -72,7 +72,20 @@ export function friendlyApiMessage(err: unknown, fallback = tr('api.generic')): 
     return tr('api.tooMany');
   }
   if (status >= 500) return tr('api.shopDown');
-  if (status === 0 || /cannot reach|too long|network|failed to fetch/i.test(msg)) {
+  // "Our API could not be reached" is a claim, and it may only be made when it
+  // is true. This branch used to say `status === 0`, and since Number(undefined)
+  // is 0 every plain Error took it — a wallet refusal, an SDK timeout, a UI
+  // bug — and every one of them came out as "shop.nimiqbase.com is
+  // unreachable". A Nimiq Pay -32000 NETWORK_ERROR (the owner's report of
+  // 2026-10-04) was rendered as our own site being down.
+  //
+  // Attribution now follows the shape of the failure: OUR transport failure
+  // (ApiError with status 0 — fetch threw) and the raw browser fetch strings
+  // are the only things blamed on the site, and they get the same localized
+  // sentence in every language. Everything else keeps its own words.
+  const transport = (err instanceof ApiError && status === 0) ||
+    /cannot reach|too long|failed to fetch|networkerror|load failed/i.test(msg);
+  if (transport) {
     return tr('api.cannotReach', { site: siteName() });
   }
   if (msg && msg.length < 180 && !/request failed \(\d+\)/i.test(msg) && !/ALLOWED_ORIGINS|\/api/i.test(msg)) {

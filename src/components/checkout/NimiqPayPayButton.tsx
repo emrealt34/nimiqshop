@@ -33,6 +33,8 @@ export type NimiqPayPayLabels = {
   duplicate: string;
   unknown: string;
   declined: string;
+  network: string;
+  noProvider: string;
   invalid: string;
   unavailable: string;
   error: string;
@@ -47,6 +49,8 @@ const DEFAULT_LABELS: NimiqPayPayLabels = {
   duplicate: 'This invoice was already submitted. Check your payment status before trying again.',
   unknown: 'We could not confirm the result. Do not pay again — check your payment status first.',
   declined: 'Payment was not approved. You can try again when ready.',
+  network: 'Nimiq Pay reported a network problem and nothing was charged. Check your connection and try again.',
+  noProvider: 'Could not reach Nimiq Pay. Close and reopen the app, then try again — nothing was charged.',
   invalid: 'This payment request is invalid or expired. Refresh the order and try again.',
   unavailable: 'Open this shop inside Nimiq Pay to pay with NIM or USDT.',
   error: 'Something went wrong starting the payment. Please try again.',
@@ -59,6 +63,8 @@ function toneFor(o: PayLightningOutcome): Tone {
     case 'submitted': return 'success';
     case 'duplicate':
     case 'unknown': return 'warn';
+    case 'network':
+    case 'noProvider': return 'warn';
     case 'declined':
     case 'unavailable': return 'info';
     default: return 'error';

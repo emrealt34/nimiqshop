@@ -172,6 +172,34 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddre
           toast(res.message, 'info');
           return;
         }
+        // A failure the WALLET reported is the wallet's, not ours. It must
+        // never be reworded as "our site is unreachable" (that is exactly what
+        // a Nimiq Pay -32000 NETWORK_ERROR became before): say what happened,
+        // say that nothing was charged, and — when the wallet's own words are
+        // short enough to be useful — quote them so support can see them.
+        if (res.status === 'unavailable') {
+          // payLightningInvoice only answers this when we are NOT inside Nimiq
+          // Pay after all — the wallet's own words are useless to the buyer.
+          toast(t('checkout.lpWalletNotOpened'), 'info');
+          return;
+        }
+        if (res.status === 'noProvider') {
+          const detail = String(res.message || '').trim();
+          const shown = detail && detail.length <= 120 && !/https?:\/\//.test(detail) ? ` (${detail})` : '';
+          toast(t('checkout.walletNoProvider') + shown, 'warn');
+          return;
+        }
+        if (res.status === 'network' || res.status === 'error' || res.status === 'invalid') {
+          const base = res.status === 'network'
+            ? t('checkout.walletNetwork')
+            : res.status === 'invalid'
+              ? t('checkout.walletInvalid')
+              : t('checkout.walletFail');
+          const detail = String(res.message || '').trim();
+          const shown = detail && detail.length <= 120 && !/https?:\/\//.test(detail) ? ` (${detail})` : '';
+          toast(base + shown, 'warn');
+          return;
+        }
         throw new Error('message' in res ? res.message : t('checkout.lpWalletNotOpened'));
       }
       if (action === 'copy') {

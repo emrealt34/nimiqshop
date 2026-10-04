@@ -5,7 +5,7 @@ name: CI
 #
 #   frontend — tsc (app + e2e sources), i18n parity (keys · placeholders ·
 #              tags · untranslated), API route contract, ESLint + oxlint,
-#              Astro production build
+#              unit tests (pay-path error copy), Astro production build
 #   backend  — gofmt, go vet, golangci-lint, `go test -race` with coverage,
 #              static release-style build
 #   coverage — publishes the Go coverage number to the `badges` branch
@@ -62,6 +62,8 @@ jobs:
           npm run check:api
       - name: Lint (ESLint for JS, oxlint for TS/TSX)
         run: npm run lint
+      - name: Unit tests (pay-path error copy)
+        run: npm run test:unit
       - name: Build
         run: npm run build
       - run: test -f dist/index.html

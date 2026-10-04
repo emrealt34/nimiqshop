@@ -84,32 +84,54 @@ func ParseBOLT11Window(invoice string) (validFrom, expiresAt time.Time, ok bool)
 
 /* Locally-advertised payment window ----------------------------------------
  *
- * PaymentWindow is the supplier-documented Lightning payment window (from
- * api.cryptorefills.com docs; the API does not return an explicit expiry).
- * PaymentSafetyBuffer shortens the window the shop advertises so buyers stop
- * paying before the true deadline — absorbing device-clock skew and
- * last-seconds races. Late payments the supplier still accepts are completed
- * by the verified webhook/poll ("expired -> fulfilled" is an allowed state
- * transition), so the buffer only ever releases the daily-limit slot a few
- * minutes early; it can never lose a paid order. */
+ * Two sources, in order of authority:
+ *
+ *  1. The BOLT-11 invoice itself. Its `x` tag IS the deadline: the supplier's
+ *     node rejects anything after it and every wallet counts to the same
+ *     second. Measured live on 2026-10-04 (order 129cbf42): the invoice is
+ *     issued with x = 3600 s while the shop's old code advertised 25 min —
+ *     the pay screen declared "expired" 35 minutes before the invoice did.
+ *     That is the bug this file now fixes: when the invoice can be decoded,
+ *     the shop advertises ITS deadline (minus InvoiceSkewBuffer, so a device
+ *     clock running a little fast cannot make the buyer start a payment the
+ *     network will refuse).
+ *
+ *  2. The supplier-documented 30-minute Lightning window, used ONLY when no
+ *     invoice can be decoded (a stablecoin order, or a BOLT-11 we cannot
+ *     parse). PaymentSafetyBuffer shortens that advertisement the same way.
+ *
+ * A later order state (webhook/poll) still completes a payment the supplier
+ * accepted — "expired -> fulfilled" is an allowed transition — so neither
+ * buffer can ever lose a paid order; they only stop the shop from advertising
+ * a payment window the network would reject.
+ */
 
 const (
-	// PaymentWindow is the supplier-documented Lightning payment window.
+	// PaymentWindow is the supplier-documented Lightning payment window,
+	// used when the invoice itself cannot be decoded.
 	PaymentWindow = 30 * time.Minute
-	// PaymentSafetyBuffer is subtracted from the advertised window.
+	// PaymentSafetyBuffer is subtracted from that fallback window.
 	PaymentSafetyBuffer = 5 * time.Minute
+	// InvoiceSkewBuffer is subtracted from a DECODED invoice's own expiry,
+	// absorbing device-clock skew and last-seconds races. One minute keeps
+	// the advertisement honest (the countdown and the wallet's hard limit
+	// agree to within a minute) while a payment that lands inside it is
+	// still captured by the supplier webhook.
+	InvoiceSkewBuffer = time.Minute
+	// PaymentMaxWindow bounds how far a decoded invoice may push the
+	// advertised deadline, as defence against a malformed invoice.
+	PaymentMaxWindow = 2 * time.Hour
 )
 
 // PaymentExpiryFor computes the locally-advertised payment deadline for a
 // supplier Lightning order:
 //
-//	deadline = min(orderCreatedAt + PaymentWindow, bolt11ValidFrom + bolt11Expiry) - PaymentSafetyBuffer
+//	decoded invoice: invoiceValidFrom + bolt11Expiry - InvoiceSkewBuffer
+//	otherwise:       orderCreatedAt + PaymentWindow - PaymentSafetyBuffer
 //
-// The window is measured from the SUPPLIER's own timestamps (the order's
-// created_at/updated_at echoed back by api.cryptorefills.com), never the
-// customer's device clock. When the BOLT-11 invoice cannot be decoded the
-// documented window minus the buffer is used. The result is clamped so it
-// never lies in the past relative to `now`.
+// The window is always measured from the SUPPLIER's own timestamps (the
+// invoice's creation time or the order's created_at echoed back by
+// api.cryptorefills.com), never the customer's device clock.
 func PaymentExpiryFor(order *Order, now time.Time) time.Time {
 	// Never restart an old invoice's clock from updated_at or from a retry.
 	if order == nil {
@@ -123,10 +145,15 @@ func PaymentExpiryFor(order *Order, now time.Time) time.Time {
 	if base.IsZero() || base.After(now) {
 		base = now
 	}
-	windowEnd := base.Add(PaymentWindow)
-	if decoded && invoiceEnd.Before(windowEnd) {
-		windowEnd = invoiceEnd
+	if decoded {
+		// The invoice is the truth — including when it is already past, in
+		// which case the caller sees an expired deadline and says so
+		// truthfully instead of inventing a fresh window.
+		end := invoiceEnd.Add(-InvoiceSkewBuffer)
+		if max := base.Add(PaymentMaxWindow); end.After(max) {
+			end = max
+		}
+		return end
 	}
-
-	return windowEnd.Add(-PaymentSafetyBuffer)
+	return base.Add(PaymentWindow - PaymentSafetyBuffer)
 }
