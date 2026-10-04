@@ -23,6 +23,41 @@ export function isValidEmail(s: unknown): boolean {
   return EMAIL_DOMAIN_RE.test(domain);
 }
 
+/* ------------------------- double entry (confirm) ------------------------- */
+/**
+ * A mistyped email or number is a lost order: the code goes to an inbox nobody
+ * reads, or the top-up lands on a stranger's line. Both fields are therefore
+ * asked for TWICE in the checkout and the two entries must agree before the
+ * order can be created.
+ *
+ * Comparison is forgiving about formatting and strict about content:
+ *   • email  — case-insensitive (mail domains are), trimmed;
+ *   • phone  — digits only, so "0555 123 45 67" and "05551234567" are the same
+ *              number while a real typo still differs;
+ *   • text   — trimmed verbatim.
+ * Empty vs empty counts as "matching" here on purpose: whether a value is
+ * required at all is decided by the callers' own validators, so this helper
+ * never duplicates (or contradicts) their copy.
+ */
+export function confirmKey(raw: unknown, kind: 'email' | 'phone' | 'text' = 'text'): string {
+  const s = String(raw == null ? '' : raw).trim();
+  if (kind === 'email') return s.toLowerCase();
+  if (kind === 'phone') {
+    let digits = '';
+    for (let i = 0; i < s.length; i++) {
+      const ch = s[i];
+      if (ch >= '0' && ch <= '9') digits += ch;
+    }
+    return digits;
+  }
+  return s;
+}
+
+/** True when the second entry matches the first (see `confirmKey`). */
+export function confirmMatches(a: unknown, b: unknown, kind: 'email' | 'phone' | 'text' = 'text'): boolean {
+  return confirmKey(a, kind) === confirmKey(b, kind);
+}
+
 export function emailError(s: unknown): string {
   const v = String(s == null ? '' : s).trim();
   if (!v) return tr('validate.emailRequired');

@@ -222,7 +222,7 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddre
 
       <RailPills
         pills={[
-          { bg: '#0582CA', img: asset('/img/nimiq-hexagon.png?v=40'), label: t('checkout.lpPayWithNim') },
+          { bg: '#0582CA', img: asset('/img/nimiq-hexagon.png?v=40'), label: t('checkout.lpPayWithNimOrUsdt') },
           { bg: '#0E6BA8', img: asset('/img/btc-lightning.png'), label: t('checkout.lpBtcNetwork') },
         ]}
       />
@@ -232,6 +232,15 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddre
         <strong>{amountLabel || t('checkout.lpNimAmountBelow')}</strong>
         {t('checkout.lpPayExactlyPost')}
       </p>
+
+      {/* Inside Nimiq Pay the asset is the wallet's call, not ours: the same
+          invoice can be settled with NIM or with USDT on Polygon, and Nimiq Pay
+          shows the swap amount and fees before the buyer approves. */}
+      {insidePay && (
+        <p className="small muted mt-1" style={{ textAlign: 'center' }}>
+          {t('checkout.lpAssetChoice')}
+        </p>
+      )}
 
       <button type="button" className="btn btn-gold btn-block btn-lg mt-2" disabled={disabled || payLocked} onClick={() => handoff('pay')}>
         <NimIcon /> <span className="btn-label">{busy ? t('checkout.verifying') : payLocked ? t('orderPage.nimiqPay.submitted') : insidePay ? t('orderPage.nimiqPay.idle') : t('checkout.flowPayWithNim')}</span>

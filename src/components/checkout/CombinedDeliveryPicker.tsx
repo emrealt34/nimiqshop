@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { isValidEmail } from '../../lib/validate';
+import { isValidEmail, confirmMatches } from '../../lib/validate';
 import { clearGiftExtras, setGiftExtras, setGiftIdenticon, collectPhoneValue } from '../../lib/delivery';
 import { needsPhone } from '../../lib/catalog';
 import { parseCountryPhone, phoneCountry } from '../../lib/phoneCountry';
 import { CountryPhoneInput } from './CountryPhoneInput';
+import { ConfirmField } from './ConfirmField';
 import type { CartItem } from '../../lib/cartStore';
 import { identiconPngDataUrl } from '../../lib/identicon';
 import { getAddress } from '../../lib/session';
@@ -32,12 +33,13 @@ function lockNumber(value: string, country?: string): { e164: string; error: str
 
 export function CombinedDeliveryPicker({
   items = [],
-  siteCfg,
   onDone,
   onBack,
 }: {
   /** The cart lines being bought — decides which contact fields are shown. */
   items?: CartItem[];
+  /** Kept in the prop list because the checkout always passes it; the single
+   *  Lightning rail no longer varies with it (no USDT/Polygon rail of our own). */
   siteCfg: any;
   onDone: (info: DeliveryInfo) => void;
   onBack: () => void;
@@ -55,29 +57,52 @@ export function CombinedDeliveryPicker({
   const [selfError, setSelfError] = useState('');
   const [phones, setPhones] = useState<string[]>(() => tops.map(() => ''));
   const [phoneErr, setPhoneErr] = useState<string[]>(() => tops.map(() => ''));
+  // Second entries. A typo in the address the code goes to (or in the number a
+  // top-up lands on) cannot be undone, so both are typed twice and the two
+  // entries must agree before the order is created.
+  const [myEmail2, setMyEmail2] = useState('');
+  const [giftEmail2, setGiftEmail2] = useState('');
+  const [noteEmail2, setNoteEmail2] = useState('');
+  const [email2Err, setEmail2Err] = useState('');
+  const [phones2, setPhones2] = useState<string[]>(() => tops.map(() => ''));
+  const [phone2Err, setPhone2Err] = useState<string[]>(() => tops.map(() => ''));
   const [checking, setChecking] = useState(false);
   const setPhone = (i: number, v: string) => {
     setPhones((prev) => prev.map((p, idx) => (idx === i ? v : p)));
     setPhoneErr((prev) => prev.map((p, idx) => (idx === i ? '' : p)));
+    setPhone2Err((prev) => prev.map((p, idx) => (idx === i ? '' : p)));
     setSelfError('');
   };
-  const [method, setMethod] = useState<'nimiq_pay' | 'usdt_polygon'>('nimiq_pay');
+  const setPhone2 = (i: number, v: string) => {
+    setPhones2((prev) => prev.map((p, idx) => (idx === i ? v : p)));
+    setPhone2Err((prev) => prev.map((p, idx) => (idx === i ? '' : p)));
+  };
+  // ONE payment rail. The order is always a Bitcoin Lightning request paid from
+  // Nimiq Pay (`payLightningInvoice`) — Nimiq Pay itself lets the buyer spend
+  // NIM or USDT on Polygon and shows the swap amount and fees, so the shop has
+  // no USDT/Polygon rail of its own to offer and does not (and cannot) know
+  // which asset was used. See "Bitcoin Lightning Payments in Mini Apps".
+  const method = 'nimiq_pay' as const;
   const [cashbackDest, setCashbackDest] = useState<'cashback' | 'burn'>('cashback');
   const [anonymous, setAnonymous] = useState(false);
-
-  const usdtOn = siteCfg?.enable_usdt !== false;
-  const usdtPct = Math.round((siteCfg?.usdt_cashback_multiplier || 0.5) * 100);
 
   const submit = async () => {
     setSelfError('');
     api.setError('');
-    // ---- 1) phone numbers: one per phone-delivered line, live-checked ----
+    setEmail2Err('');
+    // ---- 1) phone numbers: one per phone-delivered line, typed twice ----
     const phoneMap = new Map<unknown, string>();
     for (let i = 0; i < tops.length; i++) {
       const raw = String(phones[i] || '').trim();
       const locked = lockNumber(raw, tops[i].country);
       if (locked.error) {
         setPhoneErr((prev) => prev.map((p, idx) => (idx === i ? locked.error : p)));
+        return;
+      }
+      // The confirmation is compared on the digits the buyer typed, so a typo
+      // shows up as a mismatch even before the number is normalised.
+      if (!confirmMatches(raw, phones2[i], 'phone')) {
+        setPhone2Err((prev) => prev.map((p, idx) => (idx === i ? t('delivery.confirmPhoneMismatch') : p)));
         return;
       }
       setChecking(true);
@@ -95,6 +120,12 @@ export function CombinedDeliveryPicker({
     if (gift) {
       // emailed lines → the recipient's email IS the delivery target;
       // phone-only cart → the note still needs an inbox (api.noteEmail).
+      const target = hasEmail ? giftEmail : api.noteEmail;
+      const target2 = hasEmail ? giftEmail2 : noteEmail2;
+      if (!confirmMatches(target, target2, 'email')) {
+        setEmail2Err(t('delivery.confirmEmailMismatch'));
+        return;
+      }
       const r = api.check({ email: hasEmail ? giftEmail : '' });
       if (!r.ok) return;
       setGiftExtras('email', r.message);
@@ -103,6 +134,10 @@ export function CombinedDeliveryPicker({
     } else if (hasEmail) {
       if (!isValidEmail(myEmail)) {
         setSelfError(t('delivery.cdpEnterValidEmail'));
+        return;
+      }
+      if (!confirmMatches(myEmail, myEmail2, 'email')) {
+        setEmail2Err(t('delivery.confirmEmailMismatch'));
         return;
       }
       clearGiftExtras();
@@ -160,7 +195,7 @@ export function CombinedDeliveryPicker({
           marginBottom: 12,
         }}
       >
-        <input type="checkbox" checked={gift} onChange={(e) => { setGift(e.target.checked); setSelfError(''); api.setError(''); }} style={{ accentColor: 'var(--stamp)', width: 18, height: 18, flex: 'none' }} />
+        <input type="checkbox" checked={gift} onChange={(e) => { setGift(e.target.checked); setSelfError(''); api.setError(''); setEmail2Err(''); setNoteEmail2(''); setGiftEmail2(''); }} style={{ accentColor: 'var(--stamp)', width: 18, height: 18, flex: 'none' }} />
         <span style={{ width: 32, height: 32, borderRadius: 999, background: gift ? 'var(--stamp)' : 'var(--surface-2)', border: '1.5px solid var(--line-strong)', display: 'grid', placeItems: 'center', flex: 'none', fontSize: 14 }}>🎁</span>
         <span style={{ minWidth: 0 }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 900, fontSize: 13 }}>
@@ -189,6 +224,18 @@ export function CombinedDeliveryPicker({
               onEnter={() => { void submit(); }}
             />
             {phoneErr[i] && <div className="small" style={{ color: 'var(--stamp)', marginTop: 4 }}>{phoneErr[i]}</div>}
+            <ConfirmField
+              id={`${id}-again`}
+              label={t('delivery.confirmPhoneLabel')}
+              type="tel"
+              inputMode="tel"
+              placeholder={t('delivery.confirmPhonePlaceholder')}
+              value={phones2[i] || ''}
+              invalid={!!phone2Err[i]}
+              error={phone2Err[i]}
+              onChange={(v) => setPhone2(i, v)}
+              onEnter={() => { void submit(); }}
+            />
           </div>
         );
       })}
@@ -203,8 +250,19 @@ export function CombinedDeliveryPicker({
                 type="email"
                 placeholder="friend@gmail.com"
                 value={giftEmail}
-                onChange={(e) => { setGiftEmail(e.target.value); api.setError(''); }}
+                onChange={(e) => { setGiftEmail(e.target.value); api.setError(''); setEmail2Err(''); }}
                 style={{ padding: '12px 14px', border: '2px solid var(--line-strong)', borderRadius: 8, background: 'var(--surface-1)', width: '100%' }}
+              />
+              <ConfirmField
+                id="cdp-gift-email-again"
+                label={t('delivery.confirmEmailLabel')}
+                type="email"
+                inputMode="email"
+                placeholder="friend@gmail.com"
+                value={giftEmail2}
+                invalid={!!email2Err}
+                error={email2Err}
+                onChange={(v) => { setGiftEmail2(v); setEmail2Err(''); }}
               />
             </div>
           ) : (
@@ -215,8 +273,19 @@ export function CombinedDeliveryPicker({
                 type="email"
                 placeholder="friend@gmail.com"
                 value={api.noteEmail}
-                onChange={(e) => { api.setNoteEmail(e.target.value); api.setError(''); }}
+                onChange={(e) => { api.setNoteEmail(e.target.value); api.setError(''); setEmail2Err(''); }}
                 style={{ padding: '12px 14px', border: '2px solid var(--line-strong)', borderRadius: 8, background: 'var(--surface-1)', width: '100%' }}
+              />
+              <ConfirmField
+                id="cdp-note-email-again"
+                label={t('delivery.confirmEmailLabel')}
+                type="email"
+                inputMode="email"
+                placeholder="friend@gmail.com"
+                value={noteEmail2}
+                invalid={!!email2Err}
+                error={email2Err}
+                onChange={(v) => { setNoteEmail2(v); setEmail2Err(''); }}
               />
             </div>
           )}
@@ -240,8 +309,21 @@ export function CombinedDeliveryPicker({
             type="email"
             placeholder="you@gmail.com"
             value={myEmail}
-            onChange={(e) => { setMyEmail(e.target.value); setSelfError(''); }}
+            onChange={(e) => { setMyEmail(e.target.value); setSelfError(''); setEmail2Err(''); }}
             style={{ padding: '12px 14px', border: '2px solid var(--line-strong)', borderRadius: 8, background: 'var(--surface-1)', width: '100%' }}
+          />
+          <ConfirmField
+            id="cdp-my-email-again"
+            label={t('delivery.confirmEmailLabel')}
+            type="email"
+            inputMode="email"
+            placeholder="you@gmail.com"
+            value={myEmail2}
+            invalid={!!email2Err}
+            error={email2Err}
+            hint={t('delivery.confirmHint')}
+            onChange={(v) => { setMyEmail2(v); setEmail2Err(''); }}
+            onEnter={() => { void submit(); }}
           />
           <div className="small muted" style={{ marginTop: 6, display: 'flex', gap: 6, alignItems: 'flex-start', background: 'var(--paper-tint)', border: '1px dashed rgba(78,61,40,.25)', borderRadius: 8, padding: '8px 10px' }}>
             <span>⚠️</span><span>{t('delivery.cdpCodeToEmail')}</span>
@@ -252,53 +334,30 @@ export function CombinedDeliveryPicker({
 
       {/* Pay with — 2 cards side by side */}
       <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--ink)', marginBottom: 6 }}>{t('checkout.flowPayWithSection')}</div>
-      <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
-        <label
-          onClick={() => setMethod('nimiq_pay')}
-          style={{
-            flex: 1,
-            padding: '12px 10px',
-            border: method === 'nimiq_pay' ? '2px solid var(--stamp)' : '1.5px dashed var(--line-mid)',
-            borderRadius: 10,
-            background: method === 'nimiq_pay' ? 'var(--paper-tint)' : 'var(--surface-1)',
-            boxShadow: method === 'nimiq_pay' ? '2px 2px 0 rgba(78,61,40,.12)' : 'none',
-            cursor: 'pointer',
-            display: 'flex',
-            gap: 8,
-            alignItems: 'center',
-          }}
-        >
-          <input type="radio" checked={method === 'nimiq_pay'} onChange={() => setMethod('nimiq_pay')} style={{ accentColor: 'var(--stamp)' }} />
-          <img src={asset("/img/nimiq-hexagon.png?v=40")} alt="" style={{ width: 28, height: 28, borderRadius: 6 }} />
-          <span style={{ lineHeight: 1.2 }}>
-            <div style={{ fontWeight: 900, fontSize: 13 }}>{t('delivery.cdpMethodNim')}</div>
-            <div style={{ fontSize: 11, color: 'var(--ink-on-green-deep)', fontWeight: 700 }}>{t('delivery.cdpFullCashback')}</div>
-          </span>
-        </label>
-        {usdtOn && (
-          <label
-            onClick={() => setMethod('usdt_polygon')}
-            style={{
-              flex: 1,
-              padding: '12px 10px',
-              border: method === 'usdt_polygon' ? '2px solid var(--stamp)' : '1.5px dashed var(--line-mid)',
-              borderRadius: 10,
-              background: method === 'usdt_polygon' ? 'var(--paper-tint)' : 'var(--surface-1)',
-              boxShadow: method === 'usdt_polygon' ? '2px 2px 0 rgba(78,61,40,.12)' : 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              gap: 8,
-              alignItems: 'center',
-            }}
-          >
-            <input type="radio" checked={method === 'usdt_polygon'} onChange={() => setMethod('usdt_polygon')} style={{ accentColor: 'var(--stamp)' }} />
-            <img src={asset("/img/usdt.png")} alt="" style={{ width: 28, height: 28, borderRadius: 6 }} />
-            <span style={{ lineHeight: 1.2 }}>
-              <div style={{ fontWeight: 900, fontSize: 13 }}>{t('checkout.flowMethodUsdt')}</div>
-              <div style={{ fontSize: 11, color: 'var(--ink-dim)', fontWeight: 700 }}>{t('delivery.cdpUsdtCashback', { pct: usdtPct })}</div>
-            </span>
-          </label>
-        )}
+      {/* One rail, stated once: the order is a Lightning invoice; Nimiq Pay
+          opens it and the buyer picks NIM or USDT there. No second card, no
+          "USDT rail" of our own — a rail we do not control would only promise
+          something we cannot see or honour. */}
+      <div
+        style={{
+          padding: '12px 10px',
+          border: '2px solid var(--stamp)',
+          borderRadius: 10,
+          background: 'var(--paper-tint)',
+          boxShadow: '2px 2px 0 rgba(78,61,40,.12)',
+          display: 'flex',
+          gap: 10,
+          alignItems: 'center',
+          marginBottom: 12,
+        }}
+      >
+        <img src={asset("/img/nimiq-hexagon.png?v=40")} alt="" style={{ width: 28, height: 28, borderRadius: 6 }} />
+        <img src={asset("/img/usdt.png")} alt="" style={{ width: 28, height: 28, borderRadius: 6, marginLeft: -14 }} />
+        <span style={{ lineHeight: 1.25, minWidth: 0 }}>
+          <div style={{ fontWeight: 900, fontSize: 13 }}>{t('delivery.cdpMethodBoth')}</div>
+          <div style={{ fontSize: 11, color: 'var(--ink-on-green-deep)', fontWeight: 700 }}>{t('delivery.cdpFullCashback')}</div>
+          <div style={{ fontSize: 11, color: 'var(--ink-dim)', fontWeight: 700, marginTop: 2 }}>{t('delivery.cdpMethodBothSub')}</div>
+        </span>
       </div>
 
       {/* Cashback destination */}
