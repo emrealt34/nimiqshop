@@ -1622,6 +1622,8 @@ const es = {
     usdtOnPolygon: 'USDT en Polygon',
     leaderboard: 'Clasificación de Cashback y Quema',
     themeAria: 'Cambiar la clasificación entre modo día y noche',
+    themeDay: 'Día',
+    themeNight: 'Noche',
     thisWeek: 'Esta semana',
     thisMonth: 'Este mes',
     allTime: 'Histórico',

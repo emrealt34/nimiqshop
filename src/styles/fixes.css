@@ -3335,8 +3335,7 @@ input[type="range"]:focus-visible { outline: 2px solid var(--stamp); outline-off
 .cb-tab.active { background: var(--gold); border-color: var(--gold); color: var(--on-gold); }
 
 /* ---- Leaderboard tab: one day/night switch for the whole tab (owner 2026-10-04) ---- */
-.lb-toolbar { display: flex; justify-content: flex-end; margin: 6px 0 8px; }
-.lb-theme { flex: 0 0 auto; }
+.lb-mode-seg { flex: 0 0 auto; }
 .lb-wrap.lb-night { color: #e9ecf4; }
 .lb-wrap.lb-night .pt-card, .lb-wrap.lb-night .card { background: #141721; border-color: #2b3140; }
 .lb-wrap.lb-night .pt-section-title, .lb-wrap.lb-night .pt-leader-code, .lb-wrap.lb-night .cb-row-name, .lb-wrap.lb-night .small.strong { color: #e9ecf4; }
@@ -3369,5 +3368,6 @@ input[type="range"]:focus-visible { outline: 2px solid var(--stamp); outline-off
   .pt-pager { flex-wrap: wrap; justify-content: center; row-gap: 6px; }
   .pt-pager .btn { flex: 1 1 auto; justify-content: center; }
   .cb-row-right { display: flex; flex-direction: row; align-items: baseline; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
-  .lb-toolbar { margin: 4px 0 6px; }
+  .pt-card-head .lb-mode-seg { width: 100%; }
+  .pt-card-head .lb-mode-seg .btn { flex: 1 1 auto; justify-content: center; }
 }

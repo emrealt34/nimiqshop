@@ -1623,6 +1623,8 @@ const tr = {
     usdtOnPolygon: 'Polygon’da USDT',
     leaderboard: 'Cashback & Yakım Liderlik Tablosu',
     themeAria: 'Liderlik tablosunu gündüz / gece moduna geçir',
+    themeDay: 'Gündüz',
+    themeNight: 'Gece',
     thisWeek: 'Bu hafta',
     thisMonth: 'Bu ay',
     allTime: 'Tüm zamanlar',

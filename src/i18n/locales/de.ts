@@ -1622,6 +1622,8 @@ const de = {
     usdtOnPolygon: 'USDT auf Polygon',
     leaderboard: 'Cashback- & Burn-Rangliste',
     themeAria: 'Rangliste zwischen Tag- und Nachtmodus umschalten',
+    themeDay: 'Tag',
+    themeNight: 'Nacht',
     thisWeek: 'Diese Woche',
     thisMonth: 'Dieser Monat',
     allTime: 'Gesamt',

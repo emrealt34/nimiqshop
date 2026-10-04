@@ -1622,6 +1622,8 @@ const fr = {
     usdtOnPolygon: 'USDT sur Polygon',
     leaderboard: 'Classement Cashback & Brûlage',
     themeAria: 'Basculer le classement entre mode jour et nuit',
+    themeDay: 'Jour',
+    themeNight: 'Nuit',
     thisWeek: 'Cette semaine',
     thisMonth: 'Ce mois-ci',
     allTime: 'Depuis le début',

@@ -1631,6 +1631,8 @@ const en = {
     usdtOnPolygon: 'USDT on Polygon',
     leaderboard: 'Cashback & Burn Leaderboard',
     themeAria: 'Switch the leaderboard between day and night mode',
+    themeDay: 'Day',
+    themeNight: 'Night',
     thisWeek: 'This week',
     thisMonth: 'This month',
     allTime: 'All time',
