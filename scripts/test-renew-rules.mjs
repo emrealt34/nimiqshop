@@ -20,15 +20,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dir = mkdtempSync(path.join(tmpdir(), 'renew-rules-'));
 const entry = path.join(dir, 'entry.ts');
-const bundle = path.join(dir, 'bundle.cjs');
+const bundle = path.join(dir, 'bundle.mjs');
 
 writeFileSync(entry, `
 (globalThis as any).localStorage ??= { getItem: () => null, setItem() {}, removeItem() {} };
@@ -39,15 +38,14 @@ export { canRenewQuote, paymentInFlight, paymentWindowOver, paymentWindowVerifyi
 
 const esbuild = path.join(root, 'node_modules', '.bin', process.platform === 'win32' ? 'esbuild.cmd' : 'esbuild');
 const built = spawnSync(esbuild, [
-  entry, '--bundle', '--platform=node', '--format=cjs', `--outfile=${bundle}`,
+  entry, '--bundle', '--platform=node', '--format=esm', `--outfile=${bundle}`,
   '--define:import.meta.env.BASE_URL="/"', '--define:import.meta.env={}',
   '--loader:.css=empty', '--log-level=error',
 ], { encoding: 'utf8' });
 assert.equal(built.status, 0, built.stderr || 'esbuild failed to bundle src/lib/pay.ts');
 process.on('exit', () => rmSync(dir, { recursive: true, force: true }));
 
-const require = createRequire(import.meta.url);
-const { canRenewQuote, paymentInFlight, paymentWindowOver, paymentWindowVerifying, PAYMENT_VERIFY_GRACE_MS, renewItemFromQuote, renewInfoFromQuote, canRebuildRequest } = require(bundle);
+const { canRenewQuote, paymentInFlight, paymentWindowOver, paymentWindowVerifying, PAYMENT_VERIFY_GRACE_MS, renewItemFromQuote, renewInfoFromQuote, canRebuildRequest } = await import(pathToFileURL(bundle).href);
 
 const NOW = Date.parse('2026-10-04T12:00:00Z');
 const GRACE = PAYMENT_VERIFY_GRACE_MS;
