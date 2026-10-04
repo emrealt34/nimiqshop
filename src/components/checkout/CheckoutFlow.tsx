@@ -902,6 +902,22 @@ export function PayScreen({
     // gone. What remains is actions: one tap for a fresh invoice, or open the
     // order. Only the MONEY-SEEN state keeps words, because there the words
     // are the safety ("we see your money, wait for settlement").
+    // Zero-tap: a dead invoice (window over, nothing charged) is replaced
+    // silently. The button-only screen below appears once the budget is
+    // spent — no lecture, no status line, just actions.
+    if (renewSafe && (((window as any).__autoRenewBudget as number) ?? 0) > 0) {
+      return (
+        <AutoRenewOnce
+          key={`${quoteIdOf(current)}:${renewTick}`}
+          budgetKey="__autoRenewBudget"
+          fire={() => {
+            setRenewTick((x) => x + 1);
+            finish(false, 'renew');
+          }}
+          label={t('checkout.flowRenewing')}
+        />
+      );
+    }
     if (seen) {
       return (
         <div className="center" style={{ padding: '26px 10px', textAlign: 'center' }} role="status">
