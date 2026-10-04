@@ -531,13 +531,6 @@ func envIntOrZero(key string, fallback int) int {
 	return v
 }
 
-func envFloat(key string, fallback float64) float64 {
-	if v, err := strconv.ParseFloat(os.Getenv(key), 64); err == nil && v > 0 {
-		return v
-	}
-	return fallback
-}
-
 // Purchase ceilings explicitly support zero (disabled). Unlike positive-only
 // rate settings, invalid values must fail Validate, not silently change policy.
 func envBudgetUSD(key string, fallback float64) float64 {
