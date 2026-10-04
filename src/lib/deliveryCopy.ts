@@ -317,7 +317,9 @@ export function payRail(q: any): PayRail {
   if (isUsdt) {
     return {
       id: 'usdt',
-      label: tr('checkout.flowMethodUsdt'),
+      // Rail name is a proper noun — no locale key needed (the USDT rail
+      // is legacy now; only historical orders render this label).
+      label: 'USDT · Polygon',
       short: 'USDT',
       note: tr('delivery.usdtNote', { site: siteName() }),
       isUsdt: true,
