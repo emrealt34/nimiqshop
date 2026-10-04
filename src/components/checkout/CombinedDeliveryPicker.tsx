@@ -33,13 +33,14 @@ function lockNumber(value: string, country?: string): { e164: string; error: str
 
 export function CombinedDeliveryPicker({
   items = [],
+  siteCfg,
   onDone,
   onBack,
 }: {
   /** The cart lines being bought — decides which contact fields are shown. */
   items?: CartItem[];
-  /** Kept in the prop list because the checkout always passes it; the single
-   *  Lightning rail no longer varies with it (no USDT/Polygon rail of our own). */
+  /** Site config: which rails are on (`enable_usdt`) and the USDT cashback
+   *  rate shown on its card. */
   siteCfg: any;
   onDone: (info: DeliveryInfo) => void;
   onBack: () => void;
@@ -77,12 +78,17 @@ export function CombinedDeliveryPicker({
     setPhones2((prev) => prev.map((p, idx) => (idx === i ? v : p)));
     setPhone2Err((prev) => prev.map((p, idx) => (idx === i ? '' : p)));
   };
-  // ONE payment rail. The order is always a Bitcoin Lightning request paid from
-  // Nimiq Pay (`payLightningInvoice`) — Nimiq Pay itself lets the buyer spend
-  // NIM or USDT on Polygon and shows the swap amount and fees, so the shop has
-  // no USDT/Polygon rail of its own to offer and does not (and cannot) know
-  // which asset was used. See "Bitcoin Lightning Payments in Mini Apps".
-  const method = 'nimiq_pay' as const;
+  // TWO visible choices on purpose. A buyer whose coins are USDT should be able
+  // to say so up front and settle from wherever that USDT lives — any Polygon
+  // wallet, an exchange, or one tap inside Nimiq Pay — instead of being pushed
+  // through a single rail. NIM runs through Nimiq Pay's Bitcoin Lightning
+  // payment (`payLightningInvoice`, see "Bitcoin Lightning Payments in Mini
+  // Apps"); USDT-on-Polygon is the shop's own rail with its own one-time
+  // address and its own cashback rate, which is why the two cards state
+  // different cashback percentages and must never be merged into one claim.
+  const [method, setMethod] = useState<'nimiq_pay' | 'usdt_polygon'>('nimiq_pay');
+  const usdtOn = siteCfg?.enable_usdt !== false;
+  const usdtPct = Math.round((siteCfg?.usdt_cashback_multiplier || 0.5) * 100);
   const [cashbackDest, setCashbackDest] = useState<'cashback' | 'burn'>('cashback');
   const [anonymous, setAnonymous] = useState(false);
 
@@ -332,32 +338,55 @@ export function CombinedDeliveryPicker({
         </div>
       ) : null}
 
-      {/* Pay with — 2 cards side by side */}
+      {/* Pay with — two separate cards, one per asset the buyer can actually spend */}
       <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--ink)', marginBottom: 6 }}>{t('checkout.flowPayWithSection')}</div>
-      {/* One rail, stated once: the order is a Lightning invoice; Nimiq Pay
-          opens it and the buyer picks NIM or USDT there. No second card, no
-          "USDT rail" of our own — a rail we do not control would only promise
-          something we cannot see or honour. */}
-      <div
-        style={{
-          padding: '12px 10px',
-          border: '2px solid var(--stamp)',
-          borderRadius: 10,
-          background: 'var(--paper-tint)',
-          boxShadow: '2px 2px 0 rgba(78,61,40,.12)',
-          display: 'flex',
-          gap: 10,
-          alignItems: 'center',
-          marginBottom: 12,
-        }}
-      >
-        <img src={asset("/img/nimiq-hexagon.png?v=40")} alt="" style={{ width: 28, height: 28, borderRadius: 6 }} />
-        <img src={asset("/img/usdt.png")} alt="" style={{ width: 28, height: 28, borderRadius: 6, marginLeft: -14 }} />
-        <span style={{ lineHeight: 1.25, minWidth: 0 }}>
-          <div style={{ fontWeight: 900, fontSize: 13 }}>{t('delivery.cdpMethodBoth')}</div>
-          <div style={{ fontSize: 11, color: 'var(--ink-on-green-deep)', fontWeight: 700 }}>{t('delivery.cdpFullCashback')}</div>
-          <div style={{ fontSize: 11, color: 'var(--ink-dim)', fontWeight: 700, marginTop: 2 }}>{t('delivery.cdpMethodBothSub')}</div>
-        </span>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+        <label
+          onClick={() => setMethod('nimiq_pay')}
+          style={{
+            flex: 1,
+            padding: '12px 10px',
+            border: method === 'nimiq_pay' ? '2px solid var(--stamp)' : '1.5px dashed var(--line-mid)',
+            borderRadius: 10,
+            background: method === 'nimiq_pay' ? 'var(--paper-tint)' : 'var(--surface-1)',
+            boxShadow: method === 'nimiq_pay' ? '2px 2px 0 rgba(78,61,40,.12)' : 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            gap: 8,
+            alignItems: 'center',
+          }}
+        >
+          <input type="radio" checked={method === 'nimiq_pay'} onChange={() => setMethod('nimiq_pay')} style={{ accentColor: 'var(--stamp)' }} />
+          <img src={asset("/img/nimiq-hexagon.png?v=40")} alt="" style={{ width: 28, height: 28, borderRadius: 6 }} />
+          <span style={{ lineHeight: 1.2 }}>
+            <div style={{ fontWeight: 900, fontSize: 13 }}>{t('delivery.cdpMethodNim')}</div>
+            <div style={{ fontSize: 11, color: 'var(--ink-on-green-deep)', fontWeight: 700 }}>{t('delivery.cdpFullCashback')}</div>
+          </span>
+        </label>
+        {usdtOn && (
+          <label
+            onClick={() => setMethod('usdt_polygon')}
+            style={{
+              flex: 1,
+              padding: '12px 10px',
+              border: method === 'usdt_polygon' ? '2px solid var(--stamp)' : '1.5px dashed var(--line-mid)',
+              borderRadius: 10,
+              background: method === 'usdt_polygon' ? 'var(--paper-tint)' : 'var(--surface-1)',
+              boxShadow: method === 'usdt_polygon' ? '2px 2px 0 rgba(78,61,40,.12)' : 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              gap: 8,
+              alignItems: 'center',
+            }}
+          >
+            <input type="radio" checked={method === 'usdt_polygon'} onChange={() => setMethod('usdt_polygon')} style={{ accentColor: 'var(--stamp)' }} />
+            <img src={asset("/img/usdt.png")} alt="" style={{ width: 28, height: 28, borderRadius: 6 }} />
+            <span style={{ lineHeight: 1.2 }}>
+              <div style={{ fontWeight: 900, fontSize: 13 }}>{t('checkout.flowMethodUsdt')}</div>
+              <div style={{ fontSize: 11, color: 'var(--ink-dim)', fontWeight: 700 }}>{t('delivery.cdpUsdtCashback', { pct: usdtPct })}</div>
+            </span>
+          </label>
+        )}
       </div>
 
       {/* Cashback destination */}

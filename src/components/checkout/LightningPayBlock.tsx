@@ -233,9 +233,11 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddre
         {t('checkout.lpPayExactlyPost')}
       </p>
 
-      {/* Inside Nimiq Pay the asset is the wallet's call, not ours: the same
-          invoice can be settled with NIM or with USDT on Polygon, and Nimiq Pay
-          shows the swap amount and fees before the buyer approves. */}
+      {/* This card is the NIM rail, but inside Nimiq Pay the asset stays the
+          wallet's call: the same invoice can also be settled from a USDT
+          balance, and Nimiq Pay shows the swap amount and fees before the
+          buyer approves. Said here so nobody thinks they picked the wrong
+          card. */}
       {insidePay && (
         <p className="small muted mt-1" style={{ textAlign: 'center' }}>
           {t('checkout.lpAssetChoice')}
