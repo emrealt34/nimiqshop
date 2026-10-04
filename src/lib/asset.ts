@@ -1,4 +1,4 @@
-import { getLang } from './i18n';
+import { getLang } from '../i18n';
 
 /** Current language's route prefix ('' for English, which owns the root). */
 function langPrefix(): string {
