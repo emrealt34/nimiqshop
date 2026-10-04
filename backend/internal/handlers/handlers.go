@@ -410,7 +410,6 @@ func (h *Handlers) SiteConfig(ctx *fasthttp.RequestCtx) {
 		"enable_usdt":              true,
 		"usdt_coin":                h.Cfg.USDTCoin,
 		"usdt_network":             PaymentNetworkStable,
-		"usdt_cashback_multiplier": h.Cfg.USDTCashbackMultiplier,
 		"burn_nim_address":         h.Cfg.BurnNimAddress,
 	})
 }

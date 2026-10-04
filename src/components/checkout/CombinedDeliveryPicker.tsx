@@ -84,11 +84,10 @@ export function CombinedDeliveryPicker({
   // through a single rail. NIM runs through Nimiq Pay's Bitcoin Lightning
   // payment (`payLightningInvoice`, see "Bitcoin Lightning Payments in Mini
   // Apps"); USDT-on-Polygon is the shop's own rail with its own one-time
-  // address and its own cashback rate, which is why the two cards state
-  // different cashback percentages and must never be merged into one claim.
+  // address. Both rails pay the SAME cashback rate, so both cards carry the
+  // same cashback line.
   const [method, setMethod] = useState<'nimiq_pay' | 'usdt_polygon'>('nimiq_pay');
   const usdtOn = siteCfg?.enable_usdt !== false;
-  const usdtPct = Math.round((siteCfg?.usdt_cashback_multiplier || 0.5) * 100);
   const [cashbackDest, setCashbackDest] = useState<'cashback' | 'burn'>('cashback');
   const [anonymous, setAnonymous] = useState(false);
 
@@ -383,7 +382,7 @@ export function CombinedDeliveryPicker({
             <img src={asset("/img/usdt.png")} alt="" style={{ width: 28, height: 28, borderRadius: 6 }} />
             <span style={{ lineHeight: 1.2 }}>
               <div style={{ fontWeight: 900, fontSize: 13 }}>{t('checkout.flowMethodUsdt')}</div>
-              <div style={{ fontSize: 11, color: 'var(--ink-dim)', fontWeight: 700 }}>{t('delivery.cdpUsdtCashback', { pct: usdtPct })}</div>
+              <div style={{ fontSize: 11, color: 'var(--ink-on-green-deep)', fontWeight: 700 }}>{t('delivery.cdpFullCashback')}</div>
             </span>
           </label>
         )}

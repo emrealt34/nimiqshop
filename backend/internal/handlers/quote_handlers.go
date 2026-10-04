@@ -50,7 +50,7 @@ type createQuoteRequest struct {
 	Coin    string `json:"coin,omitempty"`
 	Network string `json:"network,omitempty"`
 	// PaymentMethod: "nimiq_pay" (default, BTC Lightning → Nimiq Pay) or
-	// "usdt_polygon" (direct USDT on Polygon at StableMult × NIM cashback rate).
+	// "usdt_polygon" (direct USDT on Polygon; same cashback rate as Nimiq Pay).
 	PaymentMethod string `json:"payment_method,omitempty"`
 	// CashbackDestination: buyer's choice "cashback" (default) or "burn".
 	CashbackDestination string `json:"cashback_destination,omitempty"`

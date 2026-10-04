@@ -226,7 +226,7 @@ type Quote struct {
 	// increases the cashback base (including when the buyer overpays).
 	SentCoinAmount string `json:"sent_coin_amount,omitempty"`
 	// PaymentMethod: "nimiq_pay" (BTC Lightning through Nimiq Pay, default)
-	// or "usdt_polygon" (direct USDT on Polygon; reduced cashback via StableMult).
+	// or "usdt_polygon" (direct USDT on Polygon; same cashback rate as Nimiq Pay).
 	PaymentMethod string `json:"payment_method,omitempty"`
 	// CashbackDestination: buyer's preference locked at quote time
 	// ("cashback" to their wallet, "trees" to the tree planting wallet).

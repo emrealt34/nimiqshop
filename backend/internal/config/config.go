@@ -153,12 +153,9 @@ type Config struct {
 	// switch and no env-chosen network. The frontend always shows the
 	// payment-method picker (Nimiq Pay / USDT Polygon) and the network is
 	// fixed to "Polygon (Matic)" in code (handlers.PaymentNetworkStable).
-	// Stablecoin payers earn cashback at USDTCashbackMultiplier × the standard
-	// NIM rate (default 0.5 = 50% less cashback than Nimiq Pay), clearly
-	// disclosed on the payment picker. BTC Lightning (Nimiq Pay) remains
-	// the default.
-	USDTCoin               string // "USDT"
-	USDTCashbackMultiplier float64
+	// Both payment rails pay the SAME cashback rate — there is no
+	// stablecoin reduction. BTC Lightning (Nimiq Pay) remains the default.
+	USDTCoin string // "USDT"
 
 	// --- Cashback burn destination ---
 	// When a buyer selects "Burn" as their cashback destination, the cashback
@@ -691,8 +688,7 @@ func Load() Config {
 
 		// USDT (Polygon) payment rail — always enabled; network fixed to
 		// Polygon (Matic) in handlers (no ENABLE_USDT_PAYMENT / USDT_NETWORK env).
-		USDTCoin:               env("USDT_COIN", "USDT"),
-		USDTCashbackMultiplier: envFloat("USDT_CASHBACK_MULTIPLIER", 0.5),
+		USDTCoin: env("USDT_COIN", "USDT"),
 
 		// Cashback burn wallet destination
 		BurnNimAddress: strings.TrimSpace(env("BURN_NIM_ADDRESS", "NQ07 0000 0000 0000 0000 0000 0000 0000 0000")),

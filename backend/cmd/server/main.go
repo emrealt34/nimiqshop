@@ -202,10 +202,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("db init: %v", err)
 	}
-	// Wire cashback runtime enrichment: burn wallet address +
-	// Stablecoin cashback multiplier (USDT payers earn multiplier × NIM rate).
-	store.SetCashbackEnrichment(cfg.BurnNimAddress, cfg.USDTCashbackMultiplier)
-	log.Printf("usdt: Polygon rail enabled — USDT cashback multiplier=%.0f%% of NIM rate", cfg.USDTCashbackMultiplier*100)
+	// Wire cashback runtime enrichment: burn wallet address. Both payment
+	// rails (Nimiq Pay and USDT Polygon) pay the same cashback rate.
+	store.SetCashbackEnrichment(cfg.BurnNimAddress)
+	log.Printf("usdt: Polygon rail enabled — same cashback rate as Nimiq Pay")
 	defer func() {
 		// Closing Badger flushes pending writes; skipping it can leave
 		// recent commits to be recovered from the WAL on next boot.

@@ -51,7 +51,6 @@ import {
 import { getAddress, isAuthed } from '../../lib/session';
 import { loginWithHub, friendlyHubError } from '../../lib/hub';
 import { deliverySummary, payRail, payActionLine , coinAmountLabel } from '../../lib/deliveryCopy';
-import { UsdtPayStakeNote } from './UsdtCashbackSheet';
 import { asset, pagePath } from '../../lib/asset';
 import { normalizePath } from '../../lib/router';
 
@@ -237,7 +236,7 @@ export function CheckoutFlow({
   const [phase, setPhase] = useState<Phase>({ kind: 'delivery' });
   const [, setDelivery] = useState<DeliveryInfo | null>(null);
   const [activeItems, setActiveItems] = useState<CartItem[]>(items);
-  const [siteCfg, setSiteCfg] = useState<{ enable_usdt?: boolean; burn_nim_address?: string; usdt_cashback_multiplier?: number; polygon_chain_id?: number } | null>(null);
+  const [siteCfg, setSiteCfg] = useState<{ enable_usdt?: boolean; burn_nim_address?: string; polygon_chain_id?: number } | null>(null);
   const flowRef = useRef<{ done: boolean; started: boolean }>({ done: false, started: false });
 
   useEffect(() => {
@@ -830,10 +829,6 @@ export function PayScreen({
           }}
         />
         {testPayButton}
-        {/* The quote is already on the USDT rail, so this order's rate is
-            locked at the discount — what can still change is every FUTURE
-            order, which a stake right now (one tap in Pay) covers. */}
-        <UsdtPayStakeNote quote={current} />
 
       </div>
     );

@@ -92,13 +92,11 @@ func (st StakerStake) EffectiveBaseBps(operatorBase int) int {
 // stake and ledgerParams are passed in rather than looked up here on
 // purpose: this runs inside an open Badger write transaction, and a pool
 // API call or a settings read in here would hold it for a round trip.
-// CashbackEnrichment carries runtime config (burn wallet address and the
-// stablecoin-vs-NIM cashback multiplier) into the enqueue path.
-// StableMult is applied to the final cashback Luna amount for stablecoin orders
-// (default 0.5 = 50% of the NIM rate, as publicly disclosed).
+// CashbackEnrichment carries runtime config (burn wallet address) into the
+// enqueue path. Both payment rails pay the same cashback rate — there is
+// no stablecoin reduction.
 type CashbackEnrichment struct {
-	BurnAddr   string
-	StableMult float64
+	BurnAddr string
 }
 
 // positiveCoinUnits parses a supplier decimal amount ("0.00150000") into a
@@ -308,11 +306,6 @@ func enqueueCashbackOnFulfill(tx *badger.Txn, q *Quote, stake StakerStake, ledge
 		// debitLedger() above — it stays additive and is never
 		// double-counted with the promo rate.
 		cb.AmountLuna = promoLuna + overCapBaseLuna + boostLuna
-		// Stablecoin payers earn a reduced cashback (default 50%) as publicly
-		// disclosed on the payment picker. Multiplier is wired at boot.
-		if q.PaymentMethod == "usdt_polygon" && enrich.StableMult > 0 && enrich.StableMult < 1 {
-			cb.AmountLuna = int64(float64(cb.AmountLuna) * enrich.StableMult)
-		}
 		if cb.AmountLuna < 1 {
 			skip = "cashback rounds to 0 Luna"
 		} else {
@@ -387,16 +380,8 @@ func (s *Store) ReconcileStakerCashback(address string, stake StakerStake, now t
 		if delta <= 0 {
 			continue
 		}
-		// The stablecoin rail pays a reduced cashback (default 50% of the
-		// NIM rate, as publicly disclosed). An upgrade must respect the
-		// same multiplier, or a USDT order would be reconciled at the full
-		// NIM rate the buyer was never promised.
+		// Both rails pay the same rate, so upgrades reconcile at 1×.
 		mult := 1.0
-		if q, qerr := s.GetQuote(row.QuoteID); qerr == nil && q.PaymentMethod == "usdt_polygon" {
-			if m := s.cashbackEnrich().StableMult; m > 0 && m < 1 {
-				mult = m
-			}
-		}
 		// A zero-rate skip is the "not staked at delivery" signature (the
 		// operator's universal base is 0 and the buyer had no stake the
 		// shop could verify). Now that the pool says staked, revive the row

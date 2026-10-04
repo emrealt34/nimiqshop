@@ -85,7 +85,6 @@ func (h *Handlers) writeQuoteCreatedExtra(ctx *fasthttp.RequestCtx, q db.Quote, 
 		"payment_expires_at": q.PaymentExpiry,
 		"payment_observed":   q.PaymentObserved, "payment_blocked": q.PaymentBlocked,
 		"payment_method":   paymentMethodOf(q),
-		"usdt_mult":        h.usdtMultFor(q),
 		"powered_by":       "cryptorefills",
 		"product_id":       q.ProductID,
 		"country":          q.ProductCountry,
@@ -133,16 +132,4 @@ func paymentMethodOf(q db.Quote) string {
 		return PaymentMethodUSDT
 	}
 	return PaymentMethodNIM
-}
-
-// usdtMultFor is the cashback multiplier of the USDT rail.
-func (h *Handlers) usdtMultFor(q db.Quote) float64 {
-	if paymentMethodOf(q) != PaymentMethodUSDT {
-		return 1
-	}
-	enrich := h.Store.GetCashbackEnrichment()
-	if enrich.StableMult > 0 && enrich.StableMult <= 1 {
-		return enrich.StableMult
-	}
-	return 1
 }

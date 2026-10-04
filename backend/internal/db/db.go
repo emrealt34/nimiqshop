@@ -89,7 +89,7 @@ type Store struct {
 	ledgerMu     sync.RWMutex
 	ledgerParams ledgerParamsFn
 
-	// cashbackEnrichment holds the burn NIM address and stablecoin multiplier (set at boot).
+	// cashbackEnrichment holds the burn NIM address (set at boot).
 	enrichMu           sync.RWMutex
 	cashbackEnrichment CashbackEnrichment
 
@@ -109,14 +109,13 @@ type Store struct {
 }
 
 // SetCashbackEnrichment configures runtime cashback tweaks (burn wallet
-// address, stablecoin cashback multiplier). Empty BurnAddr defaults to the
-// canonical Nimiq burn wallet; StableMult <= 0 or >= 1 disables the stablecoin reduction.
-func (s *Store) SetCashbackEnrichment(burnAddr string, stableMult float64) {
+// address). Empty BurnAddr defaults to the canonical Nimiq burn wallet.
+func (s *Store) SetCashbackEnrichment(burnAddr string) {
 	if strings.TrimSpace(burnAddr) == "" {
 		burnAddr = BurnNIMAddress
 	}
 	s.enrichMu.Lock()
-	s.cashbackEnrichment = CashbackEnrichment{BurnAddr: burnAddr, StableMult: stableMult}
+	s.cashbackEnrichment = CashbackEnrichment{BurnAddr: burnAddr}
 	s.enrichMu.Unlock()
 }
 
@@ -131,7 +130,7 @@ func (s *Store) cashbackEnrich() CashbackEnrichment {
 }
 
 // GetCashbackEnrichment returns the boot-configured cashback enrichment (burn
-// wallet address + stablecoin cashback multiplier).
+// wallet address).
 func (s *Store) GetCashbackEnrichment() CashbackEnrichment { return s.cashbackEnrich() }
 
 // SetStakerLookupDetailed installs the pool resolver. The pool's answer —
