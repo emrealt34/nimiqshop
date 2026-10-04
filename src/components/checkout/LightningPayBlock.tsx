@@ -25,7 +25,6 @@ import { payLightningInvoice, isTerminalOutcome } from '../../lib/nimiqPay';
 import { ApiError, authorizePaymentLaunch, getQuote, friendlyApiMessage, cachedNimRate } from '../../lib/api';
 import { nimAmountFor } from '../../lib/nim';
 import { siteName } from '../../lib/config';
-import { RailPills } from './payRailKit';
 import { asset } from '../../lib/asset';
 
 
@@ -208,13 +207,6 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddre
   return (
     <div aria-busy={busy}>
       <div className="xs faint mt-1" role="status">{t(msgKey, { site: siteName() })}</div>
-
-      <RailPills
-        pills={[
-          { bg: '#0582CA', img: asset('/img/nimiq-hexagon.png?v=40'), label: t('checkout.lpPayWithNimOrUsdt') },
-          { bg: '#0E6BA8', img: asset('/img/btc-lightning.png'), label: t('checkout.lpBtcNetwork') },
-        ]}
-      />
 
       {!hidePayButton && (
         <button type="button" className="btn btn-gold btn-block btn-lg mt-2" disabled={disabled || payLocked} onClick={() => handoff('pay')}>

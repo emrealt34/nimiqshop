@@ -12,6 +12,7 @@ import { useCallback, type ReactNode } from 'react';
 import { Icon } from '../ui/Icon';
 import { Clipboard } from '../../lib/clipboard';
 import { useT } from '../../i18n';
+import { asset } from '../../lib/asset';
 import { useToast } from '../AppProviders';
 
 /** Rail chip (NIM hexagon-blue / USDT teal / network purple…). The mark
@@ -67,6 +68,21 @@ export function RailPills({ pills }: { pills: Array<{ bg: string; mark?: string;
         </RailPill>
       ))}
     </div>
+  );
+}
+
+/** Owner (2026-10-05): the Lightning pills sit directly UNDER the
+ *  "Lightning wallet waiting…" line on checkout AND order page — one shared
+ *  component so the two screens can never place them differently again. */
+export function LightningRailPills() {
+  const { t } = useT();
+  return (
+    <RailPills
+      pills={[
+        { bg: '#0582CA', img: asset('/img/nimiq-hexagon.png?v=40'), label: t('checkout.lpPayWithNimOrUsdt') },
+        { bg: '#0E6BA8', img: asset('/img/btc-lightning.png'), label: t('checkout.lpBtcNetwork') },
+      ]}
+    />
   );
 }
 

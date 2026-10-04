@@ -69,6 +69,7 @@ import { deliverySummary, payRail, payActionLine, linesOf , coinAmountLabel, coi
 import { hasLockedNim, nimAmountText } from '../../lib/nim';
 import { StakerCashbackLine } from '../staker/StakerCashback';
 import { asset } from '../../lib/asset';
+import { LightningRailPills } from '../checkout/payRailKit';
 import { useT, t as i18nT, type Translator } from '../../i18n';
 import { pagePath } from '../../lib/asset';
 
@@ -664,7 +665,8 @@ function PayNowCard({ q }: { q: any }) {
         <div className="spinner" style={{ width: 14, height: 14 }} />
         <span>{t('checkout.flowWaiting')}</span>
       </div>
-      <div className="pay-hero mt-2">
+
+      {!rail.isUsdt && <LightningRailPills />}      <div className="pay-hero mt-2">
         <div className="pay-hero-label">{t('checkout.flowDirect')}</div>
         <div className="pay-hero-amt">
           {rail.isUsdt ? (

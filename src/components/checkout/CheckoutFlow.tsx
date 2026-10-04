@@ -26,6 +26,7 @@ import { CombinedDeliveryPicker } from './CombinedDeliveryPicker';
 import { needsPhone } from '../../lib/catalog';
 import { useT, t as tr } from '../../i18n';
 import { LightningPayBlock, useNimiqPayMissingToast } from './LightningPayBlock';
+import { LightningRailPills } from './payRailKit';
 import { NimiqPayPayButton } from './NimiqPayPayButton';
 import { inNimiqPay } from '../../lib/miniapp';
 import { SimulatedPayBlock } from './SimulatedPayBlock';
@@ -978,6 +979,7 @@ export function PayScreen({
         <span>{t('checkout.flowWaiting')}</span>
       </div>
 
+      <LightningRailPills />
       <div className="pay-hero mt-2">
         <div className="pay-hero-label">{t('checkout.flowDirect')}</div>
         <div className="pay-hero-amt">
