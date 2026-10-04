@@ -992,10 +992,9 @@ function FailurePrompt({ issues = [], message, activeCheckout = false, items = [
       </div>
       <div className="strong">{t('checkout.flowCheckoutPaused')}</div>
       <SupplierProblemNotice issues={issues} />
-      {!issues.length && <div className="small muted mt-1" style={{ maxWidth: 380, margin: '6px auto 0' }}>{displayMessage}</div>}
+      {!issues.length && !activeCheckout && <div className="small muted mt-1" style={{ maxWidth: 380, margin: '6px auto 0' }}>{displayMessage}</div>}
       {activeCheckout && (
         <div className="alert info mt-2" style={{ maxWidth: 380, marginLeft: 'auto', marginRight: 'auto', marginBottom: 0, textAlign: 'left', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-          <Icon name="nimiq" size={17} />
           <div className="small">{t('checkout.flowUnpaidOrderHold')}</div>
         </div>
       )}
@@ -1210,10 +1209,9 @@ function ItemFailedPrompt({ issues = [], it, reason, msg, index, total, paidCoun
       </div>
       <div className="strong">{t('checkout.flowCheckoutPaused')}</div>
       <SupplierProblemNotice issues={issues} />
-      {!issues.length && <div className="small muted mt-1" style={{ maxWidth: 380, margin: '6px auto 0' }}>{why}</div>}
+      {!issues.length && !activeCheckout && <div className="small muted mt-1" style={{ maxWidth: 380, margin: '6px auto 0' }}>{why}</div>}
       {activeCheckout && (
         <div className="alert info mt-2" style={{ marginBottom: 0, textAlign: 'left', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-          <Icon name="nimiq" size={17} />
           <div className="small">{t('checkout.flowUnpaidOrderNote')}</div>
         </div>
       )}
