@@ -357,6 +357,14 @@ const CRYPTO_RAIL_PATTERNS: RegExp[] = [
 const CRYPTO_NAME_RE =
   /\b(?:Lightning Network|Avalanche|Polygon|Fantom|Binance Smart Chain|Binance Chain|Arbitrum|Optimism|Tron|Solana|Litecoin)\b/gi;
 
+/** Coin names the supplier lists in its rail advertising. */
+const COIN_LIST_RE = /\b(?:Bitcoin|Ethereum|USDC|USDT|MIM|EUROC|FRAX|BUSD|DAI|Litecoin)\b/gi;
+
+/** Supplier leftovers that are rail advertising in any language: the coin
+ *  list sentence ("… ve DAI ile … ödeme yapın", "… and DAI on …") and the
+ *  English delivery/checkout fragments CryptoRefills appends untranslated. */
+const RAIL_LEFTOVER_RE = /instant e-?mail delivery|pay with nimiq pay/i;
+
 /** Remove the supplier's own crypto-rail advertising from any supplier text.
  *  `scrubNames` also deletes stray coin/chain words — keep it ON for plain
  *  text, OFF for HTML (a chain name could otherwise be clipped out of a URL). */
@@ -364,6 +372,18 @@ export function stripCryptoCopy(s: unknown, { scrubNames = true }: { scrubNames?
   let out = String(s || '');
   for (const re of CRYPTO_RAIL_PATTERNS) out = out.replace(re, '');
   if (scrubNames) out = out.replace(CRYPTO_NAME_RE, '');
+  // The English patterns above cannot match a LOCALISED rail sentence — once
+  // CryptoRefills translates it ("Bitcoin, Ethereum, USDC, … ve DAI ile …
+  // ödeme yapın") it sailed straight through. Filter whole sentences that
+  // carry two or more coin names (a single incidental mention survives), plus
+  // the untranslated delivery/checkout fragments. Sentences keep their own
+  // spacing, so joining with '' rebuilds the text minus the removed ones.
+  out = (out.match(/[^.!?]+[.!?]*/g) || [out])
+    .filter((sentence) => {
+      const coins = sentence.match(COIN_LIST_RE);
+      return (!coins || coins.length < 2) && !RAIL_LEFTOVER_RE.test(sentence);
+    })
+    .join('');
   return (
     out
       .replace(/\s{2,}/g, ' ')
@@ -377,8 +397,10 @@ export function stripCryptoCopy(s: unknown, { scrubNames = true }: { scrubNames?
 }
 
 /** Strip supplier terms HTML/markdown down to plain truncated text.
- *  The supplier's "Pay with Bitcoin, Litecoin … Arbitrum" advertising is
- *  removed and replaced by this shop's own rail (Nimiq Pay). */
+ *  The supplier's "Pay with Bitcoin, Litecoin … Arbitrum" advertising (and its
+ *  localised coin-list twins) is removed; what remains is the supplier's own
+ *  terms and nothing else — no coin list, no appended rail sentence, so the
+ *  text ends where the supplier's real terms end. */
 export function cleanSupplierTerms(tc: unknown): string {
   let s = stripHtml(String(tc || '')).trim();
   if (!s) return '';
@@ -390,7 +412,6 @@ export function cleanSupplierTerms(tc: unknown): string {
   s = stripCryptoCopy(s);
   if (!s) return '';
   if (s.length > 420) s = s.slice(0, 420).trim() + '…';
-  if (!/nimiq\s+pay|btc\s+lightning/i.test(s)) s = (s + ' ' + tr('fmt.payWithNimSuffix')).trim();
   return s;
 }
 

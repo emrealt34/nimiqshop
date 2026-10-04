@@ -1923,7 +1923,6 @@ const es = {
     hoursMinutes: '{{h}} h {{m}} min',
     minutesSeconds: '{{m}} min {{s}} s',
     underMinute: 'menos de un minuto',
-    payWithNimSuffix: 'Paga con NIM mediante BTC Lightning en Nimiq Pay.',
     yearsShort: '{{n}} a',
     daysShort: '{{n}} d',
   },

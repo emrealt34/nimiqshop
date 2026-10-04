@@ -1924,7 +1924,6 @@ const tr = {
     hoursMinutes: '{{h}} sa {{m}} dk',
     minutesSeconds: '{{m}} dk {{s}} sn',
     underMinute: 'bir dakikadan az',
-    payWithNimSuffix: 'Nimiq Pay içinde BTC Lightning üzerinden NIM ile öde.',
     yearsShort: '{{n}} yıl',
     daysShort: '{{n}} gün',
   },

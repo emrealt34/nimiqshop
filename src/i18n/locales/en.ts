@@ -1932,7 +1932,6 @@ const en = {
     hoursMinutes: '{{h}}h {{m}}m',
     minutesSeconds: '{{m}}m {{s}}s',
     underMinute: 'under a minute',
-    payWithNimSuffix: 'Pay with NIM via BTC Lightning in Nimiq Pay.',
     yearsShort: '{{n}} yr',
     daysShort: '{{n}} d',
   },
