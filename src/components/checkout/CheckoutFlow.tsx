@@ -34,7 +34,7 @@ import { UsdtPayBlock } from './UsdtPayBlock';
 import { PaymentCountdown } from './PaymentCountdown';
 import { lightningPaymentURI, rememberLightningPayment } from '../../lib/hub';
 import { PAID_STATUSES, quoteBolt11, quoteIdOf, isQuotePayable, launchLightningUri } from '../../lib/pay';
-import { cashbackExclusiveNote } from '../../lib/cashback';
+import { cashbackExclusiveNote, cashbackNimFromQuote, fmtCashbackNIM, loadCashbackBps } from '../../lib/cashback';
 import { quoteFaceValue } from '../../lib/format';
 import { StakerCashbackLine } from '../staker/StakerCashback';
 import { currentCashbackCode } from '../../lib/cashbackCode';
@@ -941,6 +941,22 @@ export function PayScreen({
 
   const dest = deliveryLine(current);
   const cbExclusive = cashbackExclusiveNote({ source: quote?.cashback_source, code: quote?.cashback_code });
+  // Owner (2026-10-04): the pay hero shows the cashback this order will earn,
+  // right under "what you get" — one short line, hidden when there is none.
+  const [cbNimLabel, setCbNimLabel] = useState('');
+  useEffect(() => {
+    let alive = true;
+    const compute = () => {
+      const n = cashbackNimFromQuote(current);
+      if (alive) setCbNimLabel(n > 0 ? fmtCashbackNIM(n) : '');
+    };
+    compute();
+    void loadCashbackBps().then(compute).catch(() => {});
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current]);
   const youGet = youGetLabel || youGetText(quote);
   const nimBase = nimAmountText(current);
   // The Nimiq Pay network fee is added on top of the converted amount, so the
@@ -979,6 +995,9 @@ export function PayScreen({
           <span className="xs faint">{t('checkout.flowYouGet')}</span>
           <span className="strong pay-you-get">{youGet || t('checkout.instantDelivery')}</span>
         </div>
+        {cbNimLabel && (
+          <div className="small strong" style={{ marginTop: 6 }}>{t('checkout.flowCashbackLine', { nim: cbNimLabel })}</div>
+        )}
         {dest && (
           <div className="pay-hero-del small">
             <Icon name={dest.icon as any} size={14} /> {dest.text}

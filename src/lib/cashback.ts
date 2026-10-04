@@ -62,19 +62,26 @@ export function cashbackEarnLine(productNIM: number, bps: number, meta?: { sourc
   return tr('cashback.earnLine', { nim: fmtCashbackNIM(n), pct, suffix: cashbackLabelSuffix(meta) });
 }
 
+/** The cashback NIM a quote will pay: the locked quote value when the server
+ *  stamped one, else the live estimate at the quote's (or cached) rate. */
+export function cashbackNimFromQuote(quote: any): number {
+  const bps = Number.isFinite(Number(quote && quote.cashback_bps)) ? Number(quote.cashback_bps) : cachedCashbackBps();
+  const locked = Number(quote && quote.estimated_cashback_nim);
+  if (locked > 0) return locked;
+  return estimateCashbackNIM(Number(quote && quote.estimated_nim) || 0, bps);
+}
+
 export function cashbackEarnLineFromQuote(quote: any): string {
   const bps = Number.isFinite(Number(quote && quote.cashback_bps)) ? Number(quote.cashback_bps) : cachedCashbackBps();
   const meta = {
     source: String((quote && quote.cashback_source) || ''),
     code: String((quote && quote.cashback_code) || ''),
   };
-  const locked = Number(quote && quote.estimated_cashback_nim);
-  if (locked > 0) {
-    const pct = cashbackPercentLabel(bps);
-    if (!pct) return '';
-    return tr('cashback.earnLine', { nim: fmtCashbackNIM(locked), pct, suffix: cashbackLabelSuffix(meta) });
-  }
-  return cashbackEarnLine(Number(quote && quote.estimated_nim) || 0, bps, meta);
+  const n = cashbackNimFromQuote(quote);
+  if (!n) return '';
+  const pct = cashbackPercentLabel(bps);
+  if (!pct) return '';
+  return tr('cashback.earnLine', { nim: fmtCashbackNIM(n), pct, suffix: cashbackLabelSuffix(meta) });
 }
 
 export function cachedCashbackBps(): number {

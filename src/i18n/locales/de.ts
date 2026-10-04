@@ -323,6 +323,7 @@ const de = {
     flowMostCashback: 'Hole das meiste Cashback aus dieser Bestellung',
     flowImportant: 'Wichtig',
     flowPayWithNim: 'Mit Nimiq Pay zahlen',
+    flowCashbackLine: 'Du verdienst ≈ {{nim}} NIM Cashback',
     flowBestRail: 'Beste Rail · {{factor}}',
     flowPayWithUsdt: 'Mit USDT zahlen',
     flowLowerCashback: 'Weniger Cashback · Polygon',
