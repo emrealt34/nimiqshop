@@ -67,6 +67,11 @@ func TestConfigurationAndDisabledCalls(t *testing.T) {
 	}
 }
 
+// fixtureAddr is checksum-valid on purpose: Stake now answers an address that
+// cannot be a staker locally, without a request, so a made-up string could no
+// longer exercise the HTTP path at all.
+const fixtureAddr = "NQ73SE1XYRRFQ8NCDQCPHLJMNR858P7V2HPD"
+
 func TestStakeValuesAndCache(t *testing.T) {
 	for _, tc := range []struct {
 		name, body string
@@ -83,26 +88,26 @@ func TestStakeValuesAndCache(t *testing.T) {
 			calls := 0
 			c := fixtureClient(t, tc.code, tc.body, func(r *http.Request) {
 				calls++
-				if r.URL.Path != "/api/stakers/NQ12ABCD" || r.Header.Get("X-Feed-Key") != "" {
+				if r.URL.Path != "/api/stakers/"+fixtureAddr || r.Header.Get("X-Feed-Key") != "" {
 					t.Errorf("public stake request leaked key or wrong path: %v", r.URL)
 				}
 			})
 			c.SetFeedKey("fixture-key")
 			c.cache = nil
-			first, err := c.Stake(context.Background(), " nq12 abcd ")
+			first, err := c.Stake(context.Background(), " nq73 se1x yrrf q8nc dqcp hljm nr85 8p7v 2hpd ")
 			if err != nil || first.StakeLuna != tc.stake || first.BaseBps != tc.base || first.Staked != (tc.stake > 0) || first.FromCache || first.CheckedAt.IsZero() {
 				t.Fatalf("first: %+v %v", first, err)
 			}
-			second, err := c.Stake(context.Background(), "NQ12ABCD")
+			second, err := c.Stake(context.Background(), fixtureAddr)
 			if err != nil || !second.FromCache || calls != 1 || second.CheckedAt != first.CheckedAt {
 				t.Fatalf("cache: %+v %v calls=%d", second, err, calls)
 			}
-			c.Forget("nq12 abcd")
-			if _, err = c.Stake(context.Background(), "NQ12ABCD"); err != nil || calls != 2 {
+			c.Forget("nq73 se1x yrrf q8nc dqcp hljm nr85 8p7v 2hpd")
+			if _, err = c.Stake(context.Background(), fixtureAddr); err != nil || calls != 2 {
 				t.Fatalf("forget: calls=%d err=%v", calls, err)
 			}
-			c.cache["NQ12ABCD"] = cacheEntry{expiry: time.Now().Add(-time.Hour)}
-			if _, err = c.Stake(context.Background(), "NQ12ABCD"); err != nil || calls != 3 {
+			c.cache[fixtureAddr] = cacheEntry{expiry: time.Now().Add(-time.Hour)}
+			if _, err = c.Stake(context.Background(), fixtureAddr); err != nil || calls != 3 {
 				t.Fatalf("expired cache: %d %v", calls, err)
 			}
 		})
@@ -112,7 +117,7 @@ func TestStakeValuesAndCache(t *testing.T) {
 		c.cache[fmt.Sprint(i)] = cacheEntry{expiry: time.Now().Add(-time.Hour)}
 	}
 	c.cache["fresh"] = cacheEntry{expiry: time.Now().Add(time.Hour)}
-	if _, err := c.Stake(context.Background(), "NQ00"); err != nil {
+	if _, err := c.Stake(context.Background(), fixtureAddr); err != nil {
 		t.Fatal(err)
 	}
 	if len(c.cache) != 2 {
@@ -169,7 +174,13 @@ func TestTermsConversionAndCache(t *testing.T) {
 
 func TestEveryEndpointFailure(t *testing.T) {
 	operations := map[string]func(*Client) error{
-		"stake":  func(c *Client) error { _, err := c.Stake(context.Background(), "NQ00"); return err },
+		// A checksum-valid address: "NQ00" would now short-circuit locally
+		// (an address that cannot be a staker is answered without a
+		// request), so it could no longer exercise the transport failures.
+		"stake": func(c *Client) error {
+			_, err := c.Stake(context.Background(), "NQ73SE1XYRRFQ8NCDQCPHLJMNR858P7V2HPD")
+			return err
+		},
 		"profit": func(c *Client) error { _, err := c.Profit(context.Background(), "NQ00", ""); return err },
 		"terms":  func(c *Client) error { _, err := c.Terms(context.Background()); return err },
 	}
@@ -204,5 +215,47 @@ func TestEveryEndpointFailure(t *testing.T) {
 				})
 			}
 		})
+	}
+}
+
+// The pool answers an address it cannot parse with 400 "invalid address".
+// That used to be an error, which the post-fulfillment recheck loop read as
+// an outage: it extended its own deadline and re-asked forever (observed
+// live: the same account hit the pool several times a second, indefinitely).
+// A checksum failure is knowable locally, and both shapes are now a
+// definitive "not staked".
+func TestInvalidAddressIsNotStakedAndNeverHitsTheNetwork(t *testing.T) {
+	called := false
+	c := fixtureClient(t, 400, `{"error":"invalid address"}`, func(*http.Request) { called = true })
+
+	// Local checksum check: no request at all.
+	st, err := c.Stake(context.Background(), "NQ08D44A44B90F772E228C13C3456FBDXKH9")
+	if err != nil {
+		t.Fatalf("invalid address must not be an error: %v", err)
+	}
+	if st.Staked {
+		t.Fatalf("invalid address must not be staked: %+v", st)
+	}
+	if called {
+		t.Fatal("an address that fails its own checksum must not reach the pool")
+	}
+}
+
+func TestPool400IsDefinitiveNotStaked(t *testing.T) {
+	// A valid address the pool still refuses (its own parser/config).
+	c := fixtureClient(t, 400, `{"error":"invalid address"}`, nil)
+	st, err := c.Stake(context.Background(), "NQ73SE1XYRRFQ8NCDQCPHLJMNR858P7V2HPD")
+	if err != nil {
+		t.Fatalf("a 400 must not be an outage: %v", err)
+	}
+	if st.Staked || st.StakeLuna != 0 {
+		t.Fatalf("want not-staked, got %+v", st)
+	}
+}
+
+func TestPool5xxStaysAnError(t *testing.T) {
+	c := fixtureClient(t, 503, `{}`, nil)
+	if _, err := c.Stake(context.Background(), "NQ73SE1XYRRFQ8NCDQCPHLJMNR858P7V2HPD"); err == nil {
+		t.Fatal("a 5xx is a real outage and must stay an error")
 	}
 }

@@ -15,6 +15,7 @@ import (
 
 	"github.com/valyala/fasthttp"
 
+	"nimiqshop/internal/chainstake"
 	"nimiqshop/internal/clientip"
 	"nimiqshop/internal/config"
 	"nimiqshop/internal/cryptorefills"
@@ -47,6 +48,10 @@ type Handlers struct {
 	// validator?" for the staker cashback ladder. Nil means the feature is
 	// off and every buyer earns the base rate.
 	Pool *poolstake.Client
+	// Chain verifies the same fact against the Nimiq chain itself, so a
+	// delegation the pool's own index has not recorded yet (or has lost)
+	// still earns the staker rate. Nil = pool-only, the old behaviour.
+	Chain *chainstake.Verifier
 	// Mail is the Mailtrap email transport — the ONLY one: the SMTP client
 	// and the SMS sender are gone. It carries the fulfillment gift note
 	// (settlement tracker + admin retry), the operator's direct emails and

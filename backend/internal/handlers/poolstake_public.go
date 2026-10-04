@@ -2,10 +2,13 @@ package handlers
 
 import (
 	"context"
+	"log"
+	"strconv"
 	"time"
 
 	"github.com/valyala/fasthttp"
 
+	"nimiqshop/internal/chainstake"
 	"nimiqshop/internal/db"
 	"nimiqshop/internal/middleware"
 	"nimiqshop/internal/stakeledger"
@@ -189,6 +192,21 @@ func (h *Handlers) PublicCashbackRate(ctx *fasthttp.RequestCtx) {
 	})
 }
 
+// chainStake asks the CHAIN whether address currently delegates a positive
+// stake to the operator's validator. Nil verifier = feature off. The verifier
+// caches, so this is at most one RPC per address per TTL.
+func (h *Handlers) chainStake(ctx context.Context, address string) (chainstake.Staker, error) {
+	if h.Chain == nil || address == "" {
+		return chainstake.Staker{}, nil
+	}
+	return h.Chain.Verify(ctx, address)
+}
+
+// fmtNIM renders Luna as a short NIM string for log lines.
+func fmtNIM(luna int64) string {
+	return strconv.FormatFloat(float64(luna)/lunaPerNIM, 'f', 2, 64)
+}
+
 // PoolStakeMe is the logged-in buyer's own standing: their live stake,
 // their ledger (available $, boost rate, loyalty age, remaining caps) and
 // the total rate the next delivery will pay. The product/checkout screens
@@ -233,6 +251,7 @@ func (h *Handlers) poolStakeMeFor(ctx *fasthttp.RequestCtx, address string) {
 		switch err {
 		case nil:
 			staked, stakeLuna = st.Staked, st.StakeLuna
+			resp["stake_source"] = "pool"
 			// A cached "not staked" answer can race a fresh delegation.
 			// Prefer our durable local pending/positive observation until
 			// the pool has indexed the new stake.
@@ -240,6 +259,22 @@ func (h *Handlers) poolStakeMeFor(ctx *fasthttp.RequestCtx, address string) {
 				if cached := h.Store.CachedStakerStake(address, time.Now().UTC()); cached.Staked {
 					staked, stakeLuna = cached.Staked, cached.StakeLuna
 					st.BaseBps = cached.BaseBps
+					resp["stake_source"] = "local_watch"
+				}
+			}
+			// THE chain fallback. The pool's index is a database on the
+			// pool's own machine; the delegation itself is a public fact on
+			// chain, seconds old. When the pool says "no staker" but the
+			// chain shows this address delegating to OUR validator, the
+			// buyer IS staked and must not be shown (or paid) a zero rate.
+			if !staked {
+				if cs, cerr := h.chainStake(ctx, address); cerr == nil && cs.Staked {
+					staked, stakeLuna = true, cs.StakeLuna
+					resp["stake_source"] = "chain"
+					log.Printf("poolstake: chain confirms a %s NIM delegation to %s that the pool did not report; using the chain",
+						fmtNIM(cs.StakeLuna), h.Cfg.PoolValidatorAddress)
+				} else if cerr != nil {
+					resp["chain_check_error"] = "rpc unavailable"
 				}
 			}
 			// Pool answers only whether they are staked. The rate is the
@@ -267,14 +302,24 @@ func (h *Handlers) poolStakeMeFor(ctx *fasthttp.RequestCtx, address string) {
 			// Never downgrade a known/freshly announced staker during an
 			// outage. The durable local snapshot is only a fallback; a
 			// later authoritative pool response can still replace it.
-			if cached := h.Store.CachedStakerStake(address, time.Now().UTC()); cached.Staked {
+			resp["stake_check_error"] = "pool unavailable"
+			resp["stake_source"] = "pool_error"
+			// The chain is a second, independent source: while the pool is
+			// unreachable it still answers whether the delegation exists.
+			if cs, cerr := h.chainStake(ctx, address); cerr == nil && cs.Staked {
+				staked, stakeLuna = true, cs.StakeLuna
+				resp["stake_source"] = "chain"
+				delete(resp, "stake_check_error")
+				log.Printf("poolstake: pool unreachable; chain confirms a %s NIM delegation to %s",
+					fmtNIM(cs.StakeLuna), h.Cfg.PoolValidatorAddress)
+			} else if cached := h.Store.CachedStakerStake(address, time.Now().UTC()); cached.Staked {
 				staked, stakeLuna = true, cached.StakeLuna
 				poolBase = settings.EffectiveStakerCashbackBps()
 				cached.BaseBps = poolBase
 				base = cached.EffectiveBaseBps(operatorBase)
 				resp["from_cache"] = true
+				resp["stake_source"] = "local_watch"
 			}
-			resp["stake_check_error"] = "pool unavailable"
 		}
 	}
 

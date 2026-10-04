@@ -292,6 +292,8 @@ const tr = {
     flowControlsPaused: 'Ödeme kontrolleri duraklatıldı',
     flowStatusLine: 'Durum: {{status}}. Bu siparişi koru. Zaman aşımı, ödemenin başarısız olduğunu kanıtlamaz.',
     flowDoNotPay: 'Bu ödeme sonuçlanmadan başka bir ödeme başlatma.',
+    flowRenewInvoice: 'Yeni fatura oluştur',
+    flowRenewWhy: 'Eski faturanın ödeme süresi geçti; ondan bir tahsilat yapılmadı. Aynı ürün için taze bir fatura oluşturuyoruz — fiyat, o andaki canlı tedarikçi fiyatıdır.',
     flowOpenOrder: 'Bu siparişi aç',
     flowFeeSuffix: '{{amount}} + ücret',
     flowAmountInNimiqPay: 'Nimiq Pay · BTC Lightning\'de gösterilen tutar',

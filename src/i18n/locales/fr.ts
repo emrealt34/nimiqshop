@@ -291,6 +291,8 @@ const fr = {
     flowControlsPaused: 'Commandes de paiement en pause',
     flowStatusLine: 'Statut : {{status}}. Conservez cette commande. Un délai dépassé ne prouve pas que le paiement a échoué.',
     flowDoNotPay: 'Ne lancez pas un autre paiement tant que celui-ci n\'est pas résolu.',
+    flowRenewInvoice: 'Créer une nouvelle facture',
+    flowRenewWhy: 'L\'ancienne facture ne peut plus être payée : rien n\'a été débité pour elle. Nous en créons une nouvelle pour le même article — le prix est celui du fournisseur à cet instant.',
     flowOpenOrder: 'Ouvrir cette commande',
     flowFeeSuffix: '{{amount}} + frais',
     flowAmountInNimiqPay: 'Montant affiché dans Nimiq Pay · BTC Lightning',

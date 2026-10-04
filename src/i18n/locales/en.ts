@@ -300,6 +300,8 @@ const en = {
     flowControlsPaused: 'Payment controls paused',
     flowStatusLine: 'Status: {{status}}. Keep this order. A timeout or expired local timer does not prove that payment failed.',
     flowDoNotPay: 'Do not start another payment while this one is unresolved.',
+    flowRenewInvoice: 'new invoice',
+    flowRenewWhy: 'Your old invoice can no longer be paid, so nothing was charged for it. We\'ll create a fresh one for the same item — the price is the supplier\'s live price at that moment.',
     flowOpenOrder: 'Open this order',
     flowFeeSuffix: '{{amount}} + fee',
     flowAmountInNimiqPay: 'Amount shown in Nimiq Pay · BTC Lightning',

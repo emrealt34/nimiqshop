@@ -21,11 +21,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
 	"time"
+
+	"nimiqshop/internal/nimiq"
 )
 
 // DefaultTimeout bounds a single pool request. The pool answers from its own
@@ -146,6 +149,15 @@ func (c *Client) Stake(ctx context.Context, address string) (Status, error) {
 	addr := CanonicalAddress(address)
 	if addr == "" {
 		return Status{}, errors.New("poolstake: empty address")
+	}
+	// An address that fails its own checksum can never be a staker of this
+	// (or any) pool. Answering here, without a request, is deliberate: the
+	// pool rejects such a string with 400, and because a 400 used to be an
+	// error the post-fulfillment recheck loop treated it as an outage,
+	// extended its deadline forever and re-asked the pool several times a
+	// second, for one account, indefinitely (observed live in the logs).
+	if err := nimiq.ValidateAddress(addr); err != nil {
+		return Status{Address: addr, Staked: false, CheckedAt: time.Now().UTC()}, nil
 	}
 
 	now := time.Now().UTC()
@@ -301,6 +313,13 @@ func (c *Client) fetch(ctx context.Context, addr string, now time.Time) (Status,
 			base = body.CashbackBaseBps
 		}
 		return Status{Address: addr, StakeLuna: body.StakeLuna, Staked: staked, BaseBps: base, CheckedAt: now}, nil
+	case resp.StatusCode == http.StatusBadRequest:
+		// The pool answered "invalid address" (or another input refusal).
+		// That is a definitive "not a staker", not an outage: retrying can
+		// never change it. Surfaced through a log line so the operator can
+		// still see that a bad address reached us.
+		log.Printf("poolstake: pool refused address %s with 400; treating as not-staked", addr)
+		return Status{Address: addr, Staked: false, CheckedAt: now}, nil
 	default:
 		return Status{}, fmt.Errorf("poolstake: pool returned %d", resp.StatusCode)
 	}

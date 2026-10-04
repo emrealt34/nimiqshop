@@ -173,6 +173,43 @@ func (c *Client) GetAccountBalance(ctx context.Context, addr string) (int64, err
 	return out.Balance, nil
 }
 
+// StakerInfo is the chain's answer about one address' staking position
+// (getStakerByAddress). Balance is the ACTIVE stake in Luna; Delegation is the
+// validator the address delegates to ("NQ49 …" spaced form, as the RPC prints
+// it); InactiveBalance is stake that is no longer active (kept so a caller can
+// tell "unstaked" from "never staked").
+//
+// Verified live: rpc.nimiqwatch.com returns
+// {"data":{"address":"…","balance":10000000,"delegation":"NQ49 …","inactiveBalance":0,
+// "inactiveFrom":null,"retiredBalance":0},"metadata":{…}} and callURL already
+// unwraps the envelope. An address with no staking record makes the RPC answer
+// an error, which is surfaced as an error here (callers treat "no record" as
+// not staked, never as a lookup failure).
+type StakerInfo struct {
+	Address         string `json:"address"`
+	Balance         int64  `json:"balance"`
+	Delegation      string `json:"delegation"`
+	InactiveBalance int64  `json:"inactiveBalance"`
+	RetiredBalance  int64  `json:"retiredBalance"`
+}
+
+// HasStake reports whether the chain sees an active stake worth using.
+func (s StakerInfo) HasStake() bool { return s.Balance > 0 }
+
+// GetStaker reads the address' staking position from the chain. This is the
+// same provider used for payment verification, so no new dependency is added
+// and no wallet access is involved — a staking position is public data.
+func (c *Client) GetStaker(ctx context.Context, addr string) (StakerInfo, error) {
+	if err := c.requireURLs(); err != nil {
+		return StakerInfo{}, err
+	}
+	var out StakerInfo
+	if err := c.callURL(ctx, c.urls[0], "getStakerByAddress", []interface{}{addr}, &out); err != nil {
+		return StakerInfo{}, err
+	}
+	return out, nil
+}
+
 // GetTransactionsByAddress returns recent transactions touching addr, newest
 // first. NimiqWatch's third parameter is a pagination cursor: the hash of the
 // LAST transaction of the previous page (pass "" for… a rejected empty string

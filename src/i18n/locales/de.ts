@@ -291,6 +291,8 @@ const de = {
     flowControlsPaused: 'Zahlungssteuerung pausiert',
     flowStatusLine: 'Status: {{status}}. Behalte diese Bestellung. Ein Timeout beweist nicht, dass die Zahlung fehlgeschlagen ist.',
     flowDoNotPay: 'Starte keine neue Zahlung, solange diese nicht geklärt ist.',
+    flowRenewInvoice: 'Neue Rechnung erstellen',
+    flowRenewWhy: 'Die alte Rechnung kann nicht mehr bezahlt werden — es wurde nichts dafür belastet. Wir erstellen eine neue für denselben Artikel; der Preis ist der aktuelle Live-Preis des Anbieters.',
     flowOpenOrder: 'Diese Bestellung öffnen',
     flowFeeSuffix: '{{amount}} + Gebühr',
     flowAmountInNimiqPay: 'Betrag in Nimiq Pay · BTC Lightning',

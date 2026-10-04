@@ -291,6 +291,8 @@ const pt = {
     flowControlsPaused: 'Controlos de pagamento em pausa',
     flowStatusLine: 'Estado: {{status}}. Mantenha esta encomenda. Um tempo esgotado não prova que o pagamento falhou.',
     flowDoNotPay: 'Não inicie outro pagamento enquanto este não estiver resolvido.',
+    flowRenewInvoice: 'Criar nova fatura',
+    flowRenewWhy: 'A fatura antiga já não pode ser paga, por isso nada foi cobrado por ela. Criamos uma nova para o mesmo artigo — o preço é o do fornecedor nesse momento.',
     flowOpenOrder: 'Abrir esta encomenda',
     flowFeeSuffix: '{{amount}} + taxa',
     flowAmountInNimiqPay: 'Montante mostrado no Nimiq Pay · BTC Lightning',

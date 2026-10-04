@@ -413,6 +413,14 @@ export function CheckoutFlow({
             (window as any).__payResolver = (ok: boolean) => resolve(ok);
           });
           (window as any).__payResolver = undefined;
+          if (!paid && (window as any).__lastPayReason === 'renew') {
+            // The buyer tapped "new invoice" on an expired payment window:
+            // re-create the whole batch and land back on a payable screen
+            // without the extra prompt. Safe because a renewal is only ever
+            // offered once the old invoice can no longer be paid.
+            await tryBatch();
+            continue;
+          }
           if (paid) {
             // Success
             cart.clearCart();
@@ -502,6 +510,11 @@ export function CheckoutFlow({
             (window as any).__payResolver = (ok: boolean) => resolve(ok);
           });
           (window as any).__payResolver = undefined;
+          if (!paid && (window as any).__lastPayReason === 'renew') {
+            // Same one-tap renewal on the single-item path: loop again, which
+            // forgets the dead quote and creates a fresh one for this item.
+            continue;
+          }
           if (paid) {
             paidIdx.push(i);
             break;
@@ -825,6 +838,18 @@ export function PayScreen({
   }
 
   if (!invoice || expired || !isQuotePayable(current)) {
+    // THE dead end this screen used to be: a Lightning invoice is valid for a
+    // fixed window (25 min), and a buyer who comes back later — the common
+    // case, not an exception — landed here with only "open this order" and no
+    // way back to a payable screen. Renewing is offered ONLY when it can
+    // never collide with a payment that may already be in flight: the window
+    // must be over (countdown expired or the order itself expired) and the
+    // backend must not have observed or blocked anything. One tap then lands
+    // on a fresh invoice for the same item; the parent re-quotes it.
+    const renewSafe =
+      (expired || String(current.status || '') === 'expired') &&
+      !current.payment_observed && !current.payment_blocked &&
+      String(current.status || '') !== 'order_creating';
     return (
       <div className="center" style={{ padding: '26px 10px', textAlign: 'center' }} role="status">
         <div className="strong">{current.status === 'order_creating' ? t('checkout.flowConfirmingOrder') : t('checkout.flowControlsPaused')}</div>
@@ -832,7 +857,15 @@ export function PayScreen({
           {t('checkout.flowStatusLine', { status: String(current.supplier_status || current.status || 'checking') })}
         </div>
         <div className="small mt-1">{t('checkout.flowDoNotPay')}</div>
-        <a className="btn btn-gold btn-block mt-2" href={pagePath('/order?type=quote&id=' + encodeURIComponent(quoteIdOf(current)))}>{t('checkout.flowOpenOrder')}</a>
+        {renewSafe && (
+          <>
+            <button type="button" className="btn btn-gold btn-block mt-2" onClick={() => finish(false, 'renew')}>
+              <Icon name="bolt" size={14} /> {t('checkout.flowRenewInvoice')}
+            </button>
+            <div className="xs faint mt-1">{t('checkout.flowRenewWhy')}</div>
+          </>
+        )}
+        <a className={renewSafe ? 'btn btn-outline btn-block mt-2' : 'btn btn-gold btn-block mt-2'} href={pagePath('/order?type=quote&id=' + encodeURIComponent(quoteIdOf(current)))}>{t('checkout.flowOpenOrder')}</a>
         {testPayButton}
       </div>
     );
