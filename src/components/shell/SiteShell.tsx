@@ -364,16 +364,22 @@ function TopBar({ activeKey, awaiting }: { activeKey: ShellKey; awaiting?: numbe
         <Brand />
         <nav className="mainnav" aria-label={t('nav.primaryNav')} data-fit-group data-fit-min="10.5">
           {NAV.map((n) => (
-            <a
-              key={n.key}
-              href={pagePath(n.href)}
-              className={n.key === activeKey ? 'active' : ''}
-              aria-current={n.key === activeKey ? 'page' : undefined}
-              data-fit-item
-            >
-              {t(`nav.${n.labelKey}` as any)}
+            /* The badge hangs from a wrapper, not from the link: the link
+               clips (overflow:hidden, the ellipsis budget) and would cut the
+               absolutely-positioned badge down to a sliver of its corner. The
+               wrapper hugs the link, so the badge sits at the same corner —
+               just outside the clipped box. */
+            <span className="nav-item-wrap" key={n.key}>
+              <a
+                href={pagePath(n.href)}
+                className={n.key === activeKey ? 'active' : ''}
+                aria-current={n.key === activeKey ? 'page' : undefined}
+                data-fit-item
+              >
+                {t(`nav.${n.labelKey}` as any)}
+              </a>
               {n.key === 'orders'  && (awaiting || 0) > 0 && <span className="nav-badge">{awaiting}</span>}
-            </a>
+            </span>
           ))}
         </nav>
         {/* Absorbs the free space whenever the nav is hidden (below its

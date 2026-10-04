@@ -3281,3 +3281,17 @@ input[type="range"]:focus-visible { outline: 2px solid var(--stamp); outline-off
     text-align: center;
   }
 }
+
+/* 5) the desktop nav badge hangs from a wrapper (.nav-item-wrap, see
+   SiteShell): the link itself clips (overflow:hidden, the ellipsis budget of
+   the header width block), and an absolutely-positioned badge at
+   top:-7px/right:-11px was cut down to the sliver of its corner that reached
+   into the link box — on web the red count looked "missing". The wrapper hugs
+   the link, so the badge keeps the exact same corner but lives outside the
+   clipped box; as a bonus it is no longer inside the measured fit item. */
+.mainnav .nav-item-wrap {
+  position: relative;
+  display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
+}

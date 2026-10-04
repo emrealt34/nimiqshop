@@ -2379,7 +2379,7 @@ a.product-card:hover { text-decoration: none; }
 @media (max-width:640px){ .row[style*="nowrap"]{ flex-wrap:wrap !important} .row[style*="flex-wrap:nowrap"]{ flex-wrap:wrap !important} .feed-amt-main{ font-size:1rem} }
 .mainnav a, .tabbar a{ position:relative}
 .nav-badge{ pointer-events:none}
-.mainnav a .nav-badge{ position:absolute; top:-7px; right:-11px; margin-left:0}
+.mainnav .nav-item-wrap > .nav-badge{ position:absolute; top:-7px; right:-11px; margin-left:0}
 .tabbar a .nav-badge{ position:absolute; top:2px; right:0; margin-left:0; transform:translateY(-45%)}
 .gift-toggle{ position:relative; display:flex; gap:12px; align-items:flex-start; padding:12px 14px; margin:12px 0; border:2px dashed var(--line-dash); border-radius:var(--r-l); cursor:pointer; background:var(--surface-1); transition:border-color .15s, background .15s}
 .gift-toggle:hover{ border-color:rgba(78, 61, 40, 0.55)}
