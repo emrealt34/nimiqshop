@@ -27,6 +27,8 @@ import { CombinedDeliveryPicker } from './CombinedDeliveryPicker';
 import { needsPhone } from '../../lib/catalog';
 import { useT, t as tr } from '../../i18n';
 import { LightningPayBlock } from './LightningPayBlock';
+import { NimiqPayPayButton } from './NimiqPayPayButton';
+import { inNimiqPay } from '../../lib/miniapp';
 import { SimulatedPayBlock } from './SimulatedPayBlock';
 import { isTestMode } from '../../lib/config';
 import { UsdtPayBlock } from './UsdtPayBlock';
@@ -792,6 +794,7 @@ export function PayScreen({
 
   const usdtRail = payRail(current);
   const isUsdt = usdtRail.isUsdt;
+  const insidePay = inNimiqPay();
 
   // TEST MODE: there is NO separate simulated pay screen. The customer sees
   // this exact real pay screen — real invoice, real QR, real countdown — and
@@ -985,10 +988,17 @@ export function PayScreen({
           </div>
         )}
         {localFiat && <div className="small muted" style={{ marginTop: 6, fontWeight: 700 }}>{localFiat}</div>}
+        {/* Owner (2026-10-04): inside Nimiq Pay the pay button lives INSIDE the
+            hero card, right under the amount — not one card further down. */}
+        {insidePay && invoice && (
+          <div style={{ marginTop: 12 }}>
+            <NimiqPayPayButton invoice={invoice} className="btn btn-gold btn-block btn-lg" />
+          </div>
+        )}
       </div>
       <details className="checkout-details-min"><summary>{t('checkout.flowDetailsSummary')}</summary><div style={{ marginTop: 8 }}><div className="small" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}><span className="muted">{t('orderPage.finalTotal')}</span><span className="mono strong">{coinAmountLabelFor(current, 'BTC') || t('orderPage.amountNote')}</span></div><div className="small muted">{t('checkout.flowNimEstimateNote')}</div><CashbackFeeNotice example="nim" /><StakerCashbackLine quote={current} />{cbExclusive && (<div className="small muted mt-1" style={{ textAlign: 'center' }}><Icon name="lock" size={13} /> {cbExclusive}</div>)}<div className="alert info mt-1" style={{ marginBottom: 0, display: 'flex', gap: '8px', alignItems: 'center' }}><Icon name="bolt" size={18} /><div className="small">{payRail(current).note}</div></div><div className="small muted mt-1">{payActionLine(current)}</div></div></details>
       {note}
-      {uri ? <LightningPayBlock quoteId={quoteIdOf(current)} invoice={invoice} uri={uri} onLaunch={() => rememberLightningPayment(invoice, { kind: 'quote', ref: quoteIdOf(current) })} avatarAddress={getAddress()} /> : null}
+      {uri ? <LightningPayBlock quoteId={quoteIdOf(current)} invoice={invoice} uri={uri} onLaunch={() => rememberLightningPayment(invoice, { kind: 'quote', ref: quoteIdOf(current) })} avatarAddress={getAddress()} hidePayButton={insidePay} /> : null}
       {testPayButton}
       <div className="small muted mt-1" style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
         <Icon name="alert" size={16} />

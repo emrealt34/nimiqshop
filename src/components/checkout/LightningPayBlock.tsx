@@ -79,8 +79,11 @@ function MissingDialog({ onClose }: { invoice: string; onClose: () => void }) {
 
 /** No payment side effect on mount, remount or status refresh. Every handoff
  * requires a user gesture AND a persisted backend claim after a supplier GET. */
-export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddress }: {
+export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddress, hidePayButton }: {
   invoice: string; uri: string; quoteId: string; onLaunch?: () => void; avatarAddress?: string; compact?: boolean;
+  /** The pay screen puts the Nimiq Pay button inside its hero card (owner,
+   *  2026-10-04); then the block's own copy would be a duplicate. */
+  hidePayButton?: boolean;
 }) {
   const { toast } = useToast();
   const { t } = useT();
@@ -224,9 +227,11 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddre
         ]}
       />
 
-      <button type="button" className="btn btn-gold btn-block btn-lg mt-2" disabled={disabled || payLocked} onClick={() => handoff('pay')}>
-        <NimIcon /> <span className="btn-label">{busy ? t('checkout.verifying') : payLocked ? t('orderPage.nimiqPay.submitted') : insidePay ? t('orderPage.nimiqPay.idle') : t('checkout.flowPayWithNim')}</span>
-      </button>
+      {!hidePayButton && (
+        <button type="button" className="btn btn-gold btn-block btn-lg mt-2" disabled={disabled || payLocked} onClick={() => handoff('pay')}>
+          <NimIcon /> <span className="btn-label">{busy ? t('checkout.verifying') : payLocked ? t('orderPage.nimiqPay.submitted') : insidePay ? t('orderPage.nimiqPay.idle') : t('checkout.flowPayWithNim')}</span>
+        </button>
+      )}
       <button className="btn btn-outline btn-block mt-1" disabled={disabled} onClick={() => handoff('copy')}><Icon name="copy" size={16} /> {t('checkout.lpCopyRequest')}</button>
       {/* The QR is part of the card, not a reveal: owner removed the
           "Verify & show QR" button and the hide control — a Lightning invoice
