@@ -9,7 +9,7 @@ import { AppProviders } from './AppProviders';
 import { CartProvider } from '../lib/cartStore';
 import { SiteShell, type ShellKey } from './shell/SiteShell';
 import { Router } from '../lib/router';
-import { I18nProvider, adoptRouteLang, type LangCode } from '../i18n';
+import { I18nProvider } from '../i18n';
 import { initStaticI18n } from '../lib/staticI18n';
 import { initFit } from '../lib/fitText';
 
@@ -18,11 +18,7 @@ import { initFit } from '../lib/fitText';
  * order page). No banner, no parallel screen, no other chrome — owner's
  * contract: "test mode = the original, plus one button that fakes the
  * trigger". Operator-facing test tooling lives in the admin Test Center. */
-export function AppRoot({ activeKey, children, initial }: { activeKey: ShellKey; children: ReactNode; initial?: string }) {
-  // Per-locale route: pin the imperative translator BEFORE any child renders
-  // (island SSR at build time included), so server-rendered links and strings
-  // carry the route language, not the module default.
-  if (initial) adoptRouteLang(initial as LangCode);
+export function AppRoot({ activeKey, children }: { activeKey: ShellKey; children: ReactNode }) {
   // (No pre-hydration footer handling here any more: the pages are
   // server-rendered, so there is no empty-content frame to hide it for.)
   //
@@ -39,7 +35,7 @@ export function AppRoot({ activeKey, children, initial }: { activeKey: ShellKey;
     document.documentElement.setAttribute('data-app-ready', '1');
   }, []);
   return (
-    <I18nProvider initial={(initial as LangCode) || undefined}>
+    <I18nProvider>
       <CartProvider>
         <Router initialKey={activeKey} shell={<SiteShell activeKey={activeKey} />} initialPage={children}
           wrap={(content) => <AppProviders>{content}</AppProviders>} />

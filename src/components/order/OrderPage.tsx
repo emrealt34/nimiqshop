@@ -1387,9 +1387,9 @@ function QuoteContent({ q, refund, fulfillment }: { q: any; refund?: any; fulfil
   );
 }
 
-export function OrderPage({ initial }: { initial?: string }) {
+export function OrderPage() {
   return (
-    <AppRoot activeKey="order" initial={initial}>
+    <AppRoot activeKey="order">
       <OrderView />
     </AppRoot>
   );

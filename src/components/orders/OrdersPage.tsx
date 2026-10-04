@@ -523,9 +523,9 @@ function OrderRow({ r, onRate }: { r: any; onRate: (r: any, val: number) => void
   );
 }
 
-export function OrdersPage({ initial }: { initial?: string }) {
+export function OrdersPage() {
   return (
-    <AppRoot activeKey="orders" initial={initial}>
+    <AppRoot activeKey="orders">
       <OrdersView />
     </AppRoot>
   );

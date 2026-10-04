@@ -427,9 +427,9 @@ function IdenticonChip({ address }: { address: string }) {
   return <Identicon address={address} className="feed-id" />;
 }
 
-export function ActivityPage({ initial }: { initial?: string }) {
+export function ActivityPage() {
   return (
-    <AppRoot activeKey="activity" initial={initial}>
+    <AppRoot activeKey="activity">
       <ActivityView />
     </AppRoot>
   );

@@ -18,8 +18,6 @@ interface Props {
   title: string;
   description?: string;
   activeKey: ShellKey;
-  /** Per-locale route language ('de'…'tr'); the shell is built in it. */
-  lang?: string;
   /** i18n key for the tab title on pages with no React router (e.g. 404).
    *  React routes carry their own titleKey; this one is applied by the static
    *  localiser so the tab follows the language too. */
@@ -29,30 +27,8 @@ interface Props {
   shelfSeed?: boolean;
   /** Extra head tags (JSON-LD, OG, etc.) passed via <Fragment set:html> not needed — use slots. */
 }
-const { title, description, activeKey, titleKey, shelfSeed = false, lang } = Astro.props;
+const { title, description, activeKey, titleKey, shelfSeed = false } = Astro.props;
 const siteName = 'shop.nimiqbase.com';
-// The route language: prefixed twins (/tr/…) build their shell in it, the
-// unprefixed root stays English (its boot script redirects non-English
-// visitors to their twin BEFORE paint, so nobody ever watches a flip).
-const routeLang = lang && lang !== 'en' ? lang : 'en';
-import enShell from '../i18n/locales/en';
-import deShell from '../i18n/locales/de';
-import frShell from '../i18n/locales/fr';
-import esShell from '../i18n/locales/es';
-import ptShell from '../i18n/locales/pt';
-import trShell from '../i18n/locales/tr';
-const SHELL_DICTS: Record<string, any> = { en: enShell, de: deShell, fr: frShell, es: esShell, pt: ptShell, tr: trShell };
-/** Build-time translator for the few static-shell strings (skip link, footer
- *  credit, tab title, meta description) so the FIRST paint is translated. */
-function shellT(key: string, vars: Record<string, string> = {}): string {
-  const walk = (d: any) => key.split('.').reduce((n: any, k: string) => (n == null ? undefined : n[k]), d);
-  const node = walk(SHELL_DICTS[routeLang]) ?? walk(enShell);
-  let str = typeof node === 'string' ? node : key;
-  // {{site}} is always available, exactly like the client translator.
-  const all = { site: siteName, ...vars };
-  for (const [k, v] of Object.entries(all)) str = str.split('{{' + k + '}}').join(v);
-  return str;
-}
 // Build fingerprint for BuildGuard. The deploy builds on the GitHub runner
 // (GITHUB_SHA), Cloudflare-native builds export CF_PAGES_COMMIT_SHA; local
 // builds get a constant and are never deployed.
@@ -66,7 +42,7 @@ const buildId = process.env.GITHUB_SHA || process.env.CF_PAGES_COMMIT_SHA || 'lo
 //   ?lang= → cookie → localStorage → navigator.language → "en".
 // React then hydrates on top with the identical choice, so there is no flash
 // of the wrong language.
-const initialLang = routeLang;
+const initialLang = 'en';
 
 // ---- Shelf seed (home page, build time) ----------------------------------
 // Reads the committed/hourly catalog snapshot for the default country and
@@ -199,7 +175,6 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
     <meta http-equiv="Content-Security-Policy" content={contentSecurityPolicy} />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#E7DAC0" />
-    <meta name="shop-base" content={assetBase} />
     <meta name="color-scheme" content="light dark" />
     <!--
       Boot-time language bootstrap (synchronous, runs before paint).
@@ -281,38 +256,6 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
           // saved → device → English. No IP is consulted at any point.
           var lang = queryLang || userPick || (hostWins ? hostLang : null)
                   || readCookie() || readStorage() || devLang || 'en';
-          // ---- per-locale static routes ------------------------------------
-          // /de/… /tr/… are built in their own language, so their first paint
-          // is already translated and needs no hold and no flip. The
-          // unprefixed root is the auto entry: when the resolved language is
-          // not English, replace() to the prefixed twin BEFORE paint (this
-          // script runs in <head>, the body has not parsed yet — the visitor
-          // perceives a single, already-translated load). On a prefixed page
-          // only an explicit pick (?lang= or the switcher's saved choice) may
-          // move the visitor; a shared /de/ link must stay German otherwise.
-          var BASE = '';
-          try {
-            var mb = document.querySelector('meta[name="shop-base"]');
-            if (mb) BASE = mb.getAttribute('content') || '';
-          } catch (eB) {}
-          var rawPath = location.pathname;
-          if (BASE && rawPath.indexOf(BASE) === 0) rawPath = rawPath.slice(BASE.length) || '/';
-          var firstSeg = rawPath.split('/')[1] || '';
-          var isPrefixed = firstSeg === 'de' || firstSeg === 'fr' || firstSeg === 'es' || firstSeg === 'pt' || firstSeg === 'tr';
-          var restPath = isPrefixed ? (rawPath.slice(('/' + firstSeg).length) || '/') : rawPath;
-          if (!isPrefixed) {
-            if (lang !== 'en') {
-              location.replace(BASE + '/' + lang + restPath + location.search + location.hash);
-              return;
-            }
-          } else {
-            var pick = queryLang || userPick;
-            if (pick && pick !== firstSeg) {
-              location.replace(BASE + (pick === 'en' ? '' : '/' + pick) + restPath + location.search + location.hash);
-              return;
-            }
-            lang = firstSeg;
-          }
           document.documentElement.setAttribute('lang', lang);
           document.documentElement.setAttribute('data-lang', lang);
           // HOLD — last resort, and only on a FIRST visit in this language.
@@ -329,6 +272,14 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
           // (written by src/i18n after the first load), so there is nothing to
           // hide: no hold, no loader, the first paint is translated. The key
           // and its meaning are documented in src/i18n/index.tsx.
+          function dictCached(code) {
+            try { return !!localStorage.getItem('nimshop.dict.' + code); } catch (e) { return false; }
+          }
+          if (lang !== 'en' && !dictCached(lang)) {
+            var root = document.documentElement;
+            root.setAttribute('data-i18n-hold', '');
+            setTimeout(function () { root.removeAttribute('data-i18n-hold'); }, 5000);
+          }
           // Warm the dictionary chunk for this language while the HTML is
           // still parsing. Non-English dictionaries are lazy chunks that
           // React only imports after hydration; without this the visitor's
@@ -452,14 +403,14 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
     </script>
     <meta
       name="description"
-      content={description || (routeLang !== 'en' ? shellT('meta.defaultDescription') : "Buy gift cards, mobile top-ups and eSIMs with NIM via BTC Lightning in Nimiq Pay. No internal balance, direct CryptoRefills payment, and open source.")}
+      content={description || "Buy gift cards, mobile top-ups and eSIMs with NIM via BTC Lightning in Nimiq Pay. No internal balance, direct CryptoRefills payment, and open source."}
       data-i18n-attr={description ? undefined : 'content:meta.defaultDescription'}
     />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
-    <title>{titleKey && routeLang !== 'en' ? shellT(titleKey) : title}</title>
+    <title>{title}</title>
     <link rel="icon" type="image/png" sizes="64x64" href={`${assetBase}/img/icon-64.png?v=nim-favicon-2`} />
     <link rel="icon" type="image/png" sizes="512x512" href={`${assetBase}/img/icon-512.png?v=nim-favicon-2`} />
     <link rel="apple-touch-icon" href={`${assetBase}/img/apple-touch-icon.png?v=nim-favicon-2`} />
@@ -518,10 +469,10 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
     <meta name="build-id" content={buildId} />
   </head>
   <body>
-    <a class="skip-link" href="#page-content" data-i18n="stat.skipToContent">{shellT('stat.skipToContent')}</a>
+    <a class="skip-link" href="#page-content" data-i18n="stat.skipToContent">Skip to content</a>
     <noscript>
       <div style="padding:40px;text-align:center;font-family:sans-serif;color:var(--ink, #4E3D28)">
-        <span data-i18n="stat.needsJs">{shellT('stat.needsJs', { site: siteName })}</span>
+        <span data-i18n="stat.needsJs">{siteName} needs JavaScript to run the wallet connection and live order tracking.</span>
       </div>
     </noscript>
 
@@ -533,7 +484,7 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
 
     <footer class="footer">
       <div class="container">
-        <span data-fit="wrap" data-fit-min="10">© <span>NimiqBase</span><span class="footer-credit"> <span data-i18n="stat.poweredCredit">{shellT('stat.poweredCredit')}</span></span></span>
+        <span data-fit="wrap" data-fit-min="10">© <span>NimiqBase</span><span class="footer-credit"> <span data-i18n="stat.poweredCredit">— powered by Nimiq &amp; CryptoRefills</span></span></span>
         <div class="footer-barcode">
           <!-- Inline (not <img>) so the bars can use currentColor: kraft brown
                in light, footer-ink in dark — a brown barcode vanishes on the
@@ -551,8 +502,8 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
             href="https://github.com/emrealt34/nimiqshop"
             target="_blank"
             rel="noopener noreferrer"
-            aria-label={shellT('stat.githubLabel')}
-            title={shellT('stat.githubLabel')}
+            aria-label="Open-source repository on GitHub"
+            title="Open-source repository on GitHub"
             data-i18n-attr="aria-label:stat.githubLabel title:stat.githubLabel"
           >
             <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

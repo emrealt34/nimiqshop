@@ -1,13 +1,8 @@
 ---
-import BaseLayout from '../../layouts/Base.astro';
-import { ShopPage } from '../../components/home/ShopPage';
-
-import { localeStaticPaths } from '../../lib/localeRoutes';
-
-export function getStaticPaths() { return localeStaticPaths(); }
-const routeLang = Astro.params.lang || 'en';
+import BaseLayout from '../layouts/Base.astro';
+import { ShopPage } from '../components/home/ShopPage';
 ---
-<BaseLayout lang={routeLang}
+<BaseLayout
   title="shop.nimiqbase.com — Gift cards & more, paid with NIM · BTC Lightning" titleKey="pageTitle.shop"
   activeKey="shop"
   shelfSeed
@@ -23,5 +18,5 @@ const routeLang = Astro.params.lang || 'en';
       "description": "Nimiq Pay BTC Lightning shop with no internal customer balance for gift cards, mobile top-ups and eSIMs. Open source; payment tracking is transparent."
     }
   </script>
-  <ShopPage client:load initial={routeLang} />
+  <ShopPage client:load />
 </BaseLayout>

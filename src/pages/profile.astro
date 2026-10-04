@@ -1,0 +1,7 @@
+---
+import BaseLayout from '../layouts/Base.astro';
+import { ProfilePage } from '../components/profile/ProfilePage';
+---
+<BaseLayout title="Your account — shop.nimiqbase.com" titleKey="pageTitle.profile" activeKey="profile">
+  <ProfilePage client:load />
+</BaseLayout>

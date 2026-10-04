@@ -301,9 +301,9 @@ function Header() {
   );
 }
 
-export function ProfilePage({ initial }: { initial?: string }) {
+export function ProfilePage() {
   return (
-    <AppRoot activeKey="profile" initial={initial}>
+    <AppRoot activeKey="profile">
       <ProfileView />
     </AppRoot>
   );

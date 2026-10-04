@@ -15,14 +15,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dir = mkdtempSync(path.join(tmpdir(), 'friendly-api-'));
 const entry = path.join(dir, 'entry.ts');
-const bundle = path.join(dir, 'bundle.mjs');
+const bundle = path.join(dir, 'bundle.cjs');
 
 writeFileSync(entry, `
 (globalThis as any).localStorage ??= { getItem: () => null, setItem() {}, removeItem() {} };
@@ -33,14 +34,15 @@ export { friendlyApiMessage, ApiError } from ${JSON.stringify(path.join(root, 's
 
 const esbuild = path.join(root, 'node_modules', '.bin', process.platform === 'win32' ? 'esbuild.cmd' : 'esbuild');
 const built = spawnSync(esbuild, [
-  entry, '--bundle', '--platform=node', '--format=esm', `--outfile=${bundle}`,
+  entry, '--bundle', '--platform=node', '--format=cjs', `--outfile=${bundle}`,
   '--define:import.meta.env.BASE_URL="/"', '--define:import.meta.env={}',
   '--loader:.css=empty', '--log-level=error',
 ], { encoding: 'utf8' });
 assert.equal(built.status, 0, built.stderr || 'esbuild failed to bundle src/lib/api.ts');
 process.on('exit', () => rmSync(dir, { recursive: true, force: true }));
 
-const { friendlyApiMessage, ApiError } = await import(pathToFileURL(bundle).href);
+const require = createRequire(import.meta.url);
+const { friendlyApiMessage, ApiError } = require(bundle);
 
 const FALLBACK = 'SOMETHING WENT WRONG — FALLBACK COPY';
 /** The "our site is unreachable" sentence in every language we ship. */

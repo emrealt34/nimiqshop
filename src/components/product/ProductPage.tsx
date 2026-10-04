@@ -320,9 +320,9 @@ function recordMissing(id: string, country: string) {
   } catch {}
 }
 
-export function ProductPageShell({ initial }: { initial?: string }) {
+export function ProductPageShell() {
   return (
-    <AppRoot activeKey="product" initial={initial}>
+    <AppRoot activeKey="product">
       <ProductPage />
     </AppRoot>
   );

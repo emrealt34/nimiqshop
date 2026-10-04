@@ -946,9 +946,9 @@ function Header() {
 }
 
 /** Static-page wrapper: mounts the providers + shell around the content. */
-export function CashbackPage({ initial }: { initial?: string }) {
+export function CashbackPage() {
   return (
-    <AppRoot activeKey="cashback" initial={initial}>
+    <AppRoot activeKey="cashback">
       <CashbackView />
     </AppRoot>
   );

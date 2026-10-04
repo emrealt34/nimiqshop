@@ -14,6 +14,6 @@ export function CartView() {
   </section>;
 }
 
-export function CartPage({ initial }: { initial?: string }) {
-  return <AppRoot activeKey="shop" initial={initial}><CartView /></AppRoot>;
+export function CartPage() {
+  return <AppRoot activeKey="shop"><CartView /></AppRoot>;
 }

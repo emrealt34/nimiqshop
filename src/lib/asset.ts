@@ -1,11 +1,3 @@
-import { getLang } from '../i18n';
-
-/** Current language's route prefix ('' for English, which owns the root). */
-function langPrefix(): string {
-  const l = getLang();
-  return l && l !== 'en' ? `/${l}` : '';
-}
-
 /** Public file URL that respects Astro `base` (GitHub Pages lives under /nimiqshop/). */
 export function asset(path: string): string {
   const base = String(import.meta.env.BASE_URL || '/').replace(/\/$/, '');
@@ -14,12 +6,12 @@ export function asset(path: string): string {
 }
 
 export function homeHref(): string {
-  const base = String(import.meta.env.BASE_URL || '/').replace(/\/$/, '');
-  return `${base}${langPrefix()}/`;
+  const base = String(import.meta.env.BASE_URL || '/');
+  return base.endsWith('/') ? base : `${base}/`;
 }
 
 /** In-app path that respects `base` (`/orders` → `/nimiqshop/orders` on Pages). */
 export function pagePath(p: string): string {
   if (!p || p === '/') return homeHref();
-  return asset(`${langPrefix()}${p}`);
+  return asset(p);
 }

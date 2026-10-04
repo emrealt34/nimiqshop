@@ -1,0 +1,7 @@
+---
+import BaseLayout from '../layouts/Base.astro';
+import { ProductPageShell } from '../components/product/ProductPage';
+---
+<BaseLayout title="Product — shop.nimiqbase.com" titleKey="pageTitle.product" activeKey="product">
+  <ProductPageShell client:load />
+</BaseLayout>
