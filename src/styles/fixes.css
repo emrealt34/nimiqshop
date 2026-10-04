@@ -2497,7 +2497,9 @@ label.oos-toggle > span {
    box-in-box: the logo shrank to the inner tile's 86% and the doubled
    borders/shadows made it look off-centre. */
 .feed-thumb, .feed-thumb.feed-thumb-stack {
-  width: 96px !important;
+  /* SAME tile size as the orders list wrapper (clamp(64px, 30vw, 140px)) —
+     the owner's ask: activity thumbs should look exactly like orders' ones. */
+  width: clamp(64px, 30vw, 140px) !important;
   flex: none;
   aspect-ratio: auto !important;
   border: 0 !important;
