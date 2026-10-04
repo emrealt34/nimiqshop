@@ -58,7 +58,6 @@ import {
   StarsDisplay,
   StarPicker,
   NimAmount,
-  NimWalletLabel,
 } from '../ui/uiKit';
 import { LightningPayBlock } from '../checkout/LightningPayBlock';
 import { NimiqPayPayButton } from '../checkout/NimiqPayPayButton';
@@ -976,13 +975,6 @@ function payMethodLabel(q: any): string {
   if (m === 'nimiq_pay') return i18nT('orderPage.payBtcLightning');
   return m ? m.replace(/_/g, ' ') : coin === 'NIM' ? i18nT('orderPage.payBtcLightning') : '—';
 }
-function cashbackLabel(q: any): ReactNode {
-  const d = String(q?.cashback_destination || '').toLowerCase();
-  if (d === 'burn') return i18nT('orderPage.burnNim');
-  if (d === 'cashback') return <NimWalletLabel size={16} />;
-  return null;
-}
-
 function OrderContent({ o }: { o: any }) {
   const { t } = useT();
   const meta = kindMeta(o.kind);
