@@ -1,0 +1,12 @@
+---
+import BaseLayout from '../../layouts/Base.astro';
+import { CashbackPage } from '../../components/cashback/CashbackPage';
+
+import { localeStaticPaths } from '../../lib/localeRoutes';
+
+export function getStaticPaths() { return localeStaticPaths(); }
+const routeLang = Astro.params.lang || 'en';
+---
+<BaseLayout lang={routeLang} title="Cashback & staking — shop.nimiqbase.com" titleKey="pageTitle.cashback" activeKey="cashback">
+  <CashbackPage client:load initial={routeLang} />
+</BaseLayout>

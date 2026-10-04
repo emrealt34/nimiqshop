@@ -1,0 +1,12 @@
+---
+import BaseLayout from '../../layouts/Base.astro';
+import { SupportPage } from '../../components/support/SupportPage';
+
+import { localeStaticPaths } from '../../lib/localeRoutes';
+
+export function getStaticPaths() { return localeStaticPaths(); }
+const routeLang = Astro.params.lang || 'en';
+---
+<BaseLayout lang={routeLang} title="Help & FAQ — shop.nimiqbase.com" titleKey="pageTitle.support" activeKey="support">
+  <SupportPage client:load initial={routeLang} />
+</BaseLayout>

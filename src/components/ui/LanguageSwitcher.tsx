@@ -28,6 +28,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Icon } from './Icon';
 import { FlagHex } from './FlagHex';
 import { useT, type LangCode } from '../../i18n';
+import { localeUrlFor } from '../../lib/localeRoutes';
 
 export function LanguageSwitcher() {
   const { lang, setLang, t, langs } = useT();
@@ -94,6 +95,11 @@ export function LanguageSwitcher() {
                 lang={l.code}
                 onClick={() => {
                   setLang(l.code as LangCode);
+                  // The URL mirrors the language so reload/share/bookmark keep
+                  // it: swap the /tr/… prefix in place, no navigation, no state
+                  // loss (cart, sheets and an open checkout all survive).
+                  const url = localeUrlFor(l.code);
+                  if (url) window.history.replaceState(null, '', url);
                   setOpen(false);
                   setAutoPicked(false);
                 }}

@@ -109,9 +109,9 @@ export function SupportView() {
   );
 }
 
-export function SupportPage() {
+export function SupportPage({ initial }: { initial?: string }) {
   return (
-    <AppRoot activeKey="support">
+    <AppRoot activeKey="support" initial={initial}>
       <SupportView />
     </AppRoot>
   );

@@ -1,9 +1,9 @@
 import { AppRoot } from '../AppRoot';
 import { HomePage } from './HomePage';
 
-export function ShopPage() {
+export function ShopPage({ initial }: { initial?: string }) {
   return (
-    <AppRoot activeKey="shop">
+    <AppRoot activeKey="shop" initial={initial}>
       <HomePage />
     </AppRoot>
   );

@@ -31,6 +31,7 @@ import {
 } from 'react';
 import type { ShellKey } from '../components/shell/SiteShell';
 import { siteName } from './config';
+import { isLocaleSeg } from './localeRoutes';
 import { onLangChange, t as i18nT, useT } from '../i18n';
 import { pagePath } from './asset';
 
@@ -119,6 +120,10 @@ const KEY_PATH: Record<ShellKey, string> = {
 
 export function normalizePath(p: string): string {
   let s = stripBase(String(p || '/'));
+  // Per-locale routes (/tr/orders …) map onto the same route table: the
+  // language lives in the prefix, the SPA state machine stays unprefixed.
+  const seg = s.split('/')[1];
+  if (isLocaleSeg(seg)) s = s.slice(('/' + seg).length) || '/';
   const q = s.indexOf('?');
   if (q >= 0) s = s.slice(0, q);
   const h = s.indexOf('#');

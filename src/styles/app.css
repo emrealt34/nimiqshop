@@ -254,8 +254,6 @@ img, svg, canvas { display: block; max-width: 100%; }
    non-English visitors are ever held, and two independent timeouts (the boot
    script's plus this stylesheet being CSS-only, i.e. harmless without JS)
    guarantee the page can never stay hidden. */
-html[data-i18n-hold] { background: var(--bg); }
-html[data-i18n-hold] body { visibility: hidden; }
 /* No loader artwork: the hold now only happens on a FIRST visit in a language
    (the dictionary is cached in localStorage afterwards, and Base.astro skips
    the hold when it is), so it lasts a single chunk fetch and the page simply

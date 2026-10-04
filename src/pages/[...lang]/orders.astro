@@ -1,0 +1,12 @@
+---
+import BaseLayout from '../../layouts/Base.astro';
+import { OrdersPage } from '../../components/orders/OrdersPage';
+
+import { localeStaticPaths } from '../../lib/localeRoutes';
+
+export function getStaticPaths() { return localeStaticPaths(); }
+const routeLang = Astro.params.lang || 'en';
+---
+<BaseLayout lang={routeLang} title="Orders — shop.nimiqbase.com" titleKey="pageTitle.orders" activeKey="orders">
+  <OrdersPage client:load initial={routeLang} />
+</BaseLayout>

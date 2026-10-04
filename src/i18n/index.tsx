@@ -137,6 +137,16 @@ const LOADERS: Record<string, () => Promise<{ default: Dict }>> = {
 const DICTS: Record<string, Dict> = { en: en as Dict };
 const pending = new Map<string, Promise<void>>();
 
+/* Per-locale routes (/tr/, /de/, …) are rendered AT BUILD in their language,
+ * so the island SSR pass needs every dictionary synchronously. The client
+ * build replaces `import.meta.env.SSR` with false and dead-code-eliminates
+ * this block, so browsers still lazy-load the five non-English chunks. */
+if (import.meta.env.SSR) {
+  const codes = Object.keys(LOADERS);
+  const mods = await Promise.all(codes.map((c) => LOADERS[c]()));
+  mods.forEach((m, i) => { DICTS[codes[i]] = m.default as Dict; });
+}
+
 /*
  * DICTIONARY CACHE (localStorage)
  * ------------------------------
@@ -463,6 +473,15 @@ export function onDictSwap(fn: () => void): () => void {
 
 /** Non-React API — usable from any plain TS module (toasts, api.ts, etc). */
 export function getLang(): LangCode { return currentLang; }
+
+/** Pin the imperative translator to a per-locale route BEFORE the island SSR
+ *  render (build time) and keep link builders consistent after an in-session
+ *  switch. No document writes: the provider owns the visible attributes. */
+export function adoptRouteLang(code: LangCode) {
+  if (!isValidCode(code) || currentLang === code) return;
+  currentLang = code;
+  currentT = buildT(code);
+}
 export function t(key: DictKey, vars?: Record<string, string | number>): string { return currentT(key, vars); }
 
 function applyLang(code: LangCode, persist: boolean) {

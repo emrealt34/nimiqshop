@@ -1,0 +1,12 @@
+---
+import BaseLayout from '../../layouts/Base.astro';
+import { CartPage } from '../../components/cart/CartPage';
+
+import { localeStaticPaths } from '../../lib/localeRoutes';
+
+export function getStaticPaths() { return localeStaticPaths(); }
+const routeLang = Astro.params.lang || 'en';
+---
+<BaseLayout lang={routeLang} title="Your cart — shop.nimiqbase.com" titleKey="pageTitle.cart" activeKey="shop">
+  <CartPage client:load initial={routeLang} />
+</BaseLayout>

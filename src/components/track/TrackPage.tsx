@@ -303,9 +303,9 @@ function Header() {
   );
 }
 
-export function TrackPage() {
+export function TrackPage({ initial }: { initial?: string }) {
   return (
-    <AppRoot activeKey="track">
+    <AppRoot activeKey="track" initial={initial}>
       <TrackView />
     </AppRoot>
   );

@@ -1,0 +1,12 @@
+---
+import BaseLayout from '../../layouts/Base.astro';
+import { ActivityPage } from '../../components/activity/ActivityPage';
+
+import { localeStaticPaths } from '../../lib/localeRoutes';
+
+export function getStaticPaths() { return localeStaticPaths(); }
+const routeLang = Astro.params.lang || 'en';
+---
+<BaseLayout lang={routeLang} title="Live activity — shop.nimiqbase.com" titleKey="pageTitle.activity" activeKey="activity">
+  <ActivityPage client:load initial={routeLang} />
+</BaseLayout>

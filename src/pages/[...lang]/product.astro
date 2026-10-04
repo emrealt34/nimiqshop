@@ -1,0 +1,12 @@
+---
+import BaseLayout from '../../layouts/Base.astro';
+import { ProductPageShell } from '../../components/product/ProductPage';
+
+import { localeStaticPaths } from '../../lib/localeRoutes';
+
+export function getStaticPaths() { return localeStaticPaths(); }
+const routeLang = Astro.params.lang || 'en';
+---
+<BaseLayout lang={routeLang} title="Product — shop.nimiqbase.com" titleKey="pageTitle.product" activeKey="product">
+  <ProductPageShell client:load initial={routeLang} />
+</BaseLayout>

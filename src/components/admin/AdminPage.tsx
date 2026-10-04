@@ -1398,9 +1398,9 @@ function AdminHeader() {
   );
 }
 
-export function AdminPage() {
+export function AdminPage({ initial }: { initial?: string }) {
   return (
-    <AppRoot activeKey="none">
+    <AppRoot activeKey="none" initial={initial}>
       <AdminContent />
     </AppRoot>
   );
