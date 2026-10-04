@@ -3244,13 +3244,20 @@ input[type="range"]:focus-visible { outline: 2px solid var(--stamp); outline-off
    1) let the brand yield below the desktop nav. Its wordmark already re-fits
       its own type via data-fit once its box is constrained (and keeps the
       ellipsis as the last resort), so giving the row a shrinkable item is
-      enough — the row recomputes itself back to a fit;
+      enough — the row recomputes itself back to a fit.
+      NOT below 561px, though: the phone band gives the brand flex-GROW 1 on
+      purpose (it absorbs the row's slack so the controls stay parked right
+      while the spacer sits at grow 0 there). This override used to cover
+      <=1199px and won the cascade at <=560px, leaving the slack unabsorbed —
+      brand and controls huddled left with dead space on the right (reported
+      at a ~540px window). The phone rule already shrinks the brand when the
+      row is genuinely out of room, so it needs no help from this block;
    2) let the come-back CTA shrink with an ellipsis instead of poking out of
       the banner when the rail is genuinely tighter than the pill;
    3) honour the toggle's original "wrap, don't overflow" intent: the rail
       block further up re-noWrap'd it, so at these widths the label ellipsized
       ("Out of stock h…") instead of using the second line it has room for. */
-@media (max-width: 1199px) {
+@media (min-width: 561px) and (max-width: 1199px) {
   .topbar .brand { flex: 0 1 auto; }
 }
 .come-back-cta {
