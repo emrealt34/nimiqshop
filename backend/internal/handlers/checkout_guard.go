@@ -101,8 +101,15 @@ func (h *Handlers) existingCheckout(ctx *fasthttp.RequestCtx, user, key, request
 			continue
 		}
 		if q.PurchaseFingerprint != "" && q.PurchaseFingerprint == purchaseFP {
-			h.reuseCheckout(ctx, q, key, requestFP)
-			return true
+			// A lapsed unpaid invoice is not a checkout to return to: the
+			// buyer pressed "create a fresh invoice", and handing back the
+			// dead quote loops them onto a pay screen with no live invoice
+			// (live bug, 2026-10-04). Let creation proceed instead.
+			if !db.LapsedUnpaidInvoice(q, time.Now().UTC()) {
+				h.reuseCheckout(ctx, q, key, requestFP)
+				return true
+			}
+			continue
 		}
 		if !ack {
 			h.activeCheckoutError(ctx, q)

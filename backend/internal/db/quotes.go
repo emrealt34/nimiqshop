@@ -213,14 +213,24 @@ func (s *Store) createQuoteWithPurchaseLimits(q Quote, maxOrders int, maxSpend, 
 		// cashback code must not evade a possibly-paid purchase.
 		if len(blocking) > 0 {
 			existing := blocking[0]
-			if CartEqual(existing, q) {
+			sameCart := CartEqual(existing, q)
+			renewing := sameCart && LapsedUnpaidInvoice(existing, now)
+			if sameCart && !renewing {
 				return &ErrLiveDuplicate{Quote: existing}
 			}
-			if !opts.AckActiveCheckout {
+			// Same cart with a lapsed, never-paid invoice: this request IS
+			// the renewal the pay screen promises. Neither the live-duplicate
+			// bounce nor the active-checkout refusal may fire — both would
+			// hand the buyer back the dead quote and strand them on a screen
+			// with no way to start (live bug, 2026-10-04). The lapsed quote
+			// keeps its own settlement path; if money ever shows up on it the
+			// observed flags remove it from this predicate and it blocks
+			// again like any unresolved checkout.
+			if !renewing && !opts.AckActiveCheckout {
 				return &ErrActiveCheckout{Quote: existing}
 			}
-			// Acked: fall through and create the fresh quote beside the
-			// unresolved one. The old quote keeps its own settlement path.
+			// Acked or renewing: fall through and create the fresh quote
+			// beside the unresolved one.
 		}
 		count := 0
 		attempts := 0

@@ -50,7 +50,7 @@ import {
 } from '../../lib/dailyLimit';
 import { getAddress, isAuthed } from '../../lib/session';
 import { loginWithHub, friendlyHubError } from '../../lib/hub';
-import { deliverySummary, payRail, payActionLine , coinAmountLabel } from '../../lib/deliveryCopy';
+import { deliverySummary, payRail, payActionLine , coinAmountLabel, coinAmountLabelFor } from '../../lib/deliveryCopy';
 import { asset, pagePath } from '../../lib/asset';
 import { normalizePath } from '../../lib/router';
 
@@ -922,12 +922,18 @@ export function PayScreen({
           {t('checkout.flowStatusLine', { status: supplierStatusLabel(current.supplier_status || current.status) })}
         </div>
         <div className="small mt-1">{body}</div>
-        {renewSafe && (
+        {/* The verifying screen's own copy promises a fresh invoice "right
+            here" — before this button existed that promise was a lie and the
+            buyer was stranded with no way to start (live bug, 2026-10-04).
+            Money safety: the lapsed supplier invoice cannot be paid again,
+            and the backend only lets this through while no money was ever
+            observed on the old quote. */}
+        {(renewSafe || verifying) && (
           <button type="button" className="btn btn-gold btn-block mt-2" onClick={() => finish(false, 'renew')}>
             <Icon name="bolt" size={14} /> {t('checkout.flowRenewInvoice')}
           </button>
         )}
-        <a className={renewSafe ? 'btn btn-outline btn-block mt-2' : 'btn btn-gold btn-block mt-2'} href={pagePath('/order?type=quote&id=' + encodeURIComponent(quoteIdOf(current)))}>{t('checkout.flowOpenOrder')}</a>
+        <a className={renewSafe || verifying ? 'btn btn-outline btn-block mt-2' : 'btn btn-gold btn-block mt-2'} href={pagePath('/order?type=quote&id=' + encodeURIComponent(quoteIdOf(current)))}>{t('checkout.flowOpenOrder')}</a>
         {testPayButton}
       </div>
     );
@@ -980,7 +986,7 @@ export function PayScreen({
         )}
         {localFiat && <div className="small muted" style={{ marginTop: 6, fontWeight: 700 }}>{localFiat}</div>}
       </div>
-      <details className="checkout-details-min"><summary>{t('checkout.flowDetailsSummary')}</summary><div style={{ marginTop: 8 }}><div className="small muted">{t('checkout.flowNimEstimateNote')}</div><CashbackFeeNotice example="nim" /><StakerCashbackLine quote={current} />{cbExclusive && (<div className="small muted mt-1" style={{ textAlign: 'center' }}><Icon name="lock" size={13} /> {cbExclusive}</div>)}<div className="alert info mt-1" style={{ marginBottom: 0, display: 'flex', gap: '8px', alignItems: 'center' }}><Icon name="bolt" size={18} /><div className="small">{payRail(current).note}</div></div><div className="small muted mt-1">{payActionLine(current)}</div></div></details>
+      <details className="checkout-details-min"><summary>{t('checkout.flowDetailsSummary')}</summary><div style={{ marginTop: 8 }}><div className="small" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}><span className="muted">{t('orderPage.finalTotal')}</span><span className="mono strong">{coinAmountLabelFor(current, 'BTC') || t('orderPage.amountNote')}</span></div><div className="small muted">{t('checkout.flowNimEstimateNote')}</div><CashbackFeeNotice example="nim" /><StakerCashbackLine quote={current} />{cbExclusive && (<div className="small muted mt-1" style={{ textAlign: 'center' }}><Icon name="lock" size={13} /> {cbExclusive}</div>)}<div className="alert info mt-1" style={{ marginBottom: 0, display: 'flex', gap: '8px', alignItems: 'center' }}><Icon name="bolt" size={18} /><div className="small">{payRail(current).note}</div></div><div className="small muted mt-1">{payActionLine(current)}</div></div></details>
       {note}
       {uri ? <LightningPayBlock quoteId={quoteIdOf(current)} invoice={invoice} uri={uri} onLaunch={() => rememberLightningPayment(invoice, { kind: 'quote', ref: quoteIdOf(current) })} avatarAddress={getAddress()} /> : null}
       {testPayButton}

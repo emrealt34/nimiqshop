@@ -101,6 +101,31 @@ func BlocksNewPurchaseAt(q Quote, now time.Time) bool {
 	return false
 }
 
+// LapsedUnpaidInvoice reports that the single-use invoice can no longer be
+// paid AND no money was ever seen on it. Such a quote must never be handed
+// back as a "live duplicate" or reused by the idempotency pre-check: doing so
+// strands the buyer on a dead pay screen whose own copy promises a fresh
+// invoice "right here" while no button or backend path can create one (live
+// bug, 2026-10-04). Renewing the same cart is therefore a CREATION, not a
+// reuse. Money safety is untouched: the supplier invoice died with the
+// window, so a late payment on it reconciles through the existing observed
+// path, and any quote with observed/blocked money is not lapsed by this
+// predicate and keeps blocking exactly as before.
+func LapsedUnpaidInvoice(q Quote, now time.Time) bool {
+	switch q.Status {
+	case "payment_received", "delivering", "manual_review", "fulfilled", "refunded":
+		return false
+	}
+	if q.PaymentObserved || q.PaymentBlocked {
+		return false
+	}
+	dl := q.PaymentExpiry
+	if dl.IsZero() {
+		dl = q.ExpiresAt
+	}
+	return !dl.IsZero() && dl.Before(now)
+}
+
 // BlocksNewPurchase is the time.Now() convenience wrapper used by every call
 // site that does not carry a shared clock (the index build, the exported
 // pre-check). Callers that already have `now` must use BlocksNewPurchaseAt so
