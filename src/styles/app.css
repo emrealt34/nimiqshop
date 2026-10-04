@@ -40,6 +40,10 @@
   --green-soft: rgba(62, 107, 79, 0.12);
 
   /* Gold — ratings/brand only (stars, identicons ring) */
+  /* The brand mark's own gold, sampled from public/img/nimiq-hexagon.png
+     (#E8A810 → #E8B010 gradient). The --gold-* scale below is deliberately
+     darker, for text and buttons; the MARK must match the asset exactly. */
+  --nim-gold: #E8A810;
   --gold-300: #DDA32E;
   --gold-400: #C98A1B;
   --gold-500: #A8730F;
@@ -268,8 +272,9 @@ html[data-i18n-hold] body { visibility: hidden; }
    says so — those cards are the wrong country's brands, so Base.astro marks the
    document and HomePage drops the mark in the same commit that shows the right
    catalog. The seeded cards are only hidden, never removed: the grid keeps its
-   min-height, so nothing collapses and the page does not move. Same hexagon as
-   the language hold, so the two read as one deliberate loading state. */
+   min-height, so nothing collapses and the page does not move. Drawn in the
+   brand's own gold and orientation (flat-top) — the language hold's copy of
+   this hexagon was removed with its loader, this one is the last user. */
 html[data-market-hold] #gridWrap { position: relative; }
 html[data-market-hold] #gridWrap > * { visibility: hidden; }
 html[data-market-hold] #gridWrap::after {
@@ -277,11 +282,14 @@ html[data-market-hold] #gridWrap::after {
   position: absolute;
   top: 21vh;
   left: 50%;
-  width: 34px;
-  height: 38px;
-  margin: -19px 0 0 -17px;
-  background: var(--gold-400, #C98A1B);
-  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  /* Flat-top, like the brand asset: pointy-top is the same hexagon a quarter
+     turn off, which reads as a rotated logo (the reason Icon.tsx uses the PNG
+     instead of a generic outline glyph). Ratio 0.87 = 1/(2/√3). */
+  width: 38px;
+  height: 33px;
+  margin: -17px 0 0 -19px;
+  background: var(--nim-gold, #E8A810);
+  clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
   animation: i18n-hold-pulse 1.05s var(--ease) infinite;
   pointer-events: none;
 }

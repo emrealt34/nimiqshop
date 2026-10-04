@@ -36,10 +36,12 @@ export function rateSourceLabel(cb: RecentCashbackRow): string {
 export function NimUnitMark({ size = 11 }: { size?: number }) {
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 800 }}>
-      {/* inline vector, currentColor: always renders, no image file to miss */}
-      <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" style={{ display: 'block' }}>
-        <polygon points="12,1.5 21.5,7 21.5,17 12,22.5 2.5,17 2.5,7" fill="currentColor" />
-      </svg>
+      {/* The REAL Nimiq mark, the same one the rest of the site draws: the
+          public flat-top gold hexagon (Icon name="nimiq" → the PNG). This used
+          to be a hand-rolled inline hexagon filled with currentColor, which
+          meant a pointy-top shape (rotated against the brand) painted white in
+          the dark theme — the exact thing Icon.tsx already warns about. */}
+      <Icon name="nimiq" size={size} />
       NIM
     </span>
   );
