@@ -215,7 +215,7 @@ func (s *Store) createQuoteWithPurchaseLimits(q Quote, maxOrders int, maxSpend, 
 			existing := blocking[0]
 			sameCart := CartEqual(existing, q)
 			renewing := sameCart && LapsedUnpaidInvoice(existing, now)
-			if sameCart && !renewing {
+			if sameCart && !renewing && !opts.AckActiveCheckout {
 				return &ErrLiveDuplicate{Quote: existing}
 			}
 			// Same cart with a lapsed, never-paid invoice: this request IS

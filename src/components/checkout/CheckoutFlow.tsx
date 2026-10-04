@@ -17,8 +17,7 @@ import { Icon } from '../ui/Icon';
 import { useCart, itemKey, type CartItem } from '../../lib/cartStore';
 import { useToast } from '../AppProviders';
 import { createQuote, createQuoteBatch, forgetQuote, getQuote, friendlyApiMessage, authorizePaymentLaunch } from '../../lib/api';
-import { canRenewQuote, paymentInFlight, paymentWindowVerifying } from '../../lib/pay';
-import { supplierStatusLabel } from '../../lib/supplierStatus';
+import { canRenewQuote, paymentInFlight } from '../../lib/pay';
 import { buildOrderRequest, getGiftExtras, type DeliveryInfo } from '../../lib/delivery';
 import { isValidEmail } from '../../lib/validate';
 import { giftRowFields } from '../../lib/giftNote';
@@ -445,10 +444,11 @@ export function CheckoutFlow({
           });
           (window as any).__payResolver = undefined;
           if (!paid && (window as any).__lastPayReason === 'renew') {
-            // The buyer tapped "new invoice" on an expired payment window:
-            // re-create the whole batch and land back on a payable screen
-            // without the extra prompt. Safe because a renewal is only ever
-            // offered once the old invoice can no longer be paid.
+            // The buyer tapped "new invoice": re-create the whole batch and
+            // land back on a payable screen. The ack rides along so NO
+            // safety path can hand back the dead quote instead of creating
+            // (owner: "yeni fatura oluştur çalışmıyor", 2026-10-04).
+            ackRef.current = true;
             await tryBatch();
             continue;
           }
@@ -546,8 +546,10 @@ export function CheckoutFlow({
           });
           (window as any).__payResolver = undefined;
           if (!paid && (window as any).__lastPayReason === 'renew') {
-            // Same one-tap renewal on the single-item path: loop again, which
-            // forgets the dead quote and creates a fresh one for this item.
+            // Same one-tap renewal on the single-item path: loop again with
+            // the ack set, which forgets the dead quote and creates a fresh
+            // one for this item.
+            ackRef.current = true;
             continue;
           }
           if (paid) {
@@ -896,57 +898,27 @@ export function PayScreen({
     const seen = paymentInFlight(current);
     const renewSafe = !seen && canRenewQuote(current, Date.now());
     const verifying = !seen && !renewSafe && paymentWindowVerifying(current, Date.now());
-    const headline = seen
-      ? t('checkout.flowPaymentSeen')
-      : renewSafe
-        ? t('checkout.flowWindowOver')
-        : verifying
-          ? t('checkout.flowVerifying')
-          : current.status === 'order_creating'
-            ? t('checkout.flowConfirmingOrder')
-            : t('checkout.flowControlsPaused');
-    const body = seen
-      ? t('checkout.flowWaitForSettlement')
-      : renewSafe
-        ? t('checkout.flowRenewWhy')
-        : verifying
-          ? t('checkout.flowVerifyingBody')
-          : t('checkout.flowDoNotPay');
-    // Zero-tap: the buyer came to BUY. A dead invoice (window over, nothing
-    // charged) is replaced silently; the gate below only appears once the
-    // auto-renew budget is spent or money may exist (seen/verifying/holds).
-    if (renewSafe && (((window as any).__autoRenewBudget as number) ?? 0) > 0) {
+    // Owner (2026-10-04): the "window is over" lecture misfired on fresh
+    // invoices and read like a block — the whole headed/status/body screen is
+    // gone. What remains is actions: one tap for a fresh invoice, or open the
+    // order. Only the MONEY-SEEN state keeps words, because there the words
+    // are the safety ("we see your money, wait for settlement").
+    if (seen) {
       return (
-        <AutoRenewOnce
-          key={`${quoteIdOf(current)}:${renewTick}`}
-          budgetKey="__autoRenewBudget"
-          fire={() => {
-            setRenewTick((x) => x + 1);
-            finish(false, 'renew');
-          }}
-          label={t('checkout.flowRenewing')}
-        />
+        <div className="center" style={{ padding: '26px 10px', textAlign: 'center' }} role="status">
+          <div className="strong">{t('checkout.flowPaymentSeen')}</div>
+          <div className="small mt-1">{t('checkout.flowWaitForSettlement')}</div>
+          <a className="btn btn-gold btn-block mt-2" href={pagePath('/order?type=quote&id=' + encodeURIComponent(quoteIdOf(current)))}>{t('checkout.flowOpenOrder')}</a>
+          {testPayButton}
+        </div>
       );
     }
     return (
       <div className="center" style={{ padding: '26px 10px', textAlign: 'center' }} role="status">
-        <div className="strong">{headline}</div>
-        <div className="small muted mt-1">
-          {t('checkout.flowStatusLine', { status: supplierStatusLabel(current.supplier_status || current.status) })}
-        </div>
-        <div className="small mt-1">{body}</div>
-        {/* The verifying screen's own copy promises a fresh invoice "right
-            here" — before this button existed that promise was a lie and the
-            buyer was stranded with no way to start (live bug, 2026-10-04).
-            Money safety: the lapsed supplier invoice cannot be paid again,
-            and the backend only lets this through while no money was ever
-            observed on the old quote. */}
-        {(renewSafe || verifying) && (
-          <button type="button" className="btn btn-gold btn-block mt-2" onClick={() => finish(false, 'renew')}>
-            <Icon name="bolt" size={14} /> {t('checkout.flowRenewInvoice')}
-          </button>
-        )}
-        <a className={renewSafe || verifying ? 'btn btn-outline btn-block mt-2' : 'btn btn-gold btn-block mt-2'} href={pagePath('/order?type=quote&id=' + encodeURIComponent(quoteIdOf(current)))}>{t('checkout.flowOpenOrder')}</a>
+        <button type="button" className="btn btn-gold btn-block" onClick={() => finish(false, 'renew')}>
+          <Icon name="bolt" size={14} /> {t('checkout.flowRenewInvoice')}
+        </button>
+        <a className="btn btn-outline btn-block mt-2" href={pagePath('/order?type=quote&id=' + encodeURIComponent(quoteIdOf(current)))}>{t('checkout.flowOpenOrder')}</a>
         {testPayButton}
       </div>
     );
