@@ -673,7 +673,7 @@ function PayNowCard({ q }: { q: any }) {
         <div><dt>{t('orderPage.paymentMethod')}</dt><dd>{rail.label}</dd></div>
         <div>
           <dt>{t('orderPage.finalTotal')}</dt>
-          <dd>{rail.isUsdt ? t('orderPage.finalTotalUsdt', { coin: rail.short }) : t('orderPage.amountNote')}</dd>
+          <dd>{rail.isUsdt ? t('orderPage.finalTotalUsdt', { coin: rail.short }) : (coinAmountLabel(q) || t('orderPage.amountNote'))}</dd>
         </div>
         <div><dt>{t('orderPage.rowTo')}</dt><dd>{t('orderPage.toSupplier')}</dd></div>
         <div><dt>{t('orderPage.youGet')}</dt><dd>{selectedAmountLabel(q) || cleanProductLabel(q.product_id) || t('orderPage.instantDelivery')}</dd></div>

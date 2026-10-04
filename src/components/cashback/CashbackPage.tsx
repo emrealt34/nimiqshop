@@ -257,7 +257,9 @@ export function CashbackView() {
   // Best-effort consensus note (see consensusEstablished): true = synced.
   const [synced, setSynced] = useState(true);
   const [activeNIM, setActiveNIM] = useState<string>('');
-  const [price, setPrice] = useState<number>(() => Number(cachedNimRate()?.usd_per_nim) || 0);
+  // NIM rate is still tracked (setPrice) for other displays; the caps are
+  // now shown in USD directly, so the converted value is no longer read here.
+  const [, setPrice] = useState<number>(() => Number(cachedNimRate()?.usd_per_nim) || 0);
   /** "Try again" on the programme card is in flight. */
   const [retrying, setRetrying] = useState(false);
 
@@ -846,8 +848,8 @@ export function CashbackView() {
           <li>{rich(t('cashback.fine1', { base: pct(stakerBaseBps), zero: pct(baseBps) }))}</li>
           <li>
             {t('cashback.fine2', {
-              dayCap: capNIM(params?.daily_cap_usd || 50),
-              monthCap: capNIM(params?.monthly_cap_usd || 500),
+              dayCap: `$${params?.daily_cap_usd || 50}`,
+              monthCap: `$${params?.monthly_cap_usd || 500}`,
             })}
           </li>
           <li>{t('cashback.fine3', { carry: String(Math.round((params?.carry_share ?? 0.1) * 100)) })}</li>
@@ -858,9 +860,6 @@ export function CashbackView() {
     </div>
   );
 
-  function capNIM(usd: number): string {
-    return price > 0 ? `${fmtStakeNIM(usd / price)} NIM` : `$${usd}`;
-  }
 }
 
 /**

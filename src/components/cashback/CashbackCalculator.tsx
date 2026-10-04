@@ -157,7 +157,6 @@ export function CashbackCalculator({
   // Already staked: the button adds the difference, not the whole slider.
   const addNIM = myStakeNIM && myStakeNIM > 0 ? stake - myStakeNIM : stake;
   const canUse = !!onUseAmount && addNIM >= stakeMin;
-  const monthlyCapNIM = price > 0 ? program.monthly_cap_usd / price : 0;
   const stakedOff = stake <= 0;
 
   return (
@@ -267,7 +266,7 @@ export function CashbackCalculator({
           />
           <span className="cb-slider-foot">
             <span className="xs faint">{fmtStakeNIM(SPEND_MIN)} NIM</span>
-            <span className="xs faint">{r.capped && monthlyCapNIM > 0 ? t('cashback.calcBoostCountsFirst', { nim: fmtStakeNIM(monthlyCapNIM) }) : ''}</span>
+            <span className="xs faint">{r.capped ? t('cashback.calcBoostCountsFirst', { usd: `$${program.monthly_cap_usd}` }) : ''}</span>
             <span className="xs faint">10M NIM</span>
           </span>
         </label>
@@ -392,7 +391,7 @@ export function CashbackCalculator({
                 start: program.loyalty_start.toFixed(1),
                 ramp: String(ramp),
                 cap: String(program.max_boost_percent),
-                max: price > 0 ? `${fmtStakeNIM(program.ledger_max_usd / price)} NIM` : `$${program.ledger_max_usd}`,
+                max: `$${program.ledger_max_usd}`,
               })}
             </li>
             <li>
@@ -400,13 +399,13 @@ export function CashbackCalculator({
             </li>
             <li>
               {t('cashback.calcCapsBullet', {
-                dayCap: price > 0 ? `${fmtStakeNIM(program.daily_cap_usd / price)} NIM` : `$${program.daily_cap_usd}`,
-                monthCap: price > 0 ? `${fmtStakeNIM(monthlyCapNIM)} NIM` : `$${program.monthly_cap_usd}`,
+                dayCap: `$${program.daily_cap_usd}`,
+                monthCap: `$${program.monthly_cap_usd}`,
               })}
             </li>
             <li>
               {t('cashback.calcRewardsBullet', {
-                conversion: price > 0 ? t('cashback.calcConversion', { price: price.toFixed(5) }) : '',
+                conversion: '',
               })}
             </li>
           </ul>
