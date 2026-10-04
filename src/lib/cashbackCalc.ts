@@ -185,15 +185,29 @@ export function estimateCashback(i: CalcInput): CalcResult {
 
 /* ------------------------------------------------------------- sliders */
 
-/** Log-scale slider ↔ value helpers so 100 NIM and 10,000,000 NIM share one track. */
+/** Log-scale slider ↔ value helpers so 100 NIM and 10,000,000 NIM can share
+ *  one track — but PIECEWISE, with the arithmetic middle of the range pinned
+ *  to the middle of the track. A straight log scale put the GEOMETRIC mean at
+ *  the centre (10M on the 100K–1B rail, 100K on the 1K–10M rail), so dragging
+ *  to the middle never showed the middle of the labelled range (owner:
+ *  "orta değerler hiç ortayı göstermiyor"). Each half is its own log segment
+ *  (min→mid, mid→max): the centre is the centre, and the small end keeps the
+ *  resolution a linear track would eat. */
+const logLerp = (a: number, b: number, t: number) =>
+  Math.exp(Math.log(a) + (Math.log(b) - Math.log(a)) * clamp(fin(t), 0, 1));
+const logPos = (a: number, b: number, v: number) =>
+  (Math.log(clamp(v, a, b)) - Math.log(a)) / (Math.log(b) - Math.log(a));
+
 export function sliderToValue(t: number, min: number, max: number): number {
-  const lt = Math.log(min);
-  const v = Math.exp(lt + (Math.log(max) - lt) * clamp(fin(t), 0, 1));
+  const x = clamp(fin(t), 0, 1);
+  const mid = (min + max) / 2;
+  const v = x <= 0.5 ? logLerp(min, mid, x * 2) : logLerp(mid, max, (x - 0.5) * 2);
   return roundNice(v);
 }
 export function valueToSlider(v: number, min: number, max: number): number {
-  const lt = Math.log(min);
-  return clamp((Math.log(clamp(fin(v, min), min, max)) - lt) / (Math.log(max) - lt), 0, 1);
+  const mid = (min + max) / 2;
+  const x = clamp(fin(v, min), min, max);
+  return x <= mid ? 0.5 * logPos(min, mid, x) : 0.5 + 0.5 * logPos(mid, max, x);
 }
 /** 1-2-5 style rounding so the slider lands on numbers people would type. */
 export function roundNice(v: number): number {
