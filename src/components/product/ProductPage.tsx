@@ -605,10 +605,14 @@ export function ProductPage() {
       : t('productPage.buyLabelNoPrice', { name: nm });
   }, [product, qty, buyNIM, t]);
 
+  // `cashbackEarnLine` translates through the imperative dictionary, so the
+  // memo has to depend on `t` too — without it the line kept the previous
+  // language until the product or the rate changed.
   const cashbackLine = useMemo(() => {
     if (!product) return '';
     return cashbackEarnLine(currentProductNIM(), cbBps);
-  }, [product, currentProductNIM, cbBps]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product, currentProductNIM, cbBps, t]);
 
   if (loading) {
     return (

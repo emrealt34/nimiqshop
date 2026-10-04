@@ -91,7 +91,9 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddre
   const [busy, setBusy] = useState(false);
   const [payLocked, setPayLocked] = useState(false);
   const [amountNim, setAmountNim] = useState(0);
-  const [message, setMessage] = useState(t('checkout.lpSupplierInvoice', { site: siteName() }));
+  // Keep the KEY in state, translate at render: a stored string would freeze
+  // in the language the poll last ran in (language switch looked stale).
+  const [msgKey, setMsgKey] = useState<'checkout.lpSupplierInvoice' | 'checkout.lpPending' | 'checkout.lpCannotVerify'>('checkout.lpSupplierInvoice');
   const flight = useRef(false);
 
   useEffect(() => {
@@ -104,11 +106,9 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddre
         const canPay = isQuotePayable(q) && quoteBolt11(q).toLowerCase() === invoice.toLowerCase();
         setAllowed(canPay);
         setAmountNim(nimAmountFor(q, cachedNimRate()));
-        setMessage(canPay
-          ? t('checkout.lpSupplierInvoice', { site: siteName() })
-          : t('checkout.lpPending'));
+        setMsgKey(canPay ? 'checkout.lpSupplierInvoice' : 'checkout.lpPending');
       } catch {
-        if (alive) { setAllowed(false); setMessage(t('checkout.lpCannotVerify')); }
+        if (alive) { setAllowed(false); setMsgKey('checkout.lpCannotVerify'); }
       } finally { if (alive) timer = setTimeout(check, 5000); }
     };
     check();
@@ -217,7 +217,7 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddre
   const amountLabel = amountNim > 0 ? `≈ ${fmtNIM(Math.round(amountNim), 0)} NIM` : '';
   return (
     <div aria-busy={busy}>
-      <div className="xs faint mt-1" role="status">{message}</div>
+      <div className="xs faint mt-1" role="status">{t(msgKey, { site: siteName() })}</div>
 
       <RailPills
         pills={[
