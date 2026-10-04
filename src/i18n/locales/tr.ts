@@ -341,7 +341,7 @@ const tr = {
     flowKeepRate: 'Tam cashback oranını korumak için NIM · BTC Lightning ile öde.',
     flowStakeOnce: 'NIM · BTC Lightning ile öde — en iyi oranı açmak için bir kez stake et.',
     flowImportant: 'Önemli',
-    flowPayWithNim: 'NIM · BTC Lightning ile öde',
+    flowPayWithNim: 'NIM ile öde',
     flowFullRateShort: 'Tam cashback oranı',
     flowBestRail: 'En iyi hat · {{factor}}',
     flowPayWithUsdt: 'USDT ile öde',

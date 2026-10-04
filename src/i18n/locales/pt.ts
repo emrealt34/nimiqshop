@@ -340,7 +340,7 @@ const pt = {
     flowKeepRate: 'Pague com NIM · BTC Lightning para manter a taxa de cashback total.',
     flowStakeOnce: 'Pague com NIM · BTC Lightning — e faça stake uma vez para a melhor taxa.',
     flowImportant: 'Importante',
-    flowPayWithNim: 'Pagar com NIM · BTC Lightning',
+    flowPayWithNim: 'Pagar com NIM',
     flowFullRateShort: 'Taxa de cashback total',
     flowBestRail: 'Melhor via · {{factor}}',
     flowPayWithUsdt: 'Pagar com USDT',
