@@ -455,11 +455,17 @@ function OrderRow({ r, onRate }: { r: any; onRate: (r: any, val: number) => void
   // NOTE: 'thumb ' (space!) — 'thumb.' + x would create ONE class literally named "thumb.thumb-gc"
   // which matches no CSS rule, so the raw image width (≈294px) blew up the grid track.
 
+  // A batch of the SAME brand (qty 2 of one card) is not a multi-brand stack:
+  // the fanned layer cards collapse into one small off-centre card inside the
+  // tile. Only DISTINCT brands get the stack; everything else shows the single
+  // centred thumb at full tile size.
+  const distinctTitles = Array.from(new Set((r.batchSummaryItems || []) as string[]));
+
   return (
     <a className="order-card" href={href}>
       <div style={{ width: "clamp(64px, 30vw, 140px)", flex: 'none' }}>
-        {r.batchSummaryItems?.length > 1 ? (
-          <BrandThumbStack titles={r.batchSummaryItems} country={r.country} />
+        {distinctTitles.length > 1 ? (
+          <BrandThumbStack titles={distinctTitles} country={r.country} />
         ) : r.image ? (
           <UnifiedThumb src={r.image} alt={r.name || r.id} bg={r.bgColor || 'rgb(255,255,255)'} />
         ) : (

@@ -2516,8 +2516,8 @@ label.gift-toggle.inline{ display:flex; flex-direction:row; align-items:center}
       the fixed-width mini progress bar poked past the card edge. Stack instead. */
 @media (max-width: 540px) {
   .order-card { grid-template-columns: auto 1fr; gap: 12px; }
-  .order-card .thumb { width: 64px; height: 64px; }
-  .order-card .thumb svg { width: 28px; height: 28px; }
+  .order-card .thumb { width: 84px; height: 84px; }
+  .order-card .thumb svg { width: 34px; height: 34px; }
   .order-card .o-side { grid-column: 1 / -1; flex-direction: row; align-items: center; flex-wrap: wrap; }
   .order-card .o-price { font-size: 1rem; }
 }
