@@ -195,9 +195,14 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddre
         toast(t('checkout.lpInvoiceCopied'), 'info');
         return;
       }
-      // Desktop has no wallet to launch: the always-visible QR below IS the
-      // hand-off there, so there is nothing else to do.
-      if (!detectMobilePlatform()) return;
+      // Owner (2026-10-05): outside Nimiq Pay the button must DO something.
+      // Desktop has no wallet to launch — the toast (QR-below hint + Nimiq Pay
+      // download links) is the hand-off there, shown at once; mobile tries the
+      // lightning: URI first and toasts when nothing opened.
+      if (!detectMobilePlatform()) {
+        notifyMissing();
+        return;
+      }
       launchLightningUri(uri, notifyMissing);
     } catch (err) {
       toast(friendlyApiMessage(err, t('checkout.lpWalletNotOpened')), 'warn');

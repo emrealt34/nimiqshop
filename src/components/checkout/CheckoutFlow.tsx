@@ -28,7 +28,7 @@ import { useT, t as tr } from '../../i18n';
 import { LightningPayBlock, useNimiqPayMissingToast } from './LightningPayBlock';
 import { LightningRailPills } from './payRailKit';
 import { NimiqPayPayButton } from './NimiqPayPayButton';
-import { inNimiqPay } from '../../lib/miniapp';
+import { inNimiqPay, detectMobilePlatform } from '../../lib/miniapp';
 import { SimulatedPayBlock } from './SimulatedPayBlock';
 import { isTestMode } from '../../lib/config';
 import { UsdtPayBlock } from './UsdtPayBlock';
@@ -1019,6 +1019,13 @@ export function PayScreen({
             onClick={() => {
               rememberLightningPayment(invoice, { kind: 'quote', ref: quoteIdOf(current) });
               void authorizePaymentLaunch(quoteIdOf(current)).catch(() => {});
+              // Outside Nimiq Pay the button must DO something: desktop gets
+              // the toast at once (QR hint + download links), mobile tries the
+              // lightning: URI and toasts when nothing opened.
+              if (!detectMobilePlatform()) {
+                notifyHeroMissing();
+                return;
+              }
               launchLightningUri(uri, notifyHeroMissing);
             }}
           >
