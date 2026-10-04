@@ -405,11 +405,11 @@ func isSupplierCode(code string) bool {
 // frontend knows what payment rails / features are enabled.
 func (h *Handlers) SiteConfig(ctx *fasthttp.RequestCtx) {
 	writeJSON(ctx, 200, map[string]interface{}{
-		"site_host":                h.Cfg.SiteHost,
-		"site_name":                h.Cfg.SiteName(),
-		"enable_usdt":              true,
-		"usdt_coin":                h.Cfg.USDTCoin,
-		"usdt_network":             PaymentNetworkStable,
-		"burn_nim_address":         h.Cfg.BurnNimAddress,
+		"site_host":        h.Cfg.SiteHost,
+		"site_name":        h.Cfg.SiteName(),
+		"enable_usdt":      true,
+		"usdt_coin":        h.Cfg.USDTCoin,
+		"usdt_network":     PaymentNetworkStable,
+		"burn_nim_address": h.Cfg.BurnNimAddress,
 	})
 }
