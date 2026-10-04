@@ -243,14 +243,11 @@ export function deliverySummary(source: any): DeliverySummary {
   // Only numbers that actually receive product value may be named as the
   // top-up target; a note-only number would read as if money went there.
   const phonePart = creditList.length ? joinList(creditList) : phoneList.length ? joinList(phoneList) : '';
-  const codeWord = hasEsim && !hasTopUp ? tr('delivery.codeWordQr') : hasEsim ? tr('delivery.codeWordCodesQrs') : tr('delivery.codeWordCode');
-  const codeWordPlural = hasEsim && !hasTopUp ? tr('delivery.codeWordQr') : tr('delivery.codeWordCodes');
 
   let sentence = '';
   let nextLine = '';
   if (channel === 'both') {
     sentence = tr('delivery.mixedSentence', {
-      codes: codeWordPlural,
       email: emailPart || tr('delivery.yourEmail'),
       number: phonePart || tr('delivery.theNumber'),
     });
@@ -261,11 +258,8 @@ export function deliverySummary(source: any): DeliverySummary {
   } else if (channel === 'email') {
     sentence = hasEsim
       ? tr('delivery.esimSentence', { email: emailPart || tr('delivery.yourEmail') })
-      : tr('delivery.codeSentence', {
-          code: `${codeWord[0].toUpperCase()}${codeWord.slice(1)}`,
-          email: emailPart || tr('delivery.yourEmail'),
-        });
-    nextLine = tr('delivery.emailNext', { code: codeWord });
+      : tr('delivery.codeSentence', { email: emailPart || tr('delivery.yourEmail') });
+    nextLine = tr('delivery.emailNext');
   } else {
     sentence = tr('delivery.attached');
     nextLine = tr('delivery.attachedNext');
@@ -338,14 +332,12 @@ export function payRail(q: any): PayRail {
   };
 }
 
-/** "Approve in Nimiq Pay" vs "Send the USDT transfer" — rail-correct verb. */
+/** The Next line: one short "waiting for your payment" sentence. The rail
+ *  verb and the delivery narration lived here before and read as instructions
+ *  stacked on instructions; the pay button already says how to pay. */
 export function payActionLine(q: any, summary?: DeliverySummary): string {
-  const rail = payRail(q);
   const del = summary || deliverySummary(q);
-  const approve = rail.isUsdt
-    ? tr('delivery.approveUsdt')
-    : tr('delivery.approveNim');
-  return `${approve}. ${del.nextLine.replace(/^Approve the payment\.\s*/, '')}`;
+  return del.nextLine;
 }
 
 /**

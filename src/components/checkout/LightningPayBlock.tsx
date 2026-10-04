@@ -86,7 +86,6 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddre
   const { toast } = useToast();
   const { t } = useT();
   const insidePay = useInNimiqPay();
-  const [showQR, setShowQR] = useState(false);
   const [missing, setMissing] = useState(false);
   const [allowed, setAllowed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -108,9 +107,8 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddre
         setMessage(canPay
           ? t('checkout.lpSupplierInvoice', { site: siteName() })
           : t('checkout.lpPending'));
-        if (!canPay) setShowQR(false);
       } catch {
-        if (alive) { setAllowed(false); setShowQR(false); setMessage(t('checkout.lpCannotVerify')); }
+        if (alive) { setAllowed(false); setMessage(t('checkout.lpCannotVerify')); }
       } finally { if (alive) timer = setTimeout(check, 5000); }
     };
     check();
@@ -120,7 +118,7 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddre
   // Simple flow: one clear Pay button. A single supplier Lightning invoice can
   // only ever be paid once, so re-opening the same invoice is always safe and
   // never a duplicate charge — no "already opened" barrier of any kind.
-  const handoff = async (action: 'pay' | 'copy' | 'qr') => {
+  const handoff = async (action: 'pay' | 'copy') => {
     if (flight.current || !allowed || (action === 'pay' && payLocked)) return;
     flight.current = true; setBusy(true);
     try {
@@ -153,7 +151,6 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddre
       }
       onLaunch?.();
       if (verifyUnavailable) toast(t('checkout.lpVerifySlow'), 'warn');
-      if (action === 'qr') { setShowQR(true); return; }
       if (action === 'pay' && insidePay) {
         const res = await payLightningInvoice(invoice);
         if (isTerminalOutcome(res)) {
@@ -208,7 +205,9 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddre
         toast(t('checkout.lpInvoiceCopied'), 'info');
         return;
       }
-      if (!detectMobilePlatform()) { setShowQR(true); return; }
+      // Desktop has no wallet to launch: the always-visible QR below IS the
+      // hand-off there, so there is nothing else to do.
+      if (!detectMobilePlatform()) return;
       launchLightningUri(uri, () => setMissing(true));
     } catch (err) {
       toast(friendlyApiMessage(err, t('checkout.lpWalletNotOpened')), 'warn');
@@ -248,15 +247,16 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddre
         <NimIcon /> <span className="btn-label">{busy ? t('checkout.verifying') : payLocked ? t('orderPage.nimiqPay.submitted') : insidePay ? t('orderPage.nimiqPay.idle') : t('checkout.flowPayWithNim')}</span>
       </button>
       <button className="btn btn-outline btn-block mt-1" disabled={disabled} onClick={() => handoff('copy')}><Icon name="copy" size={16} /> {t('checkout.lpCopyRequest')}</button>
-      <button className="btn btn-outline btn-block mt-1" disabled={disabled} onClick={() => handoff('qr')}>{t('checkout.lpVerifyShowQr')}</button>
-      {showQR && allowed && (
+      {/* The QR is part of the card, not a reveal: owner removed the
+          "Verify & show QR" button and the hide control — a Lightning invoice
+          is public data, and one less step between the buyer and the pay. */}
+      {allowed && (
         <div className="pay-qr mt-3">
           <div className="pay-qr-frame"><div style={{ position: 'relative', display: 'inline-block', lineHeight: 0 }}>
             <QR text={invoice} size={29} center={asset("/img/nimiq-hexagon.png?v=40")} />
             {avatarAddress && <span className="qr-ava" aria-hidden="true"><Identicon address={avatarAddress} /></span>}
           </div></div>
           <div className="xs faint mt-1">{t('checkout.lpScanOnce')}</div>
-          <button className="btn btn-ghost mt-1" onClick={() => setShowQR(false)}>{t('checkout.lpHideQr')}</button>
         </div>
       )}
 

@@ -675,12 +675,17 @@ function PayNowCard({ q }: { q: any }) {
           <dt>{t('orderPage.finalTotal')}</dt>
           <dd>{rail.isUsdt ? t('orderPage.finalTotalUsdt', { coin: rail.short }) : t('orderPage.amountNote')}</dd>
         </div>
-        <div><dt>{t('orderPage.rowTo')}</dt><dd>{t('orderPage.toSupplier', { site: siteName() })}</dd></div>
+        <div><dt>{t('orderPage.rowTo')}</dt><dd>{t('orderPage.toSupplier')}</dd></div>
         <div><dt>{t('orderPage.youGet')}</dt><dd>{selectedAmountLabel(q) || cleanProductLabel(q.product_id) || t('orderPage.instantDelivery')}</dd></div>
         <div><dt>{t('orderPage.rowDelivery')}</dt><dd>{del.sentence}</dd></div>
         <div><dt>{t('orderPage.nextStep')}</dt><dd>{payActionLine(q, del)}</dd></div>
       </dl>
-      <CashbackFeeNotice example={rail.isUsdt ? 'usdt' : 'nim'} />
+      {/* Closed by default, opened with "See details" (owner: the fee rule
+          should not shout at the buyer above the pay button). */}
+      <details className="checkout-details-min">
+        <summary>{t('orderPage.seeDetails')}</summary>
+        <div style={{ marginTop: 8 }}><CashbackFeeNotice example={rail.isUsdt ? 'usdt' : 'nim'} /></div>
+      </details>
       {rail.isUsdt ? (
         <UsdtPayBlock quote={q} expired={expired} />
       ) : payURI ? (
