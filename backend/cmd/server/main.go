@@ -40,6 +40,82 @@ import (
 	"nimiqshop/internal/stakeledger"
 )
 
+// wireStakeSources installs the two independent sources of "is this buyer
+// staking in our pool?": the pool's own index — which owns the profit feed,
+// the loyalty age and the pool's staker base — and a chain verifier that
+// answers the raw delegation fact straight from the Nimiq chain. main()
+// calls this at boot, and the integration tests call it too, so the tests
+// exercise the wiring production runs: a fallback that only lives inside
+// main() is a fallback no test can ever catch.
+func wireStakeSources(h *handlers.Handlers, store *db.Store, cfg config.Config) {
+	if cfg.PoolAPIURL == "" {
+		log.Printf("poolstake: POOL_API_URL unset — staker cashback programme disabled")
+		return
+	}
+
+	pool := poolstake.New(cfg.PoolAPIURL,
+		time.Duration(cfg.PoolStakeTimeout)*time.Second,
+		time.Duration(cfg.PoolStakeCacheTTL)*time.Second)
+	h.Pool = pool
+	// The chain verifier is the second, independent source for the raw
+	// delegation fact. It matters because the pool's staker table is a
+	// separate database that can lag or lose data (observed live: the
+	// pool reported zero stakers while the chain showed delegators to
+	// the pool's own validator) — and when it does, every real staker is
+	// silently paid and shown the non-staker rate.
+	chain := chainstake.New(nimiq.NewClient(cfg.NimiqRPCURL, cfg.NimiqRPCURL2), cfg.PoolValidatorAddress, 0, 0)
+	h.Chain = chain
+	store.SetStakerLookupDetailed(func(ctx context.Context, address string) (db.StakerStake, error) {
+		st, err := pool.Stake(ctx, address)
+		if err != nil {
+			// A pool outage must never block delivery, must never be
+			// upgraded into a free boost, and must never be mistaken
+			// for a withdrawal: propagate the error so the clocks stay
+			// untouched — UNLESS the chain can answer, in which case the
+			// answer is authoritative and the outage is irrelevant.
+			log.Printf("poolstake: lookup failed for %s: %v", poolstake.CanonicalAddress(address), err)
+			if cs, cerr := chain.Verify(ctx, address); cerr == nil && cs.Staked {
+				log.Printf("poolstake: chain confirms a %.2f NIM delegation while the pool is unreachable", float64(cs.StakeLuna)/100000)
+				return db.StakerStake{StakeLuna: cs.StakeLuna, Staked: true, BaseBps: stakerBaseBps(store)}, nil
+			}
+			return db.StakerStake{}, err
+		}
+		if !st.Staked {
+			// The pool says "no staker". Before that verdict is acted
+			// on, let the chain (public, seconds old) confirm or deny
+			// it: the pool's index is a copy of the chain, not the
+			// chain.
+			if cs, cerr := chain.Verify(ctx, address); cerr == nil && cs.Staked {
+				log.Printf("poolstake: chain confirms a %.2f NIM delegation the pool did not report; using the chain",
+					float64(cs.StakeLuna)/100000)
+				st = poolstake.Status{Address: st.Address, StakeLuna: cs.StakeLuna, Staked: true, CheckedAt: cs.CheckedAt}
+			}
+		}
+		// Fulfillment is the other useful refresh point: update only this
+		// buyer immediately before the atomic cashback calculation.
+		now := time.Now().UTC()
+		_ = store.ObserveStakeLedger(address, st.StakeLuna, now)
+		if cfg.PoolFeedAPIKey != "" {
+			if q, qerr := h.Oracle.NIMUSD(ctx); qerr == nil && q.MedianUSD > 0 {
+				month := now.Format("2006-01")
+				if l, ok, _ := store.ReadStakeLedger(address); ok && l.ProfitMonth != "" && l.ProfitMonth != month {
+					if p, perr := pool.Profit(ctx, address, "last_month"); perr == nil {
+						_, _ = store.ApplyProfitSnapshot(address, now.AddDate(0, -1, 0).Format("2006-01"), p.PoolFeeLuna, q.MedianUSD, p.LoyaltyDays, p.LoyaltyMultiplier, p.StakeLuna, now)
+					}
+				}
+				if p, perr := pool.Profit(ctx, address, "this_month"); perr == nil {
+					_, _ = store.ApplyProfitSnapshot(address, month, p.PoolFeeLuna, q.MedianUSD, p.LoyaltyDays, p.LoyaltyMultiplier, p.StakeLuna, now)
+				}
+			}
+		}
+		// BaseBps is the POOL's number: its staker base while staked
+		// (any amount), 0 otherwise. The shop applies it verbatim.
+		return db.StakerStake{StakeLuna: st.StakeLuna, Staked: st.Staked, BaseBps: st.BaseBps}, nil
+	})
+	pool.SetFeedKey(cfg.PoolFeedAPIKey)
+	log.Printf("poolstake: staker cashback armed against %s (validator %q)", cfg.PoolAPIURL, cfg.PoolValidatorAddress)
+}
+
 // stakerBaseBps is the shop's staker base rate (admin panel, default 1%).
 // Read here for the fulfillment-time decision so the promo can be changed
 // without a deploy.
@@ -193,71 +269,7 @@ func main() {
 	// The lookup is handed to the store (not called by the store) because it
 	// must run OUTSIDE the fulfillment transaction: it is a network call, and
 	// Badger replays a conflicting write closure.
-	if cfg.PoolAPIURL != "" {
-		pool := poolstake.New(cfg.PoolAPIURL,
-			time.Duration(cfg.PoolStakeTimeout)*time.Second,
-			time.Duration(cfg.PoolStakeCacheTTL)*time.Second)
-		h.Pool = pool
-		// The chain verifier is the second, independent source for the raw
-		// delegation fact. It matters because the pool's staker table is a
-		// separate database that can lag or lose data (observed live: the
-		// pool reported zero stakers while the chain showed delegators to
-		// the pool's own validator) — and when it does, every real staker is
-		// silently paid and shown the non-staker rate.
-		chain := chainstake.New(nimiq.NewClient(cfg.NimiqRPCURL, cfg.NimiqRPCURL2), cfg.PoolValidatorAddress, 0, 0)
-		h.Chain = chain
-		store.SetStakerLookupDetailed(func(ctx context.Context, address string) (db.StakerStake, error) {
-			st, err := pool.Stake(ctx, address)
-			if err != nil {
-				// A pool outage must never block delivery, must never be
-				// upgraded into a free boost, and must never be mistaken
-				// for a withdrawal: propagate the error so the clocks stay
-				// untouched — UNLESS the chain can answer, in which case the
-				// answer is authoritative and the outage is irrelevant.
-				log.Printf("poolstake: lookup failed for %s: %v", poolstake.CanonicalAddress(address), err)
-				if cs, cerr := chain.Verify(ctx, address); cerr == nil && cs.Staked {
-					log.Printf("poolstake: chain confirms a %.2f NIM delegation while the pool is unreachable", float64(cs.StakeLuna)/100000)
-					return db.StakerStake{StakeLuna: cs.StakeLuna, Staked: true, BaseBps: stakerBaseBps(store)}, nil
-				}
-				return db.StakerStake{}, err
-			}
-			if !st.Staked {
-				// The pool says "no staker". Before that verdict is acted
-				// on, let the chain (public, seconds old) confirm or deny
-				// it: the pool's index is a copy of the chain, not the
-				// chain.
-				if cs, cerr := chain.Verify(ctx, address); cerr == nil && cs.Staked {
-					log.Printf("poolstake: chain confirms a %.2f NIM delegation the pool did not report; using the chain",
-						float64(cs.StakeLuna)/100000)
-					st = poolstake.Status{Address: st.Address, StakeLuna: cs.StakeLuna, Staked: true, CheckedAt: cs.CheckedAt}
-				}
-			}
-			// Fulfillment is the other useful refresh point: update only this
-			// buyer immediately before the atomic cashback calculation.
-			now := time.Now().UTC()
-			_ = store.ObserveStakeLedger(address, st.StakeLuna, now)
-			if cfg.PoolFeedAPIKey != "" {
-				if q, qerr := h.Oracle.NIMUSD(ctx); qerr == nil && q.MedianUSD > 0 {
-					month := now.Format("2006-01")
-					if l, ok, _ := store.ReadStakeLedger(address); ok && l.ProfitMonth != "" && l.ProfitMonth != month {
-						if p, perr := pool.Profit(ctx, address, "last_month"); perr == nil {
-							_, _ = store.ApplyProfitSnapshot(address, now.AddDate(0, -1, 0).Format("2006-01"), p.PoolFeeLuna, q.MedianUSD, p.LoyaltyDays, p.LoyaltyMultiplier, p.StakeLuna, now)
-						}
-					}
-					if p, perr := pool.Profit(ctx, address, "this_month"); perr == nil {
-						_, _ = store.ApplyProfitSnapshot(address, month, p.PoolFeeLuna, q.MedianUSD, p.LoyaltyDays, p.LoyaltyMultiplier, p.StakeLuna, now)
-					}
-				}
-			}
-			// BaseBps is the POOL's number: its staker base while staked
-			// (any amount), 0 otherwise. The shop applies it verbatim.
-			return db.StakerStake{StakeLuna: st.StakeLuna, Staked: st.Staked, BaseBps: st.BaseBps}, nil
-		})
-		pool.SetFeedKey(cfg.PoolFeedAPIKey)
-		log.Printf("poolstake: staker cashback armed against %s (validator %q)", cfg.PoolAPIURL, cfg.PoolValidatorAddress)
-	} else {
-		log.Printf("poolstake: POOL_API_URL unset — staker cashback programme disabled")
-	}
+	wireStakeSources(h, store, cfg)
 	// Single-ledger staker cashback (Tek Defter): the parameter resolver
 	// reads the admin settings live, so a console edit applies to the next
 	// fulfillment/accrual without a restart.

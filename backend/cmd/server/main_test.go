@@ -103,6 +103,10 @@ func bootStack(t *testing.T, opts stackOptions) *testStack {
 	h := handlers.New(store, cfg, cr)
 	// Fixed display price so no oracle/network is involved.
 	h.NIMUSDPrice = func(context.Context) (float64, error) { return 0.002, nil }
+	// The SAME pool + chain wiring production boots with. Tests that fake a
+	// pool and an RPC therefore exercise the real ordering (pool first, chain
+	// as the fallback) instead of a test-only stand-in.
+	wireStakeSources(h, store, cfg)
 
 	// The settlement tracker is what turns a paid quote into an order (and
 	// advances simulated TEST_MODE orders), exactly as in main().
