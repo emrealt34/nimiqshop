@@ -1501,6 +1501,7 @@ const tr = {
     rowQuantity: 'Adet',
     rowUpdated: 'Güncellendi',
     rowPayment: 'Ödeme',
+    payBtcLightning: 'BTC Lightning ile öde',
     rowDelivery: 'Teslimat',
     rowNetwork: 'Ağ',
     rowCashback: 'Cashback',

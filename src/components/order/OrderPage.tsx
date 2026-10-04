@@ -971,8 +971,10 @@ function payMethodLabel(q: any): string {
   if (rail.isUsdt) return rail.label; // "USDT · Polygon"
   const m = String(q?.payment_method || '').toLowerCase();
   const coin = String(q?.coin || '').toUpperCase();
-  if (m === 'nimiq_pay') return i18nT('productPage.payWithNimChip');
-  return m ? m.replace(/_/g, ' ') : coin === 'NIM' ? i18nT('productPage.payWithNimChip') : '—';
+  // Owner (2026-10-04): the SUMMARY states the rail only — "BTC Lightning" —
+  // without the NIM prefix the pay chip carries.
+  if (m === 'nimiq_pay') return i18nT('orderPage.payBtcLightning');
+  return m ? m.replace(/_/g, ' ') : coin === 'NIM' ? i18nT('orderPage.payBtcLightning') : '—';
 }
 function cashbackLabel(q: any): ReactNode {
   const d = String(q?.cashback_destination || '').toLowerCase();
@@ -1376,7 +1378,6 @@ function QuoteContent({ q, refund, fulfillment }: { q: any; refund?: any; fulfil
     qRail.isUsdt && coinAmountLabel(q) ? [t('orderPage.usdtAmount'), <span key="ua" className="mono small">{coinAmountLabel(q)}</span>] : null,
     // Delivery channel, stated once and correctly for mixed carts.
     [t('orderPage.rowDelivery'), <span key="dl" className="strong">{qDel.label}</span>],
-    cashbackLabel(q) ? [t('orderPage.rowCashback'), <span key="cd">{cashbackLabel(q)}</span>] : null,
     [t('orderPage.rowGift'), qIsGift ? (qGiftChannel ? t('orderPage.yesWithChannel', { channel: giftChannelLabel(qGiftChannel) }) : t('orderPage.yes')) : t('orderPage.no')],
     quoteCountry
       ? [

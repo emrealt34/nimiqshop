@@ -1509,6 +1509,7 @@ const en = {
     rowQuantity: 'Quantity',
     rowUpdated: 'Updated',
     rowPayment: 'Payment',
+    payBtcLightning: 'Pay with BTC Lightning',
     rowDelivery: 'Delivery',
     rowNetwork: 'Network',
     rowCashback: 'Cashback',

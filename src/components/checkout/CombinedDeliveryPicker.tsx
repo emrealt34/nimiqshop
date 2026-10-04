@@ -227,18 +227,24 @@ export function CombinedDeliveryPicker({
               onEnter={() => { void submit(); }}
             />
             {phoneErr[i] && <div className="small" style={{ color: 'var(--stamp)', marginTop: 4 }}>{phoneErr[i]}</div>}
-            <ConfirmField
-              id={`${id}-again`}
-              label={t('delivery.confirmPhoneLabel')}
-              type="tel"
-              inputMode="tel"
-              placeholder={t('delivery.confirmPhonePlaceholder')}
-              value={phones2[i] || ''}
-              invalid={!!phone2Err[i]}
-              error={phone2Err[i]}
-              onChange={(v) => setPhone2(i, v)}
-              onEnter={() => { void submit(); }}
-            />
+            {/* Owner (2026-10-04): the confirm box opens only once the first
+                number exists (the pair ate half the screen), and it carries
+                the SAME country prefix — two different formats could never
+                match and looked broken side by side. */}
+            {String(phones[i] || '').trim() !== '' && (
+              <>
+                <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink-dim)', margin: '10px 0 4px' }}>{t('delivery.confirmPhoneLabel')}</div>
+                <CountryPhoneInput
+                  id={`${id}-again`}
+                  country={it.country}
+                  value={phones2[i] || ''}
+                  invalid={!!phone2Err[i]}
+                  onChange={(v) => setPhone2(i, v)}
+                  onEnter={() => { void submit(); }}
+                />
+                {phone2Err[i] && <div className="small" style={{ color: 'var(--stamp)', marginTop: 4 }}>{phone2Err[i]}</div>}
+              </>
+            )}
           </div>
         );
       })}
@@ -256,17 +262,19 @@ export function CombinedDeliveryPicker({
                 onChange={(e) => { setGiftEmail(e.target.value); api.setError(''); setEmail2Err(''); }}
                 style={{ padding: '12px 14px', border: '2px solid var(--line-strong)', borderRadius: 8, background: 'var(--surface-1)', width: '100%' }}
               />
-              <ConfirmField
-                id="cdp-gift-email-again"
-                label={t('delivery.confirmEmailLabel')}
-                type="email"
-                inputMode="email"
-                placeholder="friend@gmail.com"
-                value={giftEmail2}
-                invalid={!!email2Err}
-                error={email2Err}
-                onChange={(v) => { setGiftEmail2(v); setEmail2Err(''); }}
-              />
+              {String(giftEmail).trim() !== '' && (
+                <ConfirmField
+                  id="cdp-gift-email-again"
+                  label={t('delivery.confirmEmailLabel')}
+                  type="email"
+                  inputMode="email"
+                  placeholder="friend@gmail.com"
+                  value={giftEmail2}
+                  invalid={!!email2Err}
+                  error={email2Err}
+                  onChange={(v) => { setGiftEmail2(v); setEmail2Err(''); }}
+                />
+              )}
             </div>
           ) : (
             <div className="field">
@@ -279,17 +287,19 @@ export function CombinedDeliveryPicker({
                 onChange={(e) => { api.setNoteEmail(e.target.value); api.setError(''); setEmail2Err(''); }}
                 style={{ padding: '12px 14px', border: '2px solid var(--line-strong)', borderRadius: 8, background: 'var(--surface-1)', width: '100%' }}
               />
-              <ConfirmField
-                id="cdp-note-email-again"
-                label={t('delivery.confirmEmailLabel')}
-                type="email"
-                inputMode="email"
-                placeholder="friend@gmail.com"
-                value={noteEmail2}
-                invalid={!!email2Err}
-                error={email2Err}
-                onChange={(v) => { setNoteEmail2(v); setEmail2Err(''); }}
-              />
+              {String(api.noteEmail).trim() !== '' && (
+                <ConfirmField
+                  id="cdp-note-email-again"
+                  label={t('delivery.confirmEmailLabel')}
+                  type="email"
+                  inputMode="email"
+                  placeholder="friend@gmail.com"
+                  value={noteEmail2}
+                  invalid={!!email2Err}
+                  error={email2Err}
+                  onChange={(v) => { setNoteEmail2(v); setEmail2Err(''); }}
+                />
+              )}
             </div>
           )}
           <div>
@@ -315,6 +325,7 @@ export function CombinedDeliveryPicker({
             onChange={(e) => { setMyEmail(e.target.value); setSelfError(''); setEmail2Err(''); }}
             style={{ padding: '12px 14px', border: '2px solid var(--line-strong)', borderRadius: 8, background: 'var(--surface-1)', width: '100%' }}
           />
+          {String(myEmail).trim() !== '' && (
           <ConfirmField
             id="cdp-my-email-again"
             label={t('delivery.confirmEmailLabel')}
@@ -328,6 +339,7 @@ export function CombinedDeliveryPicker({
             onChange={(v) => { setMyEmail2(v); setEmail2Err(''); }}
             onEnter={() => { void submit(); }}
           />
+          )}
           <div className="small muted" style={{ marginTop: 6, display: 'flex', gap: 6, alignItems: 'flex-start', background: 'var(--paper-tint)', border: '1px dashed rgba(78,61,40,.25)', borderRadius: 8, padding: '8px 10px' }}>
             <span>⚠️</span><span>{t('delivery.cdpCodeToEmail')}</span>
           </div>

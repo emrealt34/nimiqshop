@@ -1500,6 +1500,7 @@ const es = {
     rowQuantity: 'Cantidad',
     rowUpdated: 'Actualizado',
     rowPayment: 'Pago',
+    payBtcLightning: 'Pagar con BTC Lightning',
     rowDelivery: 'Entrega',
     rowNetwork: 'Red',
     rowCashback: 'Cashback',
