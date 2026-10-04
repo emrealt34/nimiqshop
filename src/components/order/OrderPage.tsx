@@ -599,7 +599,10 @@ function PayNowCard({ q }: { q: any }) {
       setRenewBusy(true);
       setRenewErr('');
       try {
-        const req = buildOrderRequest(renewItemFromQuote(q), renewInfoFromQuote(q));
+        // Owner (2026-10-04): a renewal must NEVER be refused by the
+        // unresolved-checkout hold — same cart or a different one. The ack
+        // rides along so the backend always creates the fresh invoice.
+        const req = { ...buildOrderRequest(renewItemFromQuote(q), renewInfoFromQuote(q)), ack_active_checkout: true };
         const out: any = await createQuote(req, uuid());
         const next = (out && (out.quote || out)) || {};
         const id = next.quote_id || next.id;
@@ -620,20 +623,16 @@ function PayNowCard({ q }: { q: any }) {
     // A quote that cannot be re-quoted (no product/country in the payload) must
     // not offer a button whose only possible outcome is a backend refusal.
     const rebuildable = canRebuildRequest(q);
+    // Owner (2026-10-04): the "window is over" lecture misfired and read
+    // like a block — the card is now the action itself: one gold button.
     return (
       <div className="card" style={{ borderColor: 'var(--stamp)', borderWidth: '2px' }}>
-        <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Icon name="clock" size={15} />
-          <span>{t('orderPage.windowOverTitle')}</span>
-        </div>
-        <div className="small muted">{t('orderPage.windowOverBody')}</div>
         {rebuildable && (
         <button type="button" className="btn btn-gold btn-block mt-2" disabled={renewBusy} onClick={() => { void renew(); }}>
           <Icon name="bolt" size={14} /> <span className="btn-label">{renewBusy ? t('orderPage.renewBusy') : t('orderPage.renewCta')}</span>
         </button>
         )}
         {renewErr && <div className="small mt-1" style={{ color: 'var(--stamp)' }}>{renewErr}</div>}
-        <div className="xs faint mt-1">{t('checkout.flowRenewWhy')}</div>
       </div>
     );
   }
