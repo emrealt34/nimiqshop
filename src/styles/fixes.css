@@ -3227,3 +3227,45 @@ input[type="range"]:focus-visible { outline: 2px solid var(--stamp); outline-off
 @supports (overflow: clip) {
   body { overflow-x: clip; }
 }
+
+/* ---- Narrow-window containment (the ~431-719px band) ---------------------
+   Reported live at a ~630px window: the account chip ran past the right edge
+   (body clips overflow-x, so it looked cut in half), the come-back pill sat
+   flush against / past its banner edge, and the out-of-stock toggle ellipsized
+   mid-word instead of wrapping.
+
+   The band falls between the phone rules (which hide the address, the balance
+   and the wallet label below 430px) and the widths where the row simply has
+   room, so nothing there was yieldable: below 1200px the topbar holds brand +
+   spacer + four controls, the controls are flex:0 0 auto, the spacer bottoms
+   out at 0 and the brand was flex:0 0 auto too — negative space had nowhere
+   to go but past the right edge.
+
+   1) let the brand yield below the desktop nav. Its wordmark already re-fits
+      its own type via data-fit once its box is constrained (and keeps the
+      ellipsis as the last resort), so giving the row a shrinkable item is
+      enough — the row recomputes itself back to a fit;
+   2) let the come-back CTA shrink with an ellipsis instead of poking out of
+      the banner when the rail is genuinely tighter than the pill;
+   3) honour the toggle's original "wrap, don't overflow" intent: the rail
+      block further up re-noWrap'd it, so at these widths the label ellipsized
+      ("Out of stock h…") instead of using the second line it has room for. */
+@media (max-width: 1199px) {
+  .topbar .brand { flex: 0 1 auto; }
+}
+.come-back-cta {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 719px) {
+  label.oos-toggle,
+  label.oos-toggle > span {
+    white-space: normal;
+  }
+  label.oos-toggle > span {
+    overflow: visible;
+    text-overflow: clip;
+  }
+}
