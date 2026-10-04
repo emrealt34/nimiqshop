@@ -92,7 +92,6 @@ import {
 } from '../../lib/stake';
 
 /** Rows per page in "Recent cashback". */
-const PAYOUTS_PER_PAGE = 3;
 
 type CashbackRow = {
   id: string;
