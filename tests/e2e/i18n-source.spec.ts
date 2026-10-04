@@ -17,23 +17,30 @@
 import { test, expect, open } from './support/fixtures';
 import { path } from './support/data';
 
-/** A first-time visitor: nothing pinned by the fixture, nothing chosen yet. */
+/**
+ * A first-time visitor: nothing pinned by the fixture, nothing chosen yet.
+ *
+ * INDEPENDENT guards on purpose. At document-start the document can still
+ * carry an opaque origin, and a cookie write then throws; with one guard
+ * around the whole block (or none) that throw also kills the override lines
+ * that follow and the test measures the browser defaults instead — roughly one
+ * run in six did exactly that while this chain was being built, which reads as
+ * a mysterious "the app picked English" failure rather than a test bug.
+ */
 const FRESH = `
-  try {
-    localStorage.removeItem('nimshop.lang');
-    localStorage.removeItem('nimshop.lang.user');
-    localStorage.removeItem('nimshop_country');
-  } catch (e) {}
-  document.cookie = 'nimshop-lang=; Max-Age=0; path=/';
+  try { localStorage.removeItem('nimshop.lang'); } catch (e) {}
+  try { localStorage.removeItem('nimshop.lang.user'); } catch (e) {}
+  try { localStorage.removeItem('nimshop_country'); } catch (e) {}
+  try { document.cookie = 'nimshop-lang=; Max-Age=0; path=/'; } catch (e) {}
 `;
 
 /** Pin the device locale deterministically (don't rely on the emulation). */
 const deviceLocale = (tag: string) => `
-  Object.defineProperty(navigator, 'language', { get: function () { return '${tag}'; } });
-  Object.defineProperty(navigator, 'languages', { get: function () { return ['${tag}']; } });
+  try { Object.defineProperty(navigator, 'language', { get: function () { return '${tag}'; }, configurable: true }); } catch (e) {}
+  try { Object.defineProperty(navigator, 'languages', { get: function () { return ['${tag}']; }, configurable: true }); } catch (e) {}
 `;
 
-const inPay = (lang: string) => `window.nimiqPay = { language: '${lang}' };`;
+const inPay = (lang: string) => `try { window.nimiqPay = { language: '${lang}' }; } catch (e) {}`;
 
 /**
  * Samples the document from the first parser tick: the language the visitor
@@ -79,6 +86,19 @@ test.describe('inside Nimiq Pay', () => {
     expect(await lang(page)).toBe('de');
     expect(await ready(page), 'the German dictionary actually applied').toBe('de');
     await expectNoEnglishFrame(page, 'de');
+    // The detected language also reaches the cookie the backend reads, so a
+    // wallet-German buyer's gift email is German too.
+    expect(await page.evaluate(() => document.cookie), 'the email cookie mirrors the detected language').toContain('nimshop-lang=de');
+  });
+
+  test('a host language the shop does not ship falls through to the device', async ({ page }) => {
+    // Nimiq Pay accepts languages this shop does not render (Italian, say).
+    // Falling back to English here would be wrong twice over: the device
+    // already tells us a language we DO ship.
+    await page.addInitScript({ content: FRESH + WATCH_BOOT + deviceLocale('tr-TR') + inPay('it') });
+    await open(page, path('/'));
+    expect(await lang(page)).toBe('tr');
+    await expectNoEnglishFrame(page, 'tr');
   });
 
   test('an "en" host falls through to a device language we ship (Nimiq Pay has no Turkish)', async ({ page }) => {
