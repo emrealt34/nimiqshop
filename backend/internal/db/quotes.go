@@ -216,7 +216,7 @@ func (s *Store) createQuoteWithPurchaseLimits(q Quote, maxOrders int, maxSpend, 
 			if CartEqual(existing, q) {
 				return &ErrLiveDuplicate{Quote: existing}
 			}
-			if !o.AckActiveCheckout {
+			if !opts.AckActiveCheckout {
 				return &ErrActiveCheckout{Quote: existing}
 			}
 			// Acked: fall through and create the fresh quote beside the
