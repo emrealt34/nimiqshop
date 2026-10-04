@@ -212,12 +212,12 @@ export function CashbackCalculator({
           <input
             type="range"
             min={0}
-            max={1000}
+            max={4000}
             step={1}
-            value={stakedOff ? 0 : Math.round(valueToSlider(stake, STAKE_MIN_CALC, STAKE_MAX) * 1000)}
+            value={stakedOff ? 0 : Math.round(valueToSlider(stake, STAKE_MIN_CALC, STAKE_MAX) * 4000)}
             onChange={(e) => {
               setStakeText('');
-              setStake(sliderToValue(Number(e.target.value) / 1000, STAKE_MIN_CALC, STAKE_MAX));
+              setStake(sliderToValue(Number(e.target.value) / 4000, STAKE_MIN_CALC, STAKE_MAX));
             }}
             aria-label={t('cashback.calcStakeSlider')}
           />
@@ -256,12 +256,12 @@ export function CashbackCalculator({
           <input
             type="range"
             min={0}
-            max={1000}
+            max={4000}
             step={1}
-            value={Math.round(valueToSlider(spend, SPEND_MIN, SPEND_MAX) * 1000)}
+            value={Math.round(valueToSlider(spend, SPEND_MIN, SPEND_MAX) * 4000)}
             onChange={(e) => {
               setSpendText('');
-              setSpend(sliderToValue(Number(e.target.value) / 1000, SPEND_MIN, SPEND_MAX));
+              setSpend(sliderToValue(Number(e.target.value) / 4000, SPEND_MIN, SPEND_MAX));
             }}
             aria-label={t('cashback.calcOrdersSlider')}
           />

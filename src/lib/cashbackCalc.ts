@@ -202,20 +202,29 @@ export function sliderToValue(t: number, min: number, max: number): number {
   const x = clamp(fin(t), 0, 1);
   const mid = (min + max) / 2;
   const v = x <= 0.5 ? logLerp(min, mid, x * 2) : logLerp(mid, max, (x - 0.5) * 2);
-  return roundNice(v);
+  return roundSlide(v);
 }
 export function valueToSlider(v: number, min: number, max: number): number {
   const mid = (min + max) / 2;
   const x = clamp(fin(v, min), min, max);
   return x <= mid ? 0.5 * logPos(min, mid, x) : 0.5 + 0.5 * logPos(mid, max, x);
 }
-/** 1-2-5 style rounding so the slider lands on numbers people would type. */
-export function roundNice(v: number): number {
+/** Fine rounding for the SLIDER output: four significant digits.
+ *  roundNice's 1-2-5 quanta are up to half an order of magnitude wide (5M in
+ *  the 50-100M band, 50M near 1B), so consecutive slider ticks landed on the
+ *  same number and then jumped a whole quantum — "5'er 5'er milyon gidiyor,
+ *  tek tek gitmiyor". Four sig figs keep the value readable while their
+ *  quantum stays far below one tick's step at every point of both rails. */
+export function roundSlide(v: number): number {
   if (!(v > 0)) return 0;
-  const mag = Math.pow(10, Math.floor(Math.log10(v)));
-  const m = v / mag;
-  const step = m < 2 ? 0.1 : m < 5 ? 0.25 : 0.5;
-  const out = Math.round(m / step) * step * mag;
-  // Kill float noise (1200.0000000000002) so the number is typeable as-is.
-  return Number(out.toPrecision(12));
+  if (v < 1000) return Math.round(v);
+  const mag = Math.pow(10, Math.floor(Math.log10(v)) - 3);
+  const q = v / mag;
+  // Round halves to even: the track middle (500,050,000 → q=5000.5) lands on
+  // the clean 500,000,000 instead of 500,100,000, so "middle shows middle"
+  // stays true with the fine quantum.
+  const r = Math.abs(q % 1 - 0.5) < 1e-9
+    ? (Math.floor(q) % 2 === 0 ? Math.floor(q) : Math.ceil(q))
+    : Math.round(q);
+  return Number((r * mag).toPrecision(12));
 }
