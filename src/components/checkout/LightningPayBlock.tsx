@@ -23,7 +23,7 @@ import { useT } from '../../i18n';
 import { useInNimiqPay, detectMobilePlatform, NIMIQ_PAY_IOS_URL, NIMIQ_PAY_ANDROID_URL } from '../../lib/miniapp';
 import { launchLightningUri, isQuotePayable, quoteBolt11 } from '../../lib/pay';
 import { payLightningInvoice, isTerminalOutcome } from '../../lib/nimiqPay';
-import { authorizePaymentLaunch, getQuote, friendlyApiMessage, cachedNimRate } from '../../lib/api';
+import { ApiError, authorizePaymentLaunch, getQuote, friendlyApiMessage, cachedNimRate } from '../../lib/api';
 import { nimAmountFor } from '../../lib/nim';
 import { siteName } from '../../lib/config';
 import { PayNote, RailPills } from './payRailKit';
@@ -124,10 +124,35 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddre
     if (flight.current || !allowed || (action === 'pay' && payLocked)) return;
     flight.current = true; setBusy(true);
     try {
-      const result = await authorizePaymentLaunch(quoteId);
-      const q = result.quote || result;
-      if (!isQuotePayable(q) || quoteBolt11(q).toLowerCase() !== invoice.toLowerCase()) throw new Error(t('checkout.lpNoLongerPayable'));
+      // The server re-verifies the supplier state before a wallet handoff
+      // (payment_launch.go: fresh supplier GET, details-unchanged and payable
+      // checks). That round trip is the ONLY network step between the buyer
+      // and their wallet, and it used to decide whether they could pay at all:
+      // a slow tunnel or a slow supplier surfaced as "site unreachable" and the
+      // invoice in their hand — still valid, still single-use — could not be
+      // opened. So the rule is now:
+      //   • the server REFUSED (4xx: not payable, held for review, test order,
+      //     invoice/amount changed) → block, exactly as before;
+      //   • the server could not be reached (network error, timeout, 5xx) →
+      //     open the wallet anyway and say so, then retry the verification in
+      //     the background so the audit stamp still lands.
+      // The button is already gated on the 5-second status poll (`allowed`), so
+      // a definitive "no longer payable" from that poll disables it regardless.
+      let verifyUnavailable = false;
+      try {
+        const result = await authorizePaymentLaunch(quoteId);
+        const q = result.quote || result;
+        if (!isQuotePayable(q) || quoteBolt11(q).toLowerCase() !== invoice.toLowerCase()) {
+          throw new ApiError(409, t('checkout.lpNoLongerPayable'));
+        }
+      } catch (err) {
+        const refused = err instanceof ApiError && err.status >= 400 && err.status < 500;
+        if (refused) throw err;
+        verifyUnavailable = true;
+        void authorizePaymentLaunch(quoteId).catch(() => {});
+      }
       onLaunch?.();
+      if (verifyUnavailable) toast(t('checkout.lpVerifySlow'), 'warn');
       if (action === 'qr') { setShowQR(true); return; }
       if (action === 'pay' && insidePay) {
         const res = await payLightningInvoice(invoice);

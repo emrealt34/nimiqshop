@@ -9,13 +9,15 @@
  * without POOL_API_URL or without a feed key looks exactly as it did before
  * this feature existed.
  */
-import { useEffect, useState, type ReactNode, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type CSSProperties } from 'react';
 import {
   loadStakerProgram,
   loadMyStake,
   refreshMyStake,
+  watchStakeDetection,
   fmtStakeNIM,
   fmtUSD,
+  type StakeWatch,
   type StakerProgram,
   type MyStake,
 } from '../../lib/stakerCashback';
@@ -61,6 +63,28 @@ function useStakerState() {
     });
     return () => {
       alive = false;
+    };
+  }, [authed, program?.enabled]);
+
+  // Returning from the wallet app — or from another tab — is exactly the moment
+  // the buyer expects the shop to know about their stake. Re-read on focus and
+  // on becoming visible instead of waiting for a manual reload; loadMyStake()
+  // is the cheap backend read (no pool round trip), so this never hammers the
+  // pool. A stake that the pool has not indexed yet is covered by the watcher
+  // started on the stake action itself.
+  useEffect(() => {
+    if (!authed || !program?.enabled) return;
+    const again = () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      void loadMyStake().then((m) => {
+        if (m) setMine(m);
+      });
+    };
+    document.addEventListener('visibilitychange', again);
+    window.addEventListener('focus', again);
+    return () => {
+      document.removeEventListener('visibilitychange', again);
+      window.removeEventListener('focus', again);
     };
   }, [authed, program?.enabled]);
 
@@ -234,6 +258,30 @@ export function StakerCashbackCard() {
   const { toast } = useToast();
   const { t } = useT();
   const { authed, program, mine, setMine } = useStakerState();
+  const [detectNote, setDetectNote] = useState('');
+  const watchRef = useRef<StakeWatch | null>(null);
+
+  // One watcher per stake action; the previous one is stopped first so two
+  // actions can never fight over the same card.
+  function startWatch() {
+    watchRef.current?.stop();
+    const stamp = () => new Date().toLocaleTimeString();
+    setDetectNote(t('staker.detectWatching', { time: stamp() }));
+    watchRef.current = watchStakeDetection({
+      onUpdate: (m) => {
+        if (!m) return;
+        setMine(m);
+        if (!m.staked) setDetectNote(t('staker.detectWatching', { time: stamp() }));
+      },
+      onDetected: (m) => {
+        setDetectNote('');
+        toast(t('staker.toastBoostActive', { pct: pct(m.cashback_bps) }), 'success');
+      },
+      onExpire: () => setDetectNote(t('staker.detectExpired')),
+    });
+  }
+  useEffect(() => () => watchRef.current?.stop(), []);
+
   const [amount, setAmount] = useState<string>(String(1000));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -260,7 +308,9 @@ export function StakerCashbackCard() {
       const hash = await stakeWithUs(validator, amountNIM, !!mine?.staked);
       toast(t('staker.toastStakeSent'), 'success');
       // The pool indexes a new delegation on the next epoch pass, so the
-      // refreshed rate can still be the old one. Say so instead of lying.
+      // refreshed rate can still be the old one. Say so instead of lying —
+      // and then keep WATCHING: one refresh is what made a freshly staked
+      // wallet look "not detected" until the buyer reloaded by hand.
       const fresh = await refreshMyStake();
       if (fresh) setMine(fresh);
       toast(
@@ -269,6 +319,7 @@ export function StakerCashbackCard() {
           : t('staker.toastStakeRecorded', { hash: String(hash).slice(0, 10) }),
         fresh && fresh.boosted ? 'success' : 'info'
       );
+      if (!fresh?.staked) startWatch();
     } catch (e) {
       if (e instanceof StakeCancelledError) setErr(e.message);
       else if (e instanceof StakeInvalidError)
@@ -364,6 +415,9 @@ export function StakerCashbackCard() {
           </div>
           {!stakeable && (
             <div className="xs faint mt-1">{t('staker.openInPayNote')}</div>
+          )}
+          {detectNote && (
+            <div className="xs faint mt-1" role="status">{detectNote}</div>
           )}
           {err && <div className="alert error mt-1"><div className="small">{err}</div></div>}
         </div>

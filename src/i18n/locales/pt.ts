@@ -441,6 +441,7 @@ const pt = {
     lpNimAmountBelow: 'o valor em NIM abaixo',
     lpPayExactlyPost: ' com o Nimiq Pay via BTC Lightning — uma fatura do fornecedor, paga diretamente da sua carteira. A entrega começa automaticamente assim que a fatura for paga.',
     lpCopyRequest: 'Copiar o pedido de pagamento BTC Lightning',
+    lpVerifySlow: 'Não foi possível reverificar com o servidor (ligação ou tempo esgotado). A fatura está aberta — pode pagar e depois verificar o estado do pedido.',
     lpVerifyShowQr: 'Verificar e mostrar o QR BTC Lightning',
     lpScanOnce: 'Digitalize uma vez com o Nimiq Pay e aprove o pagamento BTC Lightning na sua carteira.',
     lpHideQr: 'Ocultar QR',
@@ -739,7 +740,6 @@ const pt = {
       policyBody: 'os códigos de vale-presente são entregues, substituídos e reembolsados pela **CryptoRefills**, o vendedor responsável — escreva-lhes **do endereço de e-mail para o qual o cartão foi enviado**. Esta loja não processa reembolsos de compras feitas através do fornecedor.',
       contactTitle: 'Falar com a loja',
       contactBody: 'Para tudo o que a FAQ não resolver — consulta de encomendas, estado do cashback, pagamentos, erros neste site — escreva-nos. Não podemos reembolsar compras do fornecedor por si, mas ajudamos sempre a encontrar a sua encomenda e o canal correto da CryptoRefills.',
-      noInbox: 'Já não existe caixa de tickets — o e-mail é o único canal e as respostas demoram até 2 dias úteis.',
       q1: 'O meu código não funciona — o que faço?',
       a1: 'Os vales-presente são gerados e enviados **diretamente pela CryptoRefills**, o nosso fornecedor — não por esta loja. Escreva ao suporte da CryptoRefills **a partir do endereço exato para onde o cartão foi entregue** (verifique primeiro o spam). Inclua o id da encomenda e o nome do produto; eles podem verificar a entrega e emitir um código válido.',
       q2: 'Nunca recebi o e-mail do vale-presente',
@@ -1653,6 +1653,8 @@ const pt = {
   },
   /* ---- staker ---- */
   staker: {
+    detectWatching: 'A acompanhar o pool até comunicar a sua delegação — última verificação {{time}}.',
+    detectExpired: 'O pool ainda não a comunicou. Verifique novamente em alguns minutos — o cashback sobe assim que ele vir a delegação.',
     needsStake: 'O cashback precisa de um stake:',
     needsStakeText: 'faça stake de NIM no nosso pool para receber {{pct}} (até +{{max}}%).',
     rateLine: '{{kind}} — {{pct}} de cashback',

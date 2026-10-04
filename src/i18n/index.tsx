@@ -137,6 +137,62 @@ const LOADERS: Record<string, () => Promise<{ default: Dict }>> = {
 const DICTS: Record<string, Dict> = { en: en as Dict };
 const pending = new Map<string, Promise<void>>();
 
+/*
+ * DICTIONARY CACHE (localStorage)
+ * ------------------------------
+ * The five non-English dictionaries are ~100 KB each and used to be fetched on
+ * every page view; the page also had to stay hidden until that fetch landed,
+ * which is why the pre-paint hold (and its loader) existed.
+ *
+ * A returning visitor does not need the network for this at all: the module
+ * writes the dictionary it just used into localStorage, and the next visit
+ * reads it back synchronously at module init. Base.astro checks the same key
+ * before setting the hold, so for a cached language there is no hold, no
+ * loader and no English frame — the first paint is already translated.
+ *
+ * Freshness: the cached copy is validated in the background every load (the
+ * chunk is content-hashed and modulepreloaded anyway). If the deployed strings
+ * changed, the cache is replaced and the language is re-applied — same
+ * language, newer copy, so the visitor sees a text fix, never a language
+ * switch. A deploy that adds keys can therefore never leave a visitor mixing
+ * languages for longer than that background fetch.
+ *
+ * The key has no build id on purpose: presence is what Base.astro needs to
+ * know pre-paint, and the content itself is revalidated on every load.
+ */
+const DICT_CACHE_PREFIX = 'nimshop.dict.';
+
+function readCachedDict(code: LangCode): Dict | null {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(DICT_CACHE_PREFIX + code);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? (parsed as Dict) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedDict(code: LangCode, dict: Dict) {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(DICT_CACHE_PREFIX + code, JSON.stringify(dict));
+  } catch {
+    /* private mode or quota — the network path stays the fallback */
+  }
+}
+
+/** True when this language's dictionary is already cached for the next visit. */
+export function dictCached(code: LangCode): boolean {
+  if (typeof localStorage === 'undefined') return false;
+  try {
+    return !!localStorage.getItem(DICT_CACHE_PREFIX + code);
+  } catch {
+    return false;
+  }
+}
+
 /** Load (once) the dictionary for `code`. English is always available. */
 export function loadDict(code: LangCode): Promise<void> {
   if (DICTS[code]) return Promise.resolve();
@@ -144,9 +200,25 @@ export function loadDict(code: LangCode): Promise<void> {
   if (!loader) return Promise.resolve();
   const inflight = pending.get(code);
   if (inflight) return inflight;
+  const cached = readCachedDict(code);
+  if (cached) DICTS[code] = cached;
   const job = loader()
-    .then((mod) => { DICTS[code] = mod.default as Dict; })
-    .catch(() => { /* offline: English fallback keeps the UI readable */ })
+    .then((mod) => {
+      const fresh = mod.default as Dict;
+      if (!cached) {
+        DICTS[code] = fresh;
+        writeCachedDict(code, fresh);
+        return;
+      }
+      // Revalidate: has the deployed copy moved on? Compare cheaply, then swap
+      // in the new strings without a reload (language unchanged → no flash).
+      if (JSON.stringify(fresh) !== JSON.stringify(cached)) {
+        DICTS[code] = fresh;
+        writeCachedDict(code, fresh);
+        if (currentLang === code) applyLang(code, false);
+      }
+    })
+    .catch(() => { /* offline: the cached copy (or English) keeps the UI readable */ })
     .finally(() => { pending.delete(code); });
   pending.set(code, job);
   return job;

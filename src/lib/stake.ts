@@ -402,7 +402,25 @@ export async function moveStakeToPool(validator: string): Promise<string> {
  * staker's cashback is upgraded trust-free within minutes.
  */
 export async function stakeWithUs(validator: string, amountNIM: number, alreadyStaked: boolean): Promise<string> {
-  return alreadyStaked ? addStake(amountNIM) : newStaker(validator, amountNIM);
+  try {
+    return alreadyStaked ? await addStake(amountNIM) : await newStaker(validator, amountNIM);
+  } catch (e) {
+    // The CHAIN, not the pool index, is the authority on whether a staker
+    // exists — `alreadyStaked` comes from the pool's latest pass and can be
+    // stale. One direction can be fixed without changing what the buyer asked
+    // for: the pool believed there was a stake, the chain says there is none,
+    // so the same amount goes out as the FIRST delegation. This is what used
+    // to read as "the button behaves randomly": a freshly staked wallet whose
+    // pool index had not caught up got an add-stake op the chain rejected.
+    // The reverse (a new staker rejected because one already exists) cannot be
+    // fixed silently — the buyer asked to ADD, and moving an existing
+    // delegation to our pool is a different, explicit action — so that one
+    // keeps its guided error and the move flow on the cashback page.
+    if (e instanceof StakeInvalidError && alreadyStaked) {
+      return newStaker(validator, amountNIM);
+    }
+    throw e;
+  }
 }
 
 /**

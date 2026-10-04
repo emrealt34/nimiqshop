@@ -19,13 +19,15 @@
  * loyalty bridge over the pool's index latency) and the parent can refresh
  * whatever numbers it is showing via onStaked().
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSession } from '../../lib/useSession';
 import { useInNimiqPay } from '../../lib/miniapp';
 import {
   loadStakerProgram,
   loadMyStake,
   refreshMyStake,
+  watchStakeDetection,
+  type StakeWatch,
   fmtStakeNIM,
   pctLabel,
   type MyStake,
@@ -70,6 +72,9 @@ export function QuickStake({
 }) {
   const authed = useSession();
   const { toast } = useToast();
+  const watchRef = useRef<StakeWatch | null>(null);
+  useEffect(() => () => watchRef.current?.stop(), []);
+
   const { t } = useT();
   const inPay = useInNimiqPay();
 
@@ -127,7 +132,18 @@ export function QuickStake({
     if (fresh) setMine(fresh);
     onStaked?.(fresh);
     if (fresh?.staked) toast(t('checkout.qsStakerActive', { pct: pctLabel(fresh.cashback_bps) }), 'success');
-    else toast(t('checkout.qsPoolNextPass'), 'info');
+    else {
+      toast(t('checkout.qsPoolNextPass'), 'info');
+      // Keep asking until the pool reports the delegation (paused while the
+      // buyer is away in the wallet app, re-checked the moment they return).
+      watchRef.current?.stop();
+      watchRef.current = watchStakeDetection({
+        onUpdate: (m) => {
+          if (m) setMine(m);
+        },
+        onDetected: (m) => toast(t('checkout.qsStakerActive', { pct: pctLabel(m.cashback_bps) }), 'success'),
+      });
+    }
   }
 
   async function doStake() {

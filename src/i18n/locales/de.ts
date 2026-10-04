@@ -441,6 +441,7 @@ const de = {
     lpNimAmountBelow: 'den NIM-Betrag unten',
     lpPayExactlyPost: ' mit Nimiq Pay über BTC Lightning — eine Lieferantenrechnung, direkt aus deiner Wallet beglichen. Die Lieferung startet automatisch, sobald die Rechnung bezahlt ist.',
     lpCopyRequest: 'BTC-Lightning-Zahlungsanforderung kopieren',
+    lpVerifySlow: 'Die erneute Prüfung beim Server war nicht möglich (Verbindung oder Zeitüberschreitung). Die Rechnung ist offen — du kannst bezahlen und danach den Bestellstatus prüfen.',
     lpVerifyShowQr: 'BTC-Lightning-QR prüfen & anzeigen',
     lpScanOnce: 'Scanne einmal mit Nimiq Pay und bestätige die BTC-Lightning-Zahlung in deiner Wallet.',
     lpHideQr: 'QR ausblenden',
@@ -739,7 +740,6 @@ const de = {
       policyBody: 'Gutscheincodes werden von **CryptoRefills** geliefert, ersetzt und erstattet — dem Merchant of Record. Schreibe ihnen von **der E-Mail-Adresse, an die der Gutschein gesendet wurde**. Dieser Shop wickelt keine Erstattungen für Käufe über den Lieferanten ab.',
       contactTitle: 'Kontakt zum Shop',
       contactBody: 'Wenn die FAQ nicht weiterhilft — Bestellstatus, Cashback, Zahlungen, Fehler auf dieser Seite — schreib uns. Wir können Käufe beim Lieferanten nicht für dich erstatten, helfen dir aber immer, deine Bestellung und den richtigen CryptoRefills-Kanal zu finden.',
-      noInbox: 'Ein Ticket-Postfach gibt es nicht mehr — E-Mail ist der einzige Kanal, Antworten dauern bis zu 2 Werktage.',
       q1: 'Mein Code funktioniert nicht — was tun?',
       a1: 'Geschenkkarten werden **direkt von CryptoRefills**, unserem Lieferanten, erzeugt und per E-Mail versendet — nicht von diesem Shop. Schreibe dem CryptoRefills-Support **von genau der Adresse, an die die Karte geliefert wurde** (prüfe zuerst den Spam-Ordner). Gib deine Bestellnummer und den Produktnamen an; sie können die Lieferung prüfen und einen gültigen Code ausstellen.',
       q2: 'Ich habe die Gutschein-E-Mail nie erhalten',
@@ -1653,6 +1653,8 @@ const de = {
   },
   /* ---- staker ---- */
   staker: {
+    detectWatching: 'Der Pool wird beobachtet, bis er deine Delegation meldet — letzte Prüfung {{time}}.',
+    detectExpired: 'Der Pool hat sie noch nicht gemeldet. Schau in ein paar Minuten wieder nach — dein Cashback steigt, sobald er die Delegation sieht.',
     needsStake: 'Cashback braucht einen Stake:',
     needsStakeText: 'stake NIM in unserem Pool für {{pct}} zurück (bis zu +{{max}}%).',
     rateLine: '{{kind}} — {{pct}} Cashback',

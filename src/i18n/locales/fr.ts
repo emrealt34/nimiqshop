@@ -441,6 +441,7 @@ const fr = {
     lpNimAmountBelow: 'le montant en NIM ci-dessous',
     lpPayExactlyPost: ' avec Nimiq Pay via BTC Lightning — une facture fournisseur, réglée directement depuis votre portefeuille. La livraison démarre automatiquement dès que la facture est payée.',
     lpCopyRequest: 'Copier la demande de paiement BTC Lightning',
+    lpVerifySlow: 'Impossible de revérifier avec le serveur (connexion ou délai). La facture est ouverte : vous pouvez payer, puis vérifier l’état de la commande.',
     lpVerifyShowQr: 'Vérifier et afficher le QR BTC Lightning',
     lpScanOnce: 'Scannez une fois avec Nimiq Pay et approuvez le paiement BTC Lightning dans votre portefeuille.',
     lpHideQr: 'Masquer le QR',
@@ -739,7 +740,6 @@ const fr = {
       policyBody: 'les codes de cartes cadeaux sont livrés, remplacés et remboursés par **CryptoRefills**, le vendeur officiel — écrivez-leur depuis **l’adresse e-mail à laquelle la carte a été envoyée**. Cette boutique ne traite pas les remboursements des achats effectués via le fournisseur.',
       contactTitle: 'Contacter la boutique',
       contactBody: 'Pour tout ce que la FAQ ne règle pas — suivi de commande, statut du cashback, paiements, bugs sur ce site — écrivez-nous. Nous ne pouvons pas rembourser les achats du fournisseur à votre place, mais nous vous aiderons toujours à retrouver votre commande et le bon canal CryptoRefills.',
-      noInbox: 'Il n’y a plus de boîte à tickets : l’e-mail est le seul canal, et les réponses prennent jusqu’à 2 jours ouvrés.',
       q1: 'Mon code ne fonctionne pas — que faire ?',
       a1: 'Les cartes cadeaux sont générées et envoyées **directement par CryptoRefills**, notre fournisseur — pas par cette boutique. Écrivez au support CryptoRefills **depuis l’adresse exacte à laquelle la carte a été livrée** (vérifiez d’abord les spams). Indiquez l’identifiant de commande et le nom du produit ; ils peuvent vérifier la livraison et réémettre un code valide.',
       q2: 'Je n’ai jamais reçu l’e-mail de la carte cadeau',
@@ -1653,6 +1653,8 @@ const fr = {
   },
   /* ---- staker ---- */
   staker: {
+    detectWatching: 'Surveillance du pool jusqu’à ce qu’il signale votre délégation — dernier contrôle {{time}}.',
+    detectExpired: 'Le pool ne l’a pas encore signalée. Revérifiez dans quelques minutes : votre cashback augmente dès qu’il voit la délégation.',
     needsStake: 'Le cashback nécessite un staking :',
     needsStakeText: 'stakez des NIM dans notre pool pour récupérer {{pct}} (jusqu’à +{{max}}%).',
     rateLine: '{{kind}} — {{pct}} de cashback',

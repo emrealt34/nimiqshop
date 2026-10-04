@@ -442,6 +442,7 @@ const tr = {
     lpNimAmountBelow: 'aşağıdaki NIM tutarını',
     lpPayExactlyPost: ' ile Nimiq Pay üzerinden BTC Lightning — tek tedarikçi faturası, doğrudan cüzdanınızdan ödenir. Fatura ödenir ödenmez teslim otomatik başlar.',
     lpCopyRequest: 'BTC Lightning ödeme talebini kopyala',
+    lpVerifySlow: 'Sunucuyla son doğrulama yapılamadı (bağlantı ya da zaman aşımı). Faturanız açık — ödemeye devam edebilirsiniz; sonrasında sipariş durumunu kontrol edin.',
     lpVerifyShowQr: 'Doğrula ve BTC Lightning QR’ını göster',
     lpScanOnce: 'Nimiq Pay ile bir kez tarayın ve BTC Lightning ödemesini cüzdanınızda onaylayın.',
     lpHideQr: 'QR’ı gizle',
@@ -740,7 +741,6 @@ const tr = {
       policyBody: 'hediye kartı kodları **CryptoRefills** tarafından teslim edilir, değiştirilir ve iade edilir; kayıtlı satıcı (merchant of record) onlardır. Onlara **hediye kartının gönderildiği e-posta adresinden** yazın. Bu mağaza, tedarikçi üzerinden yapılan alışverişlerde iade işlemi yapmaz.',
       contactTitle: 'Mağazayla iletişime geçin',
       contactBody: 'SSS’nin çözemediği her şey için — sipariş sorgulama, cashback durumu, ödemeler, bu sitedeki hatalar — bize yazın. Tedarikçi alışverişlerinin iadesini sizin adınıza yapamayız, ancak siparişinizi ve doğru CryptoRefills kanalını bulmanıza her zaman yardımcı oluruz.',
-      noInbox: 'Artık talep (ticket) kutusu yok — tek kanal e-posta ve yanıtlar en fazla 2 iş günü sürer.',
       q1: 'Kodum çalışmıyor — ne yapmalıyım?',
       a1: 'Hediye kartları bu mağaza tarafından değil, tedarikçimiz **CryptoRefills tarafından doğrudan** oluşturulur ve e-postayla gönderilir. CryptoRefills desteğine **hediye kartının teslim edildiği adresten** yazın (önce spam/gereksiz klasörüne bakın). Sipariş kimliğinizi ve ürün adını ekleyin; teslimatı doğrulayıp çalışan bir kod verebilirler.',
       q2: 'Hediye kartı e-postası hiç gelmedi',
@@ -1654,6 +1654,8 @@ const tr = {
   },
   /* ---- staker ---- */
   staker: {
+    detectWatching: 'Havuz delegasyonunuzu bildirene kadar izleniyor — son kontrol {{time}}.',
+    detectExpired: 'Havuz henüz bildirmedi. Birkaç dakika sonra yeniden kontrol edin — delegasyonu gördüğü an cashback yükselir.',
     needsStake: 'Cashback için stake gerekir:',
     needsStakeText: 'havuzumuzda NIM stake edin, {{pct}} geri alın (+{{max}}%’e kadar).',
     rateLine: '{{kind}} — %{{pct}} cashback',

@@ -450,6 +450,7 @@ const en = {
     lpNimAmountBelow: 'the NIM amount below',
     lpPayExactlyPost: ' with Nimiq Pay over BTC Lightning — one supplier invoice, settled straight from your wallet. Delivery starts automatically once the invoice is paid.',
     lpCopyRequest: 'Copy BTC Lightning payment request',
+    lpVerifySlow: 'We could not re-verify with the server (connection or timeout). Your invoice is open — you can still pay, then check the order status.',
     lpVerifyShowQr: 'Verify & show BTC Lightning QR',
     lpScanOnce: 'Scan once with Nimiq Pay and approve the BTC Lightning payment in your wallet.',
     lpHideQr: 'Hide QR',
@@ -748,7 +749,6 @@ const en = {
       policyBody: 'gift codes are delivered, replaced and refunded by **CryptoRefills**, the merchant of record — write to them from **the email address the gift card was sent to**. This shop does not process refunds or purchases made through the supplier.',
       contactTitle: 'Contact the shop',
       contactBody: 'For anything the FAQ could not settle — order lookups, cashback status, payments, bugs on this site — write to us. We cannot refund supplier purchases for you, but we will always help you find your order and the right CryptoRefills channel.',
-      noInbox: 'There is no ticket inbox any more — email is the only channel, and answers take up to 2 business days.',
       q1: 'My code is not working — what do I do?',
       a1: 'Gift cards are generated and emailed **directly by CryptoRefills**, our supplier — not by this shop. Email CryptoRefills support **from the exact address the gift card was delivered to** (check your spam/junk folder first). Include your order id and the product name; they can verify delivery and re-issue a working code.',
       q2: 'I never received the gift card email',
@@ -1662,6 +1662,8 @@ const en = {
   },
   /* ---- staker ---- */
   staker: {
+    detectWatching: 'Watching the pool until it reports your delegation — last check {{time}}.',
+    detectExpired: 'The pool has not reported it yet. Check again in a few minutes — your cashback rises the moment it sees the delegation.',
     needsStake: 'Cashback needs a stake:',
     needsStakeText: 'stake NIM with our pool for {{pct}} back (up to +{{max}}%).',
     rateLine: '{{kind}} — {{pct}} cashback',

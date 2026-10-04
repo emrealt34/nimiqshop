@@ -55,7 +55,7 @@ import { CashbackFeeNotice } from '../checkout/CashbackFeeNotice';
  * The form also renders while the session is still undecided (`null`), so the
  * static HTML carries the real form instead of a skeleton.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AppRoot } from '../AppRoot';
 import { Icon } from '../ui/Icon';
 import { CashbackCalculator } from './CashbackCalculator';
@@ -70,6 +70,8 @@ import {
   clearStakerProgramCache,
   loadMyStake,
   refreshMyStake,
+  watchStakeDetection,
+  type StakeWatch,
   fmtStakeNIM,
   pctLabel,
   type StakerProgram,
@@ -242,6 +244,7 @@ export function CashbackView() {
 
   const [program, setProgram] = useState<StakerProgram | null>(null);
   const [mine, setMine] = useState<MyStake | null>(null);
+  const watchRef = useRef<StakeWatch | null>(null);
   const [ledger, setLedger] = useState<MyCashback | null>(null);
   const [amount, setAmount] = useState<string>('10000000');
   const [busy, setBusy] = useState<StakeOp['kind'] | ''>('');
@@ -267,7 +270,10 @@ export function CashbackView() {
     setProgram(p);
     setMine(m);
     if (m && m.stake_nim > 0 && (!activeNIM || Number(activeNIM) === 0)) setActiveNIM(String(m.stake_nim));
-  }, [authed, activeNIM]);
+    // setActiveNIM is a state setter (stable) — listed because the React
+    // Compiler's inferred dependency set includes it, and a mismatch there
+    // costs this page its automatic memoization.
+  }, [authed, activeNIM, setActiveNIM]);
 
   /**
    * Re-asks the backend for the live programme. The programme is PUBLIC —
@@ -389,7 +395,19 @@ export function CashbackView() {
       const fresh = await refreshMyStake();
       if (fresh) setMine(fresh);
       if (fresh?.staked) toast(t('cashback.toastStakerActive', { pct: pct(fresh.cashback_bps) }), 'success');
-      else toast(successNote || t('cashback.toastPoolPicksUp'), 'info');
+      else {
+        toast(successNote || t('cashback.toastPoolPicksUp'), 'info');
+        // The pool's index is the only authority on the delegation, and it
+        // lands on its own pass — so watch for it instead of leaving the page
+        // showing "not staked" until the buyer reloads by hand.
+        watchRef.current?.stop();
+        watchRef.current = watchStakeDetection({
+          onUpdate: (m) => {
+            if (m) setMine(m);
+          },
+          onDetected: (m) => toast(t('cashback.toastStakerActive', { pct: pct(m.cashback_bps) }), 'success'),
+        });
+      }
       return true;
     } catch (e) {
       if (e instanceof StakeCancelledError) setErr(e.message);

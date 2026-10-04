@@ -312,6 +312,95 @@ export async function refreshMyStake(): Promise<MyStake | null> {
   }
 }
 
+/**
+ * watchStakeDetection — "I staked. Is the shop seeing it yet?"
+ *
+ * The shop deliberately takes no "I've staked" claim from the buyer: the pool
+ * is the single source of truth (see the backend's PoolStakeMe). But the pool
+ * indexes a delegation on its own pass, so the honest UX after a stake
+ * transaction is not one refresh — it is a short, visible watch:
+ *
+ *   • poll POST /poolstake/refresh until the pool reports the delegation
+ *     (`staked`, optionally `boosted` for the rate itself),
+ *   • pause while the tab is hidden and re-check the moment the buyer comes
+ *     back from the wallet app (visibilitychange / focus) — that is exactly
+ *     when they expect to see it,
+ *   • give up after a bounded window and say so, instead of leaving the buyer
+ *     with a number that silently stays stale.
+ *
+ * One watcher per action; `stop()` is safe to call from an effect cleanup.
+ */
+export type StakeWatch = { stop: () => void };
+
+export function watchStakeDetection(opts: {
+  onUpdate?: (mine: MyStake | null) => void;
+  onDetected?: (mine: MyStake) => void;
+  onExpire?: () => void;
+  /** 'staked' — the pool sees the delegation; 'boosted' — the rate moved too. */
+  goal?: 'staked' | 'boosted';
+  intervalMs?: number;
+  maxMs?: number;
+}): StakeWatch {
+  const goal = opts.goal ?? 'staked';
+  const intervalMs = opts.intervalMs ?? 15_000;
+  const deadline = Date.now() + (opts.maxMs ?? 5 * 60_000);
+  let stopped = false;
+  let expiredTold = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  const reached = (m: MyStake | null): m is MyStake =>
+    !!m && (goal === 'boosted' ? !!m.boosted : !!m.staked);
+
+  const tick = async () => {
+    if (stopped) return;
+    // Hidden tabs are not polled: the buyer is in the wallet app. The
+    // visibilitychange handler below resumes with an immediate check.
+    if (typeof document !== 'undefined' && document.hidden) return;
+    const mine = await refreshMyStake();
+    if (stopped) return;
+    opts.onUpdate?.(mine);
+    if (reached(mine)) {
+      stopped = true;
+      opts.onDetected?.(mine);
+      return;
+    }
+    if (Date.now() >= deadline) {
+      if (!expiredTold) {
+        expiredTold = true;
+        opts.onExpire?.();
+      }
+      return;
+    }
+    timer = setTimeout(() => void tick(), intervalMs);
+  };
+
+  const wake = () => {
+    if (stopped || (typeof document !== 'undefined' && document.hidden)) return;
+    if (timer) clearTimeout(timer);
+    void tick();
+  };
+  try {
+    document.addEventListener('visibilitychange', wake);
+    window.addEventListener('focus', wake);
+  } catch {
+    /* no document (SSR) */
+  }
+  void tick();
+
+  return {
+    stop() {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+      try {
+        document.removeEventListener('visibilitychange', wake);
+        window.removeEventListener('focus', wake);
+      } catch {
+        /* ignore */
+      }
+    },
+  };
+}
+
 export function fmtStakeNIM(n: number): string {
   if (!(n > 0)) return '0';
   if (n >= 1000) return Math.round(n).toLocaleString('en-US');

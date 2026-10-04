@@ -105,7 +105,6 @@ export function SupportView() {
         </div>
       </div>
 
-      <p className="xs faint mt-2" style={{ textAlign: 'center' }}>{t('support.faq.noInbox')}</p>
     </div>
   );
 }

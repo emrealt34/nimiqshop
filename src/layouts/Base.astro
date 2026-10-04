@@ -253,19 +253,24 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
                   || readCookie() || readStorage() || devLang || 'en';
           document.documentElement.setAttribute('lang', lang);
           document.documentElement.setAttribute('data-lang', lang);
-          // HOLD — the page is server-rendered in English (a static build has
-          // no visitor to render for), so a Turkish visitor used to watch the
-          // whole page flip from English to Turkish the moment React hydrated
-          // and the dictionary chunk landed. That flip is what this attribute
-          // removes: for any non-English visitor the body stays unpainted (the
-          // stylesheet shows a language-neutral hexagon loader instead) until
-          // the i18n module has applied the real dictionary — it removes the
-          // attribute in the same commit as the translated strings. Safety
-          // nets: a hard timeout here (measured: the live site applies the
-          // dictionary ~0.5 s after paint on a fast link, and a throttled
-          // Fast-3G harness stays under this) and the loader is CSS-only, so
-          // an English visitor (or a JS-disabled one) is never held at all.
-          if (lang !== 'en') {
+          // HOLD — last resort, and only on a FIRST visit in this language.
+          // The page is server-rendered in English (a static build has no
+          // visitor to render for), so without this the visitor would watch the
+          // whole page flip from English to the real language the moment React
+          // hydrated and the dictionary chunk landed. While held, the body is
+          // simply unpainted (background colour, no artwork): the CSS-only
+          // loader that used to pulse here was removed at the owner's request
+          // once the dictionary cache made this path rare. Safety nets: a hard
+          // timeout below, and the hold is skipped entirely for English and for
+          // any language whose dictionary is already cached.
+          // A returning visitor already has the dictionary in localStorage
+          // (written by src/i18n after the first load), so there is nothing to
+          // hide: no hold, no loader, the first paint is translated. The key
+          // and its meaning are documented in src/i18n/index.tsx.
+          function dictCached(code) {
+            try { return !!localStorage.getItem('nimshop.dict.' + code); } catch (e) { return false; }
+          }
+          if (lang !== 'en' && !dictCached(lang)) {
             var root = document.documentElement;
             root.setAttribute('data-i18n-hold', '');
             setTimeout(function () { root.removeAttribute('data-i18n-hold'); }, 5000);
