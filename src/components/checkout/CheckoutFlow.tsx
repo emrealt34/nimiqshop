@@ -803,6 +803,21 @@ export function PayScreen({
   // "creating your new invoice…" line froze forever (live bug, 2026-10-04).
   // Keying it by quote + attempt remounts it for every new attempt.
   const [renewTick, setRenewTick] = useState(0);
+  // Owner (2026-10-04): the pay hero shows the cashback this order will earn,
+  // right under "what you get" — one short line, hidden when there is none.
+  const [cbNimLabel, setCbNimLabel] = useState('');
+  useEffect(() => {
+    let alive = true;
+    const compute = () => {
+      const n = cashbackNimFromQuote({ ...quote, ...liveQuote });
+      if (alive) setCbNimLabel(n > 0 ? fmtCashbackNIM(n) : '');
+    };
+    compute();
+    void loadCashbackBps().then(compute).catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [quote, liveQuote]);
 
   // TEST MODE: there is NO separate simulated pay screen. The customer sees
   // this exact real pay screen — real invoice, real QR, real countdown — and
@@ -941,22 +956,6 @@ export function PayScreen({
 
   const dest = deliveryLine(current);
   const cbExclusive = cashbackExclusiveNote({ source: quote?.cashback_source, code: quote?.cashback_code });
-  // Owner (2026-10-04): the pay hero shows the cashback this order will earn,
-  // right under "what you get" — one short line, hidden when there is none.
-  const [cbNimLabel, setCbNimLabel] = useState('');
-  useEffect(() => {
-    let alive = true;
-    const compute = () => {
-      const n = cashbackNimFromQuote(current);
-      if (alive) setCbNimLabel(n > 0 ? fmtCashbackNIM(n) : '');
-    };
-    compute();
-    void loadCashbackBps().then(compute).catch(() => {});
-    return () => {
-      alive = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current]);
   const youGet = youGetLabel || youGetText(quote);
   const nimBase = nimAmountText(current);
   // The Nimiq Pay network fee is added on top of the converted amount, so the
