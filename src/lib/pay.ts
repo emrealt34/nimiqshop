@@ -265,13 +265,29 @@ export function launchLightningUri(uri: string, onMiss: () => void): void {
   };
   document.addEventListener('visibilitychange', mark);
   window.addEventListener('pagehide', mark, { once: true });
+  // Owner (2026-10-05): the attempt goes through a HIDDEN IFRAME, never
+  // window.location.href — a phone with no wallet app used to navigate the
+  // tab into a protocol error and kill this page (and the toast) with it.
+  // The iframe hands the URI to the OS the same way; when nothing handles
+  // it, the page lives and the miss callback always fires.
+  let frame: HTMLIFrameElement | null = null;
   try {
-    window.location.href = uri;
+    frame = document.createElement('iframe');
+    frame.style.display = 'none';
+    frame.setAttribute('aria-hidden', 'true');
+    frame.setAttribute('tabindex', '-1');
+    document.body.appendChild(frame);
+    frame.src = uri;
   } catch {
     /* ignore */
   }
   const settle = () => {
     document.removeEventListener('visibilitychange', mark);
+    try {
+      if (frame) frame.remove();
+    } catch {
+      /* ignore */
+    }
     if (!left && !inNimiqPay()) onMiss();
   };
   window.setTimeout(settle, 1500);

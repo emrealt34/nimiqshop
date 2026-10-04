@@ -109,7 +109,18 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddre
   // only ever be paid once, so re-opening the same invoice is always safe and
   // never a duplicate charge — no "already opened" barrier of any kind.
   const handoff = async (action: 'pay' | 'copy') => {
-    if (flight.current || !allowed || (action === 'pay' && payLocked)) return;
+    if (flight.current) return;
+    // Owner (2026-10-05): a click must NEVER be silent. Pending/unverifiable
+    // status and an already-submitted payment answer with a toast instead of
+    // a dead disabled button.
+    if (action === 'pay' && payLocked) {
+      toast(t('orderPage.nimiqPay.submitted'), 'info');
+      return;
+    }
+    if (action === 'pay' && !allowed) {
+      toast(t(msgKey === 'checkout.lpCannotVerify' ? 'checkout.lpCannotVerify' : 'checkout.lpPending'), 'warn');
+      return;
+    }
     flight.current = true; setBusy(true);
     try {
       // The server re-verifies the supplier state before a wallet handoff
@@ -208,17 +219,16 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddre
       toast(friendlyApiMessage(err, t('checkout.lpWalletNotOpened')), 'warn');
     } finally { flight.current = false; setBusy(false); }
   };
-  const disabled = busy || !allowed;
   return (
     <div aria-busy={busy}>
       <div className="xs faint mt-1" role="status">{t(msgKey, { site: siteName() })}</div>
 
       {!hidePayButton && (
-        <button type="button" className="btn btn-gold btn-block btn-lg mt-2" disabled={disabled || payLocked} onClick={() => handoff('pay')}>
+        <button type="button" className="btn btn-gold btn-block btn-lg mt-2" disabled={busy} onClick={() => handoff('pay')}>
           <span className="btn-label">{busy ? t('checkout.verifying') : payLocked ? t('orderPage.nimiqPay.submitted') : insidePay ? t('orderPage.nimiqPay.idle') : t('checkout.flowPayWithNim')}</span>
         </button>
       )}
-      <button className="btn btn-outline btn-block mt-1" disabled={disabled} onClick={() => handoff('copy')}><Icon name="copy" size={16} /> {t('checkout.lpCopyRequest')}</button>
+      <button className="btn btn-outline btn-block mt-1" disabled={busy} onClick={() => handoff('copy')}><Icon name="copy" size={16} /> {t('checkout.lpCopyRequest')}</button>
       {/* The QR is part of the card, not a reveal: owner removed the
           "Verify & show QR" button and the hide control — a Lightning invoice
           is public data, and one less step between the buyer and the pay. */}
