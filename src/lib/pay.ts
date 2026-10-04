@@ -10,6 +10,62 @@ function stripLightningPrefix(s: string): string {
   return s.toLowerCase().startsWith('lightning:') ? s.slice('lightning:'.length) : s;
 }
 
+/* ---- BOLT11 integrity: one gate, no silent garbage -----------------------
+   A bolt11 string IS a bech32 string, so a truncated or corrupted invoice
+   fails its checksum; and the human-readable part carries the amount
+   (lnbc<digits>[munp]) — an amount-less invoice must never reach a buyer's
+   clipboard or wallet. Both checks live here so EVERY consumer (the copy
+   button, the pay hand-off, the lightning: URI, the order page) shares one
+   definition of "this invoice is sane". */
+const BECH32_CHARSET = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
+
+function bech32Polymod(vals: number[]): number {
+  const GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
+  let chk = 1;
+  for (const v of vals) {
+    const b = chk >> 25;
+    chk = ((chk & 0x1ffffff) << 5) ^ v;
+    for (let i = 0; i < 5; i += 1) if ((b >> i) & 1) chk ^= GEN[i];
+  }
+  return chk;
+}
+
+/** True when the string's bech32 checksum verifies (BOLT11 uses constant 1). */
+export function bolt11ChecksumOk(inv: string): boolean {
+  const s = String(inv || '').toLowerCase();
+  const sep = s.lastIndexOf('1');
+  if (sep < 1 || s.length - sep - 1 < 6) return false;
+  const hrp = s.slice(0, sep);
+  const data = s.slice(sep + 1);
+  const vals: number[] = [];
+  for (const c of hrp) {
+    const o = c.charCodeAt(0);
+    if (o < 33 || o > 126) return false;
+    vals.push(o >> 5);
+  }
+  vals.push(0);
+  for (const c of hrp) vals.push(c.charCodeAt(0) & 31);
+  for (const c of data) {
+    const i = BECH32_CHARSET.indexOf(c);
+    if (i < 0) return false;
+    vals.push(i);
+  }
+  return bech32Polymod(vals) === 1;
+}
+
+/** True when the hrp carries an amount: lnbc<digits>[munp] (2500u, 25m, …). */
+export function bolt11HasAmount(inv: string): boolean {
+  const s = String(inv || '').toLowerCase();
+  const hrp = s.slice(0, s.lastIndexOf('1'));
+  return /^ln(?:bc|tb|bcrt)[0-9]+[munp]?$/.test(hrp);
+}
+
+/** The one sanity gate: shape + amount + checksum. */
+export function saneBolt11(inv: string): boolean {
+  const s = String(inv || '').trim();
+  return BOLT.test(s) && bolt11HasAmount(s) && bolt11ChecksumOk(s);
+}
+
 /** First valid BOLT11 on a quote/order, regardless of which field the API used. */
 export function quoteBolt11(q: unknown): string {
   if (!q || typeof q !== 'object') return '';
@@ -23,7 +79,7 @@ export function quoteBolt11(q: unknown): string {
   ];
   for (const c of cands) {
     const raw = stripLightningPrefix(String(c || '').trim());
-    if (BOLT.test(raw)) return raw;
+    if (saneBolt11(raw)) return raw;
   }
   return '';
 }

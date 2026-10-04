@@ -9,6 +9,7 @@ import { getNimiqProvider, initNimiqMiniApp, openInNimiqPay } from './miniapp';
 import { authChallenge, hubLogin as apiHubLogin } from './api';
 import { saveSession } from './session';
 import { ensureLib } from './vendorLoad';
+import { saneBolt11 } from './pay';
 import { t as tr } from '../i18n';
 
 let hub: any = null;
@@ -213,7 +214,9 @@ async function finishLogin(challengeToken: string, signed: any): Promise<{ addre
 /* ---------------- Nimiq Pay: direct BTC Lightning ---------------- */
 export function lightningPaymentURI(invoice: string): string {
   const raw = String(invoice || '').trim();
-  if (!/^ln(?:bc|tb|bcrt)[a-z0-9]+$/i.test(raw)) {
+  // Same gate as the copy button and the pay hand-off (lib/pay): shape +
+  // amount + bech32 checksum, so a mangled invoice can never be launched.
+  if (!saneBolt11(raw)) {
     throw new Error(tr('hub.payRequest'));
   }
   return 'lightning:' + raw;

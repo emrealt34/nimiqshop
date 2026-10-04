@@ -972,7 +972,7 @@ const tr = {
   /* ---- home ---- */
   home: {
     heroTitle1: 'NIM\'ini hediye kartı, kontör ve eSIM\'e harca.',
-    heroTitle2: 'NIM · BTC Lightning ile öde. Coin\'lerin asla bizde durmaz.',
+    heroTitle2: 'NIM ile öde. NIM ile cashback kazan.',
     heroLede: 'Cüzdanın hesabın. Nimiq Pay, NIM\'i BTC Lightning üzerinden doğrudan CryptoRefills\'e gönderir — kodlar ve kontör saniyeler içinde ulaşır.',
     browseShelf: 'Rafa göz at',
     earnCashback: 'Cashback kazan',

@@ -971,7 +971,7 @@ const fr = {
   /* ---- home ---- */
   home: {
     heroTitle1: 'Dépensez des NIM en cartes cadeaux, recharges et eSIM.',
-    heroTitle2: 'Payez avec NIM · BTC Lightning. Nous ne détenons jamais vos coins.',
+    heroTitle2: 'Payez avec NIM. Gagnez du cashback en NIM.',
     heroLede: 'Votre portefeuille Nimiq est le compte. Nimiq Pay envoie les NIM via BTC Lightning directement à CryptoRefills — codes et crédit arrivent en quelques secondes.',
     browseShelf: 'Parcourir le catalogue',
     earnCashback: 'Gagner du cashback',

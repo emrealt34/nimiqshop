@@ -980,7 +980,7 @@ const en = {
   /* ---- home ---- */
   home: {
     heroTitle1: 'Spend NIM on gift cards, top-ups & eSIMs.',
-    heroTitle2: 'Pay with NIM · BTC Lightning. We never hold your coins.',
+    heroTitle2: 'Pay with NIM. Earn cashback with NIM.',
     heroLede: 'Your Nimiq wallet is the account. Nimiq Pay sends NIM over BTC Lightning to CryptoRefills directly — codes and credit land in seconds.',
     browseShelf: 'Browse the shelf',
     earnCashback: 'Earn cashback',
