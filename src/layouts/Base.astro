@@ -284,6 +284,47 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
             root.setAttribute('data-i18n-hold', '');
             setTimeout(function () { root.removeAttribute('data-i18n-hold'); }, 5000);
           }
+          // Pre-paint shell translation: the cached dictionary (written by
+          // src/i18n after every successful load) is enough to localise the
+          // static shell — skip link, footer credit, tab title, meta — BEFORE
+          // the first frame, so even the frame the hold releases is already
+          // the visitor's language everywhere React does not own the DOM.
+          try {
+            var cachedRaw = lang === 'en' ? null : localStorage.getItem('nimshop.dict.' + lang);
+            if (cachedRaw) {
+              var CD = JSON.parse(cachedRaw);
+              var resolveKey = function (key) {
+                var n = CD;
+                var parts = String(key).split('.');
+                for (var pi = 0; pi < parts.length; pi++) n = n == null ? undefined : n[parts[pi]];
+                return typeof n === 'string' ? n : null;
+              };
+              var interp = function (str) { return str.split('{{site}}').join(location.host); };
+              document.querySelectorAll('[data-i18n]').forEach(function (el) {
+                var v = resolveKey(el.getAttribute('data-i18n'));
+                if (v) el.textContent = interp(v);
+              });
+              document.querySelectorAll('[data-i18n-attr]').forEach(function (el) {
+                var spec = String(el.getAttribute('data-i18n-attr')).split(/\s+/);
+                for (var si = 0; si < spec.length; si++) {
+                  var at = spec[si].indexOf(':');
+                  if (at < 1) continue;
+                  var av = resolveKey(spec[si].slice(at + 1));
+                  if (av) el.setAttribute(spec[si].slice(0, at), interp(av));
+                }
+              });
+              var titleKeyBoot = root.getAttribute('data-title-key');
+              if (titleKeyBoot) { var tv = resolveKey(titleKeyBoot); if (tv) document.title = interp(tv); }
+            }
+          } catch (eT) {}
+          // Pages with no React island (404) have no provider to release the
+          // hold: once the body exists and nothing will hydrate, the shell
+          // patch above IS the translation — let the page paint.
+          document.addEventListener('DOMContentLoaded', function () {
+            if (!document.querySelector('astro-island')) {
+              document.documentElement.removeAttribute('data-i18n-hold');
+            }
+          });
           // Warm the dictionary chunk for this language while the HTML is
           // still parsing. Non-English dictionaries are lazy chunks that
           // React only imports after hydration; without this the visitor's

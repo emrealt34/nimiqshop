@@ -628,7 +628,14 @@ export function I18nProvider({ children, initial }: { children: ReactNode; initi
   useEffect(() => {
     if (typeof document === 'undefined') return;
     if (lang === adoptedLang && dictLoaded(lang)) {
-      document.documentElement.removeAttribute('data-i18n-hold');
+      // Two frames: the commit that carries the translated strings must be
+      // ON SCREEN before the curtain lifts, or the visitor catches one frame
+      // of the English server HTML — the exact flip this hold exists to hide.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          document.documentElement.removeAttribute('data-i18n-hold');
+        });
+      });
     }
   }, [lang, adoptedLang, dictTick]);
 
