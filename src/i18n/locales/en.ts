@@ -9,6 +9,10 @@
  * in the other five locales.
  */
 const en = {
+  /* ---- app ---- */
+  app: {
+    updateReady: 'New version — tap to refresh',
+  },
   meta: {
     defaultTitle: 'nim.shop — Gift cards, eSIMs & mobile top-ups',
     defaultDescription: 'Buy gift cards, eSIMs and mobile top-ups. Pay with Nimiq (NIM) or USD₮ on Polygon. Non-custodial, global, delivered in seconds.',

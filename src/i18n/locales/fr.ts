@@ -3,6 +3,10 @@
  * Pluriel : un (n===1) / autre.
  */
 const fr = {
+  /* ---- app ---- */
+  app: {
+    updateReady: 'Nouvelle version — touchez pour actualiser',
+  },
   meta: {
     defaultTitle: 'nim.shop — Cartes cadeaux, eSIM et recharges mobiles',
     defaultDescription: 'Achetez des cartes cadeaux, eSIM et recharges mobiles. Payez avec Nimiq (NIM) ou USD₮ sur Polygon. Sans garde, mondial, livré en quelques secondes.',

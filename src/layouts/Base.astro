@@ -8,6 +8,7 @@ import '../styles/app.css';
 import '../styles/fixes.css';
 import '../styles/accessibility.css';
 import type { ShellKey } from '../components/shell/SiteShell';
+import BuildGuard from '../components/ui/BuildGuard.tsx';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { flattenBrands } from '../lib/catalog';
@@ -28,6 +29,9 @@ interface Props {
 }
 const { title, description, activeKey, titleKey, shelfSeed = false } = Astro.props;
 const siteName = 'shop.nimiqbase.com';
+// Build fingerprint for BuildGuard: Cloudflare Pages exports the commit sha
+// at build time; local builds get a constant (never deployed).
+const buildId = process.env.CF_PAGES_COMMIT_SHA || 'local';
 
 // --- Locale ----------------------------------------------------------------
 // This build is STATIC (output: 'static') — there is NO per-request server
@@ -461,6 +465,7 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
         set:html={`window.__SHELF_SEED=${JSON.stringify(seedPayload).replace(/</g, '\\u003c')};`}
       />
     )}
+    <meta name="build-id" content={buildId} />
   </head>
   <body>
     <a class="skip-link" href="#page-content" data-i18n="stat.skipToContent">Skip to content</a>
@@ -473,6 +478,8 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
     <main id="main" class="page">
       <slot />
     </main>
+
+    <BuildGuard client:load />
 
     <footer class="footer">
       <div class="container">

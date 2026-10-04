@@ -3,6 +3,10 @@
  * Plural en español: uno (n===1) / otros.
  */
 const es = {
+  /* ---- app ---- */
+  app: {
+    updateReady: 'Nueva versión: toca para actualizar',
+  },
   meta: {
     defaultTitle: 'nim.shop — Tarjetas regalo, eSIM y recargas móviles',
     defaultDescription: 'Compra tarjetas regalo, eSIM y recargas móviles. Paga con Nimiq (NIM) o USD₮ en Polygon. Sin custodia, global, entregado en segundos.',

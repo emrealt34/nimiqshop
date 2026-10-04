@@ -3302,3 +3302,23 @@ input[type="range"]:focus-visible { outline: 2px solid var(--stamp); outline-off
   flex: 0 1 auto;
   min-width: 0;
 }
+
+/* BuildGuard: one-tap refresh pill when a newer deploy has shipped. */
+.build-guard {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  z-index: 1200;
+  border: 0;
+  border-radius: 999px;
+  padding: 11px 18px;
+  background: var(--stamp, #b4471c);
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .2px;
+  box-shadow: 0 6px 18px rgba(40, 24, 10, .28);
+  cursor: pointer;
+}

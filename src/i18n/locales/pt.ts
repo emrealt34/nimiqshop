@@ -3,6 +3,10 @@
  * Plural: um (n===1) / outro.
  */
 const pt = {
+  /* ---- app ---- */
+  app: {
+    updateReady: 'Nova versão — toque para atualizar',
+  },
   meta: {
     defaultTitle: 'nim.shop — Cartões-presente, eSIM e recargas móveis',
     defaultDescription: 'Compre cartões-presente, eSIM e recargas móveis. Pague com Nimiq (NIM) ou USD₮ na Polygon. Sem custódia, global, entregue em segundos.',

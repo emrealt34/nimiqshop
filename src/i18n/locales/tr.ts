@@ -3,6 +3,10 @@
  * Türkçe'de çoğul: sayı 1 ise tekil, diğer hallerde çoğul.
  */
 const tr = {
+  /* ---- app ---- */
+  app: {
+    updateReady: 'Yeni sürüm — yenilemek için dokun',
+  },
   meta: {
     defaultTitle: 'nim.shop — Hediye kartları, eSIM ve mobil kontör',
     defaultDescription: 'Hediye kartı, eSIM ve mobil kontör satın al. Nimiq (NIM) veya Polygon üzerinde USD₮ ile öde. Saklama gerektirmez, global, saniyeler içinde teslim.',
