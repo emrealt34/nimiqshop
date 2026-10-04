@@ -562,49 +562,6 @@ export function ProductPage() {
     [nimUsd, btcUsd]
   );
 
-  // ---- range band: the supplier prices arbitrary amounts, so the header's
-  // min/max can be REAL prices too. Before this the band was a face-value
-  // conversion (FX table), which ran ~10% under what the supplier charges for
-  // the same amounts — the single selected value was already supplier-priced,
-  // so the card contradicted itself. Now both ends are quoted by the supplier;
-  // the nominal conversion survives only as a labelled fallback while the
-  // quotes are in flight or when the supplier refuses to price an end
-  // (out-of-range SKUs stay usable because the selected value is re-priced
-  // anyway).
-  const [rangeBand, setRangeBand] = useState<{ min?: string; max?: string } | null>(null);
-  useEffect(() => {
-    let alive = true;
-    setRangeBand(null);
-    if (!product?.range || product.packages?.length) return;
-    const selectedPkg = product.packages?.find((x: any) => x.package_id === pkg) as any;
-    const brandForPrice = selectedPkg?.brand || product._family?.brand || product.family || product.id;
-    const ends: Array<['min' | 'max', number]> = [
-      ['min', product.range.min],
-      ['max', product.range.max],
-    ];
-    (async () => {
-      const out: { min?: string; max?: string } = {};
-      for (const [key, faceValue] of ends) {
-        try {
-          const price = await getProductPrice(brandForPrice, product.country, faceValue);
-          if (!alive) return;
-          if (price.coin === 'BTC' && Number(price.coin_amount) > 0) {
-            const label = nimPriceFromBTC(Number(price.coin_amount));
-            if (label) out[key] = label;
-          }
-        } catch {
-          /* leave this end as the labelled estimate */
-        }
-      }
-      if (alive && (out.min || out.max)) setRangeBand(out);
-    })();
-    return () => {
-      alive = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [product?.id, product?.country, product?.range?.min, product?.range?.max, pkg, nimPriceFromBTC]);
-
-
   const currentProductNIM = useCallback(() => {
     const q = qty || 1;
     const k = product && product.packages ? product.packages.find((x) => x.package_id === pkg) : null;
@@ -871,11 +828,7 @@ export function ProductPage() {
               product={product}
               value={value}
               setValue={setValue}
-              nimPriceFromUSD={nimPriceFromUSD}
-              localToUSD={localToUSD}
               liveNim={supplierPrice && Number(supplierPrice.coin_amount) > 0 ? nimPriceFromBTC(supplierPrice.coin_amount) : null}
-              liveMin={rangeBand?.min}
-              liveMax={rangeBand?.max}
             />
           ) : (
             <div className="alert info" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -999,22 +952,13 @@ function RangeChooser({
   product,
   value,
   setValue,
-  nimPriceFromUSD,
-  localToUSD,
   liveNim,
-  liveMin,
-  liveMax,
 }: {
   product: ProductDetail;
   value: number;
   setValue: (v: number) => void;
-  nimPriceFromUSD: (u: number) => string;
-  localToUSD: (a: number, c?: string | null) => number;
   /** Authoritative per-item NIM from the supplier's live price for `value`. */
   liveNim?: string | null;
-  /** Supplier-quoted NIM for the range's own min/max (absent = estimate). */
-  liveMin?: string;
-  liveMax?: string;
 }) {
   const { t } = useT();
   const range = product.range!;
@@ -1030,20 +974,12 @@ function RangeChooser({
   // the range MIN). Only the raw keystrokes are shown while the field has
   // focus — otherwise the box kept showing the initial 0 after load.
   const [editing, setEditing] = useState(false);
-  // Both ends of the header are supplier quotes when we have them (fetched by
-  // the parent for range.min and range.max). Only when a quote is unavailable
-  // does the face-value conversion stand in — and it is marked with ≈ so a
-  // guess is never presented as a price. Measured: the conversion ran ~10%
-  // under the supplier for these SKUs (TR Rewarble VISA 30 USD: 102,183 vs
-  // 113,625 NIM), which is what made the card disagree with the till.
-  const estMin = nimPriceFromUSD(localToUSD(range.min, rangeCur));
-  const estMax = nimPriceFromUSD(localToUSD(range.max, rangeCur));
-  const bandIsLive = Boolean(liveMin && liveMax);
-  const nimMin = liveMin || (estMin ? `≈ ${estMin}` : estMin);
-  const nimMax = liveMax || (estMax ? `≈ ${estMax}` : estMax);
-  // The only number that matters is the supplier-confirmed price. Never show a
-  // hand-rolled FX estimate as if it were real: until the live price arrives we
-  // show a loading label instead. The min/max header is a hint (live or ≈).
+  // The only number that matters is the supplier-confirmed price for the
+  // selected amount. Never show a hand-rolled FX estimate as if it were real:
+  // until the live price arrives we show a loading label instead. The old
+  // min/max NIM band in this header is gone on purpose (owner request): the
+  // chosen amount's own live NIM price by the buy button is the one number
+  // the buyer needs, a seven-figure band only read as noise.
   const nimText = liveNim ? liveNim : t('productPage.nimPriceLoading');
 
   return (
@@ -1053,13 +989,6 @@ function RangeChooser({
           <div className="xs faint">{t('productPage.amountRange')}</div>
           <div className="strong">
             {fmtMoney(range.min, rangeCur)} - {fmtMoney(range.max, rangeCur)}
-          </div>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <div className="xs faint">{bandIsLive ? t('productPage.nimPriceQuoted') : t('productPage.nimEstimate')}</div>
-          <div className="strong nim-price" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
-            <img src={asset("/img/nimiq-hexagon.png?v=40")} alt="NIM" width={14} height={14} style={{ borderRadius: 2, verticalAlign: 'middle' }} />
-            <span>{nimMin} - {nimMax}</span>
           </div>
         </div>
       </div>

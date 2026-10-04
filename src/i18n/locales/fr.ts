@@ -1245,8 +1245,6 @@ const fr = {
     nimAtCheckout: 'NIM au paiement',
     packageFallback: 'Forfait',
     amountRange: 'Plage de montant',
-    nimEstimate: 'Estimation NIM',
-    nimPriceQuoted: 'Prix en NIM',
     nimPriceLoading: 'Chargement du prix en NIM…',
     typeAmount: 'Ou saisissez le montant ({{ccy}})',
     customAmountAria: 'Montant personnalisé en {{ccy}}',

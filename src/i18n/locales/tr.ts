@@ -1246,8 +1246,6 @@ const tr = {
     nimAtCheckout: 'Ödemede NIM',
     packageFallback: 'Paket',
     amountRange: 'Tutar aralığı',
-    nimEstimate: 'NIM tahmini',
-    nimPriceQuoted: 'NIM fiyatı',
     nimPriceLoading: 'NIM fiyatı yükleniyor…',
     typeAmount: 'Veya tutarı yaz ({{ccy}})',
     customAmountAria: '{{ccy}} cinsinden özel tutar',
