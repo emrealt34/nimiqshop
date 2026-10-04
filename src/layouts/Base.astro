@@ -48,7 +48,9 @@ function shellT(key: string, vars: Record<string, string> = {}): string {
   const walk = (d: any) => key.split('.').reduce((n: any, k: string) => (n == null ? undefined : n[k]), d);
   const node = walk(SHELL_DICTS[routeLang]) ?? walk(enShell);
   let str = typeof node === 'string' ? node : key;
-  for (const [k, v] of Object.entries(vars)) str = str.split('{{' + k + '}}').join(v);
+  // {{site}} is always available, exactly like the client translator.
+  const all = { site: siteName, ...vars };
+  for (const [k, v] of Object.entries(all)) str = str.split('{{' + k + '}}').join(v);
   return str;
 }
 // Build fingerprint for BuildGuard. The deploy builds on the GitHub runner
