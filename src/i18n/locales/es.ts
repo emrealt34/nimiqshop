@@ -694,6 +694,8 @@ const es = {
     noWalletChip: 'Aún sin cartera',
     connectHistory: 'Conecta tu cartera para ver tu historial de cashback: la calculadora y el programa de arriba son públicos para todos.',
     fineTitle: 'La letra pequeña',
+    tabProgram: 'Programa',
+    tabCommunity: 'Cashback & clasificación',
     fine1: 'Tu tasa se fija cuando un pedido se **entrega**, según el stake que tengas en nuestro pool en ese momento. Cualquier stake positivo gana la base de {{base}}; sin stake ganas {{zero}}.',
     fine2: 'El boost se financia con las comisiones del pool que generó tu stake: cuenta pedidos hasta {{dayCap}} al día y {{monthCap}} al mes, nunca más de lo que recaudó el pool.',
     fine3: 'Al final del mes, el {{carry}}% del saldo de boost sin usar pasa al siguiente mes; el resto vuelve a la reserva.',

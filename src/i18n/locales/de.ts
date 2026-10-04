@@ -694,6 +694,8 @@ const de = {
     noWalletChip: 'Noch keine Wallet',
     connectHistory: 'Verbinde deine Wallet, um deine Cashback-Historie zu sehen — Rechner und Programm oben sind für alle öffentlich.',
     fineTitle: 'Das Kleingedruckte',
+    tabProgram: 'Programm',
+    tabCommunity: 'Cashback & Bestenliste',
     fine1: 'Deine Rate wird bei **Lieferung** einer Bestellung festgelegt, nach dem Stake, den du in diesem Moment in unserem Pool hältst. Jeder positive Stake bringt die {{base}}-Basis; kein Stake bringt {{zero}}.',
     fine2: 'Der Boost wird aus den Pool-Gebühren finanziert, die dein Stake erwirtschaftet — er zählt Bestellungen bis {{dayCap}} pro Tag und {{monthCap}} pro Monat, nie mehr, als der Pool eingenommen hat.',
     fine3: 'Zum Monatsende werden {{carry}}% des ungenutzten Boost-Guthabens in den nächsten Monat übertragen; der Rest geht in die Reserve.',

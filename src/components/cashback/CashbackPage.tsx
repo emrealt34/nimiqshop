@@ -250,6 +250,9 @@ export function CashbackView() {
   const [busy, setBusy] = useState<StakeOp['kind'] | ''>('');
   const [err, setErr] = useState('');
   const [manageOpen, setManageOpen] = useState(false);
+  // The cashback card & leaderboard used to drown at the bottom of this long
+  // programme page (owner, 2026-10-04) — they now live in their own tab.
+  const [tab, setTab] = useState<'program' | 'community'>('program');
   // Revealed after a rejected first delegation (the wallet already stakes
   // with another validator) and kept for the session: the fix is the "move"
   // flow, not retrying the same button.
@@ -514,6 +517,16 @@ export function CashbackView() {
   return (
     <div className="container">
       <Header />
+      <div className="cb-tabs" role="tablist">
+        <button type="button" role="tab" aria-selected={tab === 'program'} className={tab === 'program' ? 'cb-tab active' : 'cb-tab'} onClick={() => setTab('program')}>
+          <Icon name="gift" size={14} /> {t('cashback.tabProgram')}
+        </button>
+        <button type="button" role="tab" aria-selected={tab === 'community'} className={tab === 'community' ? 'cb-tab active' : 'cb-tab'} onClick={() => setTab('community')}>
+          <Icon name="trophy" size={14} /> {t('cashback.tabCommunity')}
+        </button>
+      </div>
+      {tab === 'program' && (
+        <>
       <CashbackFeeNotice example="nim" />
 
       {/* ------------------------------------------------------ your rate */}
@@ -819,7 +832,11 @@ export function CashbackView() {
         </>
       </div>
 
-      {/* --------------------------------------------------- cashback rows — always visible (user: giriş farketmemeli) */}
+        </>
+      )}
+      {tab === 'community' && (
+        <>
+      {/* ------------------------------------ cashback rows — visible logged in or not (user: giriş farketmemeli) */}
       {(authed ? (
         <RecentCashbackList rows={ledger ? rows : null} loading={!ledger} pageSize={PAYOUTS_PER_PAGE} />
       ) : (
@@ -838,6 +855,10 @@ export function CashbackView() {
 
       {/* ------------------------------------------------------ burn stats, cashback card & leaderboard */}
       <CashbackImpactSection authed={authed === true} myTotals={ledger?.totals || null} />
+        </>
+      )}
+      {tab === 'program' && (
+        <>
 
       {/* ------------------------------------------------------ fine print */}
       <details className="cb-details cb-fineprint mt-2">
@@ -857,6 +878,8 @@ export function CashbackView() {
           <li>{t('cashback.fine5')}</li>
         </ul>
       </details>
+        </>
+      )}
     </div>
   );
 

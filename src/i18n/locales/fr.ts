@@ -694,6 +694,8 @@ const fr = {
     noWalletChip: 'Pas encore de portefeuille',
     connectHistory: 'Connectez votre portefeuille pour voir votre historique de cashback — le calculateur et le programme ci-dessus sont publics.',
     fineTitle: 'Les petits caractères',
+    tabProgram: 'Programme',
+    tabCommunity: 'Cashback & classement',
     fine1: 'Votre taux est fixé à la **livraison** d’une commande, selon le staking que vous détenez dans notre pool à ce moment-là. Tout staking positif rapporte la base de {{base}} ; sans staking vous gagnez {{zero}}.',
     fine2: 'Le boost est financé par les frais de pool générés par votre staking — il compte les commandes jusqu’à {{dayCap}} par jour et {{monthCap}} par mois, jamais plus que ce que le pool a perçu.',
     fine3: 'En fin de mois, {{carry}}% du solde boost inutilisé est reporté au mois suivant ; le reste retourne à la réserve.',

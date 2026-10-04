@@ -695,6 +695,8 @@ const tr = {
     noWalletChip: 'Henüz cüzdan yok',
     connectHistory: 'Cashback geçmişinizi görmek için cüzdanınızı bağlayın — yukarıdaki hesaplayıcı ve program herkese açıktır.',
     fineTitle: 'İnce ayrıntılar',
+    tabProgram: 'Program',
+    tabCommunity: 'Cashback & liderler',
     fine1: 'Oranınız bir sipariş **teslim edildiğinde**, o anda havuzumuzda tuttuğunuz stake’e göre sabitlenir. Her pozitif stake {{base}} temelini kazandırır; stake yoksa {{zero}} kazanırsınız.',
     fine2: 'Boost, stake’inizin kazandığı havuz ücretleriyle finanse edilir — günde {{dayCap}}, ayda {{monthCap}} tutarına kadar sipariş sayar, havuzun topladığından fazlasını asla.',
     fine3: 'Ay sonunda kullanılmayan boost bakiyesinin %{{carry}}’i sonraki aya devreder; gerisi rezerve döner.',
