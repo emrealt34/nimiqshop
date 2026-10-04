@@ -897,7 +897,6 @@ export function PayScreen({
     //     it truthfully, in words, with no raw supplier enum.
     const seen = paymentInFlight(current);
     const renewSafe = !seen && canRenewQuote(current, Date.now());
-    const verifying = !seen && !renewSafe && paymentWindowVerifying(current, Date.now());
     // Owner (2026-10-04): the "window is over" lecture misfired on fresh
     // invoices and read like a block — the whole headed/status/body screen is
     // gone. What remains is actions: one tap for a fresh invoice, or open the
