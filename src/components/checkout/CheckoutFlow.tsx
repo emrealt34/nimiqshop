@@ -16,7 +16,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../ui/Icon';
 import { useCart, itemKey, type CartItem } from '../../lib/cartStore';
 import { useToast } from '../AppProviders';
-import { createQuote, createQuoteBatch, forgetQuote, getQuote, getSiteConfig, friendlyApiMessage } from '../../lib/api';
+import { createQuote, createQuoteBatch, forgetQuote, getQuote, friendlyApiMessage } from '../../lib/api';
 import { canRenewQuote, paymentInFlight, paymentWindowVerifying } from '../../lib/pay';
 import { supplierStatusLabel } from '../../lib/supplierStatus';
 import { buildOrderRequest, getGiftExtras, type DeliveryInfo } from '../../lib/delivery';
@@ -236,12 +236,7 @@ export function CheckoutFlow({
   const [phase, setPhase] = useState<Phase>({ kind: 'delivery' });
   const [, setDelivery] = useState<DeliveryInfo | null>(null);
   const [activeItems, setActiveItems] = useState<CartItem[]>(items);
-  const [siteCfg, setSiteCfg] = useState<{ enable_usdt?: boolean; burn_nim_address?: string; polygon_chain_id?: number } | null>(null);
   const flowRef = useRef<{ done: boolean; started: boolean }>({ done: false, started: false });
-
-  useEffect(() => {
-    getSiteConfig().then(setSiteCfg).catch(() => {});
-  }, []);
 
   const startCheckout = useCallback(
     async (info: DeliveryInfo) => {
@@ -605,7 +600,7 @@ export function CheckoutFlow({
   return (
     <div>
       {phase.kind === 'delivery' && (
-        <CombinedDeliveryPicker items={activeItems} siteCfg={siteCfg} onDone={onDeliveryDone} onBack={onClose} />
+        <CombinedDeliveryPicker items={activeItems} onDone={onDeliveryDone} onBack={onClose} />
       )}
       {phase.kind === 'preparing' && <Preparing label={phase.label} />}
       {phase.kind === 'batch-pay' && (

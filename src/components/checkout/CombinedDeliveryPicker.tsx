@@ -12,7 +12,6 @@ import { CashbackCodeField } from '../cashback/CashbackCodeField';
 import { useGiftNote } from './DeliverySteps';
 import type { DeliveryInfo } from '../../lib/delivery';
 import { useT, t as tr } from '../../i18n';
-import { asset } from '../../lib/asset';
 
 function preloadGiftAvatar() {
   const addr = getAddress();
@@ -33,7 +32,6 @@ function lockNumber(value: string, country?: string): { e164: string; error: str
 
 export function CombinedDeliveryPicker({
   items = [],
-  siteCfg,
   onDone,
   onBack,
 }: {
@@ -41,7 +39,6 @@ export function CombinedDeliveryPicker({
   items?: CartItem[];
   /** Site config: which rails are on (`enable_usdt`) and the USDT cashback
    *  rate shown on its card. */
-  siteCfg: any;
   onDone: (info: DeliveryInfo) => void;
   onBack: () => void;
 }) {
@@ -86,8 +83,9 @@ export function CombinedDeliveryPicker({
   // Apps"); USDT-on-Polygon is the shop's own rail with its own one-time
   // address. Both rails pay the SAME cashback rate, so both cards carry the
   // same cashback line.
-  const [method, setMethod] = useState<'nimiq_pay' | 'usdt_polygon'>('nimiq_pay');
-  const usdtOn = siteCfg?.enable_usdt !== false;
+  // Single payment rail: BTC Lightning (Nimiq Pay or any Lightning wallet).
+  // The USDT option was removed by owner decision; legacy USDT quotes keep
+  // their pay screen in CheckoutFlow, but no new USDT quote can be created.
   const [cashbackDest, setCashbackDest] = useState<'cashback' | 'burn'>('cashback');
   const [anonymous, setAnonymous] = useState(false);
 
@@ -154,7 +152,7 @@ export function CombinedDeliveryPicker({
     const info: DeliveryInfo = {
       email,
       phones: phoneMap,
-      paymentMethod: method,
+      paymentMethod: 'nimiq_pay',
       cashbackDestination: cashbackDest,
       anonymous,
     } as any;
@@ -337,56 +335,6 @@ export function CombinedDeliveryPicker({
         </div>
       ) : null}
 
-      {/* Pay with — two separate cards, one per asset the buyer can actually spend */}
-      <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--ink)', marginBottom: 6 }}>{t('checkout.flowPayWithSection')}</div>
-      <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
-        <label
-          onClick={() => setMethod('nimiq_pay')}
-          style={{
-            flex: 1,
-            padding: '12px 10px',
-            border: method === 'nimiq_pay' ? '2px solid var(--stamp)' : '1.5px dashed var(--line-mid)',
-            borderRadius: 10,
-            background: method === 'nimiq_pay' ? 'var(--paper-tint)' : 'var(--surface-1)',
-            boxShadow: method === 'nimiq_pay' ? '2px 2px 0 rgba(78,61,40,.12)' : 'none',
-            cursor: 'pointer',
-            display: 'flex',
-            gap: 8,
-            alignItems: 'center',
-          }}
-        >
-          <input type="radio" checked={method === 'nimiq_pay'} onChange={() => setMethod('nimiq_pay')} style={{ accentColor: 'var(--stamp)' }} />
-          <img src={asset("/img/nimiq-hexagon.png?v=40")} alt="" style={{ width: 28, height: 28, borderRadius: 6 }} />
-          <span style={{ lineHeight: 1.2 }}>
-            <div style={{ fontWeight: 900, fontSize: 13 }}>{t('delivery.cdpMethodNim')}</div>
-            <div style={{ fontSize: 11, color: 'var(--ink-on-green-deep)', fontWeight: 700 }}>{t('delivery.cdpFullCashback')}</div>
-          </span>
-        </label>
-        {usdtOn && (
-          <label
-            onClick={() => setMethod('usdt_polygon')}
-            style={{
-              flex: 1,
-              padding: '12px 10px',
-              border: method === 'usdt_polygon' ? '2px solid var(--stamp)' : '1.5px dashed var(--line-mid)',
-              borderRadius: 10,
-              background: method === 'usdt_polygon' ? 'var(--paper-tint)' : 'var(--surface-1)',
-              boxShadow: method === 'usdt_polygon' ? '2px 2px 0 rgba(78,61,40,.12)' : 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              gap: 8,
-              alignItems: 'center',
-            }}
-          >
-            <input type="radio" checked={method === 'usdt_polygon'} onChange={() => setMethod('usdt_polygon')} style={{ accentColor: 'var(--stamp)' }} />
-            <img src={asset("/img/usdt.png")} alt="" style={{ width: 28, height: 28, borderRadius: 6 }} />
-            <span style={{ lineHeight: 1.2 }}>
-              <div style={{ fontWeight: 900, fontSize: 13 }}>{t('checkout.flowMethodUsdt')}</div>
-              <div style={{ fontSize: 11, color: 'var(--ink-on-green-deep)', fontWeight: 700 }}>{t('delivery.cdpFullCashback')}</div>
-            </span>
-          </label>
-        )}
-      </div>
 
       {/* Cashback destination */}
       <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--ink)', marginBottom: 6 }}>{t('checkout.flowWhereCashback')}</div>
