@@ -3269,3 +3269,15 @@ input[type="range"]:focus-visible { outline: 2px solid var(--stamp); outline-off
     text-overflow: clip;
   }
 }
+
+/* 4) the three-step strip: phones centre each step (column, centred) but the
+   desktop row still started at the left edge — that shape was built for the
+   two-line sub-descriptions. With one number + one line per step, centre the
+   group inside its box at >=720px too, so web and phone agree. */
+@media (min-width: 720px) {
+  .how-step {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+}
