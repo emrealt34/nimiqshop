@@ -2,9 +2,9 @@
  * LightningPayBlock.tsx — the Nimiq Pay Lightning payment block (ported from
  * ui.js lightningPayBlock). One system, three situations:
  *   1. INSIDE Nimiq Pay: Mini App SDK payLightningInvoice() (NIM or USDT swap).
- *   2. MOBILE browser: try the `lightning:` URI, show missing-app dialog if
- *      nothing opened.
- *   3. DESKTOP: no lightning handler — copy + show missing-app dialog.
+ *   2. MOBILE browser: try the `lightning:` URI, toast "Nimiq Pay not found"
+ *      (QR hint + store links) if nothing opened.
+ *   3. DESKTOP: no lightning handler — copy + the same toast.
  * Plus copy + QR (open by default).
  *
  * Renders the SHARED pay-now skeleton from payRailKit (status line → rail
@@ -12,7 +12,7 @@
  * → warning note), exactly like UsdtPayBlock: same sections, same
  * order — only the words and the QR payload are rail-specific.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../ui/Icon';
 import { Identicon } from '../ui/Identicon';
 import { QR } from './QR';
@@ -30,44 +30,44 @@ import { asset } from '../../lib/asset';
 
 
 
-export function MissingDialog({ onClose }: { invoice: string; onClose: () => void }) {
+/** Owner (2026-10-04): "Nimiq Pay not found" is a TOAST, not a dialog: one
+ *  line — scan the QR below with your phone — plus store buttons that open
+ *  the Nimiq Pay download. Replaces the old missing-app sheet everywhere. */
+export function useNimiqPayMissingToast() {
+  const { toast } = useToast();
   const { t } = useT();
-  return (
-    <div className="overlay open" role="alertdialog" aria-modal="true" aria-label={t('checkout.lpNotDetected')} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="sheet" style={{ maxWidth: 460 }}>
-        <div className="sheet-head" style={{ justifyContent: 'flex-end' }}>
-          <h3 style={{ position: 'absolute', left: 0, right: 0, margin: 0, textAlign: 'center', whiteSpace: 'nowrap', pointerEvents: 'none' }}>
-            {t('checkout.lpNotDetected')}
-          </h3>
-          <button className="sheet-close" aria-label={t('actions.close')} onClick={onClose} style={{ position: 'relative', zIndex: 1 }}>
-            <Icon name="x" size={18} />
-          </button>
-        </div>
-        <div className="sheet-body">
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '6px 0 0' }}>
-            <div className="lock-ico">
-              <Icon name="nimiq" size={34} />
-            </div>
-          </div>
-          <p className="small muted center" style={{ margin: '10px 0 14px' }}>
-            {t('checkout.lpInstallHint')}
-          </p>
-          <div className="row" style={{ gap: '8px', flexWrap: 'wrap' }}>
-            <a className="btn btn-outline" style={{ flex: '1' }} href={NIMIQ_PAY_IOS_URL} target="_blank" rel="noopener noreferrer">
-              <span className="btn-label">{t('checkout.lpAppStore')}</span>
-            </a>
-            <a className="btn btn-outline" style={{ flex: '1' }} href={NIMIQ_PAY_ANDROID_URL} target="_blank" rel="noopener noreferrer">
-              <span className="btn-label">{t('checkout.lpGooglePlay')}</span>
-            </a>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  return useCallback(() => {
+    const plat = detectMobilePlatform();
+    const stores = plat === 'ios'
+      ? [{ href: NIMIQ_PAY_IOS_URL, label: t('checkout.lpAppStore') }]
+      : plat === 'android'
+        ? [{ href: NIMIQ_PAY_ANDROID_URL, label: t('checkout.lpGooglePlay') }]
+        : [
+            { href: NIMIQ_PAY_IOS_URL, label: t('checkout.lpAppStore') },
+            { href: NIMIQ_PAY_ANDROID_URL, label: t('checkout.lpGooglePlay') },
+          ];
+    toast(
+      t('checkout.nimiqPayNotFound'),
+      'info',
+      <span style={{ display: 'inline-flex', gap: 6, flex: '0 0 auto' }}>
+        {stores.map((st) => (
+          <a
+            key={st.href}
+            className="btn btn-outline btn-sm"
+            style={{ padding: '4px 10px', minHeight: 0 }}
+            href={st.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span className="btn-label">{st.label}</span>
+          </a>
+        ))}
+      </span>,
+    );
+  }, [t, toast]);
 }
 
-/** No payment side effect on mount, remount or status refresh. Every handoff
- * requires a user gesture AND a persisted backend claim after a supplier GET. */
 export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddress, hidePayButton }: {
   invoice: string; uri: string; quoteId: string; onLaunch?: () => void; avatarAddress?: string; compact?: boolean;
   /** The pay screen puts the Nimiq Pay button inside its hero card (owner,
@@ -77,7 +77,7 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddre
   const { toast } = useToast();
   const { t } = useT();
   const insidePay = useInNimiqPay();
-  const [missing, setMissing] = useState(false);
+  const notifyMissing = useNimiqPayMissingToast();
   const [allowed, setAllowed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [payLocked, setPayLocked] = useState(false);
@@ -199,7 +199,7 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddre
       // Desktop has no wallet to launch: the always-visible QR below IS the
       // hand-off there, so there is nothing else to do.
       if (!detectMobilePlatform()) return;
-      launchLightningUri(uri, () => setMissing(true));
+      launchLightningUri(uri, notifyMissing);
     } catch (err) {
       toast(friendlyApiMessage(err, t('checkout.lpWalletNotOpened')), 'warn');
     } finally { flight.current = false; setBusy(false); }
@@ -234,8 +234,6 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddre
           <div className="xs faint mt-1">{t('checkout.lpScanOnce')}</div>
         </div>
       )}
-
-      {missing && <MissingDialog invoice={invoice} onClose={() => setMissing(false)} />}
     </div>
   );
 }

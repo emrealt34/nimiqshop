@@ -25,7 +25,7 @@ import { uuid } from '../../lib/format';
 import { CombinedDeliveryPicker } from './CombinedDeliveryPicker';
 import { needsPhone } from '../../lib/catalog';
 import { useT, t as tr } from '../../i18n';
-import { LightningPayBlock, MissingDialog } from './LightningPayBlock';
+import { LightningPayBlock, useNimiqPayMissingToast } from './LightningPayBlock';
 import { NimiqPayPayButton } from './NimiqPayPayButton';
 import { inNimiqPay } from '../../lib/miniapp';
 import { SimulatedPayBlock } from './SimulatedPayBlock';
@@ -797,7 +797,7 @@ export function PayScreen({
   const usdtRail = payRail(current);
   const isUsdt = usdtRail.isUsdt;
   const insidePay = inNimiqPay();
-  const [heroMissing, setHeroMissing] = useState(false);
+  const notifyHeroMissing = useNimiqPayMissingToast();
   // AutoRenewOnce fires once per MOUNT. A renewal that hands back the same
   // dead quote (or a quote born dead) left the old instance mounted, so the
   // "creating your new invoice…" line froze forever (live bug, 2026-10-04).
@@ -1017,14 +1017,12 @@ export function PayScreen({
             onClick={() => {
               rememberLightningPayment(invoice, { kind: 'quote', ref: quoteIdOf(current) });
               void authorizePaymentLaunch(quoteIdOf(current)).catch(() => {});
-              launchLightningUri(uri, () => setHeroMissing(true));
+              launchLightningUri(uri, notifyHeroMissing);
             }}
           >
             {t('checkout.flowPayWithNim')}
           </button>
-        ) : null)}
-        {heroMissing && <MissingDialog invoice={invoice} onClose={() => setHeroMissing(false)} />}
-      </div>
+        ) : null)}      </div>
       <details className="checkout-details-min"><summary>{t('checkout.flowDetailsSummary')}</summary><div style={{ marginTop: 8 }}><div className="small" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}><span className="muted">{t('orderPage.finalTotal')}</span><span className="mono strong">{coinAmountLabelFor(current, 'BTC') || t('orderPage.amountNote')}</span></div><div className="small muted">{t('checkout.flowNimEstimateNote')}</div><CashbackFeeNotice example="nim" /><StakerCashbackLine quote={current} />{cbExclusive && (<div className="small muted mt-1" style={{ textAlign: 'center' }}><Icon name="lock" size={13} /> {cbExclusive}</div>)}<div className="alert info mt-1" style={{ marginBottom: 0, display: 'flex', gap: '8px', alignItems: 'center' }}><Icon name="bolt" size={18} /><div className="small">{payRail(current).note}</div></div><div className="small muted mt-1">{payActionLine(current)}</div></div></details>
       {note}
       {uri ? <LightningPayBlock quoteId={quoteIdOf(current)} invoice={invoice} uri={uri} onLaunch={() => rememberLightningPayment(invoice, { kind: 'quote', ref: quoteIdOf(current) })} avatarAddress={getAddress()} hidePayButton /> : null}

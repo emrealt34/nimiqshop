@@ -333,6 +333,7 @@ const en = {
     flowImportant: 'Important',
     flowPayWithNim: 'Pay with Nimiq Pay',
     flowCashbackLine: "You'll earn ≈ {{nim}} NIM cashback",
+    nimiqPayNotFound: "Nimiq Pay not found — scan the QR code below with your phone to pay.",
     flowBestRail: 'Best rail · {{factor}}',
     flowPayWithUsdt: 'Pay with USDT',
     flowLowerCashback: 'Lower cashback · Polygon',

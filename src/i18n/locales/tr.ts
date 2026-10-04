@@ -325,6 +325,7 @@ const tr = {
     flowImportant: 'Önemli',
     flowPayWithNim: 'Nimiq Pay ile öde',
     flowCashbackLine: '≈ {{nim}} NIM cashback kazanacaksın',
+    nimiqPayNotFound: "Nimiq Pay bulunamadı — telefonunuzda alttaki QR'ı okutarak ödeyebilirsiniz.",
     flowBestRail: 'En iyi hat · {{factor}}',
     flowPayWithUsdt: 'USDT ile öde',
     flowLowerCashback: 'Daha az cashback · Polygon',
