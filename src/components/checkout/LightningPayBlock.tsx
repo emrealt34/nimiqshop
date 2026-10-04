@@ -29,17 +29,6 @@ import { RailPills } from './payRailKit';
 import { asset } from '../../lib/asset';
 
 
-function NimIcon({ size = 18 }: { size?: number }) {
-  return (
-    <img
-      src={asset("/img/nimiq-hexagon.png?v=40")}
-      alt="NIM"
-      width={size}
-      height={size}
-      style={{ verticalAlign: 'middle', borderRadius: '3px', display: 'inline-block' }}
-    />
-  );
-}
 
 export function MissingDialog({ onClose }: { invoice: string; onClose: () => void }) {
   const { t } = useT();
@@ -229,7 +218,7 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddre
 
       {!hidePayButton && (
         <button type="button" className="btn btn-gold btn-block btn-lg mt-2" disabled={disabled || payLocked} onClick={() => handoff('pay')}>
-          <NimIcon /> <span className="btn-label">{busy ? t('checkout.verifying') : payLocked ? t('orderPage.nimiqPay.submitted') : insidePay ? t('orderPage.nimiqPay.idle') : t('checkout.flowPayWithNim')}</span>
+          <span className="btn-label">{busy ? t('checkout.verifying') : payLocked ? t('orderPage.nimiqPay.submitted') : insidePay ? t('orderPage.nimiqPay.idle') : t('checkout.flowPayWithNim')}</span>
         </button>
       )}
       <button className="btn btn-outline btn-block mt-1" disabled={disabled} onClick={() => handoff('copy')}><Icon name="copy" size={16} /> {t('checkout.lpCopyRequest')}</button>

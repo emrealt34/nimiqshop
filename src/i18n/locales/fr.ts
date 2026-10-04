@@ -322,7 +322,7 @@ const fr = {
     flowReady: 'Prêt',
     flowMostCashback: 'Obtenez le maximum de cashback sur cette commande',
     flowImportant: 'Important',
-    flowPayWithNim: 'Payer en NIM',
+    flowPayWithNim: 'Payer avec Nimiq Pay',
     flowBestRail: 'Meilleur rail · {{factor}}',
     flowPayWithUsdt: 'Payer en USDT',
     flowLowerCashback: 'Cashback réduit · Polygon',

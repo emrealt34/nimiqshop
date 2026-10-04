@@ -331,7 +331,7 @@ const en = {
     flowReady: 'Ready',
     flowMostCashback: 'Get the most cashback from this order',
     flowImportant: 'Important',
-    flowPayWithNim: 'Pay with NIM',
+    flowPayWithNim: 'Pay with Nimiq Pay',
     flowBestRail: 'Best rail · {{factor}}',
     flowPayWithUsdt: 'Pay with USDT',
     flowLowerCashback: 'Lower cashback · Polygon',

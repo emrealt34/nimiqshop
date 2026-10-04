@@ -129,9 +129,6 @@ export function NimiqPayPayButton({
         aria-busy={busy}
       >
         <span className="btn-label" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" style={{ flex: '0 0 auto' }}>
-            <path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z" fill="currentColor" />
-          </svg>
           {busy ? label('paying') : locked ? label('submitted') : label('idle')}
         </span>
       </button>

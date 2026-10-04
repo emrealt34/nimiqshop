@@ -1002,7 +1002,7 @@ export function PayScreen({
               launchLightningUri(uri, () => setHeroMissing(true));
             }}
           >
-            <Icon name="bolt" size={16} /> {t('checkout.flowPayWithNim')}
+            {t('checkout.flowPayWithNim')}
           </button>
         ) : null)}
         {heroMissing && <MissingDialog invoice={invoice} onClose={() => setHeroMissing(false)} />}

@@ -323,7 +323,7 @@ const tr = {
     flowReady: 'Hazır',
     flowMostCashback: 'Bu siparişten en yüksek cashback\'i al',
     flowImportant: 'Önemli',
-    flowPayWithNim: 'NIM ile öde',
+    flowPayWithNim: 'Nimiq Pay ile öde',
     flowBestRail: 'En iyi hat · {{factor}}',
     flowPayWithUsdt: 'USDT ile öde',
     flowLowerCashback: 'Daha az cashback · Polygon',
