@@ -12,14 +12,17 @@ import { UnifiedThumb, BrandThumbStack } from '../ui/UnifiedThumb';
 import { FlagMark } from '../ui/FlagMark';
 import { AppRoot } from '../AppRoot';
 import { openLoginSheet } from '../shell/SiteShell';
-import { friendlyApiMessage, getOrder, refreshOrder, getQuote, refreshQuote, rateOrder, rateQuote, getProduct, allowNewPurchase } from '../../lib/api';
+import { friendlyApiMessage, getOrder, refreshOrder, getQuote, refreshQuote, rateOrder, rateQuote, getProduct, allowNewPurchase, createQuote } from '../../lib/api';
 import { isAuthed, getAddress } from '../../lib/session';
 import { useSession } from '../../lib/useSession';
 import { quoteStages, isTerminalStatus, shouldAskRating, ratingDismissedKey } from '../../lib/orderTrack';
 import { brandMetaForTitle } from '../../lib/catalogMeta';
 import { mapKind } from '../../lib/catalog';
 import { lightningPaymentURI, rememberLightningPayment } from '../../lib/hub';
-import { isQuotePayable, quoteBolt11 } from '../../lib/pay';
+import { isQuotePayable, quoteBolt11, canRenewQuote, paymentInFlight, paymentWindowVerifying } from '../../lib/pay';
+import { supplierStatusLabel } from '../../lib/supplierStatus';
+import { buildOrderRequest } from '../../lib/delivery';
+import { uuid } from '../../lib/format';
 import { inNimiqPay } from '../../lib/miniapp';
 import {
   fmtNum,
@@ -550,13 +553,97 @@ function QuoteItemsCard({ q }: { q: any }) {
 function PayNowCard({ q }: { q: any }) {
   const { t } = useT();
   const [expired, setExpired] = useState(false);
-  useEffect(() => { setExpired(false); }, [q.id]);
+  const [renewBusy, setRenewBusy] = useState(false);
+  const [renewErr, setRenewErr] = useState('');
+  useEffect(() => { setExpired(false); setRenewErr(''); }, [q.id]);
   const rail = payRail(q);
   const del = deliverySummary(q);
   const invoice = quoteBolt11(q);
-  // A USDT order has NO Lightning invoice — requiring one hid the whole
-  // pay-now card from every USDT buyer.
-  if (expired || !isQuotePayable(q)) return null;
+  // NOT payable any more — but never silently vanish. The order page used to
+  // render nothing at all here, which left the buyer staring at a raw supplier
+  // state with no button: the exact dead end reported on 2026-10-04. Three
+  // states matter, and each gets its own card:
+  //   • money was seen (or is in flight) → say so calmly; nothing to do;
+  //   • window just lapsed, verification buffer running → "checking", no CTA;
+  //   • window over with nothing charged → one-tap FRESH INVOICE.
+  if (expired || !isQuotePayable(q)) {
+    if (paymentInFlight(q)) {
+      return (
+        <div className="card" style={{ borderColor: 'var(--line-strong)', borderWidth: '2px' }}>
+          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Icon name="check" size={15} />
+            <span>{t('orderPage.paySeenTitle')}</span>
+          </div>
+          <div className="small muted">{t('orderPage.paySeenBody')}</div>
+          <div className="xs faint mt-1">{t('orderPage.supplierState', { state: supplierStatusLabel(q.supplier_status) })}</div>
+        </div>
+      );
+    }
+    if (!canRenewQuote(q, Date.now())) {
+      // Either the shop is still proving whether money arrived (the grace
+      // buffer after the deadline) or a human has this order. Both are
+      // "wait, do not pay again" — a timer is never proof of failure.
+      if (!paymentWindowVerifying(q, Date.now())) return null;
+      return (
+        <div className="card" style={{ borderColor: 'var(--line-strong)', borderWidth: '2px' }}>
+          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Icon name="clock" size={15} />
+            <span>{t('orderPage.verifyTitle')}</span>
+          </div>
+          <div className="small muted">{t('orderPage.verifyBody')}</div>
+        </div>
+      );
+    }
+    const renew = async () => {
+      setRenewBusy(true);
+      setRenewErr('');
+      try {
+        const req = buildOrderRequest(
+          {
+            id: q.product_id, qty: q.quantity || 1, country: q.country,
+            denomination: q.denomination || '', value: q.product_value || 0,
+            brand: q.brand || '', brand_id: q.brand_id || '', category: q.category || '',
+          },
+          {
+            email: q.customer_email || q.email || '',
+            phone: q.phone_number || '',
+            paymentMethod: q.payment_method || 'nimiq_pay',
+            cashbackDestination: q.cashback_destination || 'cashback',
+            anonymous: !!q.anonymous,
+          },
+        );
+        const out: any = await createQuote(req, uuid());
+        const next = (out && (out.quote || out)) || {};
+        const id = next.quote_id || next.id;
+        if (!id) throw new Error(t('orderPage.renewFailed'));
+        window.location.href = pagePath('/order?type=quote&id=' + encodeURIComponent(id));
+      } catch (e) {
+        // ACTIVE_CHECKOUT here means the shop is still holding this buyer to
+        // the old order (the verification buffer, or a human review). That is
+        // not a failure of the renewal — say what is actually happening.
+        if ((e as { code?: string } | null)?.code === 'ACTIVE_CHECKOUT') {
+          setRenewErr(t('orderPage.verifyBody'));
+        } else {
+          setRenewErr(friendlyApiMessage(e, t('orderPage.renewFailed')));
+        }
+        setRenewBusy(false);
+      }
+    };
+    return (
+      <div className="card" style={{ borderColor: 'var(--stamp)', borderWidth: '2px' }}>
+        <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Icon name="clock" size={15} />
+          <span>{t('orderPage.windowOverTitle')}</span>
+        </div>
+        <div className="small muted">{t('orderPage.windowOverBody')}</div>
+        <button type="button" className="btn btn-gold btn-block mt-2" disabled={renewBusy} onClick={() => { void renew(); }}>
+          <Icon name="bolt" size={14} /> <span className="btn-label">{renewBusy ? t('orderPage.renewBusy') : t('orderPage.renewCta')}</span>
+        </button>
+        {renewErr && <div className="small mt-1" style={{ color: 'var(--stamp)' }}>{renewErr}</div>}
+        <div className="xs faint mt-1">{t('checkout.flowRenewWhy')}</div>
+      </div>
+    );
+  }
   if (!rail.isUsdt && !invoice) return null;
   let payURI = '';
   try {
@@ -1172,7 +1259,7 @@ function QuoteContent({ q, refund, fulfillment }: { q: any; refund?: any; fulfil
       <div className="card">
         <div className="card-title">{t('orderPage.liveTracking')}</div>
         <StageTimeline stages={stages} channel={qDel.channel} usdt={qRail.isUsdt} />
-        <div className="small muted mt-1">{t('orderPage.supplierState', { state: q.supplier_status || t('orderPage.notYetConfirmed') })}</div>
+        <div className="small muted mt-1">{t('orderPage.supplierState', { state: q.supplier_status ? supplierStatusLabel(q.supplier_status) : t('orderPage.notYetConfirmed') })}</div>
       {(['fulfilled','refunded'].includes(q.status) || (q.status === 'failed' && (!q.supplier_order_id || (q.supplier_status === 'PaymentSetupFailed' && !q.payment_observed)))) && (
         <div className="mt-2">
           <button className="btn btn-gold btn-block" disabled={rebuyBusy} onClick={rebuyIntoCart}>

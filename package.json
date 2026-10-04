@@ -43,7 +43,7 @@
     "lint:ts": "oxlint",
     "verify": "npm run check && npm run check:e2e && npm run check:i18n && npm run check:fonts && npm run check:keys && npm run check:i18n:deep && npm run check:api && npm run check:workflows && npm run check:config && npm run lint",
     "test:pages-proxy": "node --test scripts/test-pages-proxy.mjs",
-    "test:unit": "node --test scripts/test-friendly-api-message.mjs scripts/test-confirm-match.mjs",
+    "test:unit": "node --test scripts/test-friendly-api-message.mjs scripts/test-confirm-match.mjs scripts/test-renew-rules.mjs",
     "css:capture": "node scripts/critical-css.mjs --capture"
   },
   "dependencies": {

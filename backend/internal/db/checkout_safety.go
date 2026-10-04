@@ -17,6 +17,15 @@ import (
 // it never ends fulfillment polling for a quote where money was actually seen.
 const quoteExpiryBuffer = 5 * time.Minute
 
+// PaymentGrace is how long after the supplier's payment window the shop keeps
+// treating a lapsed invoice as possibly paid. A payment submitted right at the
+// edge of the window may not be visible to the supplier yet, so a timer running
+// out is NOT proof that nothing was charged. Until this buffer has passed the
+// quote keeps blocking a new purchase and the buyer is told the shop is still
+// verifying — never that the payment failed. The frontend mirrors the same
+// constant in src/lib/pay.ts; the two must not drift.
+const PaymentGrace = quoteExpiryBuffer
+
 func quoteRequestFingerprintKey(user, key string) []byte {
 	return []byte("ix:q:request:" + user + ":" + key)
 }
@@ -28,13 +37,58 @@ func (e *ErrActiveCheckout) Error() string {
 	return "an unresolved checkout already exists for this buyer"
 }
 
+// PaymentDeadline is the moment the supplier's single-use invoice stops being
+// payable: the supplier's own window when we have it, otherwise the local quote
+// expiry that mirrors the same window. A zero value means UNKNOWN, and an
+// unknown deadline must keep blocking — it can never authorise a second
+// payment.
+func (q Quote) PaymentDeadline() time.Time {
+	if !q.PaymentExpiry.IsZero() {
+		return q.PaymentExpiry
+	}
+	return q.ExpiresAt
+}
+
+// hasPaymentEvidence reports whether any of the three sources saw money or
+// requested a hold. This is the ONLY thing that may end the "unresolved
+// payment" state — never a clock.
+func (q Quote) hasPaymentEvidence() bool {
+	return q.PaymentObserved || q.PaymentBlocked || cryptorefills.IsPaidOrBeyond(q.SupplierStatus)
+}
+
+// PaymentVerifiedUnpaid reports whether the shop can PROVE nothing was charged:
+// the supplier was able to see any last-second payment (the deadline plus the
+// grace buffer is in the past) and no payment evidence exists in the shop or
+// upstream. Only this authorises telling a buyer "nothing was charged" and
+// offering a fresh invoice.
+func (q Quote) PaymentVerifiedUnpaid(now time.Time) bool {
+	if q.hasPaymentEvidence() {
+		return false
+	}
+	deadline := q.PaymentDeadline()
+	if deadline.IsZero() {
+		return false
+	}
+	return !now.Before(deadline.Add(PaymentGrace))
+}
+
 // Deliberately conservative: one unresolved checkout per buyer, including an
 // uncertain batch. Changing quantities/recipients/cashback codes or switching
 // from batch to per-item must not evade a possibly-paid purchase.
-func BlocksNewPurchase(q Quote) bool {
+//
+// Time-aware on purpose. The old version returned true for every
+// "awaiting_payment" quote forever, which is how a single lapsed invoice — one
+// the buyer can never pay again — held the whole shop shut for them and the
+// checkout answered ACTIVE_CHECKOUT with no way out. Now such a quote only
+// blocks while money could still be in play (see PaymentVerifiedUnpaid); the
+// re-check inside blockingQuotesFor drops it from the index on the next read,
+// so both the pre-check and the atomic gate release at the same instant.
+func BlocksNewPurchaseAt(q Quote, now time.Time) bool {
 	switch q.Status {
-	case "order_creating", "awaiting_payment", "payment_started", "payment_received", "delivering", "manual_review":
+	case "order_creating", "payment_started", "payment_received", "delivering", "manual_review":
 		return true
+	case "awaiting_payment":
+		return !q.PaymentVerifiedUnpaid(now)
 	case "expired":
 		// An expired quote only blocks a new purchase when real money was
 		// observed (it must then be reconciled). Once the window has lapsed
@@ -47,11 +101,31 @@ func BlocksNewPurchase(q Quote) bool {
 	return false
 }
 
+// BlocksNewPurchase is the time.Now() convenience wrapper used by every call
+// site that does not carry a shared clock (the index build, the exported
+// pre-check). Callers that already have `now` must use BlocksNewPurchaseAt so
+// one request cannot decide on two different clocks.
+func BlocksNewPurchase(q Quote) bool { return BlocksNewPurchaseAt(q, time.Now().UTC()) }
+
+// NeedsSupplierPoll answers a DIFFERENT question from BlocksNewPurchase and
+// must not be derived from it: "is there any supplier state left to
+// reconcile?" A lapsed-but-unpaid quote no longer blocks a new purchase, yet
+// the tracker must still drive it to `expired` (display, admin timeline, and
+// the release of its daily-limit slot), and a quote where money was seen must
+// be polled forever. Deleting a poll is how a real payment ends up forgotten.
 func (q Quote) NeedsSupplierPoll() bool {
 	if q.SupplierOrderID == "" || q.Status == "fulfilled" || q.Status == "refunded" {
 		return false
 	}
-	return BlocksNewPurchase(q)
+	switch q.Status {
+	case "order_creating", "awaiting_payment", "payment_started", "payment_received", "delivering", "manual_review":
+		return true
+	case "expired":
+		return q.PaymentObserved
+	case "failed":
+		return q.PaymentObserved || !strings.EqualFold(q.SupplierStatus, cryptorefills.StatusPaymentSetupFailed)
+	}
+	return false
 }
 
 func (q Quote) CanPay(now time.Time) bool {

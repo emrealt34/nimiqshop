@@ -89,14 +89,14 @@ func (h *Handlers) existingCheckout(ctx *fasthttp.RequestCtx, user, key, request
 		return true
 	}
 	for _, q := range quotes {
-		// A still-"awaiting payment" order that the buyer can no longer pay
-		// (its window lapsed, no money seen, no hold) must not hold the
-		// checkout hostage. Release it so a fresh purchase may proceed; the
-		// settlement tracker independently sweeps it to "expired" for display.
-		if q.Status == "awaiting_payment" && !q.PaymentObserved && !q.PaymentBlocked &&
-			!q.PaymentExpiry.IsZero() && q.PaymentExpiry.Before(time.Now().UTC()) {
-			continue
-		}
+		// The release rule lives in db.BlocksNewPurchaseAt, NOT here. It used
+		// to be a `continue` in this loop, which made it dead code: the atomic
+		// gate inside CreateQuote re-asks the same question through the same
+		// index and answered "blocked" for a lapsed invoice forever, so the
+		// buyer got ACTIVE_CHECKOUT with no way out (live bug, 2026-10-04).
+		// One predicate, one answer for both callers — and it is time-aware:
+		// a lapsed invoice keeps blocking only while money could still be in
+		// play (payment seen, hold, or inside the supplier's grace buffer).
 		if !db.BlocksNewPurchase(q) {
 			continue
 		}

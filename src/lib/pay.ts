@@ -57,6 +57,105 @@ export const FAIL_STATUSES = new Set([
   'blocked',
 ]);
 
+/* ------------------- payment window & safe renewal ----------------------- */
+
+/**
+ * Is the payment window over? Read from the quote ITSELF, never from a local
+ * countdown: a page opened after the deadline (the common returning-buyer
+ * case) never ran the timer, and treating that as "still open" is exactly how
+ * the shop used to strand a buyer on "payment controls paused" with no way to
+ * pay and no way to start a fresh invoice.
+ */
+/**
+ * Grace period after the invoice's payment window, mirrored EXACTLY by the
+ * backend (`db.PaymentGrace`). It is the time the supplier gets to notice a
+ * payment that landed right at the edge of the window.
+ *
+ * Until it has passed, "the timer ran out" is NOT proof that nothing was
+ * charged — so no buyer is told "ödeme alınmadı" and no fresh invoice is
+ * offered to sit next to a possibly-paid one. Both sides read the same field
+ * (`payment_expiry`) and the same constant, so the button never appears
+ * before the backend is willing to honour it.
+ */
+export const PAYMENT_VERIFY_GRACE_MS = 5 * 60 * 1000;
+
+/** The quote's payment deadline in ms, or NaN when the shop cannot know it. */
+export function paymentDeadline(q: any): number {
+  return Date.parse(q?.payment_expiry || q?.payment_expires_at || q?.expires_at || '');
+}
+
+/** The supplier's single-use invoice can no longer be paid. */
+export function paymentWindowOver(q: any, now = Date.now()): boolean {
+  const expiry = paymentDeadline(q);
+  return Number.isFinite(expiry) && expiry <= now;
+}
+
+/**
+ * The window is over but the shop is still proving whether money arrived
+ * (inside the grace buffer, or the deadline is unknown). The truthful state
+ * here is "checking, you will be able to get a fresh invoice in a moment",
+ * never "it failed" and never a second payment.
+ */
+export function paymentWindowVerifying(q: any, now = Date.now()): boolean {
+  if (paymentInFlight(q) || q?.payment_observed || q?.payment_blocked) return false;
+  const deadline = paymentDeadline(q);
+  if (!Number.isFinite(deadline)) return false;
+  return deadline <= now && now < deadline + PAYMENT_VERIFY_GRACE_MS;
+}
+
+/** Supplier states that mean money was seen or is being verified. */
+const PAYMENT_IN_FLIGHT = new Set([
+  'payment_started',
+  'payment_received',
+  'delivering',
+  'fulfilled',
+]);
+
+/** True when the order itself says a payment landed and only settlement is left. */
+export function paymentInFlight(q: any): boolean {
+  const status = String(q?.status || '');
+  if (q?.payment_observed) return true;
+  if (PAYMENT_IN_FLIGHT.has(status)) return true;
+  return /^(payments?started|partialpaymentstarted|paymentreceived|waitingfordelivery|done)$/i
+    .test(String(q?.supplier_status || ''));
+}
+
+/**
+ * May the buyer safely get a NEW invoice for the same order?
+ *
+ * Only when the old one can no longer be paid AND nothing was charged:
+ * the window is over and neither the shop nor the supplier has seen money.
+ * Anything else (observed payment, supplier hold, in-flight settlement) must
+ * stay exactly where it is — a fresh invoice next to a possibly-paid one is
+ * how a buyer pays twice.
+ */
+export function canRenewQuote(q: any, now = Date.now()): boolean {
+  if (!q) return false;
+  const status = String(q.status || '');
+  if (status === 'order_creating') return false;
+  if (q.payment_observed || q.payment_blocked) return false;
+  if (paymentInFlight(q)) return false;
+  if (['refunded', 'fulfilled', 'manual_review'].includes(status)) return false;
+  // A settled local state (expired/failed) is the backend agreeing that this
+  // quote is done, but the timer alone never proves it: the grace buffer has
+  // to have elapsed on the real deadline before a fresh invoice is offered.
+  const deadline = paymentDeadline(q);
+  if (Number.isFinite(deadline)) {
+    if (now < deadline + PAYMENT_VERIFY_GRACE_MS) return false;
+    return true;
+  }
+  // No deadline on the record: only a terminal state that the shop itself set
+  // can authorise a renewal (and never while money may exist — handled above).
+  return status === 'expired' || status === 'failed';
+}
+
+/** Fresh-invoice reasons that never prove the payment failed — for copy. */
+export function renewalReason(q: any, localExpired = false, now = Date.now()): 'window' | 'expired' | 'none' {
+  if (!canRenewQuote(q, now)) return 'none';
+  if (localExpired && paymentWindowOver(q, now)) return 'window';
+  return paymentWindowOver(q, now) ? 'window' : 'expired';
+}
+
 
 export function launchLightningUri(uri: string, onMiss: () => void): void {
   if (typeof window === 'undefined') return;

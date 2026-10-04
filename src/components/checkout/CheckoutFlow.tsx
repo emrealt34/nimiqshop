@@ -17,6 +17,8 @@ import { Icon } from '../ui/Icon';
 import { useCart, itemKey, type CartItem } from '../../lib/cartStore';
 import { useToast } from '../AppProviders';
 import { createQuote, createQuoteBatch, forgetQuote, getQuote, getSiteConfig, friendlyApiMessage } from '../../lib/api';
+import { canRenewQuote, paymentInFlight, paymentWindowVerifying } from '../../lib/pay';
+import { supplierStatusLabel } from '../../lib/supplierStatus';
 import { buildOrderRequest, getGiftExtras, type DeliveryInfo } from '../../lib/delivery';
 import { isValidEmail } from '../../lib/validate';
 import { giftRowFields } from '../../lib/giftNote';
@@ -838,32 +840,53 @@ export function PayScreen({
   }
 
   if (!invoice || expired || !isQuotePayable(current)) {
-    // THE dead end this screen used to be: a Lightning invoice is valid for a
-    // fixed window (25 min), and a buyer who comes back later — the common
-    // case, not an exception — landed here with only "open this order" and no
-    // way back to a payable screen. Renewing is offered ONLY when it can
-    // never collide with a payment that may already be in flight: the window
-    // must be over (countdown expired or the order itself expired) and the
-    // backend must not have observed or blocked anything. One tap then lands
-    // on a fresh invoice for the same item; the parent re-quotes it.
-    const renewSafe =
-      (expired || String(current.status || '') === 'expired') &&
-      !current.payment_observed && !current.payment_blocked &&
-      String(current.status || '') !== 'order_creating';
+    // This screen has FOUR very different reasons to exist, and lumping them
+    // together is what used to strand buyers ("controls paused / do not start
+    // another payment") in front of a dead end:
+    //
+    //  1. MONEY SEEN — the supplier or the shop has a payment and only
+    //     settlement is left. There is nothing to fix and nothing to start;
+    //     say so calmly instead of shouting "paused".
+    //  2. WINDOW JUST LAPSED — the invoice can no longer be paid, but the
+    //     shop is still inside its verification buffer, so "nothing was
+    //     charged" is not yet proven. Truthful copy, no button, auto-refresh.
+    //  3. WINDOW OVER, NOTHING CHARGED — a fresh invoice is safe and must be
+    //     one tap away. The decision is read from the QUOTE's own deadline
+    //     (`canRenewQuote`), not from this page's countdown: a buyer who opens
+    //     the page after the deadline never ran the timer, and that was the
+    //     exact case with no button at all.
+    //  4. ANYTHING ELSE (hold, review, an order still being created) — report
+    //     it truthfully, in words, with no raw supplier enum.
+    const seen = paymentInFlight(current);
+    const renewSafe = !seen && canRenewQuote(current, Date.now());
+    const verifying = !seen && !renewSafe && paymentWindowVerifying(current, Date.now());
+    const headline = seen
+      ? t('checkout.flowPaymentSeen')
+      : renewSafe
+        ? t('checkout.flowWindowOver')
+        : verifying
+          ? t('checkout.flowVerifying')
+          : current.status === 'order_creating'
+            ? t('checkout.flowConfirmingOrder')
+            : t('checkout.flowControlsPaused');
+    const body = seen
+      ? t('checkout.flowWaitForSettlement')
+      : renewSafe
+        ? t('checkout.flowRenewWhy')
+        : verifying
+          ? t('checkout.flowVerifyingBody')
+          : t('checkout.flowDoNotPay');
     return (
       <div className="center" style={{ padding: '26px 10px', textAlign: 'center' }} role="status">
-        <div className="strong">{current.status === 'order_creating' ? t('checkout.flowConfirmingOrder') : t('checkout.flowControlsPaused')}</div>
+        <div className="strong">{headline}</div>
         <div className="small muted mt-1">
-          {t('checkout.flowStatusLine', { status: String(current.supplier_status || current.status || 'checking') })}
+          {t('checkout.flowStatusLine', { status: supplierStatusLabel(current.supplier_status || current.status) })}
         </div>
-        <div className="small mt-1">{t('checkout.flowDoNotPay')}</div>
+        <div className="small mt-1">{body}</div>
         {renewSafe && (
-          <>
-            <button type="button" className="btn btn-gold btn-block mt-2" onClick={() => finish(false, 'renew')}>
-              <Icon name="bolt" size={14} /> {t('checkout.flowRenewInvoice')}
-            </button>
-            <div className="xs faint mt-1">{t('checkout.flowRenewWhy')}</div>
-          </>
+          <button type="button" className="btn btn-gold btn-block mt-2" onClick={() => finish(false, 'renew')}>
+            <Icon name="bolt" size={14} /> {t('checkout.flowRenewInvoice')}
+          </button>
         )}
         <a className={renewSafe ? 'btn btn-outline btn-block mt-2' : 'btn btn-gold btn-block mt-2'} href={pagePath('/order?type=quote&id=' + encodeURIComponent(quoteIdOf(current)))}>{t('checkout.flowOpenOrder')}</a>
         {testPayButton}
