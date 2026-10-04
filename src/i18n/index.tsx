@@ -162,13 +162,27 @@ const pending = new Map<string, Promise<void>>();
  */
 const DICT_CACHE_PREFIX = 'nimshop.dict.';
 
+/** The deploy stamp Base.astro exposes on <meta name="shop-build">. A cached
+ *  dictionary written by THIS build is byte-identical to the chunk it would
+ *  fetch (chunks are content-hashed per build), so a stamp match skips the
+ *  network AND the JSON.stringify revalidation entirely — the two things that
+ *  cost returning visitors main-thread time and a request on every load. */
+function buildStamp(): string {
+  if (typeof window === 'undefined') return '';
+  return String((window as any).__BUILD_ID || '');
+}
+
 function readCachedDict(code: LangCode): Dict | null {
   if (typeof localStorage === 'undefined') return null;
   try {
     const raw = localStorage.getItem(DICT_CACHE_PREFIX + code);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? (parsed as Dict) : null;
+    if (parsed && typeof parsed === 'object' && 'd' in parsed) {
+      const stamp = buildStamp();
+      return stamp && parsed.v === stamp ? (parsed.d as Dict) : null;
+    }
+    return null; // pre-versioning cache shape: treat as a miss, rewrite fresh
   } catch {
     return null;
   }
@@ -177,7 +191,7 @@ function readCachedDict(code: LangCode): Dict | null {
 function writeCachedDict(code: LangCode, dict: Dict) {
   if (typeof localStorage === 'undefined') return;
   try {
-    localStorage.setItem(DICT_CACHE_PREFIX + code, JSON.stringify(dict));
+    localStorage.setItem(DICT_CACHE_PREFIX + code, JSON.stringify({ v: buildStamp(), d: dict }));
   } catch {
     /* private mode or quota — the network path stays the fallback */
   }
@@ -201,25 +215,22 @@ export function loadDict(code: LangCode): Promise<void> {
   const inflight = pending.get(code);
   if (inflight) return inflight;
   const cached = readCachedDict(code);
-  if (cached) DICTS[code] = cached;
+  if (cached) {
+    // Same build ⇒ same strings: no chunk fetch, no revalidation stringify.
+    DICTS[code] = cached;
+    return Promise.resolve();
+  }
   const job = loader()
     .then((mod) => {
       const fresh = mod.default as Dict;
-      if (!cached) {
-        DICTS[code] = fresh;
-        writeCachedDict(code, fresh);
-        return;
-      }
-      // Revalidate: has the deployed copy moved on? Compare cheaply, then swap
-      // in the new strings without a reload (language unchanged → no flash).
-      if (JSON.stringify(fresh) !== JSON.stringify(cached)) {
-        DICTS[code] = fresh;
-        writeCachedDict(code, fresh);
-        if (currentLang === code) applyLang(code, false);
-        // Wake every React tree that renders this language so the fresher
-        // copy lands on screen without waiting for the next language change.
-        dictSubs.forEach((f) => f());
-      }
+      // A cache hit returned early above, so reaching here means the network
+      // copy is the first one this build has seen: store it versioned.
+      DICTS[code] = fresh;
+      writeCachedDict(code, fresh);
+      if (currentLang === code) applyLang(code, false);
+      // Wake every React tree that renders this language so the fresher
+      // copy lands on screen without waiting for the next language change.
+      dictSubs.forEach((f) => f());
     })
     .catch(() => { /* offline: the cached copy (or English) keeps the UI readable */ })
     .finally(() => { pending.delete(code); });

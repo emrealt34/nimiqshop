@@ -175,6 +175,8 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
     <meta http-equiv="Content-Security-Policy" content={contentSecurityPolicy} />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#E7DAC0" />
+    <meta name="shop-build" content={buildId} />
+    <link rel="preload" as="image" href={`${assetBase}/img/nimiq-hexagon.png?v=40`} />
     <meta name="color-scheme" content="light dark" />
     <!--
       Boot-time language bootstrap (synchronous, runs before paint).
@@ -195,6 +197,10 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
     <script is:inline define:vars={{ dictPreloadMap }}>
       (function () {
         try {
+          try {
+            var bmeta = document.querySelector('meta[name="shop-build"]');
+            window.__BUILD_ID = bmeta ? (bmeta.getAttribute('content') || '') : '';
+          } catch (eS) {}
           var SUPPORTED = { en: 1, es: 1, de: 1, fr: 1, pt: 1, tr: 1 };
           function clean(raw) {
             if (!raw) return null;
@@ -293,6 +299,7 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
             var cachedRaw = lang === 'en' ? null : localStorage.getItem('nimshop.dict.' + lang);
             if (cachedRaw) {
               var CD = JSON.parse(cachedRaw);
+              if (CD && typeof CD === 'object' && 'd' in CD) CD = CD.d;
               var resolveKey = function (key) {
                 var n = CD;
                 var parts = String(key).split('.');
@@ -421,6 +428,10 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
           for (var i = 0; i < files.length; i += 1) {
             var l = document.createElement('link');
             l.rel = 'preload'; l.as = 'fetch'; l.href = files[i];
+            // The grid (and the market hold that hides the seeded one) waits
+            // on exactly these three files: make them the first bytes after
+            // the document itself, even on a country-mismatched first visit.
+            try { l.setAttribute('fetchpriority', 'high'); } catch (eP) {}
             document.head.appendChild(l);
           }
           var pc = document.createElement('link');
