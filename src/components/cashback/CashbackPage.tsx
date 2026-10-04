@@ -253,6 +253,15 @@ export function CashbackView() {
   // The cashback card & leaderboard used to drown at the bottom of this long
   // programme page (owner, 2026-10-04) — they now live in their own tab.
   const [tab, setTab] = useState<'program' | 'community'>('program');
+  // Day/night mode for the whole Leaderboard tab (owner, 2026-10-04): ONE
+  // toggle themes the cashback card and the leaderboard card together, and
+  // the choice is remembered per browser.
+  const [lbMode, setLbMode] = useState<'night' | 'day'>(() => {
+    try { return localStorage.getItem('nimshop:lb-theme') === 'day' ? 'day' : 'night'; } catch { return 'night'; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('nimshop:lb-theme', lbMode); } catch {}
+  }, [lbMode]);
   // Revealed after a rejected first delegation (the wallet already stakes
   // with another validator) and kept for the session: the fix is the "move"
   // flow, not retrying the same button.
@@ -835,7 +844,18 @@ export function CashbackView() {
         </>
       )}
       {tab === 'community' && (
-        <>
+        <div className={`lb-wrap lb-${lbMode}`}>
+          <div className="lb-toolbar">
+            <button
+              type="button"
+              className="btn btn-sm btn-outline lb-theme"
+              onClick={() => setLbMode((m) => (m === 'night' ? 'day' : 'night'))}
+              aria-label={t('cashbackCard.themeAria')}
+              title={t('cashbackCard.themeAria')}
+            >
+              <Icon name={lbMode === 'night' ? 'sun' : 'moon'} size={14} />
+            </button>
+          </div>
       {/* ------------------------------------ cashback rows — visible logged in or not (user: giriş farketmemeli) */}
       {(authed ? (
         <RecentCashbackList rows={ledger ? rows : null} loading={!ledger} pageSize={PAYOUTS_PER_PAGE} />
@@ -855,7 +875,7 @@ export function CashbackView() {
 
       {/* ------------------------------------------------------ burn stats, cashback card & leaderboard */}
       <CashbackImpactSection authed={authed === true} myTotals={ledger?.totals || null} />
-        </>
+        </div>
       )}
       {tab === 'program' && (
         <>
