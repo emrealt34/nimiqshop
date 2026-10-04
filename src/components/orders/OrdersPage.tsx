@@ -86,7 +86,6 @@ const FILTERS = [
   { key: 'active', labelKey: 'ordersPage.filterActive' },
   { key: 'delivered', labelKey: 'ordersPage.filterDelivered' },
   { key: 'issues', labelKey: 'ordersPage.filterIssues' },
-  { key: 'support', labelKey: 'ordersPage.filterSupport' },
 ];
 
 export function OrdersView() {
@@ -269,7 +268,6 @@ export function OrdersView() {
     if (filter === 'active') return !isTerminalStatus(r.status);
     if (filter === 'delivered') return isDeliveredStatus(r.status);
     if (filter === 'issues') return isIssueStatus(r.status);
-    if (filter === 'support') return r.hasTicket;
     return true;
   });
   // The list auto-refreshes (new statuses arrive), so the current page is
@@ -486,7 +484,6 @@ function OrderRow({ r, onRate }: { r: any; onRate: (r: any, val: number) => void
             </span>
           ) : null}
           {r.railLabel ? <span>{r.railLabel}</span> : null}
-          {r.hasTicket ? <span style={{ color: 'var(--orange)' }}>{t('ordersPage.supportTicket')}</span> : null}
         </div>
         <div className="mt-1">
           <MiniProgress order={r} />
