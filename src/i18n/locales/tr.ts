@@ -460,7 +460,7 @@ const tr = {
     lpPayExactlyPost: ' herhangi bir Lightning cüzdanla — tek tedarikçi faturası, doğrudan cüzdanından ödenir. Fatura ödendiğinde teslimat otomatik başlar.',
     lpCopyRequest: 'BTC Lightning ödeme talebini kopyala',
     lpVerifySlow: 'Sunucuyla son doğrulama yapılamadı (bağlantı ya da zaman aşımı). Faturanız açık — ödemeye devam edebilirsiniz; sonrasında sipariş durumunu kontrol edin.',
-    lpScanOnce: 'Herhangi bir Lightning cüzdanla bir kez tara ve BTC Lightning ödemesini onayla.',
+    lpScanOnce: 'Nimiq Pay veya Lightning destekleyen herhangi bir cüzdanla bir kez tara ve ödemeyi onayla.',
     usdtpNotConnected: 'Nimiq Pay artık bağlı değil. Mağazayı Nimiq Pay içinde yeniden açın.',
     usdtpNotEnough: 'Bu cüzdanda yeterli USDT yok — {{bal}} USDT var, sipariş {{amount}} USDT gerektiriyor. Bu cüzdana yükleme yapın (veya BTC Lightning ile NIM ödeyin) ve tekrar deneyin. Ağ ücreti için biraz POL de gerekir.',
     usdtpSent: 'USDT gönderildi — Polygon’da onaylanıyor. Bu sayfayı açık tutun.',

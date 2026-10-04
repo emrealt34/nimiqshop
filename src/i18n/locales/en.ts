@@ -468,7 +468,7 @@ const en = {
     lpPayExactlyPost: ' with any Lightning wallet — one supplier invoice, settled straight from your wallet. Delivery starts automatically once the invoice is paid.',
     lpCopyRequest: 'Copy BTC Lightning payment request',
     lpVerifySlow: 'We could not re-verify with the server (connection or timeout). Your invoice is open — you can still pay, then check the order status.',
-    lpScanOnce: 'Scan once with any Lightning wallet and approve the BTC Lightning payment.',
+    lpScanOnce: 'Scan once with Nimiq Pay or any Lightning wallet and approve the payment.',
     usdtpNotConnected: 'Nimiq Pay is no longer connected. Reopen the shop inside Nimiq Pay.',
     usdtpNotEnough: 'Not enough USDT in this wallet — you have {{bal}} USDT, the order needs {{amount}} USDT. Top up this wallet (or pay with NIM via BTC Lightning) and try again. A little POL is also needed for the network fee.',
     usdtpSent: 'USDT sent — confirming on Polygon. Keep this page open.',

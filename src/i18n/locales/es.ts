@@ -459,7 +459,7 @@ const es = {
     lpPayExactlyPost: ' con cualquier wallet Lightning — una factura del proveedor, liquidada directamente desde tu wallet. La entrega comienza automáticamente al pagarse la factura.',
     lpCopyRequest: 'Copiar la solicitud de pago BTC Lightning',
     lpVerifySlow: 'No se pudo reverificar con el servidor (conexión o tiempo de espera). La factura está abierta: puedes pagar y luego revisar el estado del pedido.',
-    lpScanOnce: 'Escanea una vez con cualquier wallet Lightning y aprueba el pago BTC Lightning.',
+    lpScanOnce: 'Escanea una vez con Nimiq Pay o cualquier wallet compatible con Lightning y aprueba el pago.',
     usdtpNotConnected: 'Nimiq Pay ya no está conectado. Reabre la tienda dentro de Nimiq Pay.',
     usdtpNotEnough: 'No hay suficiente USDT en esta cartera: tienes {{bal}} USDT y el pedido necesita {{amount}} USDT. Recarga esta cartera (o paga con NIM vía BTC Lightning) e inténtalo de nuevo. También hace falta algo de POL para la comisión de red.',
     usdtpSent: 'USDT enviado — confirmando en Polygon. Mantén esta página abierta.',
