@@ -29,9 +29,10 @@ interface Props {
 }
 const { title, description, activeKey, titleKey, shelfSeed = false } = Astro.props;
 const siteName = 'shop.nimiqbase.com';
-// Build fingerprint for BuildGuard: Cloudflare Pages exports the commit sha
-// at build time; local builds get a constant (never deployed).
-const buildId = process.env.CF_PAGES_COMMIT_SHA || 'local';
+// Build fingerprint for BuildGuard. The deploy builds on the GitHub runner
+// (GITHUB_SHA), Cloudflare-native builds export CF_PAGES_COMMIT_SHA; local
+// builds get a constant and are never deployed.
+const buildId = process.env.GITHUB_SHA || process.env.CF_PAGES_COMMIT_SHA || 'local';
 
 // --- Locale ----------------------------------------------------------------
 // This build is STATIC (output: 'static') — there is NO per-request server
