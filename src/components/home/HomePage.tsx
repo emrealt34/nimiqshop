@@ -360,25 +360,25 @@ export function HomePage() {
       </section>
 
       <div className="container how-strip" aria-label={t('home.howAria', { site: siteName() })}>
+        {/* One number + one short line per step, at every width: the sub
+            descriptions made steps 2 and 3 wrap to two or three lines while
+            step 1 stayed one, so the strip never read as three siblings. */}
         <div className="how-step">
           <span className="how-n">1</span>
           <div>
             <div className="strong">{t('home.how1Title')}</div>
-            <div className="small muted">{t('home.how1Text')}</div>
           </div>
         </div>
         <div className="how-step">
           <span className="how-n">2</span>
           <div>
             <div className="strong">{t('home.how2Title')}</div>
-            <div className="small muted">{t('home.how2Text', { site: siteName() })}</div>
           </div>
         </div>
         <div className="how-step">
           <span className="how-n">3</span>
           <div>
-            <div className="strong">{t('home.how3Title')}<span className="how-rest">{t('home.how3Rest')}</span></div>
-            <div className="small muted">{t('home.how3Text')}</div>
+            <div className="strong">{t('home.how3Title')}</div>
           </div>
         </div>
       </div>
