@@ -272,10 +272,14 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
           // (written by src/i18n after the first load), so there is nothing to
           // hide: no hold, no loader, the first paint is translated. The key
           // and its meaning are documented in src/i18n/index.tsx.
-          function dictCached(code) {
-            try { return !!localStorage.getItem('nimshop.dict.' + code); } catch (e) { return false; }
-          }
-          if (lang !== 'en' && !dictCached(lang)) {
+          // EVERY non-English load is held, not only first visits: the static
+          // HTML is always English and the translation lands with the first
+          // React commit, so without the hold a returning visitor (dictionary
+          // already cached) watched one English frame and then the flip — the
+          // exact "wrong language, then it changes" complaint. With the hold
+          // the body stays unpainted until the translated commit releases it;
+          // a cached dictionary makes that gap a single fast frame.
+          if (lang !== 'en') {
             var root = document.documentElement;
             root.setAttribute('data-i18n-hold', '');
             setTimeout(function () { root.removeAttribute('data-i18n-hold'); }, 5000);
