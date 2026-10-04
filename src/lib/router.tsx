@@ -114,6 +114,7 @@ const KEY_PATH: Record<ShellKey, string> = {
   track: '/track',
   order: '/order',
   cashback: '/cashback',
+  leaderboard: '/cashback?tab=leaderboard',
   none: '/admin',
 };
 
