@@ -173,7 +173,6 @@ func TestForgetDropsTheCachedAnswer(t *testing.T) {
 }
 
 func TestDisabledVerifierIsNotStakedAndReadyFalse(t *testing.T) {
-	var calls int64
 	for name, v := range map[string]*Verifier{
 		"no client":    New(nil, validator, 0, 0),
 		"no validator": New(nimiq.NewClient("http://127.0.0.1:1"), "", 0, 0),
@@ -186,7 +185,6 @@ func TestDisabledVerifierIsNotStakedAndReadyFalse(t *testing.T) {
 			t.Fatalf("%s: disabled verifier must answer not-staked: %+v err=%v", name, got, err)
 		}
 	}
-	_ = calls
 }
 
 func TestCacheIsBounded(t *testing.T) {

@@ -106,7 +106,7 @@ func TestPoolStakeMeFallsBackToTheChain(t *testing.T) {
 			ID string `json:"id"`
 		} `json:"users"`
 	}
-	if err := json.Unmarshal([]byte(users.body), &list); err != nil {
+	if err := json.Unmarshal(users.body, &list); err != nil {
 		t.Fatalf("admin users json: %v", err)
 	}
 	if len(list.Users) == 0 {
@@ -123,7 +123,7 @@ func TestPoolStakeMeFallsBackToTheChain(t *testing.T) {
 			BaseBps  int     `json:"base_bps"`
 		} `json:"rate"`
 	}
-	if err := json.Unmarshal([]byte(detail.body), &dv); err != nil {
+	if err := json.Unmarshal(detail.body, &dv); err != nil {
 		t.Fatalf("admin detail json: %v", err)
 	}
 	if !dv.Rate.Staked || dv.Rate.StakeNIM != 100 || dv.Rate.BaseBps < 100 {
