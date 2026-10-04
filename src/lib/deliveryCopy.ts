@@ -351,12 +351,14 @@ export function payActionLine(q: any, summary?: DeliverySummary): string {
  * field a payer must copy — so fall back through both, then trim the trailing
  * zeros the fixed-point column carries.
  */
-export function coinAmountOf(q: any): string {
+export function coinAmountOf(q: any, decimals = 6): string {
   const raw = q?.coin_amount ?? q?.validated_coin_amount ?? '';
   const n = Number(raw);
   if (!raw || !Number.isFinite(n) || n <= 0) return '';
-  // Keep up to 6 dp (USDT is 6-decimal), drop trailing zeros.
-  return String(Number(n.toFixed(6)));
+  // USDT is 6-decimal; BTC needs the FULL satoshi precision (8 dp) or the
+  // recap rounds the Lightning invoice away (owner, 2026-10-05). Trailing
+  // zeros drop, value stays exact.
+  return String(Number(n.toFixed(decimals)));
 }
 
 /** "12.34 USDT", or '' when unknown. */
@@ -368,7 +370,7 @@ export function coinAmountLabel(q: any): string {
  *  invoice amount on the Lightning rail — labelling the latter "USDT" read as
  *  a wrong currency on the order recap (owner, 2026-10-04). */
 export function coinAmountLabelFor(q: any, unit: 'USDT' | 'BTC'): string {
-  const a = coinAmountOf(q);
+  const a = coinAmountOf(q, unit === 'BTC' ? 8 : 6);
   return a ? `${a} ${unit}` : '';
 }
 

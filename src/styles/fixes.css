@@ -327,7 +327,9 @@ html.in-nimiq-pay #main.page {
   display: grid;
   grid-template-columns: 92px minmax(0, 1fr);
   gap: 8px;
-  align-items: start;
+  /* baseline, not start: the small-caps label and the bold value used to
+     sit on different lines visually (owner: "hafif aşağı kaymışlar"). */
+  align-items: baseline;
 }
 .pay-recap dt { margin: 0; font-size: 0.72rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-dim, #7a6a55); font-weight: 800; }
 
