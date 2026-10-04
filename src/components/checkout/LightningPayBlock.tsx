@@ -41,7 +41,7 @@ function NimIcon({ size = 18 }: { size?: number }) {
   );
 }
 
-function MissingDialog({ onClose }: { invoice: string; onClose: () => void }) {
+export function MissingDialog({ onClose }: { invoice: string; onClose: () => void }) {
   const { t } = useT();
   return (
     <div className="overlay open" role="alertdialog" aria-modal="true" aria-label={t('checkout.lpNotDetected')} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>

@@ -16,7 +16,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../ui/Icon';
 import { useCart, itemKey, type CartItem } from '../../lib/cartStore';
 import { useToast } from '../AppProviders';
-import { createQuote, createQuoteBatch, forgetQuote, getQuote, friendlyApiMessage } from '../../lib/api';
+import { createQuote, createQuoteBatch, forgetQuote, getQuote, friendlyApiMessage, authorizePaymentLaunch } from '../../lib/api';
 import { canRenewQuote, paymentInFlight, paymentWindowVerifying } from '../../lib/pay';
 import { supplierStatusLabel } from '../../lib/supplierStatus';
 import { buildOrderRequest, getGiftExtras, type DeliveryInfo } from '../../lib/delivery';
@@ -26,7 +26,7 @@ import { uuid } from '../../lib/format';
 import { CombinedDeliveryPicker } from './CombinedDeliveryPicker';
 import { needsPhone } from '../../lib/catalog';
 import { useT, t as tr } from '../../i18n';
-import { LightningPayBlock } from './LightningPayBlock';
+import { LightningPayBlock, MissingDialog } from './LightningPayBlock';
 import { NimiqPayPayButton } from './NimiqPayPayButton';
 import { inNimiqPay } from '../../lib/miniapp';
 import { SimulatedPayBlock } from './SimulatedPayBlock';
@@ -34,7 +34,7 @@ import { isTestMode } from '../../lib/config';
 import { UsdtPayBlock } from './UsdtPayBlock';
 import { PaymentCountdown } from './PaymentCountdown';
 import { lightningPaymentURI, rememberLightningPayment } from '../../lib/hub';
-import { PAID_STATUSES, quoteBolt11, quoteIdOf, isQuotePayable } from '../../lib/pay';
+import { PAID_STATUSES, quoteBolt11, quoteIdOf, isQuotePayable, launchLightningUri } from '../../lib/pay';
 import { cashbackExclusiveNote } from '../../lib/cashback';
 import { quoteFaceValue } from '../../lib/format';
 import { StakerCashbackLine } from '../staker/StakerCashback';
@@ -795,6 +795,7 @@ export function PayScreen({
   const usdtRail = payRail(current);
   const isUsdt = usdtRail.isUsdt;
   const insidePay = inNimiqPay();
+  const [heroMissing, setHeroMissing] = useState(false);
 
   // TEST MODE: there is NO separate simulated pay screen. The customer sees
   // this exact real pay screen — real invoice, real QR, real countdown — and
@@ -990,15 +991,29 @@ export function PayScreen({
         {localFiat && <div className="small muted" style={{ marginTop: 6, fontWeight: 700 }}>{localFiat}</div>}
         {/* Owner (2026-10-04): inside Nimiq Pay the pay button lives INSIDE the
             hero card, right under the amount — not one card further down. */}
-        {insidePay && invoice && (
+        {invoice && (insidePay ? (
           <div style={{ marginTop: 12 }}>
             <NimiqPayPayButton invoice={invoice} className="btn btn-gold btn-block btn-lg" />
           </div>
-        )}
+        ) : uri ? (
+          <button
+            type="button"
+            className="btn btn-gold btn-block btn-lg"
+            style={{ marginTop: 12 }}
+            onClick={() => {
+              rememberLightningPayment(invoice, { kind: 'quote', ref: quoteIdOf(current) });
+              void authorizePaymentLaunch(quoteIdOf(current)).catch(() => {});
+              launchLightningUri(uri, () => setHeroMissing(true));
+            }}
+          >
+            <Icon name="bolt" size={16} /> {t('checkout.flowPayWithNim')}
+          </button>
+        ) : null)}
+        {heroMissing && <MissingDialog invoice={invoice} onClose={() => setHeroMissing(false)} />}
       </div>
       <details className="checkout-details-min"><summary>{t('checkout.flowDetailsSummary')}</summary><div style={{ marginTop: 8 }}><div className="small" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}><span className="muted">{t('orderPage.finalTotal')}</span><span className="mono strong">{coinAmountLabelFor(current, 'BTC') || t('orderPage.amountNote')}</span></div><div className="small muted">{t('checkout.flowNimEstimateNote')}</div><CashbackFeeNotice example="nim" /><StakerCashbackLine quote={current} />{cbExclusive && (<div className="small muted mt-1" style={{ textAlign: 'center' }}><Icon name="lock" size={13} /> {cbExclusive}</div>)}<div className="alert info mt-1" style={{ marginBottom: 0, display: 'flex', gap: '8px', alignItems: 'center' }}><Icon name="bolt" size={18} /><div className="small">{payRail(current).note}</div></div><div className="small muted mt-1">{payActionLine(current)}</div></div></details>
       {note}
-      {uri ? <LightningPayBlock quoteId={quoteIdOf(current)} invoice={invoice} uri={uri} onLaunch={() => rememberLightningPayment(invoice, { kind: 'quote', ref: quoteIdOf(current) })} avatarAddress={getAddress()} hidePayButton={insidePay} /> : null}
+      {uri ? <LightningPayBlock quoteId={quoteIdOf(current)} invoice={invoice} uri={uri} onLaunch={() => rememberLightningPayment(invoice, { kind: 'quote', ref: quoteIdOf(current) })} avatarAddress={getAddress()} hidePayButton /> : null}
       {testPayButton}
       <div className="small muted mt-1" style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
         <Icon name="alert" size={16} />
