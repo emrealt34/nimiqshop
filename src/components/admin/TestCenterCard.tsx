@@ -56,7 +56,10 @@ export function TestCenterCard() {
   const [email, setEmail] = useState('');
   const [giftMessage, setGiftMessage] = useState('');
   const [anonymous, setAnonymous] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState('nimiq_pay');
+  // Single rail: every test order is a Bitcoin Lightning request (see the rail
+  // card below). Kept as a plain constant so nothing can drift from the
+  // customer checkout, which no longer has a second rail either.
+  const paymentMethod = 'nimiq_pay';
   const [cashbackDestination, setCashbackDestination] = useState('cashback');
 
   // run state
@@ -313,19 +316,23 @@ export function TestCenterCard() {
       <div className="row" style={{ gap: '14px', flexWrap: 'wrap', marginTop: '8px', alignItems: 'center' }}>
         <div className="field" style={{ margin: 0 }}>
           <label>Payment rail</label>
-          <div className="row" style={{ gap: '8px' }}>
-            {[
-              { id: 'nimiq_pay', label: '⚡ Pay with NIM · BTC Lightning' },
-              { id: 'usdt_polygon', label: '💵 USDT (Polygon)' },
-            ].map((m) => (
-              <label
-                key={m.id}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 12px', border: '2px solid var(--line-strong)', borderRadius: 'var(--r-s)', cursor: 'pointer', fontWeight: 800, fontSize: '0.85rem', background: paymentMethod === m.id ? 'var(--surface-2, #f3ecd9)' : 'var(--surface-1)' }}
-              >
-                <input type="radio" name="tc-method" value={m.id} checked={paymentMethod === m.id} onChange={() => setPaymentMethod(m.id)} style={{ accentColor: 'var(--stamp)' }} />
-                {m.label}
-              </label>
-            ))}
+          {/* One rail only — the same one customers get. A test order is a
+              Bitcoin Lightning request settled from Nimiq Pay, and the buyer's
+              choice of NIM or USDT happens inside the wallet (the shop neither
+              sees nor records it). The old "USDT (Polygon)" simulation tested a
+              rail customers can no longer take, so it is gone from this form;
+              the backend still accepts usdt_polygon for existing orders. */}
+          <div
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+              border: '2px solid var(--line-strong)', borderRadius: 'var(--r-s)',
+              background: 'var(--surface-2, #f3ecd9)', fontWeight: 800, fontSize: '0.85rem',
+            }}
+          >
+            ⚡ Nimiq Pay · BTC Lightning — NIM veya USDT
+          </div>
+          <div className="small muted" style={{ marginTop: 4 }}>
+            USDT, Nimiq Pay içinde seçilir; sipariş yine Bitcoin Lightning faturasıdır.
           </div>
         </div>
         <div className="field" style={{ margin: 0, minWidth: 140 }}>
