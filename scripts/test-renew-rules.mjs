@@ -34,7 +34,7 @@ writeFileSync(entry, `
 (globalThis as any).localStorage ??= { getItem: () => null, setItem() {}, removeItem() {} };
 (globalThis as any).window ??= { addEventListener() {}, location: { href: '' }, navigator: { language: 'en' } };
 (globalThis as any).document ??= { addEventListener() {}, documentElement: { lang: 'en' }, createElement: () => ({ style: {} }), cookie: '' };
-export { canRenewQuote, paymentInFlight, paymentWindowOver, paymentWindowVerifying, PAYMENT_VERIFY_GRACE_MS } from ${JSON.stringify(path.join(root, 'src/lib/pay'))};
+export { canRenewQuote, paymentInFlight, paymentWindowOver, paymentWindowVerifying, PAYMENT_VERIFY_GRACE_MS, renewItemFromQuote, renewInfoFromQuote, canRebuildRequest } from ${JSON.stringify(path.join(root, 'src/lib/pay'))};
 `);
 
 const esbuild = path.join(root, 'node_modules', '.bin', process.platform === 'win32' ? 'esbuild.cmd' : 'esbuild');
@@ -47,7 +47,7 @@ assert.equal(built.status, 0, built.stderr || 'esbuild failed to bundle src/lib/
 process.on('exit', () => rmSync(dir, { recursive: true, force: true }));
 
 const require = createRequire(import.meta.url);
-const { canRenewQuote, paymentInFlight, paymentWindowOver, paymentWindowVerifying, PAYMENT_VERIFY_GRACE_MS } = require(bundle);
+const { canRenewQuote, paymentInFlight, paymentWindowOver, paymentWindowVerifying, PAYMENT_VERIFY_GRACE_MS, renewItemFromQuote, renewInfoFromQuote, canRebuildRequest } = require(bundle);
 
 const NOW = Date.parse('2026-10-04T12:00:00Z');
 const GRACE = PAYMENT_VERIFY_GRACE_MS;
@@ -130,4 +130,50 @@ test('the grace boundary is inclusive and the shop field names all work', () => 
   assert.equal(canRenewQuote({ status: 'awaiting_payment', can_pay: false, payment_expires_at: at(-GRACE) }, NOW), true);
   assert.equal(canRenewQuote({ status: 'awaiting_payment', can_pay: false, expires_at: at(-GRACE) }, NOW), true);
   assert.equal(canRenewQuote({ status: 'awaiting_payment', can_pay: false, expires_at: at(-GRACE + 1000) }, NOW), false);
+});
+
+/* ------------------------------------------------------------------ *
+ * The renewal REQUEST shape.
+ *
+ * A live click on "Yeni fatura oluştur" answered 400 "product_id and country
+ * are required", because the quote payload calls it `product_country` and the
+ * cart item calls it `country`. These cases are written against the keys the
+ * live API actually returns (captured 2026-10-04):
+ *   id, product_id, product_country, denomination, product_value, quantity,
+ *   customer_email, beneficiary_account, payment_method, cashback_destination
+ * ------------------------------------------------------------------ */
+const liveQuote = {
+  id: '5fc9efdf-cc03-4906-95b7-07bf3c6df5a2',
+  product_id: 'Amazon.com.tr', product_country: 'TR', denomination: 'range',
+  product_value: 100, quantity: 1, customer_email: 'canli.test.nimshop@gmail.com',
+  payment_method: 'nimiq_pay', cashback_destination: 'cashback', status: 'expired',
+  payment_expiry: '2026-10-04T11:53:04Z', expires_at: '2026-10-04T11:53:04Z', coin: 'BTC',
+};
+
+test('the renewal request is built from the QUOTE field names, not the cart names', () => {
+  const item = renewItemFromQuote(liveQuote);
+  assert.equal(item.id, 'Amazon.com.tr');
+  assert.equal(item.country, 'TR', 'product_country must map to country — the live 400 came from exactly this');
+  assert.equal(item.denomination, 'range');
+  assert.equal(item.value, 100);
+  assert.equal(item.qty, 1);
+  const info = renewInfoFromQuote(liveQuote);
+  assert.equal(info.email, 'canli.test.nimshop@gmail.com');
+  assert.equal(info.paymentMethod, 'nimiq_pay');
+  assert.equal(info.cashbackDestination, 'cashback');
+});
+
+test('a phone-delivered quote keeps the number that lives in beneficiary_account', () => {
+  const topup = { product_id: 'Vodafone TR', product_country: 'TR', denomination: 'range', product_value: 50,
+                  quantity: 1, customer_email: '', beneficiary_account: '+905321112233', payment_method: 'nimiq_pay' };
+  assert.equal(renewInfoFromQuote(topup).phone, '+905321112233');
+  assert.equal(renewInfoFromQuote({ phone_number: '+905321112233' }).phone, '+905321112233');
+});
+
+test('renewal is refused when the shop does not know what to buy', () => {
+  assert.equal(canRebuildRequest(liveQuote), true);
+  assert.equal(canRebuildRequest({ product_id: 'Amazon.com.tr' }), false);
+  assert.equal(canRebuildRequest({ product_country: 'TR' }), false);
+  assert.equal(canRebuildRequest(null), false);
+  assert.equal(renewItemFromQuote(null).country, undefined);
 });

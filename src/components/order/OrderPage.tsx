@@ -19,7 +19,7 @@ import { quoteStages, isTerminalStatus, shouldAskRating, ratingDismissedKey } fr
 import { brandMetaForTitle } from '../../lib/catalogMeta';
 import { mapKind } from '../../lib/catalog';
 import { lightningPaymentURI, rememberLightningPayment } from '../../lib/hub';
-import { isQuotePayable, quoteBolt11, canRenewQuote, paymentInFlight, paymentWindowVerifying } from '../../lib/pay';
+import { isQuotePayable, quoteBolt11, canRenewQuote, paymentInFlight, paymentWindowVerifying, renewItemFromQuote, renewInfoFromQuote, canRebuildRequest } from '../../lib/pay';
 import { supplierStatusLabel } from '../../lib/supplierStatus';
 import { buildOrderRequest } from '../../lib/delivery';
 import { uuid } from '../../lib/format';
@@ -598,20 +598,7 @@ function PayNowCard({ q }: { q: any }) {
       setRenewBusy(true);
       setRenewErr('');
       try {
-        const req = buildOrderRequest(
-          {
-            id: q.product_id, qty: q.quantity || 1, country: q.country,
-            denomination: q.denomination || '', value: q.product_value || 0,
-            brand: q.brand || '', brand_id: q.brand_id || '', category: q.category || '',
-          },
-          {
-            email: q.customer_email || q.email || '',
-            phone: q.phone_number || '',
-            paymentMethod: q.payment_method || 'nimiq_pay',
-            cashbackDestination: q.cashback_destination || 'cashback',
-            anonymous: !!q.anonymous,
-          },
-        );
+        const req = buildOrderRequest(renewItemFromQuote(q), renewInfoFromQuote(q));
         const out: any = await createQuote(req, uuid());
         const next = (out && (out.quote || out)) || {};
         const id = next.quote_id || next.id;
@@ -629,6 +616,9 @@ function PayNowCard({ q }: { q: any }) {
         setRenewBusy(false);
       }
     };
+    // A quote that cannot be re-quoted (no product/country in the payload) must
+    // not offer a button whose only possible outcome is a backend refusal.
+    const rebuildable = canRebuildRequest(q);
     return (
       <div className="card" style={{ borderColor: 'var(--stamp)', borderWidth: '2px' }}>
         <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -636,9 +626,11 @@ function PayNowCard({ q }: { q: any }) {
           <span>{t('orderPage.windowOverTitle')}</span>
         </div>
         <div className="small muted">{t('orderPage.windowOverBody')}</div>
+        {rebuildable && (
         <button type="button" className="btn btn-gold btn-block mt-2" disabled={renewBusy} onClick={() => { void renew(); }}>
           <Icon name="bolt" size={14} /> <span className="btn-label">{renewBusy ? t('orderPage.renewBusy') : t('orderPage.renewCta')}</span>
         </button>
+        )}
         {renewErr && <div className="small mt-1" style={{ color: 'var(--stamp)' }}>{renewErr}</div>}
         <div className="xs faint mt-1">{t('checkout.flowRenewWhy')}</div>
       </div>

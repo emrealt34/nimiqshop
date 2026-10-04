@@ -149,6 +149,48 @@ export function canRenewQuote(q: any, now = Date.now()): boolean {
   return status === 'expired' || status === 'failed';
 }
 
+/**
+ * Rebuild "the same item" for a fresh invoice.
+ *
+ * The quote payload and the cart item do NOT share field names —
+ * `product_country` vs `country`, `customer_email` vs `email`, and a
+ * phone-delivered order keeps its number in `beneficiary_account`. Reading the
+ * wrong one produced a live 400 ("product_id and country are required") on the
+ * very button meant to unblock a stuck buyer, so the mapping lives here, in
+ * one place, with tests against the real payload keys.
+ */
+export function renewItemFromQuote(q: any) {
+  return {
+    id: q?.product_id,
+    qty: q?.quantity || 1,
+    country: q?.product_country,
+    denomination: q?.denomination || '',
+    value: q?.product_value ?? 0,
+    brand: q?.brand || '',
+    brand_id: q?.brand_id || '',
+    category: q?.category || '',
+  };
+}
+
+export function renewInfoFromQuote(q: any) {
+  return {
+    email: q?.customer_email || q?.email || '',
+    phone: q?.phone_number || q?.beneficiary_account || '',
+    paymentMethod: q?.payment_method || 'nimiq_pay',
+    cashbackDestination: q?.cashback_destination || 'cashback',
+    anonymous: !!q?.anonymous,
+  };
+}
+
+/**
+ * A quote can only be re-quoted when the shop knows WHAT to buy and WHERE it
+ * ships. Without both, the button must not be offered at all: a click that can
+ * only fail with a raw backend sentence is worse than no button.
+ */
+export function canRebuildRequest(q: any): boolean {
+  return Boolean(q?.product_id) && Boolean(q?.product_country || q?.country);
+}
+
 /** Fresh-invoice reasons that never prove the payment failed — for copy. */
 export function renewalReason(q: any, localExpired = false, now = Date.now()): 'window' | 'expired' | 'none' {
   if (!canRenewQuote(q, now)) return 'none';
