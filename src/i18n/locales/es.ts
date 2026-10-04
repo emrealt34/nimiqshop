@@ -431,6 +431,7 @@ const es = {
     flowUnpaidOrderHold: 'Tienes un pedido sin pagar. Paga o resuelve el pago existente en Pedidos primero. Cambiar o dividir el carrito no evita esta retención de seguridad.',
     flowUnpaidOrderNote: 'Tienes un pedido sin pagar. Abre Pedidos y paga o resuelve el pago existente antes de iniciar otro. Cambiar o dividir el carrito no evita esta retención de seguridad.',
     flowMayStillLand: 'El pago aún puede llegar. No crees un pedido de reemplazo. Abre el pedido existente y verifica la transacción; reintentar solo reabre ese mismo pago.',
+    flowForceContinue: 'Continuar de todos modos — nuevo pago',
     flowOpenOrdersPayExisting: 'Abrir Pedidos — pagar el pedido existente',
     flowReopenCheckout: 'Reabrir el pago existente de {{name}}',
     flowSkipNextItem: 'Omitir — siguiente artículo (quedan {{n}})',

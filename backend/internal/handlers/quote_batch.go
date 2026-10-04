@@ -65,6 +65,9 @@ type batchQuoteItem struct {
 }
 
 type batchQuoteRequest struct {
+	// AckActiveCheckout: "continue anyway" on the unresolved-checkout hold.
+	AckActiveCheckout bool `json:"ack_active_checkout,omitempty"`
+
 	Items []batchQuoteItem `json:"items"`
 	Email string           `json:"email,omitempty"`
 	// The cart's gift note, hoisted out of the item rows before validation so
@@ -234,7 +237,7 @@ func (h *Handlers) createQuoteBatchInner(ctx *fasthttp.RequestCtx, userID string
 		return
 	}
 	requestFP, purchaseFP := batchFingerprints(req)
-	if h.existingCheckout(ctx, userID, idempotencyKey, requestFP, purchaseFP) {
+	if h.existingCheckout(ctx, userID, idempotencyKey, requestFP, purchaseFP, req.AckActiveCheckout) {
 		return
 	}
 
@@ -553,7 +556,7 @@ func (h *Handlers) createQuoteBatchInner(ctx *fasthttp.RequestCtx, userID string
 		}
 	}
 	if err := h.Store.CreateQuoteWithPurchaseLimits(q, h.Cfg.DailyOrderLimit, money.FromFloat(h.Cfg.DailySpendLimitUSD), money.FromFloat(h.Cfg.MonthlySpendLimitUSD), now,
-		h.quoteGateOptions(&q, &cashbackView)); err != nil {
+		h.quoteGateOptions(&q, &cashbackView, req.AckActiveCheckout)); err != nil {
 		if h.quoteGateError(ctx, err) {
 			return
 		}

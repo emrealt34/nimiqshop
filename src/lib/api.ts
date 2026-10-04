@@ -514,10 +514,11 @@ async function createCheckout(path: string, req: unknown, proposedKey?: string):
 // Legacy callers may clear display state, never the durable purchase key.
 export const forgetQuote = (_req: unknown) => {};
 export const createQuote = (req: unknown, key?: string) => createCheckout('/quotes', req, key);
-export const createQuoteBatch = (items: unknown[], email?: string, key?: string, cashbackCode?: string, paymentMethod?: string, cashbackDest?: string, anonymous?: boolean) =>
+export const createQuoteBatch = (items: unknown[], email?: string, key?: string, cashbackCode?: string, paymentMethod?: string, cashbackDest?: string, anonymous?: boolean, ackActiveCheckout?: boolean) =>
   createCheckout('/quotes/batch', {
     items,
     email,
+    ack_active_checkout: !!ackActiveCheckout,
     cashback_code: cashbackCode || '',
     payment_method: paymentMethod || 'nimiq_pay',
     cashback_destination: cashbackDest || 'cashback',

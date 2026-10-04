@@ -308,7 +308,7 @@ func (h *Handlers) AdminTestPurchase(ctx *fasthttp.RequestCtx) {
 	// quote-attempt ceiling: an operator testing a flow fifty times in a row
 	// is the intended use of the test center, not an abuse pattern.
 	if err := h.Store.CreateQuoteWithPurchaseLimits(q, h.Cfg.DailyOrderLimit, money.FromFloat(h.Cfg.DailySpendLimitUSD), money.FromFloat(h.Cfg.MonthlySpendLimitUSD), now,
-		h.quoteGateOptions(&q, &cashbackView)); err != nil {
+		h.quoteGateOptions(&q, &cashbackView, false)); err != nil {
 		writeError(ctx, fasthttp.StatusConflict, "test quote could not be created: "+err.Error())
 		return
 	}

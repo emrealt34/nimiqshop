@@ -431,6 +431,7 @@ const pt = {
     flowUnpaidOrderHold: 'Tem uma encomenda por pagar. Pague ou resolva primeiro o pagamento existente em Encomendas. Alterar ou dividir o carrinho não evita este bloqueio de segurança.',
     flowUnpaidOrderNote: 'Tem uma encomenda por pagar. Abra Encomendas e pague ou resolva o pagamento existente antes de iniciar outro. Alterar ou dividir o carrinho não evita este bloqueio.',
     flowMayStillLand: 'O pagamento ainda pode chegar. Não crie uma encomenda substituta. Abra a encomenda existente e verifique a transação; tentar de novo só reabre esse mesmo pagamento.',
+    flowForceContinue: 'Continuar mesmo assim — novo pagamento',
     flowOpenOrdersPayExisting: 'Abrir Encomendas — pagar encomenda existente',
     flowReopenCheckout: 'Reabrir o pagamento existente de {{name}}',
     flowSkipNextItem: 'Saltar — próximo artigo (faltam {{n}})',

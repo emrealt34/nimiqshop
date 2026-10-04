@@ -254,6 +254,13 @@ export function CheckoutFlow({
   const cart = useCart();
   const { toast } = useToast();
   const [phase, setPhase] = useState<Phase>({ kind: 'delivery' });
+  // Per-flow auto-renew budget (see AutoRenewOnce): a dead invoice is replaced
+  // silently, but a quote that renews into another dead quote falls back to
+  // the manual gate instead of creating invoices in a loop.
+  useEffect(() => { (window as any).__autoRenewBudget = 2; }, []);
+  // "Continue anyway" on the unresolved-checkout hold: once pressed, every
+  // quote creation in this flow carries the buyer's ack to the backend gate.
+  const ackRef = useRef(false);
   const [, setDelivery] = useState<DeliveryInfo | null>(null);
   const [activeItems, setActiveItems] = useState<CartItem[]>(items);
   const flowRef = useRef<{ done: boolean; started: boolean }>({ done: false, started: false });
@@ -320,7 +327,7 @@ export function CheckoutFlow({
             if (cards.length > 0 && !isValidEmail(info.email)) {
               throw new Error(t('checkout.flowNeedEmail'));
             }
-            batch = await createQuoteBatch(batchReqFor(items, info.phones, info.email, pm, cd, !!info.anonymous), info.email.trim(), uuid(), currentCashbackCode(), pm, cd, !!info.anonymous);
+            batch = await createQuoteBatch(batchReqFor(items, info.phones, info.email, pm, cd, !!info.anonymous), info.email.trim(), uuid(), currentCashbackCode(), pm, cd, !!info.anonymous, ackRef.current);
           } catch (e) {
             batchIssues = supplierIssues(e);
             batchLimit = dailyLimitFromError(e);
@@ -406,12 +413,18 @@ export function CheckoutFlow({
               return;
             }
             // Generic batch failure
-            const c = await new Promise<'retry' | 'onebyone' | 'stop'>((resolve) => {
+            const c = await new Promise<'retry' | 'onebyone' | 'stop' | 'force'>((resolve) => {
               setPhase({ kind: 'batch-failed', message: batchErr || t('checkout.flowBatchUnconfirmed'), activeCheckout: batchActiveCheckout, items, issues: batchIssues });
               (window as any).__promptResolver = (x: any) => resolve(x);
             });
             (window as any).__promptResolver = undefined;
             if (c === 'retry') {
+              await tryBatch();
+              continue;
+            }
+            if (c === 'force') {
+              // Buyer chose to start a new payment beside the unresolved one.
+              ackRef.current = true;
               await tryBatch();
               continue;
             }
@@ -484,7 +497,7 @@ export function CheckoutFlow({
           let qLimit: DailyLimit | null = null;
           let qIssues: SupplierIssue[] = [];
           try {
-            quote = await createQuote(buildReq(it));
+            quote = await createQuote(ackRef.current ? { ...buildReq(it), ack_active_checkout: true } : buildReq(it));
           } catch (e) {
             qIssues = supplierIssues(e);
             qLimit = dailyLimitFromError(e);
@@ -508,12 +521,16 @@ export function CheckoutFlow({
               stop = true;
               continue;
             }
-            const c = await new Promise<'retry' | 'skip' | 'stop'>((resolve) => {
+            const c = await new Promise<'retry' | 'skip' | 'stop' | 'force'>((resolve) => {
               setPhase({ kind: 'item-failed', it, reason: qReason, msg: qErr, index: i, total: items.length, paidCount: paidIdx.length, issues: qIssues });
               (window as any).__promptResolver = (x: any) => resolve(x);
             });
             (window as any).__promptResolver = undefined;
             if (c === 'retry') continue;
+            if (c === 'force') {
+              ackRef.current = true;
+              continue;
+            }
             if (c === 'skip') {
               skip = true;
               continue;
@@ -1011,7 +1028,7 @@ function PerItemPayPhase({ quote, name, qty = 1, index, total, paidCount, onResu
   return <PayScreen quote={quote} name={name} stepNote={stepNote} youGetLabel={`${name} ×${qty}`} onResult={onResult} />;
 }
 
-function FailurePrompt({ issues = [], message, activeCheckout = false, items = [], onChoice, onBackToCart }: { issues?: SupplierIssue[]; message: string; activeCheckout?: boolean; items?: CartItem[]; onChoice: (c: 'retry' | 'onebyone' | 'stop') => void; onBackToCart: () => void }) {
+function FailurePrompt({ issues = [], message, activeCheckout = false, items = [], onChoice, onBackToCart }: { issues?: SupplierIssue[]; message: string; activeCheckout?: boolean; items?: CartItem[]; onChoice: (c: 'retry' | 'onebyone' | 'stop' | 'force') => void; onBackToCart: () => void }) {
   const { t } = useT();
   const productLabel = items.length === 1 ? items[0].name : items.length > 1 ? t('checkout.flowTheseItems') : t('checkout.flowYourCart');
   const displayMessage = activeCheckout
@@ -1032,7 +1049,12 @@ function FailurePrompt({ issues = [], message, activeCheckout = false, items = [
       )}
       <div style={{ maxWidth: 330, margin: '16px auto 0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {activeCheckout && (
-          <a className="btn btn-gold btn-block" href={pagePath("/orders")}>
+          <button type="button" className="btn btn-gold btn-block" onClick={() => onChoice('force')}>
+            <Icon name="bolt" size={14} /> {t('checkout.flowForceContinue')}
+          </button>
+        )}
+        {activeCheckout && (
+          <a className="btn btn-outline btn-block mt-1" href={pagePath("/orders")}>
             {t('checkout.flowOpenOrdersPayExisting')}
           </a>
         )}
@@ -1229,7 +1251,7 @@ function LimitBar({ pct }: { pct: number }) {
   );
 }
 
-function ItemFailedPrompt({ issues = [], it, reason, msg, index, total, paidCount, onChoice, onBackToCart }: { issues?: SupplierIssue[]; it: CartItem; reason: string; msg: string; index: number; total: number; paidCount: number; onChoice: (c: 'retry' | 'skip' | 'stop') => void; onBackToCart: () => void }) {
+function ItemFailedPrompt({ issues = [], it, reason, msg, index, total, paidCount, onChoice, onBackToCart }: { issues?: SupplierIssue[]; it: CartItem; reason: string; msg: string; index: number; total: number; paidCount: number; onChoice: (c: 'retry' | 'skip' | 'stop' | 'force') => void; onBackToCart: () => void }) {
   const { t } = useT();
   const why = whyFor(reason, it.name, msg);
   const activeCheckout = isActiveCheckoutMessage(reason, msg);
@@ -1260,14 +1282,19 @@ function ItemFailedPrompt({ issues = [], it, reason, msg, index, total, paidCoun
       )}
       <div style={{ maxWidth: 320, margin: '16px auto 0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {activeCheckout ? (
-          <a className="btn btn-gold btn-block" href={pagePath("/orders")}>
-            {t('checkout.flowOpenOrdersPayExisting')}
-          </a>
+          <button type="button" className="btn btn-gold btn-block" onClick={() => onChoice('force')}>
+            <Icon name="bolt" size={14} /> {t('checkout.flowForceContinue')}
+          </button>
         ) : !issues.length ? (
           <button className="btn btn-gold btn-block" onClick={() => onChoice('retry')}>
             {t('checkout.flowReopenCheckout', { name: it.name })}
           </button>
         ) : null}
+        {activeCheckout && (
+          <a className="btn btn-outline btn-block" href={pagePath("/orders")}>
+            {t('checkout.flowOpenOrdersPayExisting')}
+          </a>
+        )}
         {!activeCheckout && !issues.length && remaining > 0 && (
           <button className="btn btn-outline btn-block" onClick={() => onChoice('skip')}>
             {t('checkout.flowSkipNextItem', { n: remaining })}

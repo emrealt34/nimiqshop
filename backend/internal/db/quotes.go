@@ -121,6 +121,13 @@ type QuoteOptions struct {
 	// at reserve time, so a burst of concurrent checkouts cannot collectively
 	// overshoot a ceiling that is otherwise only measured at fulfillment.
 	CashbackEstimateUSD money.Micros
+	// AckActiveCheckout is the buyer's explicit "continue anyway" against the
+	// unresolved-checkout hold: the gate still surfaces a live duplicate of
+	// the SAME cart (that path just hands back the existing quote) but no
+	// longer refuses a DIFFERENT unresolved cart. Operator decision
+	// (2026-10-04): a buyer with an active payment must be able to start a
+	// new purchase; the button that sets this lives on the hold screen.
+	AckActiveCheckout bool
 	// MaxAttemptsPerDay bounds how many quotes (PAID OR ABANDONED) one
 	// account may open in a rolling 24h. 0 disables.
 	//
@@ -209,7 +216,11 @@ func (s *Store) createQuoteWithPurchaseLimits(q Quote, maxOrders int, maxSpend, 
 			if CartEqual(existing, q) {
 				return &ErrLiveDuplicate{Quote: existing}
 			}
-			return &ErrActiveCheckout{Quote: existing}
+			if !o.AckActiveCheckout {
+				return &ErrActiveCheckout{Quote: existing}
+			}
+			// Acked: fall through and create the fresh quote beside the
+			// unresolved one. The old quote keeps its own settlement path.
 		}
 		count := 0
 		attempts := 0

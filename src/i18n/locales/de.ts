@@ -431,6 +431,7 @@ const de = {
     flowUnpaidOrderHold: 'Du hast eine unbezahlte Bestellung. Zahle oder kläre zuerst den bestehenden Checkout in Bestellungen. Warenkorb ändern oder teilen hebt diese Sicherheitssperre nicht auf.',
     flowUnpaidOrderNote: 'Du hast eine unbezahlte Bestellung. Öffne Bestellungen und zahle oder kläre den bestehenden Checkout, bevor du eine neue Zahlung startest. Warenkorb ändern oder teilen hebt diese Sperre nicht auf.',
     flowMayStillLand: 'Die Zahlung kann noch eintreffen. Erstelle keine Ersatzbestellung. Öffne die bestehende Bestellung und prüfe die Wallet-Transaktion; ein erneuter Versuch öffnet nur denselben Checkout.',
+    flowForceContinue: 'Trotzdem fortfahren — neue Zahlung starten',
     flowOpenOrdersPayExisting: 'Bestellungen öffnen — bestehende Bestellung zahlen',
     flowReopenCheckout: 'Bestehenden {{name}}-Checkout wieder öffnen',
     flowSkipNextItem: 'Überspringen — nächster Artikel ({{n}} übrig)',

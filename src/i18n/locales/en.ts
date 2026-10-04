@@ -440,6 +440,7 @@ const en = {
     flowUnpaidOrderHold: 'You have an unpaid order. Pay or resolve the existing checkout in Orders first. Changing or splitting the cart cannot bypass this safety hold.',
     flowUnpaidOrderNote: 'You have an unpaid order. Open Orders, pay or resolve the existing checkout before starting another payment. Changing or splitting the cart cannot bypass this safety hold.',
     flowMayStillLand: 'The payment may still land. Do not create a replacement order. Open the existing order and verify the wallet transaction; a retry only reopens that same checkout.',
+    flowForceContinue: 'Continue anyway — start a new payment',
     flowOpenOrdersPayExisting: 'Open Orders — pay existing order',
     flowReopenCheckout: 'Reopen the existing {{name}} checkout',
     flowSkipNextItem: 'Skip — next item ({{n}} left)',

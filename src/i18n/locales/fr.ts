@@ -431,6 +431,7 @@ const fr = {
     flowUnpaidOrderHold: 'Vous avez une commande non payée. Payez ou réglez d\'abord le paiement existant dans Commandes. Modifier ou scinder le panier ne contourne pas ce blocage de sécurité.',
     flowUnpaidOrderNote: 'Vous avez une commande non payée. Ouvrez Commandes et payez ou réglez le paiement existant avant d\'en lancer un autre. Modifier ou scinder le panier ne contourne pas ce blocage.',
     flowMayStillLand: 'Le paiement peut encore aboutir. Ne créez pas de commande de remplacement. Ouvrez la commande existante et vérifiez la transaction ; réessayer ne rouvre que ce même paiement.',
+    flowForceContinue: 'Continuer quand même — nouveau paiement',
     flowOpenOrdersPayExisting: 'Ouvrir Commandes — payer la commande existante',
     flowReopenCheckout: 'Rouvrir le paiement {{name}} existant',
     flowSkipNextItem: 'Ignorer — article suivant ({{n}} restants)',

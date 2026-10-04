@@ -28,6 +28,10 @@ import (
 )
 
 type createQuoteRequest struct {
+	// AckActiveCheckout: the buyer pressed "continue anyway" on the
+	// unresolved-checkout hold (see db.QuoteOptions.AckActiveCheckout).
+	AckActiveCheckout bool `json:"ack_active_checkout,omitempty"`
+
 	// ProductID is the supplier family/brand ("Airbnb", "t-mobile").
 	ProductID string `json:"product_id"`
 	Country   string `json:"country"`
@@ -203,7 +207,7 @@ func (h *Handlers) createQuoteInner(ctx *fasthttp.RequestCtx, userID string, req
 		return
 	}
 	requestFP, purchaseFP := singleFingerprints(req)
-	if h.existingCheckout(ctx, userID, idempotencyKey, requestFP, purchaseFP) {
+	if h.existingCheckout(ctx, userID, idempotencyKey, requestFP, purchaseFP, req.AckActiveCheckout) {
 		return
 	}
 	cashbackView, err := h.resolveQuoteCashback(req.CashbackCode, userID)
@@ -444,7 +448,7 @@ func (h *Handlers) createQuoteInner(ctx *fasthttp.RequestCtx, userID string, req
 		}
 	}
 	if err := h.Store.CreateQuoteWithPurchaseLimits(q, h.Cfg.DailyOrderLimit, money.FromFloat(h.Cfg.DailySpendLimitUSD), money.FromFloat(h.Cfg.MonthlySpendLimitUSD), now,
-		h.quoteGateOptions(&q, &cashbackView)); err != nil {
+		h.quoteGateOptions(&q, &cashbackView, req.AckActiveCheckout)); err != nil {
 		if h.quoteGateError(ctx, err) {
 			return
 		}

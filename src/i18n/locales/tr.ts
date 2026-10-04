@@ -432,6 +432,7 @@ const tr = {
     flowUnpaidOrderHold: 'Ödenmemiş bir siparişin var. Önce Siparişler\'den öde ya da mevcut ödemeyi sonuçlandır. Sepeti değiştirmek veya bölmek bu güvenlik kilidini aşmaz.',
     flowUnpaidOrderNote: 'Ödenmemiş bir siparişin var. Başka bir ödeme başlatmadan önce Siparişler\'i açıp mevcut ödemeyi öde ya da sonuçlandır. Sepeti değiştirmek veya bölmek bu kilidi aşmaz.',
     flowMayStillLand: 'Ödeme hâlâ gelebilir. Yeni bir sipariş oluşturma. Mevcut siparişi açıp cüzdan işlemini doğrula; yeniden denemek yalnızca aynı ödemeyi açar.',
+    flowForceContinue: 'Yine de devam et — yeni ödeme başlat',
     flowOpenOrdersPayExisting: 'Siparişler\'i aç — mevcut siparişi öde',
     flowReopenCheckout: 'Mevcut {{name}} ödemesini yeniden aç',
     flowSkipNextItem: 'Atla — sonraki ürün ({{n}} kaldı)',

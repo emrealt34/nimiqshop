@@ -64,7 +64,7 @@ func checkoutKey(ctx *fasthttp.RequestCtx) (string, bool) {
 
 // Runs BEFORE catalog, price, promo or supplier validation. Retries must work
 // even when the catalog changes, a promo code was consumed, or the API is down.
-func (h *Handlers) existingCheckout(ctx *fasthttp.RequestCtx, user, key, requestFP, purchaseFP string) bool {
+func (h *Handlers) existingCheckout(ctx *fasthttp.RequestCtx, user, key, requestFP, purchaseFP string, ack bool) bool {
 	q, fp, err := h.Store.GetQuoteByIdempotencyRequest(user, key)
 	if err == nil {
 		if fp == "" || fp != requestFP {
@@ -102,10 +102,15 @@ func (h *Handlers) existingCheckout(ctx *fasthttp.RequestCtx, user, key, request
 		}
 		if q.PurchaseFingerprint != "" && q.PurchaseFingerprint == purchaseFP {
 			h.reuseCheckout(ctx, q, key, requestFP)
-		} else {
-			h.activeCheckoutError(ctx, q)
+			return true
 		}
-		return true
+		if !ack {
+			h.activeCheckoutError(ctx, q)
+			return true
+		}
+		// Acked ("continue anyway"): this unresolved cart must not block a
+		// new purchase — check the rest, then let creation proceed.
+		continue
 	}
 	return false
 }
@@ -282,8 +287,8 @@ func (h *Handlers) finishSupplierCreation(ctx *fasthttp.RequestCtx, q db.Quote, 
 // is harmless — the reservation is replaced by the exact figure at
 // fulfillment — while under-reserving would let a burst of concurrent
 // checkouts collectively blow through a budget the operator set.
-func (h *Handlers) quoteGateOptions(q *db.Quote, view *quoteCashbackView) db.QuoteOptions {
-	opts := db.QuoteOptions{MaxAttemptsPerDay: h.Cfg.DailyQuoteAttemptLimit}
+func (h *Handlers) quoteGateOptions(q *db.Quote, view *quoteCashbackView, ack bool) db.QuoteOptions {
+	opts := db.QuoteOptions{MaxAttemptsPerDay: h.Cfg.DailyQuoteAttemptLimit, AckActiveCheckout: ack}
 	if q == nil {
 		return opts
 	}
