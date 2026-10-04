@@ -183,6 +183,7 @@ export function CashbackCalculator({
 
       {/* ---------------------------------------------------------- inputs */}
       <div className="cb-calc-inputs">
+
         <label className={'cb-slider' + (stakedOff ? ' off' : '')}>
           <span className="cb-slider-top">
             <span className="xs faint">{t('cashback.calcYourStake')}</span>
@@ -191,6 +192,7 @@ export function CashbackCalculator({
                 className="cb-slider-input"
                 inputMode="numeric"
                 aria-label={t('cashback.calcStakeAria')}
+                style={{ width: `calc(${Math.max(5, (stakeText !== '' ? stakeText : fmtStakeNIM(stake)).length)}ch + 6px)` }}
                 value={stakeText !== '' ? stakeText : fmtStakeNIM(stake)}
                 onFocus={() => setStakeText(String(Math.round(stake)))}
                 onChange={(e) => {
@@ -235,6 +237,7 @@ export function CashbackCalculator({
                 className="cb-slider-input"
                 inputMode="numeric"
                 aria-label={t('cashback.calcOrdersAria')}
+                style={{ width: `calc(${Math.max(5, (spendText !== '' ? spendText : fmtStakeNIM(spend)).length)}ch + 6px)` }}
                 value={spendText !== '' ? spendText : fmtStakeNIM(spend)}
                 onFocus={() => setSpendText(String(Math.round(spend)))}
                 onChange={(e) => {

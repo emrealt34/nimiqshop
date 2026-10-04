@@ -793,7 +793,7 @@ html.in-nimiq-pay #main.page {
 .cb-slider-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
 .cb-slider-val { display: inline-flex; align-items: baseline; gap: 6px; font-size: clamp(18px, 4.5vw, 22px); font-weight: 800; }
 .cb-slider-input {
-  width: 9ch; max-width: 40vw; background: transparent; border: 0; border-bottom: 1.5px dashed var(--line-dash);
+  width: 9ch; min-width: 5ch; max-width: 46vw; background: transparent; border: 0; border-bottom: 1.5px dashed var(--line-dash);
   color: var(--ink); font: inherit; font-weight: 800; text-align: right; padding: 0 2px;
 }
 .cb-slider-input:focus { outline: none; border-bottom-color: var(--stamp); }
@@ -870,7 +870,6 @@ html.in-nimiq-pay #main.page {
 .cb-hero, .cb-calc, .cb-steps, .cb-row { max-width: 100%; }
 .cb-hero-main, .cb-hero-stats > div { min-width: 0; overflow-wrap: anywhere; }
 .cb-rate { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: clamp(30px, 8vw, 40px); line-height: 1.1; }
-.cb-slider-input { max-width: 8ch; }
 .cb-calc-kv dt { min-width: 0; overflow-wrap: anywhere; }
 .cb-calc-kv dd { white-space: nowrap; }
 /* Desktop: keep the stake amount + action together instead of pinning the
