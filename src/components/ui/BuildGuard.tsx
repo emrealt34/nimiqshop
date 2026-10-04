@@ -17,7 +17,9 @@
  * is blocked, or when the ids match.
  */
 import { useEffect, useState } from 'react';
-import { useT } from '../../i18n';
+// Imperative translator: this island mounts standalone (no I18n provider
+// wraps it), and the module-level t follows language switches globally.
+import { t as tr } from '../../i18n';
 
 function currentBuild(): string {
   return document.querySelector('meta[name="build-id"]')?.getAttribute('content') || '';
@@ -32,7 +34,6 @@ async function latestBuild(): Promise<string> {
 }
 
 export function BuildGuard() {
-  const t = useT();
   const [stale, setStale] = useState(false);
 
   useEffect(() => {
@@ -63,7 +64,7 @@ export function BuildGuard() {
   if (!stale) return null;
   return (
     <button type="button" className="build-guard" onClick={() => window.location.reload()}>
-      {t('app.updateReady')}
+      {tr('app.updateReady')}
     </button>
   );
 }
