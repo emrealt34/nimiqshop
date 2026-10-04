@@ -181,6 +181,44 @@ function gapBetween(container: HTMLElement, items: HTMLElement[]): number {
   return total / Math.max(1, items.length - 1);
 }
 
+/**
+ * Out-of-flow decorations inside a fitted box — the awaiting-payment badge
+ * hangs off the ORDERS link at `right:-11px` — sit outside the label's text
+ * but still land in the box's scrollable overflow (so `ellipsized()` reports a
+ * healthy label as cut) and in a Range's client rects (so `textWidth()`
+ * overcharges it). Left in place, a single awaiting payment made every pass
+ * shrink the nav rail to its floor and then take the row's compact shape
+ * (tighter gaps, slimmer paddings, capped brand) for a clip that was never
+ * there — the nav visibly collapsed the moment the badge appeared.
+ *
+ * The decorations are out of flow, so hiding them while measuring changes
+ * nothing about the layout being measured; and a whole pass runs inside one
+ * task, so no paint ever sees them gone.
+ */
+interface HiddenDeco { el: HTMLElement; display: string }
+
+function hideDecorations(targets: HTMLElement[]): HiddenDeco[] {
+  const hidden: HiddenDeco[] = [];
+  const seen = new Set<HTMLElement>();
+  for (const target of targets) {
+    target.querySelectorAll<HTMLElement>('*').forEach((d) => {
+      if (seen.has(d)) return;
+      seen.add(d);
+      if (getComputedStyle(d).position !== 'absolute') return;
+      hidden.push({ el: d, display: d.style.display });
+      d.style.display = 'none';
+    });
+  }
+  return hidden;
+}
+
+function restoreDecorations(hidden: HiddenDeco[]) {
+  for (const { el, display } of hidden) {
+    if (display) el.style.display = display;
+    else el.style.removeProperty('display');
+  }
+}
+
 /* ---------------------------------------------------------------------------
  * BATCHED FITTING
  *
@@ -455,16 +493,25 @@ export function fitNow() {
   rows.forEach((row) => row.removeAttribute(TIGHT));
   const gStates = groups.map(makeGroupFit).filter((g): g is GroupFit => g !== null);
   const sStates = singles.map(makeSingleFit);
-  relax(gStates, sStates);
 
-  // 2. a rail that cannot fit — or that had to shrink past its squeeze point —
-  //    means the row is out of room. Tighten one step at a time and stop as
-  //    soon as the rail is comfortable, so the row never takes a harsher shape
-  //    than the current language actually needs. The decision is always taken
-  //    from the roomy measurement, so it is stable from pass to pass.
-  for (let level = 1; level <= MAX_TIGHT && rowOutOfRoom(); level += 1) {
-    rows.forEach((row) => row.setAttribute(TIGHT, String(level)));
+  // Out-of-flow decorations (the awaiting-payment badge) must not pollute the
+  // measurements of this pass — see hideDecorations(). Hidden here, restored
+  // in the finally below, all inside this one task.
+  const deco = hideDecorations(gStates.flatMap((g) => g.items).concat(sStates.map((f) => f.el)));
+  try {
     relax(gStates, sStates);
+
+    // 2. a rail that cannot fit — or that had to shrink past its squeeze point —
+    //    means the row is out of room. Tighten one step at a time and stop as
+    //    soon as the rail is comfortable, so the row never takes a harsher shape
+    //    than the current language actually needs. The decision is always taken
+    //    from the roomy measurement, so it is stable from pass to pass.
+    for (let level = 1; level <= MAX_TIGHT && rowOutOfRoom(); level += 1) {
+      rows.forEach((row) => row.setAttribute(TIGHT, String(level)));
+      relax(gStates, sStates);
+    }
+  } finally {
+    restoreDecorations(deco);
   }
   thawSoon();
 }
