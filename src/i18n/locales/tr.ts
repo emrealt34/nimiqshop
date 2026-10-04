@@ -19,6 +19,7 @@ const tr = {
     activity: 'Akış',
     orders: 'Siparişler',
     cashback: 'Cashback',
+    leaderboard: 'Liderler',
     support: 'Destek',
     cart: 'Sepet',
     account: 'Hesap',

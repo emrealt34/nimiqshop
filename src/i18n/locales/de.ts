@@ -19,6 +19,7 @@ const de = {
     activity: 'Aktivität',
     orders: 'Bestellungen',
     cashback: 'Cashback',
+    leaderboard: 'Leaderboard',
     support: 'Support',
     cart: 'Warenkorb',
     account: 'Konto',

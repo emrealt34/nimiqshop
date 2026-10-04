@@ -19,6 +19,7 @@ const pt = {
     activity: 'Atividade',
     orders: 'Pedidos',
     cashback: 'Cashback',
+    leaderboard: 'Classificação',
     support: 'Suporte',
     cart: 'Carrinho',
     account: 'Conta',

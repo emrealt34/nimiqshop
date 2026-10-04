@@ -19,6 +19,7 @@ const es = {
     activity: 'Actividad',
     orders: 'Pedidos',
     cashback: 'Reembolso',
+    leaderboard: 'Clasificación',
     support: 'Soporte',
     cart: 'Carrito',
     account: 'Cuenta',

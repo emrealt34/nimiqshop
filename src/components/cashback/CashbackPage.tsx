@@ -57,6 +57,7 @@ import { CashbackFeeNotice } from '../checkout/CashbackFeeNotice';
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AppRoot } from '../AppRoot';
+import type { ShellKey } from '../shell/SiteShell';
 import { Icon } from '../ui/Icon';
 import { CashbackCalculator } from './CashbackCalculator';
 import { RecentCashbackList } from './RecentCashbackList';
@@ -253,7 +254,12 @@ export function CashbackView() {
   // The cashback card & leaderboard used to drown at the bottom of this long
   // programme page (owner, 2026-10-04) — they now live in their own tab.
   const [tab, setTab] = useState<'program' | 'community'>(() => {
-    try { return sessionStorage.getItem('nimshop:cb-tab') === 'community' ? 'community' : 'program'; } catch { return 'program'; }
+    try {
+      const q = new URLSearchParams(window.location.search).get('tab');
+      if (q === 'leaderboard' || q === 'community') return 'community';
+      if (q === 'program') return 'program';
+      return sessionStorage.getItem('nimshop:cb-tab') === 'community' ? 'community' : 'program';
+    } catch { return 'program'; }
   });
   useEffect(() => {
     try { sessionStorage.setItem('nimshop:cb-tab', tab); } catch {}
@@ -982,10 +988,17 @@ function Header() {
   );
 }
 
-/** Static-page wrapper: mounts the providers + shell around the content. */
+/** Static-page wrapper: mounts the providers + shell around the content.
+ *  The Leaderboard nav tab deep-links here with ?tab=leaderboard, and then
+ *  the shell highlights THAT tab instead of Cashback (owner, 2026-10-04). */
 export function CashbackPage() {
+  const [activeKey] = useState<ShellKey>(() => {
+    try {
+      return new URLSearchParams(window.location.search).get('tab') === 'leaderboard' ? 'leaderboard' : 'cashback';
+    } catch { return 'cashback'; }
+  });
   return (
-    <AppRoot activeKey="cashback">
+    <AppRoot activeKey={activeKey}>
       <CashbackView />
     </AppRoot>
   );

@@ -27,6 +27,7 @@ const en = {
     activity: 'Activity',
     orders: 'Orders',
     cashback: 'Cashback',
+    leaderboard: 'Leaderboard',
     support: 'Support',
     cart: 'Cart',
     account: 'Account',

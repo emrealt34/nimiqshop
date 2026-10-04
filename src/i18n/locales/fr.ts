@@ -19,6 +19,7 @@ const fr = {
     activity: 'Activité',
     orders: 'Commandes',
     cashback: 'Cashback',
+    leaderboard: 'Classement',
     support: 'Support',
     cart: 'Panier',
     account: 'Compte',
