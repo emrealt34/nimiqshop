@@ -866,7 +866,12 @@ export function ProductPage() {
 
         <HowToRedeemCard product={product} info={info} termsText={termsText} />
 
-        <CashbackFeeNotice example="nim" />
+        {/* Owner (2026-10-04): same collapsed design as the pay screen —
+            closed by default, opens on tap. */}
+        <details className="checkout-details-min">
+          <summary>{t('productPage.feesDetails')}</summary>
+          <div style={{ marginTop: 8 }}><CashbackFeeNotice example="nim" /></div>
+        </details>
         <div className="mt-3 row" style={{ gap: '12px' }}>
           <button className="btn btn-outline btn-block btn-lg" onClick={doAddToCart} disabled={dead} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', justifyContent: 'center', opacity: dead ? 0.5 : 1 }}>
             <Icon name="bag" size={14} />

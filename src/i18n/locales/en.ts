@@ -130,6 +130,7 @@ const en = {
 
   product: {
     addToCart: 'Add to cart',
+    feesDetails: 'Fees and cashback',
     buyNow: 'Buy now',
     denomination: 'Denomination',
     country: 'Country',
@@ -460,7 +461,7 @@ const en = {
     walletNetwork: 'Network problem: the wallet could not verify this invoice.',
     walletInvalid: 'The wallet rejected this invoice as invalid — open the order and check it.',
     walletFail: 'The wallet request did not complete — open the order and check its status.',
-    lpPayWithNimOrUsdt: 'Pay with NIM or USDT',
+    lpPayWithNimOrUsdt: 'Pay with Nimiq Pay',
     lpAssetChoice: 'Inside the wallet you choose which asset pays (NIM or USDT) — the amount and any swap fee are shown before you approve.',
     lpPayWithNim: 'Pay with NIM · BTC Lightning',
     lpBtcNetwork: 'BTC Lightning Network',

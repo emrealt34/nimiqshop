@@ -121,6 +121,7 @@ const es = {
 
   product: {
     addToCart: 'Añadir al carrito',
+    feesDetails: 'Comisiones y cashback',
     buyNow: 'Comprar ahora',
     denomination: 'Valor',
     country: 'País',
@@ -451,7 +452,7 @@ const es = {
     walletNetwork: 'Problema de red: la cartera no pudo verificar esta factura.',
     walletInvalid: 'La cartera consideró inválida esta factura — abre el pedido y revísalo.',
     walletFail: 'La solicitud a la cartera no se completó — abre el pedido y revisa su estado.',
-    lpPayWithNimOrUsdt: 'Pagar con NIM o USDT',
+    lpPayWithNimOrUsdt: 'Pagar con Nimiq Pay',
     lpAssetChoice: 'Dentro de la cartera eliges con qué activo pagar (NIM o USDT): el importe y la comisión de cambio se muestran antes de aprobar.',
     lpPayWithNim: 'Pagar con NIM · BTC Lightning',
     lpBtcNetwork: 'Red BTC Lightning',

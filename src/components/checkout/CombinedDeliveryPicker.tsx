@@ -86,8 +86,6 @@ export function CombinedDeliveryPicker({
   // Single payment rail: BTC Lightning (Nimiq Pay or any Lightning wallet).
   // The USDT option was removed by owner decision; legacy USDT quotes keep
   // their pay screen in CheckoutFlow, but no new USDT quote can be created.
-  const [cashbackDest, setCashbackDest] = useState<'cashback' | 'burn'>('cashback');
-  const [anonymous, setAnonymous] = useState(false);
 
   const submit = async () => {
     setSelfError('');
@@ -153,8 +151,10 @@ export function CombinedDeliveryPicker({
       email,
       phones: phoneMap,
       paymentMethod: 'nimiq_pay',
-      cashbackDestination: cashbackDest,
-      anonymous,
+      // Owner (2026-10-04): cashback always goes to the buyer's wallet and
+      // every purchase is public — the burn/private choices are gone.
+      cashbackDestination: 'cashback',
+      anonymous: false,
     } as any;
     onDone(info);
   };
@@ -335,51 +335,6 @@ export function CombinedDeliveryPicker({
         </div>
       ) : null}
 
-
-      {/* Cashback destination */}
-      <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--ink)', marginBottom: 6 }}>{t('checkout.flowWhereCashback')}</div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <label
-          onClick={() => setCashbackDest('cashback')}
-          style={{
-            flex: 1,
-            padding: '10px',
-            border: cashbackDest === 'cashback' ? '2px solid var(--line-strong)' : '1.5px dashed var(--line-mid)',
-            borderRadius: 9,
-            background: cashbackDest === 'cashback' ? 'var(--paper-tint)' : 'var(--surface-1)',
-            cursor: 'pointer',
-            display: 'flex',
-            gap: 6,
-            alignItems: 'center',
-            fontWeight: 800,
-            fontSize: 12,
-          }}
-        >
-          <input type="radio" checked={cashbackDest === 'cashback'} onChange={() => setCashbackDest('cashback')} style={{ accentColor: 'var(--stamp)' }} /> {t('delivery.cdpMyWallet')}
-        </label>
-        <label
-          onClick={() => setCashbackDest('burn')}
-          style={{
-            flex: 1,
-            padding: '10px',
-            border: cashbackDest === 'burn' ? '2px solid var(--line-strong)' : '1.5px dashed var(--line-mid)',
-            borderRadius: 9,
-            background: cashbackDest === 'burn' ? 'var(--paper-tint)' : 'var(--surface-1)',
-            cursor: 'pointer',
-            display: 'flex',
-            gap: 6,
-            alignItems: 'center',
-            fontWeight: 800,
-            fontSize: 12,
-          }}
-        >
-          <input type="radio" checked={cashbackDest === 'burn'} onChange={() => setCashbackDest('burn')} style={{ accentColor: 'var(--stamp)' }} /> {t('checkout.flowBurnNim')}
-        </label>
-      </div>
-
-      <label style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '10px', border: anonymous ? '2px solid var(--line-strong)' : '1.5px dashed var(--line-mid)', borderRadius: 8, background: anonymous ? 'var(--paper-tint)' : 'var(--surface-1)', cursor: 'pointer', fontSize: 12, fontWeight: 700, marginBottom: 12 }}>
-        <input type="checkbox" checked={anonymous} onChange={(e) => setAnonymous(e.target.checked)} style={{ accentColor: 'var(--stamp)' }} /> {t('delivery.cdpPrivate')}
-      </label>
 
       <CashbackCodeField compact />
 

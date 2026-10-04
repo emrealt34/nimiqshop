@@ -121,6 +121,7 @@ const de = {
 
   product: {
     addToCart: 'In den Warenkorb',
+    feesDetails: 'Gebühren & Cashback',
     buyNow: 'Jetzt kaufen',
     denomination: 'Wert',
     country: 'Land',
@@ -451,7 +452,7 @@ const de = {
     walletNetwork: 'Netzwerkproblem: Das Wallet konnte diese Rechnung nicht prüfen.',
     walletInvalid: 'Das Wallet hielt diese Rechnung für ungültig — öffne die Bestellung und prüfe sie.',
     walletFail: 'Die Wallet-Anfrage wurde nicht abgeschlossen — öffne die Bestellung und prüfe den Status.',
-    lpPayWithNimOrUsdt: 'Mit NIM oder USDT zahlen',
+    lpPayWithNimOrUsdt: 'Mit Nimiq Pay zahlen',
     lpAssetChoice: 'Im Wallet entscheidest du, womit bezahlt wird (NIM oder USDT) — Betrag und ggf. Tauschgebühr werden vor der Freigabe angezeigt.',
     lpPayWithNim: 'Mit NIM · BTC Lightning bezahlen',
     lpBtcNetwork: 'BTC-Lightning-Netzwerk',

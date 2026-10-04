@@ -122,6 +122,7 @@ const tr = {
 
   product: {
     addToCart: 'Sepete ekle',
+    feesDetails: 'Ücretler ve cashback',
     buyNow: 'Hemen al',
     denomination: 'Miktar',
     country: 'Ülke',
@@ -452,7 +453,7 @@ const tr = {
     walletNetwork: 'Ağ sorunu: cüzdan bu faturayı doğrulayamadı.',
     walletInvalid: 'Cüzdan bu faturayı geçersiz saydı — siparişi açıp kontrol edin.',
     walletFail: 'Cüzdan isteği tamamlanamadı — siparişi açıp durumunu kontrol edin.',
-    lpPayWithNimOrUsdt: 'NIM veya USDT ile öde',
+    lpPayWithNimOrUsdt: 'Nimiq Pay ile öde',
     lpAssetChoice: 'Cüzdanın içinde hangi varlıkla ödeyeceğinizi siz seçersiniz (NIM ya da USDT) — tutar ve varsa takas ücreti onaydan önce gösterilir.',
     lpPayWithNim: 'NIM · BTC Lightning ile öde',
     lpBtcNetwork: 'BTC Lightning ağı',

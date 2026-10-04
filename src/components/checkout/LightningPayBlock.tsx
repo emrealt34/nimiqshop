@@ -16,7 +16,6 @@ import { useEffect, useRef, useState } from 'react';
 import { Icon } from '../ui/Icon';
 import { Identicon } from '../ui/Identicon';
 import { QR } from './QR';
-import { fmtNIM } from '../../lib/format';
 import { Clipboard } from '../../lib/clipboard';
 import { useToast } from '../AppProviders';
 import { useT } from '../../i18n';
@@ -90,7 +89,7 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddre
   const [allowed, setAllowed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [payLocked, setPayLocked] = useState(false);
-  const [amountNim, setAmountNim] = useState(0);
+  const [, setAmountNim] = useState(0);
   // Keep the KEY in state, translate at render: a stored string would freeze
   // in the language the poll last ran in (language switch looked stale).
   const [msgKey, setMsgKey] = useState<'checkout.lpSupplierInvoice' | 'checkout.lpPending' | 'checkout.lpCannotVerify'>('checkout.lpSupplierInvoice');
@@ -214,7 +213,6 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddre
     } finally { flight.current = false; setBusy(false); }
   };
   const disabled = busy || !allowed;
-  const amountLabel = amountNim > 0 ? `≈ ${fmtNIM(Math.round(amountNim), 0)} NIM` : '';
   return (
     <div aria-busy={busy}>
       <div className="xs faint mt-1" role="status">{t(msgKey, { site: siteName() })}</div>
@@ -225,23 +223,6 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddre
           { bg: '#0E6BA8', img: asset('/img/btc-lightning.png'), label: t('checkout.lpBtcNetwork') },
         ]}
       />
-
-      <p className="small muted mt-2" style={{ textAlign: 'center' }}>
-        {t('checkout.lpPayExactlyPre')}
-        <strong>{amountLabel || t('checkout.lpNimAmountBelow')}</strong>
-        {t('checkout.lpPayExactlyPost')}
-      </p>
-
-      {/* This card is the NIM rail, but inside Nimiq Pay the asset stays the
-          wallet's call: the same invoice can also be settled from a USDT
-          balance, and Nimiq Pay shows the swap amount and fees before the
-          buyer approves. Said here so nobody thinks they picked the wrong
-          card. */}
-      {insidePay && (
-        <p className="small muted mt-1" style={{ textAlign: 'center' }}>
-          {t('checkout.lpAssetChoice')}
-        </p>
-      )}
 
       <button type="button" className="btn btn-gold btn-block btn-lg mt-2" disabled={disabled || payLocked} onClick={() => handoff('pay')}>
         <NimIcon /> <span className="btn-label">{busy ? t('checkout.verifying') : payLocked ? t('orderPage.nimiqPay.submitted') : insidePay ? t('orderPage.nimiqPay.idle') : t('checkout.flowPayWithNim')}</span>
