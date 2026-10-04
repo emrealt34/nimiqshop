@@ -956,8 +956,8 @@ const es = {
 
   /* ---- home ---- */
   home: {
-    heroTitle1: 'Gasta NIM en tarjetas regalo, recargas y eSIM.',
-    heroTitle2: 'Paga con Nimiq Pay. Gana cashback con NIM.',
+    heroTitle1: 'Compra tarjetas regalo, recargas y eSIM con NIM.',
+    heroTitle2: 'Paga con Nimiq Pay. Gana cashback.',
     heroLede: 'Paga con tu wallet de Nimiq Pay o con cualquier wallet compatible con BTC Lightning.',
     browseShelf: 'Ver el catálogo',
     earnCashback: 'Gana cashback',
@@ -1328,8 +1328,7 @@ const es = {
   /* ---- ui ---- */
   ui: {
     myNimWallet: 'Mi cartera NIM',
-    comeBackLabel: 'Valor repetido:',
-    comeBackText: 'haz staking en nuestro pool para hasta un +10% extra de cashback y vuelve a gastar NIM aquí.',
+    comeBackText: 'Haz staking en nuestro pool para hasta un +10% extra de cashback y vuelve a gastar NIM aquí.',
     comeBackCta: 'Cashback y staking →',
     copied: 'Copiado',
     copy: 'Copiar',

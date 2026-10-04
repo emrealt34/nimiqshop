@@ -957,8 +957,8 @@ const tr = {
 
   /* ---- home ---- */
   home: {
-    heroTitle1: 'NIM\'ini hediye kartı, kontör ve eSIM\'e harca.',
-    heroTitle2: 'Nimiq Pay ile öde. NIM ile cashback kazan.',
+    heroTitle1: 'NIM ile hediye kartı, kontör ve eSIM al.',
+    heroTitle2: 'Nimiq Pay ile öde, cashback kazan.',
     heroLede: 'Nimiq Pay cüzdanınla veya BTC Lightning destekleyen herhangi bir cüzdanla öde.',
     browseShelf: 'Rafa göz at',
     earnCashback: 'Cashback kazan',
@@ -1329,8 +1329,7 @@ const tr = {
   /* ---- ui ---- */
   ui: {
     myNimWallet: 'NIM cüzdanım',
-    comeBackLabel: 'Tekrar avantajı:',
-    comeBackText: 'havuzumuzda stake ederek +%10\'a kadar ekstra cashback kazan, sonra burada tekrar NIM harca.',
+    comeBackText: 'Havuzumuzda stake ederek +%10\'a kadar ekstra cashback kazan, sonra burada tekrar NIM harca.',
     comeBackCta: 'Cashback ve staking →',
     copied: 'Kopyalandı',
     copy: 'Kopyala',

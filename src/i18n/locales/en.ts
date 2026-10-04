@@ -965,8 +965,8 @@ const en = {
 
   /* ---- home ---- */
   home: {
-    heroTitle1: 'Spend NIM on gift cards, top-ups & eSIMs.',
-    heroTitle2: 'Pay with Nimiq Pay. Earn cashback with NIM.',
+    heroTitle1: 'Get gift cards, top-ups and eSIM with NIM.',
+    heroTitle2: 'Pay with Nimiq Pay. Earn cashback.',
     heroLede: 'Pay with your Nimiq Pay wallet or any BTC-Lightning-enabled wallet.',
     browseShelf: 'Browse the shelf',
     earnCashback: 'Earn cashback',
@@ -1337,8 +1337,7 @@ const en = {
   /* ---- ui ---- */
   ui: {
     myNimWallet: 'My NIM wallet',
-    comeBackLabel: 'Repeat value:',
-    comeBackText: 'stake with our pool for up to +10% extra cashback, then spend NIM here again.',
+    comeBackText: 'Stake with our pool for up to +10% extra cashback, then spend NIM here again.',
     comeBackCta: 'Cashback & staking →',
     copied: 'Copied',
     copy: 'Copy',

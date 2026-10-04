@@ -64,7 +64,9 @@ export function ComeBackBanner({
   className?: string;
 }) {
   const { t } = useT();
-  const labelNode = label !== undefined ? label : t('ui.comeBackLabel');
+  // No default lead-in label: the sentence stands alone (the old checklist
+  // leftover "Repeat value:" lead-in was deleted at the owner's request).
+  const labelNode = label !== undefined ? label : null;
   const textNode = text !== undefined ? text : t('ui.comeBackText');
   return (
     <a className={`come-back ${className}`.trim()} href={pagePath("/cashback")}>
@@ -74,8 +76,8 @@ export function ComeBackBanner({
           long at the floor (French/German/Turkish are), the text wraps instead
           of being ellipsized. Re-measured on every language switch. */}
       <span className="come-back-txt" data-fit="wrap">
-        <span className="strong">{labelNode}</span>
-        {textNode != null ? <> {textNode}</> : null}
+        {labelNode != null && <span className="strong">{labelNode} </span>}
+        {textNode != null ? <>{textNode}</> : null}
       </span>
       {/* No data-fit here: the runtime wrap escape injected an inline
           white-space that broke the pill into three lines on phones. The
