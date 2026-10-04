@@ -6,7 +6,7 @@ import { productMoney } from '../../lib/productMoney';
  * inline support thread, and a reload-safe "pay now" block for quotes.
  * Handles legacy order rows and direct CryptoRefills-Lightning quotes.
  */
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../ui/Icon';
 import { UnifiedThumb, BrandThumbStack } from '../ui/UnifiedThumb';
 import { FlagMark } from '../ui/FlagMark';
