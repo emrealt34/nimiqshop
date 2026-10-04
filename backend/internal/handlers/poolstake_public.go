@@ -11,6 +11,7 @@ import (
 	"nimiqshop/internal/chainstake"
 	"nimiqshop/internal/db"
 	"nimiqshop/internal/middleware"
+	"nimiqshop/internal/poolstake"
 	"nimiqshop/internal/stakeledger"
 )
 
@@ -52,6 +53,34 @@ func (h *Handlers) stakeProgramEnabled() bool {
 // syncProfitOnDemand refreshes one wallet only when its data is actually
 // needed. There is no global 30-second poll. Pool/API failures are best-effort:
 // the existing ledger remains intact and fulfillment can still pay base rate.
+/* Pool/chain calls never borrow the HTTP request's context.
+ *
+ * fasthttp recycles a RequestCtx the moment the client's connection goes away
+ * (a buyer or admin closing the tab is enough), while net/http's cancellation
+ * watcher — started from the context we hand it — keeps READING that recycled
+ * ctx until the call returns. The race detector caught exactly that on CI
+ * (TestPoolStakeMeFallsBackToTheChain: fasthttp Shutdown vs RequestCtx.Done
+ * inside poolstake.Client.Profit and chainstake.Verifier.Verify). The supplier
+ * side already follows this rule (see supplierContext); these helpers bring
+ * the pool and chain calls in line.
+ *
+ * Unlike supplierContext the work still finishes inside the handler, so the
+ * caller releases the timer: defer cancel().
+ */
+
+const poolCallTimeout = 8 * time.Second
+
+func poolContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.WithoutCancel(ctx), poolCallTimeout)
+}
+
+// poolStake is the detached wrapper for every pool Status call in this file.
+func (h *Handlers) poolStake(ctx context.Context, address string) (poolstake.Status, error) {
+	cctx, cancel := poolContext(ctx)
+	defer cancel()
+	return h.Pool.Stake(cctx, address)
+}
+
 func (h *Handlers) syncProfitOnDemand(ctx context.Context, addr string) {
 	if h.Pool == nil || addr == "" || !h.stakeProgramEnabled() {
 		return
@@ -60,6 +89,8 @@ func (h *Handlers) syncProfitOnDemand(ctx context.Context, addr string) {
 	if nimUsd <= 0 {
 		return
 	}
+	ctx, cancel := poolContext(ctx)
+	defer cancel()
 	now := time.Now().UTC()
 	currentMonth := now.Format("2006-01")
 	l, ok, _ := h.Store.ReadStakeLedger(addr)
@@ -199,7 +230,9 @@ func (h *Handlers) chainStake(ctx context.Context, address string) (chainstake.S
 	if h.Chain == nil || address == "" {
 		return chainstake.Staker{}, nil
 	}
-	return h.Chain.Verify(ctx, address)
+	cctx, cancel := poolContext(ctx)
+	defer cancel()
+	return h.Chain.Verify(cctx, address)
 }
 
 // fmtNIM renders Luna as a short NIM string for log lines.
@@ -247,7 +280,7 @@ func (h *Handlers) poolStakeMeFor(ctx *fasthttp.RequestCtx, address string) {
 	lockedDays := 0
 
 	if h.Cfg.PoolAPIURL != "" && h.Pool != nil && address != "" {
-		st, err := h.Pool.Stake(ctx, address)
+		st, err := h.poolStake(ctx, address)
 		switch err {
 		case nil:
 			staked, stakeLuna = st.Staked, st.StakeLuna
@@ -368,7 +401,7 @@ func (h *Handlers) PoolStakeRefresh(ctx *fasthttp.RequestCtx) {
 	}
 
 	h.Pool.Forget(user.NimiqAddress)
-	st, err := h.Pool.Stake(ctx, user.NimiqAddress)
+	st, err := h.poolStake(ctx, user.NimiqAddress)
 	if err != nil {
 		writeError(ctx, fasthttp.StatusBadGateway, "could not reach the staking pool")
 		return
