@@ -20,7 +20,7 @@
  * sync even if the two copies of the i18n module are not the same instance.
  * Two tabs stay in sync for the same reason (applyLang writes the attribute).
  */
-import { getLang, loadDict, onLangChange, t } from '../i18n';
+import { getLang, loadDict, onDictSwap, onLangChange, t } from '../i18n';
 import { siteName } from './config';
 
 type Vars = Record<string, string>;
@@ -70,6 +70,7 @@ export function initStaticI18n() {
   // (the copy's listener would never fire for the app's load).
   void loadDict(getLang()).then(() => applyStaticI18n());
   onLangChange(() => applyStaticI18n());
+  onDictSwap(() => applyStaticI18n());
   // The static shell is translated as soon as the page runs, but a non-English
   // dictionary now arrives as its own chunk — the first pass therefore renders
   // English. `data-i18n-ready` is written by the i18n module exactly when a

@@ -216,6 +216,9 @@ export function loadDict(code: LangCode): Promise<void> {
         DICTS[code] = fresh;
         writeCachedDict(code, fresh);
         if (currentLang === code) applyLang(code, false);
+        // Wake every React tree that renders this language so the fresher
+        // copy lands on screen without waiting for the next language change.
+        dictSubs.forEach((f) => f());
       }
     })
     .catch(() => { /* offline: the cached copy (or English) keeps the UI readable */ })
@@ -319,9 +322,14 @@ export interface Translator {
 }
 
 function buildT(lang: LangCode): Translator {
-  const dict = DICTS[lang] || DICTS[DEFAULT_LANG];
+  // NOTE: the dictionary object is resolved PER CALL, not closed over here.
+  // `loadDict` revalidation can swap DICTS[lang] for a fresher object at any
+  // moment; a translator that captured the old object kept translating from
+  // the previous copy until the next language change — exactly the "the page
+  // shows the previous language" staleness this module must never have.
   const fallback = DICTS[DEFAULT_LANG];
   const fn: Translator = ((key: DictKey, vars?: Record<string, string | number>) => {
+    const dict = DICTS[lang] || DICTS[DEFAULT_LANG];
     let node = resolve(key, dict);
     if (node === undefined) node = resolve(key, fallback); // graceful EN fallback
     if (node === undefined) return String(key); // last resort: print the key so devs SEE the gap
@@ -445,6 +453,13 @@ const I18nContext = createContext<I18nCtx>({
 let currentLang: LangCode = DEFAULT_LANG;
 let currentT: Translator = buildT(DEFAULT_LANG);
 const listeners = new Set<(lang: LangCode) => void>();
+/** Subscribers that need to know a dictionary object was replaced in place
+ *  (same language, fresher copy). Providers bump their render tick here. */
+const dictSubs = new Set<() => void>();
+export function onDictSwap(fn: () => void): () => void {
+  dictSubs.add(fn);
+  return () => { dictSubs.delete(fn); };
+}
 
 /** Non-React API — usable from any plain TS module (toasts, api.ts, etc). */
 export function getLang(): LangCode { return currentLang; }
@@ -556,6 +571,40 @@ export function I18nProvider({ children, initial }: { children: ReactNode; initi
     void loadDict(lang).then(() => { if (alive) setDictTick((n) => n + 1); });
     return () => { alive = false; };
   }, [lang]);
+
+  // A fresher copy of the CURRENT dictionary arrived (deploy moved on while
+  // the tab was open): re-render so no component keeps showing cached copy.
+  useEffect(() => onDictSwap(() => setDictTick((n) => n + 1)), []);
+
+  // Cross-instance bridge. The static shell bundle carries its OWN copy of
+  // this module (see lib/staticI18n.ts); if code-splitting ever gives an
+  // island a second copy too, that copy's listeners never hear this one's
+  // applyLang(). applyLang always writes data-lang / data-i18n-ready on
+  // <html>, so watching those attributes keeps EVERY provider — whichever
+  // module instance it came from — locked to the language actually applied,
+  // and re-renders it when the dictionary object swaps in place.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    let last = document.documentElement.getAttribute('data-i18n-ready');
+    // Initial sync: the attribute may already carry a language this provider
+    // instance never heard about (it mounted after another copy applied it).
+    if (last && isValidCode(last as LangCode)) {
+      setAdoptedLang((cur) => (cur === last ? cur : (last as LangCode)));
+      setLangState((cur) => (cur === last ? cur : (last as LangCode)));
+    }
+    const obs = new MutationObserver(() => {
+      const ready = document.documentElement.getAttribute('data-i18n-ready');
+      if (ready === last) return;
+      last = ready;
+      if (ready && isValidCode(ready as LangCode)) {
+        setAdoptedLang((cur) => (cur === ready ? cur : (ready as LangCode)));
+        setLangState((cur) => (cur === ready ? cur : (ready as LangCode)));
+      }
+      setDictTick((n) => n + 1);
+    });
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-i18n-ready'] });
+    return () => obs.disconnect();
+  }, []);
 
   // Keep the global singleton (and the static Astro shell) in sync. The first
   // run is skipped for a non-pinned provider (`adopted` is still null: nothing
