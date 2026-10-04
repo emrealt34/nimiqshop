@@ -313,6 +313,7 @@ const de = {
     flowVerifyingBody: 'Wir prüfen, ob die Zahlung eingegangen ist; in wenigen Minuten kannst du eine neue Rechnung erzeugen. Starte keine weitere Zahlung, solange diese offen ist.',
     flowWaitForSettlement: 'Du musst nichts tun: Sobald der Lieferant die Zahlung geprüft hat, geht die Bestellung von selbst weiter. Starte keine weitere Zahlung, solange diese offen ist.',
     flowRenewInvoice: 'Neue Rechnung erstellen',
+    flowRenewing: 'Neue Rechnung wird erstellt…',
     flowRenewWhy: 'Die alte Rechnung kann nicht mehr bezahlt werden — es wurde nichts dafür belastet. Wir erstellen eine neue für denselben Artikel; der Preis ist der aktuelle Live-Preis des Anbieters.',
     flowOpenOrder: 'Diese Bestellung öffnen',
     flowFeeSuffix: '{{amount}} + Gebühr',

@@ -322,6 +322,7 @@ const en = {
     flowVerifyingBody: 'We are checking whether the payment arrived; in a few minutes you will be able to create a fresh invoice. Do not start another payment while this one is unresolved.',
     flowWaitForSettlement: 'There is nothing for you to do: the order moves on by itself once the supplier verifies the payment. Do not start another payment while this one is unresolved.',
     flowRenewInvoice: 'new invoice',
+    flowRenewing: 'Creating your fresh invoice…',
     flowRenewWhy: 'Your old invoice can no longer be paid, so nothing was charged for it. We\'ll create a fresh one for the same item — the price is the supplier\'s live price at that moment.',
     flowOpenOrder: 'Open this order',
     flowFeeSuffix: '{{amount}} + fee',

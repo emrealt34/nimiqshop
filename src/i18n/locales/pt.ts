@@ -313,6 +313,7 @@ const pt = {
     flowVerifyingBody: 'Estamos a verificar se o pagamento chegou; dentro de alguns minutos poderá criar uma fatura nova. Não inicie outro pagamento enquanto este não estiver resolvido.',
     flowWaitForSettlement: 'Não precisa de fazer nada: o pedido avança sozinho quando o fornecedor verificar o pagamento. Não inicie outro pagamento enquanto este não estiver resolvido.',
     flowRenewInvoice: 'Criar nova fatura',
+    flowRenewing: 'Criando sua nova fatura…',
     flowRenewWhy: 'A fatura antiga já não pode ser paga, por isso nada foi cobrado por ela. Criamos uma nova para o mesmo artigo — o preço é o do fornecedor nesse momento.',
     flowOpenOrder: 'Abrir esta encomenda',
     flowFeeSuffix: '{{amount}} + taxa',

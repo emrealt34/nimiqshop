@@ -221,6 +221,26 @@ export function openSingleBuyFlow(opts: {
 }
 
 
+/** Zero-tap renewal: a dead invoice (window over, nothing charged) is replaced
+ *  silently the moment the pay screen meets it — the buyer asked to BUY, not
+ *  to read about invoices. The manual gate stays as the fallback once the
+ *  per-flow budget is spent (a quote that renews into another dead quote must
+ *  never loop forever). */
+function AutoRenewOnce({ budgetKey, fire, label }: { budgetKey: string; fire: () => void; label: string }) {
+  const started = useRef(false);
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    (window as any)[budgetKey] = Math.max(0, (((window as any)[budgetKey] as number) ?? 0) - 1);
+    fire();
+  }, [budgetKey, fire]);
+  return (
+    <div className="center" style={{ padding: '26px 10px', textAlign: 'center' }} role="status">
+      <div className="small muted">{label}</div>
+    </div>
+  );
+}
+
 export function CheckoutFlow({
   items,
   onClose,
@@ -866,6 +886,18 @@ export function PayScreen({
         : verifying
           ? t('checkout.flowVerifyingBody')
           : t('checkout.flowDoNotPay');
+    // Zero-tap: the buyer came to BUY. A dead invoice (window over, nothing
+    // charged) is replaced silently; the gate below only appears once the
+    // auto-renew budget is spent or money may exist (seen/verifying/holds).
+    if (renewSafe && (((window as any).__autoRenewBudget as number) ?? 0) > 0) {
+      return (
+        <AutoRenewOnce
+          budgetKey="__autoRenewBudget"
+          fire={() => finish(false, 'renew')}
+          label={t('checkout.flowRenewing')}
+        />
+      );
+    }
     return (
       <div className="center" style={{ padding: '26px 10px', textAlign: 'center' }} role="status">
         <div className="strong">{headline}</div>

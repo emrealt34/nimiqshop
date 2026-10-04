@@ -314,6 +314,7 @@ const tr = {
     flowVerifyingBody: 'Ödemenin gelip gelmediğini doğruluyoruz; birkaç dakika içinde taze fatura oluşturabileceksiniz. Bu ödeme sonuçlanmadan başka bir ödeme başlatmayın.',
     flowWaitForSettlement: 'Yapmanız gereken bir şey yok: tedarikçi ödemeyi doğrulayınca sipariş kendiliğinden ilerler. Bu ödeme sonuçlanmadan başka bir ödeme başlatmayın.',
     flowRenewInvoice: 'Yeni fatura oluştur',
+    flowRenewing: 'Yeni faturanız oluşturuluyor…',
     flowRenewWhy: 'Eski faturanın ödeme süresi geçti; ondan bir tahsilat yapılmadı. Aynı ürün için taze bir fatura oluşturuyoruz — fiyat, o andaki canlı tedarikçi fiyatıdır.',
     flowOpenOrder: 'Bu siparişi aç',
     flowFeeSuffix: '{{amount}} + ücret',
