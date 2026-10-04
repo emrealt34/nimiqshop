@@ -1,0 +1,7 @@
+---
+import BaseLayout from '../layouts/Base.astro';
+import { LeaderboardPage } from '../components/cashback/LeaderboardPage';
+---
+<BaseLayout title="Leaderboard — shop.nimiqbase.com" titleKey="pageTitle.leaderboard" activeKey="leaderboard">
+  <LeaderboardPage client:load />
+</BaseLayout>

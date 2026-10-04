@@ -50,9 +50,8 @@ const NAV: { key: ShellKey; labelKey: 'shop' | 'activity' | 'orders' | 'cashback
   { key: 'activity',    labelKey: 'activity',   href: '/activity',     icon: 'pulse' },
   { key: 'orders',      labelKey: 'orders',     href: '/orders',       icon: 'receipt' },
   { key: 'cashback',    labelKey: 'cashback',   href: '/cashback',     icon: 'spark' },
-  // Owner (2026-10-04, asked four times): the leaderboard deserves its OWN
-  // nav tab. It deep-links into the cashback page's Leaderboard tab.
-  { key: 'leaderboard', labelKey: 'leaderboard', href: '/cashback?tab=leaderboard', icon: 'trophy' },
+  // Owner (2026-10-04): the leaderboard is its OWN page, one nav tab away.
+  { key: 'leaderboard', labelKey: 'leaderboard', href: '/leaderboard', icon: 'trophy' },
   { key: 'support',     labelKey: 'support',    href: '/support',      icon: 'headset' },
 ];
 

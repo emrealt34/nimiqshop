@@ -57,11 +57,8 @@ import { CashbackFeeNotice } from '../checkout/CashbackFeeNotice';
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AppRoot } from '../AppRoot';
-import type { ShellKey } from '../shell/SiteShell';
 import { Icon } from '../ui/Icon';
 import { CashbackCalculator } from './CashbackCalculator';
-import { RecentCashbackList } from './RecentCashbackList';
-import { CashbackImpactSection } from './CashbackImpactSection';
 import { useSheet, useToast } from '../AppProviders';
 import { useSession } from '../../lib/useSession';
 import { useInNimiqPay } from '../../lib/miniapp';
@@ -253,26 +250,6 @@ export function CashbackView() {
   const [manageOpen, setManageOpen] = useState(false);
   // The cashback card & leaderboard used to drown at the bottom of this long
   // programme page (owner, 2026-10-04) — they now live in their own tab.
-  const [tab, setTab] = useState<'program' | 'community'>(() => {
-    try {
-      const q = new URLSearchParams(window.location.search).get('tab');
-      if (q === 'leaderboard' || q === 'community') return 'community';
-      if (q === 'program') return 'program';
-      return sessionStorage.getItem('nimshop:cb-tab') === 'community' ? 'community' : 'program';
-    } catch { return 'program'; }
-  });
-  useEffect(() => {
-    try { sessionStorage.setItem('nimshop:cb-tab', tab); } catch {}
-  }, [tab]);
-  // Day/night mode for the whole Leaderboard tab (owner, 2026-10-04): ONE
-  // toggle themes the cashback card and the leaderboard card together, and
-  // the choice is remembered per browser.
-  const [lbMode, setLbMode] = useState<'night' | 'day'>(() => {
-    try { return localStorage.getItem('nimshop:lb-theme') === 'day' ? 'day' : 'night'; } catch { return 'night'; }
-  });
-  useEffect(() => {
-    try { localStorage.setItem('nimshop:lb-theme', lbMode); } catch {}
-  }, [lbMode]);
   // Revealed after a rejected first delegation (the wallet already stakes
   // with another validator) and kept for the session: the fix is the "move"
   // flow, not retrying the same button.
@@ -532,21 +509,10 @@ export function CashbackView() {
     document.getElementById('cb-stake-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
-  const rows = ledger?.cashbacks || [];
 
   return (
     <div className="container">
       <Header />
-      <div className="cb-tabs" role="tablist">
-        <button type="button" role="tab" aria-selected={tab === 'program'} className={tab === 'program' ? 'cb-tab active' : 'cb-tab'} onClick={() => setTab('program')}>
-          <Icon name="gift" size={14} /> {t('cashback.tabProgram')}
-        </button>
-        <button type="button" role="tab" aria-selected={tab === 'community'} className={tab === 'community' ? 'cb-tab active' : 'cb-tab'} onClick={() => setTab('community')}>
-          <Icon name="trophy" size={14} /> {t('cashback.tabCommunity')}
-        </button>
-      </div>
-      {tab === 'program' && (
-        <>
       <CashbackFeeNotice example="nim" />
 
       {/* ------------------------------------------------------ your rate */}
@@ -852,34 +818,6 @@ export function CashbackView() {
         </>
       </div>
 
-        </>
-      )}
-      {tab === 'community' && (
-        <div className={`lb-wrap lb-${lbMode}`}>
-      {/* ------------------------------------ cashback rows — visible logged in or not (user: giriş farketmemeli) */}
-      {(authed ? (
-        <RecentCashbackList rows={ledger ? rows : null} loading={!ledger} pageSize={PAYOUTS_PER_PAGE} />
-      ) : (
-        <div className="card mt-2">
-          <div className="card-title cb-payouts-head">
-            <span><Icon name="gift" size={16} /> {t('cashback.recentTitle')}</span>
-          </div>
-          <div className="small muted" style={{ textAlign: 'center', padding: '20px 12px' }}>
-            {t('cashback.connectHistory')}
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}>
-            <span className="chip"><Icon name="wallet" size={13} /> {t('cashback.noWalletChip')}</span>
-          </div>
-        </div>
-      ))}
-
-      {/* ------------------------------------------------------ burn stats, cashback card & leaderboard */}
-      <CashbackImpactSection authed={authed === true} myTotals={ledger?.totals || null} lbMode={lbMode} onLbMode={setLbMode} />
-        </div>
-      )}
-      {tab === 'program' && (
-        <>
-
       {/* ------------------------------------------------------ fine print */}
       <details className="cb-details cb-fineprint mt-2">
         <summary className="small strong">
@@ -898,8 +836,6 @@ export function CashbackView() {
           <li>{t('cashback.fine5')}</li>
         </ul>
       </details>
-        </>
-      )}
     </div>
   );
 
@@ -988,17 +924,10 @@ function Header() {
   );
 }
 
-/** Static-page wrapper: mounts the providers + shell around the content.
- *  The Leaderboard nav tab deep-links here with ?tab=leaderboard, and then
- *  the shell highlights THAT tab instead of Cashback (owner, 2026-10-04). */
+/** Static-page wrapper: mounts the providers + shell around the content. */
 export function CashbackPage() {
-  const [activeKey] = useState<ShellKey>(() => {
-    try {
-      return new URLSearchParams(window.location.search).get('tab') === 'leaderboard' ? 'leaderboard' : 'cashback';
-    } catch { return 'cashback'; }
-  });
   return (
-    <AppRoot activeKey={activeKey}>
+    <AppRoot activeKey="cashback">
       <CashbackView />
     </AppRoot>
   );
