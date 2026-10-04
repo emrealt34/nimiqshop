@@ -530,8 +530,6 @@ const en = {
     usdtpPayNote: 'Only USDT on Polygon (chain 137) is accepted for this order — funds sent on any other network or in any other token cannot be recovered. A little POL is needed for the network fee. Keep this page open after sending; confirmation usually takes ~30 seconds to a few minutes.',
     lpNotDetected: 'Lightning wallet not detected',
     lpInstallHint: 'No Lightning wallet detected here. Install any Lightning wallet on your phone and scan the QR code on this page — or copy the BTC Lightning payment request into your wallet.',
-    lpPayNote: 'A BTC Lightning invoice can be paid exactly once — paying it twice is impossible by design. Keep this page open after paying; settlement usually takes a few seconds.',
-    flowPayFinal: 'Payment is final once the BTC Lightning invoice settles. We can’t be held responsible for codes delivered to the address you entered or redeemed in error — verify every detail before paying.',
     flowTrackOrders: 'Track your orders',
     deliveryEmail: 'Delivery email',
     instantDelivery: 'Instant delivery',

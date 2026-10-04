@@ -521,8 +521,6 @@ const es = {
     usdtpPayNote: 'Para este pedido solo se acepta USDT en Polygon (cadena 137): los fondos enviados en otra red o en otro token no se pueden recuperar. Hace falta algo de POL para la comisión de red. Mantén esta página abierta tras enviar; la confirmación suele tardar entre ~30 segundos y unos minutos.',
     lpNotDetected: 'Wallet Lightning no detectada',
     lpInstallHint: 'No se detectó una wallet Lightning aquí. Instala cualquier wallet Lightning en tu teléfono y escanea el código QR de esta página — o copia la solicitud de pago BTC Lightning en tu wallet.',
-    lpPayNote: 'Una factura BTC Lightning se puede pagar exactamente una vez: pagarla dos veces es imposible por diseño. Mantén esta página abierta tras pagar; la liquidación suele tardar unos segundos.',
-    flowPayFinal: 'El pago es definitivo cuando se liquida la factura BTC Lightning. No nos hacemos responsables de códigos entregados a la dirección que introdujiste o canjeados por error: verifica todos los datos antes de pagar.',
     flowTrackOrders: 'Sigue tus pedidos',
     deliveryEmail: 'Correo de entrega',
     instantDelivery: 'Entrega instantánea',

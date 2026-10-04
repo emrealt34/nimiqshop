@@ -1024,12 +1024,6 @@ export function PayScreen({
       {note}
       {uri ? <LightningPayBlock quoteId={quoteIdOf(current)} invoice={invoice} uri={uri} onLaunch={() => rememberLightningPayment(invoice, { kind: 'quote', ref: quoteIdOf(current) })} avatarAddress={getAddress()} hidePayButton /> : null}
       {testPayButton}
-      <div className="small muted mt-1" style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-        <Icon name="alert" size={16} />
-        <span style={{ flex: 1, minWidth: 0 }}>
-          {t('checkout.flowPayFinal')}
-        </span>
-      </div>
     </div>
   );
 }

@@ -522,8 +522,6 @@ const tr = {
     usdtpPayNote: 'Bu sipariş için yalnızca Polygon’daki (zincir 137) USDT kabul edilir — başka bir ağda veya başka bir token’da gönderilen fonlar kurtarılamaz. Ağ ücreti için biraz POL gerekir. Gönderdikten sonra bu sayfayı açık tutun; onay genelde ~30 saniye ile birkaç dakika sürer.',
     lpNotDetected: 'Lightning cüzdan algılanmadı',
     lpInstallHint: 'Burada bir Lightning cüzdan algılanmadı. Telefonuna herhangi bir Lightning cüzdan kur ve bu sayfadaki QR kodunu onunla tara — ya da BTC Lightning ödeme talebini cüzdanına kopyala.',
-    lpPayNote: 'Bir BTC Lightning faturası tam olarak bir kez ödenebilir — iki kez ödemek tasarım gereği imkânsızdır. Ödedikten sonra bu sayfayı açık tutun; takas genelde birkaç saniye sürer.',
-    flowPayFinal: 'BTC Lightning faturası ödendiğinde ödeme kesinleşir. Girdiğiniz adrese teslim edilen veya yanlışlıkla kullanılan kodlardan sorumlu tutulamayız — ödemeden önce tüm ayrıntıları doğrulayın.',
     flowTrackOrders: 'Siparişlerinizi takip edin',
     deliveryEmail: 'Teslimat e-postası',
     instantDelivery: 'Anında teslimat',

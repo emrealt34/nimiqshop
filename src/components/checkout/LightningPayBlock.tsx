@@ -25,7 +25,7 @@ import { payLightningInvoice, isTerminalOutcome } from '../../lib/nimiqPay';
 import { ApiError, authorizePaymentLaunch, getQuote, friendlyApiMessage, cachedNimRate } from '../../lib/api';
 import { nimAmountFor } from '../../lib/nim';
 import { siteName } from '../../lib/config';
-import { PayNote, RailPills } from './payRailKit';
+import { RailPills } from './payRailKit';
 import { asset } from '../../lib/asset';
 
 
@@ -245,10 +245,6 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddre
           <div className="xs faint mt-1">{t('checkout.lpScanOnce')}</div>
         </div>
       )}
-
-      <PayNote>
-        {t('checkout.lpPayNote')}
-      </PayNote>
 
       {missing && <MissingDialog invoice={invoice} onClose={() => setMissing(false)} />}
     </div>
