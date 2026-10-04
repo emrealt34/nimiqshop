@@ -2478,30 +2478,34 @@ label.oos-toggle > span {
   margin: auto !important;
   width: auto !important;
   height: auto !important;
-  max-width: 86% !important;
-  max-height: 86% !important;
+  max-width: 92% !important;
+  max-height: 92% !important;
   object-fit: contain !important;
   border-radius: 4px !important;
   box-shadow: 4px 4px 0 rgba(78, 61, 40, 0.2) !important;
   background: rgb(255, 255, 255);
   z-index: 1 !important;
+  /* OPTICAL CENTERING: the 4px/4px sticker shadow adds visual weight to the
+     bottom-right, which read as "logo sits top-left". Shift by half the
+     shadow so the sticker LOOKS centred in the tile. */
+  transform: translate(-2px, -2px);
 }
 /* checkout preview stack uses the unified thumb sizing */
 
-/* Activity feed unified thumb — same markup styling as homepage thumb */
+/* Activity feed thumb: the wrapper is a PURE size box — the visible tile is
+   the inner global .thumb. Styling the wrapper as a second tile produced a
+   box-in-box: the logo shrank to the inner tile's 86% and the doubled
+   borders/shadows made it look off-centre. */
 .feed-thumb, .feed-thumb.feed-thumb-stack {
-  aspect-ratio: 16 / 10 !important;
-  width: 72px !important;
-  height: auto !important;
-  min-height: 0 !important;
-  border-radius: var(--r-s) !important;
-  border: 2px solid var(--line-strong) !important;
-  box-shadow: 3px 3px 0 rgba(78,61,40,0.22) !important;
-  background: rgb(255, 255, 255);
-  display: grid !important;
-  place-items: center !important;
-  overflow: hidden !important;
-  position: relative !important;
+  width: 96px !important;
+  flex: none;
+  aspect-ratio: auto !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  display: block !important;
+  overflow: visible !important;
+  position: static !important;
 }
 
 
