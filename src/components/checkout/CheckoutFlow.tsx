@@ -796,6 +796,11 @@ export function PayScreen({
   const isUsdt = usdtRail.isUsdt;
   const insidePay = inNimiqPay();
   const [heroMissing, setHeroMissing] = useState(false);
+  // AutoRenewOnce fires once per MOUNT. A renewal that hands back the same
+  // dead quote (or a quote born dead) left the old instance mounted, so the
+  // "creating your new invoice…" line froze forever (live bug, 2026-10-04).
+  // Keying it by quote + attempt remounts it for every new attempt.
+  const [renewTick, setRenewTick] = useState(0);
 
   // TEST MODE: there is NO separate simulated pay screen. The customer sees
   // this exact real pay screen — real invoice, real QR, real countdown — and
@@ -913,8 +918,12 @@ export function PayScreen({
     if (renewSafe && (((window as any).__autoRenewBudget as number) ?? 0) > 0) {
       return (
         <AutoRenewOnce
+          key={`${quoteIdOf(current)}:${renewTick}`}
           budgetKey="__autoRenewBudget"
-          fire={() => finish(false, 'renew')}
+          fire={() => {
+            setRenewTick((x) => x + 1);
+            finish(false, 'renew');
+          }}
           label={t('checkout.flowRenewing')}
         />
       );
