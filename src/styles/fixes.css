@@ -3333,3 +3333,36 @@ input[type="range"]:focus-visible { outline: 2px solid var(--stamp); outline-off
 .cb-tabs { display: flex; gap: 8px; margin: 10px 0 2px; flex-wrap: wrap; }
 .cb-tab { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--surface-2); color: var(--ink-muted); font-weight: 700; font-size: 13px; cursor: pointer; }
 .cb-tab.active { background: var(--gold); border-color: var(--gold); color: var(--on-gold); }
+
+/* ---- leaderboard card: day/night mode (owner 2026-10-04) ---- */
+.lb-theme { flex: 0 0 auto; }
+.pt-card.lb-night { background: #141721; border-color: #2b3140; }
+.pt-card.lb-night .pt-section-title, .pt-card.lb-night .pt-leader-code { color: #e9ecf4; }
+.pt-card.lb-night .pt-sub, .pt-card.lb-night .pt-leader-orders, .pt-card.lb-night .xs.faint, .pt-card.lb-night .small.muted { color: #9aa3b5; }
+.pt-card.lb-night .pt-badge { background: #1e2434; color: #c6cddd; }
+.pt-card.lb-night .pt-leader > li { border-color: #2b3140; }
+.pt-card.lb-night .pt-leader-trees { color: #7fd6a4; }
+.pt-card.lb-night .pt-yourank { background: rgba(62, 107, 79, .18); border-color: rgba(62, 107, 79, .45); }
+.pt-card.lb-night .btn-outline { background: #1a1f2c; border-color: #333a4b; color: #dfe4ee; }
+.pt-card.lb-day { background: #faf8f4; border-color: #d9d2c4; }
+.pt-card.lb-day .pt-section-title, .pt-card.lb-day .pt-leader-code { color: #26221c; }
+.pt-card.lb-day .pt-sub, .pt-card.lb-day .pt-leader-orders, .pt-card.lb-day .xs.faint, .pt-card.lb-day .small.muted { color: #7c7466; }
+.pt-card.lb-day .pt-badge { background: #eee9df; color: #6b6353; }
+.pt-card.lb-day .pt-leader > li { border-color: #e2dbcc; }
+.pt-card.lb-day .pt-leader-trees { color: #2f6b4f; }
+.pt-card.lb-day .pt-yourank { background: #edf3ec; border-color: #c4d8c8; }
+.pt-card.lb-day .btn-outline { background: #fffdf9; border-color: #d9d2c4; color: #4c463c; }
+
+/* ---- leaderboard card: phone fixes (owner 2026-10-04) ---- */
+@media (max-width: 560px) {
+  .pt-card-head .lb-theme { order: 2; margin-left: auto; }
+  .pt-card-head .pt-seg { order: 3; }
+}
+@media (max-width: 480px) {
+  .pt-leader > li { row-gap: 4px; }
+  .pt-leader-orders { padding-left: 74px; }
+  .pt-you-badge { order: 11; flex: 0 0 auto; }
+  .pt-yourank { flex-wrap: wrap; }
+  .pt-pager { flex-wrap: wrap; justify-content: center; row-gap: 6px; }
+  .pt-pager .btn { flex: 1 1 auto; justify-content: center; }
+}

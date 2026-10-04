@@ -117,6 +117,15 @@ export function CashbackImpactSection({
   const [address, setAddress] = useState<string>('');
   const [leaderPage, setLeaderPage] = useState(0);
   const [shareImg, setShareImg] = useState<string | null>(null);
+  // Day/night mode for the leaderboard card only (owner, 2026-10-04): the
+  // card used to inherit whatever the page did and there was no way to look
+  // at it in the other light. Remembered per browser.
+  const [lbMode, setLbMode] = useState<'night' | 'day'>(() => {
+    try { return localStorage.getItem('nimshop:lb-theme') === 'day' ? 'day' : 'night'; } catch { return 'night'; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('nimshop:lb-theme', lbMode); } catch {}
+  }, [lbMode]);
   const shareBlobRef = useRef<Blob | null>(null);
   const [burnAddressCopied, setBurnAddressCopied] = useState(false);
   const [burnWalletNim, setBurnWalletNim] = useState<number | null>(() => readCachedBurnBalance()?.balance_nim ?? null);
@@ -861,11 +870,20 @@ export function CashbackImpactSection({
       )}
 
       {/* ------------------------------------------------ leaderboard */}
-      <section className="pt-card">
+      <section className={`pt-card lb-${lbMode}`}>
         <div className="pt-card-head">
           <h2 className="pt-section-title">
             <Icon name="trophy" size={20} /> {t('cashbackCard.leaderboard')}
           </h2>
+          <button
+            type="button"
+            className="btn btn-sm btn-outline lb-theme"
+            onClick={() => setLbMode((m) => (m === 'night' ? 'day' : 'night'))}
+            aria-label={t('cashbackCard.themeAria')}
+            title={t('cashbackCard.themeAria')}
+          >
+            <Icon name={lbMode === 'night' ? 'sun' : 'moon'} size={14} />
+          </button>
           <div className="pt-seg">
             {(['week', 'month', 'all'] as const).map((b) => (
               <button
