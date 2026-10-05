@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -173,76 +172,12 @@ func (h *Handlers) CashbackLeaderboard(ctx *fasthttp.RequestCtx) {
 		writeError(ctx, fasthttp.StatusInternalServerError, "could not load cashback leaderboard")
 		return
 	}
-	burnAddr := strings.TrimSpace(h.Cfg.BurnNimAddress)
-	if burnAddr == "" {
-		burnAddr = db.BurnNIMAddress
-	}
+	// REQ-63: burn is gone from every user-facing surface — the public
+	// leaderboard no longer advertises a burn wallet address either.
 	writeJSON(ctx, fasthttp.StatusOK, map[string]any{
-		"bucket":       bucket,
-		"burn_address": burnAddr,
-		"totals":       totals,
-		"leaderboard":  leaderboard,
+		"bucket":      bucket,
+		"totals":      totals,
+		"leaderboard": leaderboard,
 	})
 }
 
-type burnBalanceSnapshot struct {
-	BalanceLuna int64
-	CachedAt    time.Time
-}
-
-const burnBalanceTTL = 60 * time.Second
-
-// BurnWalletBalance returns the public Nimiq burn wallet balance (cached 60s).
-func (h *Handlers) BurnWalletBalance(ctx *fasthttp.RequestCtx) {
-	address := strings.TrimSpace(h.Cfg.BurnNimAddress)
-	if address == "" {
-		address = db.BurnNIMAddress
-	}
-	key := "cashback:burn-balance:" + address
-	writeSnapshot := func(s burnBalanceSnapshot, cached, stale bool, ageSeconds int64) {
-		writeJSON(ctx, fasthttp.StatusOK, map[string]any{
-			"enabled":           true,
-			"available":         true,
-			"address":           address,
-			"balance_luna":      s.BalanceLuna,
-			"balance_nim":       float64(s.BalanceLuna) / lunaPerNIM,
-			"cached":            cached,
-			"stale":             stale,
-			"cached_at":         s.CachedAt.UTC(),
-			"age_seconds":       ageSeconds,
-			"cache_ttl_seconds": int64(burnBalanceTTL / time.Second),
-		})
-	}
-	if h.cache != nil {
-		if value, age, ok := h.cache.peekStale(key); ok && age < burnBalanceTTL {
-			if snapshot, ok := value.(burnBalanceSnapshot); ok {
-				writeSnapshot(snapshot, true, false, int64(age.Seconds()))
-				return
-			}
-		}
-	}
-	if h.NIMRPC == nil {
-		writeJSON(ctx, fasthttp.StatusOK, map[string]any{"enabled": true, "available": false, "address": address, "error": "NIM RPC unavailable"})
-		return
-	}
-	readCtx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
-	balanceLuna, err := h.NIMRPC.GetAccountBalance(readCtx, address)
-	cancel()
-	if err != nil {
-		if h.cache != nil {
-			if value, age, ok := h.cache.peekStale(key); ok {
-				if snapshot, ok := value.(burnBalanceSnapshot); ok {
-					writeSnapshot(snapshot, true, true, int64(age.Seconds()))
-					return
-				}
-			}
-		}
-		writeJSON(ctx, fasthttp.StatusOK, map[string]any{"enabled": true, "available": false, "address": address, "error": "NIM balance temporarily unavailable"})
-		return
-	}
-	snapshot := burnBalanceSnapshot{BalanceLuna: balanceLuna, CachedAt: time.Now().UTC()}
-	if h.cache != nil {
-		h.cache.setTTL(key, snapshot, burnBalanceTTL)
-	}
-	writeSnapshot(snapshot, false, false, 0)
-}

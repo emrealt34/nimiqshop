@@ -929,7 +929,6 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 	r.GET("/api/site-config", wrap(publicCached(300, 3600, h.SiteConfig)))
 	r.GET("/api/cashback/rate", wrap(publicCached(300, 1800, h.PublicCashbackRate)))
 	r.GET("/api/cashback/leaderboard", wrap(publicCached(60, 600, h.CashbackLeaderboard)))
-	r.GET("/api/cashback/burn-balance", wrap(publicCached(60, 300, h.BurnWalletBalance)))
 	// Echoes per-account redemption state for the code being looked up.
 	r.GET("/api/cashback/code", tiered(tPromo, pinPrivate(h.PublicCashbackCode)))
 	r.GET("/api/cashback/me", authed(h.CashbackMe))

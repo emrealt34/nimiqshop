@@ -369,35 +369,6 @@ export function SkeletonCards({ n = 8, cls = 'skel card' }: { n?: number; cls?: 
   );
 }
 
-export function SkeletonLines({ n = 3 }: { n?: number }) {
-  return (
-    <>
-      {Array.from({ length: n }).map((_, i) => (
-        <div key={i} className="skel line" style={{ width: 90 - i * 18 + '%' }} />
-      ))}
-    </>
-  );
-}
-
-/** Row-shaped skeleton: mirrors the thumb + two-line rows the real lists
- *  render (feed, cashback rows, profile, track), so a card never "opens
- *  wrong" when data lands (owner, 2026-10-05). */
-export function SkeletonRows({ n = 3, thumb = true }: { n?: number; thumb?: boolean }) {
-  return (
-    <>
-      {Array.from({ length: n }).map((_, i) => (
-        <div key={i} className="row" style={{ gap: 10, alignItems: 'center', padding: '9px 0' }}>
-          {thumb ? <div className="skel" style={{ width: 44, height: 44, borderRadius: 8, flex: '0 0 auto' }} /> : null}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="skel line" style={{ width: (i % 2 ? 62 : 74) + '%', marginBottom: 6 }} />
-            <div className="skel line" style={{ width: (i % 2 ? 38 : 46) + '%', marginBottom: 0 }} />
-          </div>
-        </div>
-      ))}
-    </>
-  );
-}
-
 export function EmptyState({ iconName = 'bag', title, text, action }: { iconName?: string; title: string; text?: string; action?: ReactNode }) {
   return (
     <div className="empty fade-in">
