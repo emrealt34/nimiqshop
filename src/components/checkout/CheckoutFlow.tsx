@@ -865,7 +865,6 @@ export function PayScreen({
   onResult: (ok: boolean) => void;
 }) {
   const { t } = useT();
-  const { toast } = useToast();
   const [liveQuote, setLiveQuote] = useState(quote);
   const [expired, setExpired] = useState(false);
   useEffect(() => { setLiveQuote(quote); setExpired(false); }, [quote]);
