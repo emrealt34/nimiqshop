@@ -427,6 +427,14 @@ const fr = {
     flowUnpaidOrderNote: 'Vous avez une commande non payée. Ouvrez Commandes et payez ou réglez le paiement existant avant d\'en lancer un autre. Modifier ou scinder le panier ne contourne pas ce blocage.',
     flowMayStillLand: 'Le paiement peut encore aboutir. Ne créez pas de commande de remplacement. Ouvrez la commande existante et vérifiez la transaction ; réessayer ne rouvre que ce même paiement.',
     flowForceContinue: 'Continuer quand même — nouveau paiement',
+    flowLowBalance: 'Pas assez de NIM pour ce paiement',
+    flowLowBalanceBody: 'Ce paiement nécessite environ {{need}} NIM (montant + frais de réseau). Votre wallet a {{have}} NIM — il manque {{short}} NIM. Vous pouvez quand même essayer.',
+    flowLowBalanceAnyway: 'Essayer quand même',
+    flowLowBalanceToast: 'Votre wallet semble insuffisant : environ {{need}} NIM requis, {{have}} NIM disponibles. Vous pouvez continuer quand même.',
+    flowAlreadyPaid: 'Cette commande est déjà payée',
+    flowAlreadyPaidBody: 'Cette commande a été payée précédemment. Aucun second paiement n’a été lancé — votre commande est en préparation.',
+    flowOpenThatOrder: 'Ouvrir cette commande',
+    flowSeeAllOrders: 'Voir toutes les commandes',
     flowOpenOrdersPayExisting: 'Ouvrir Commandes — payer la commande existante',
     flowReopenCheckout: 'Rouvrir le paiement {{name}} existant',
     flowSkipNextItem: 'Ignorer — article suivant ({{n}} restants)',
@@ -1760,6 +1768,8 @@ const fr = {
     short: 'Il vous manque {{nim}} NIM',
     error: 'Solde illisible pour le moment',
     signIn: 'Connectez votre wallet pour voir votre solde NIM',
+    onNetwork: 'sur {{network}}',
+    stale: 'actualisation…',
   },
 
   nim: {

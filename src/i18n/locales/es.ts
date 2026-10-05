@@ -427,6 +427,14 @@ const es = {
     flowUnpaidOrderNote: 'Tienes un pedido sin pagar. Abre Pedidos y paga o resuelve el pago existente antes de iniciar otro. Cambiar o dividir el carrito no evita esta retención de seguridad.',
     flowMayStillLand: 'El pago aún puede llegar. No crees un pedido de reemplazo. Abre el pedido existente y verifica la transacción; reintentar solo reabre ese mismo pago.',
     flowForceContinue: 'Continuar de todos modos — nuevo pago',
+    flowLowBalance: 'NIM insuficiente para este pago',
+    flowLowBalanceBody: 'Este pago necesita unos {{need}} NIM (importe + comisión de red). Tu wallet tiene {{have}} NIM — faltan {{short}} NIM. Puedes intentarlo igualmente.',
+    flowLowBalanceAnyway: 'Intentar igualmente',
+    flowLowBalanceToast: 'Tu wallet parece insuficiente: unos {{need}} NIM necesarios, {{have}} NIM disponibles. Puedes continuar igualmente.',
+    flowAlreadyPaid: 'Este pedido ya está pagado',
+    flowAlreadyPaidBody: 'Este pedido se pagó antes. No hemos iniciado un segundo pago — tu pedido se está preparando.',
+    flowOpenThatOrder: 'Abrir ese pedido',
+    flowSeeAllOrders: 'Ver todos los pedidos',
     flowOpenOrdersPayExisting: 'Abrir Pedidos — pagar el pedido existente',
     flowReopenCheckout: 'Reabrir el pago existente de {{name}}',
     flowSkipNextItem: 'Omitir — siguiente artículo (quedan {{n}})',
@@ -1760,6 +1768,8 @@ const es = {
     short: 'Te faltan {{nim}} NIM',
     error: 'No se pudo leer el saldo',
     signIn: 'Inicia sesión con tu wallet para ver tu saldo en NIM',
+    onNetwork: 'en {{network}}',
+    stale: 'actualizando…',
   },
 
   nim: {

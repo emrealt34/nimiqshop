@@ -26,6 +26,7 @@ import {
   type PayLightningOutcome,
 } from '../../lib/nimiqPay';
 import { useWalletBalance } from '../wallet/WalletBalance';
+import { SPEND_MARGIN } from '../../lib/walletBalance';
 
 /** NIM with enough precision to be recognisable (see WalletBalance.nimText). */
 function nim(n: number): string {
@@ -159,12 +160,16 @@ export function NimiqPayPayButton({
   // (2026-10-05): "o kırmızı yerde tam hataları söyleyebilirdi" — our sentence
   // explains, the wallet's sentence is the evidence, and support can trace it.
   const walletErr = outcome && 'wallet' in outcome ? outcome.wallet : undefined;
+  // The shortfall carries the shop's 1% cushion (SPEND_MARGIN), so the number
+  // the buyer reads is the number they must actually hold: amount + fee + the
+  // rate's next tick.
+  const needTotal = amountNim > 0 ? amountNim * (1 + SPEND_MARGIN) : 0;
   const shortfall = (() => {
-    if (outcome?.status !== 'insufficient' || !(amountNim > 0)) return 0;
+    if (outcome?.status !== 'insufficient' || !(needTotal > 0)) return 0;
     if (wallet.status !== 'ready') return 0;
-    return Math.max(0, amountNim - wallet.availableNim);
+    return Math.max(0, needTotal - wallet.availableNim);
   })();
-  const needHave = outcome?.status === 'insufficient' && amountNim > 0 && wallet.status === 'ready';
+  const needHave = outcome?.status === 'insufficient' && needTotal > 0 && wallet.status === 'ready';
 
   return (
     <div className="nimiq-pay-trigger mt-2">
@@ -188,7 +193,7 @@ export function NimiqPayPayButton({
 
       {needHave ? (
         <p className="xs" style={{ color: TONE_COLOR.error, margin: '4px 2px 0', fontWeight: 700 }}>
-          {t('orderPage.nimiqPay.needHave', { need: nim(amountNim), have: nim(wallet.availableNim) })}
+          {t('orderPage.nimiqPay.needHave', { need: nim(needTotal), have: nim(wallet.availableNim) })}
           {shortfall > 0 ? ' ' + t('wallet.short', { nim: nim(shortfall) }) : ''}
         </p>
       ) : null}

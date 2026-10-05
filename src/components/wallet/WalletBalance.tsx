@@ -26,6 +26,10 @@ import {
   getWalletBalanceState,
   refreshWalletBalance,
   subscribeWalletBalance,
+  nimText,
+  affordableUnits,
+  coversTarget,
+  SPEND_MARGIN,
   type WalletBalanceState,
 } from '../../lib/walletBalance';
 import { Icon } from '../ui/Icon';
@@ -110,11 +114,15 @@ export function WalletBalance({
 
   const verdict = (() => {
     if (!ready || !(targetNim > 0)) return null;
-    // Affordability is decided on SPENDABLE NIM only: staked NIM cannot pay.
-    const units = Math.floor(state.availableNim / targetNim);
-    const missing = Math.max(0, targetNim - state.availableNim);
+    /* Affordability is decided on SPENDABLE NIM only (staked NIM cannot pay),
+       and with the 1% cushion the shop keeps on every verdict — see
+       SPEND_MARGIN: an exact comparison promises something the wallet's own fee
+       and the next rate tick can take away, and the buyer pays for that with a
+       refused payment. The DISPLAYED balance is never adjusted. */
+    const units = affordableUnits(state.availableNim, targetNim);
+    const missing = Math.max(0, targetNim * (1 + SPEND_MARGIN) - state.availableNim);
     if (targetTotal) {
-      return units >= 1
+      return coversTarget(targetNim, state.availableNim)
         ? { ok: true, text: t('wallet.enough') }
         : { ok: false, text: t('wallet.short', { nim: nimText(missing) }) };
     }
@@ -176,6 +184,11 @@ export function WalletBalance({
           {state.address && <span className="mono">{shortAddress(state.address)}</span>}
           {state.address && clockOf(state.at) ? ' · ' : ''}
           {clockOf(state.at) ? t('wallet.updated', { time: clockOf(state.at) }) : ''}
+          {/* WHICH CHAIN the figure was read from. A testnet balance shown as a
+              real one is a wrong reading in every sense — this line makes the
+              mix-up visible instead of mysterious. */}
+          {state.network ? ' · ' + t('wallet.onNetwork', { network: state.network }) : ''}
+          {state.stale ? ' · ' + t('wallet.stale') : ''}
           <button type="button" className="wal-refresh" onClick={refresh} aria-label={t('wallet.refresh')}>
             <Icon name="refresh" size={13} />
           </button>

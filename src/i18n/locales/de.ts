@@ -427,6 +427,14 @@ const de = {
     flowUnpaidOrderNote: 'Du hast eine unbezahlte Bestellung. Öffne Bestellungen und zahle oder kläre den bestehenden Checkout, bevor du eine neue Zahlung startest. Warenkorb ändern oder teilen hebt diese Sperre nicht auf.',
     flowMayStillLand: 'Die Zahlung kann noch eintreffen. Erstelle keine Ersatzbestellung. Öffne die bestehende Bestellung und prüfe die Wallet-Transaktion; ein erneuter Versuch öffnet nur denselben Checkout.',
     flowForceContinue: 'Trotzdem fortfahren — neue Zahlung starten',
+    flowLowBalance: 'Nicht genug NIM für diese Zahlung',
+    flowLowBalanceBody: 'Diese Zahlung braucht etwa {{need}} NIM (Betrag + Netzwerkgebühr). Deine Wallet hat {{have}} NIM — {{short}} NIM zu wenig. Du kannst es trotzdem versuchen.',
+    flowLowBalanceAnyway: 'Trotzdem versuchen',
+    flowLowBalanceToast: 'Deine Wallet scheint zu wenig zu haben: etwa {{need}} NIM nötig, {{have}} NIM vorhanden. Du kannst trotzdem fortfahren.',
+    flowAlreadyPaid: 'Diese Bestellung ist bereits bezahlt',
+    flowAlreadyPaidBody: 'Diese Bestellung wurde früher bezahlt. Es wurde keine zweite Zahlung gestartet — deine Bestellung wird vorbereitet.',
+    flowOpenThatOrder: 'Diese Bestellung öffnen',
+    flowSeeAllOrders: 'Alle Bestellungen',
     flowOpenOrdersPayExisting: 'Bestellungen öffnen — bestehende Bestellung zahlen',
     flowReopenCheckout: 'Bestehenden {{name}}-Checkout wieder öffnen',
     flowSkipNextItem: 'Überspringen — nächster Artikel ({{n}} übrig)',
@@ -1760,6 +1768,8 @@ const de = {
     short: 'Es fehlen {{nim}} NIM',
     error: 'Guthaben konnte nicht gelesen werden',
     signIn: 'Melde dich mit deiner Wallet an, um dein NIM-Guthaben zu sehen',
+    onNetwork: 'auf {{network}}',
+    stale: 'wird aktualisiert…',
   },
 
   nim: {

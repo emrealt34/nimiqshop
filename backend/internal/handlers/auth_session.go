@@ -6,6 +6,7 @@ import (
 
 	"github.com/valyala/fasthttp"
 
+	"nimiqshop/internal/auth"
 	"nimiqshop/internal/middleware"
 )
 
@@ -91,9 +92,31 @@ func (h *Handlers) AuthSession(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	var expiresAt int64
-	if claims.ExpiresAt != nil {
-		expiresAt = claims.ExpiresAt.Unix()
+	// SLIDING RENEWAL. The cookie used to be issued once, at login, and simply
+	// ran out — so a shopper who used the shop every day was still thrown out
+	// on the fixed schedule, which is what "sürekli giriş yapıyorum çıkıyor"
+	// describes (owner, 2026-10-06). A session that is being USED should not
+	// expire out from under the person using it. This endpoint already runs on
+	// every page load, so it is the natural place to renew: once the token has
+	// less than half its life left, a fresh one is issued and the cookie
+	// replaced. A session that is never used still expires exactly as before.
+	//
+	// Only the cookie is rotated; nothing else about the session changes, and
+	// an invalid or expired token still takes the self-healing path above.
+	csrf := middleware.CSRFCookieValue(ctx)
+	remaining, renew := sessionNeedsRenewal(claims, h.Cfg.JWTExpiryMins)
+	expiresAt := remaining
+	if renew {
+		if token, terr := auth.IssueToken(h.Cfg.JWTSecret, user.ID, h.Cfg.JWTExpiryMins); terr == nil {
+			if fresh, serr := middleware.SetSession(ctx, h.sessionCookieOptions(), token); serr == nil {
+				// The renewal rotates the CSRF cookie too, so the value echoed
+				// to the page must be the NEW one — returning the request's
+				// copy would leave a page that just recovered from storage with
+				// a token the server no longer accepts.
+				csrf = fresh
+				expiresAt = sessionExpiry(h.Cfg.JWTExpiryMins).Unix()
+			}
+		}
 	}
 
 	writeJSON(ctx, fasthttp.StatusOK, map[string]interface{}{
@@ -103,9 +126,9 @@ func (h *Handlers) AuthSession(ctx *fasthttp.RequestCtx) {
 			"nimiq_address": user.NimiqAddress,
 		},
 		"expires_at": expiresAt,
-		// Echoing the existing CSRF cookie lets a page that lost its in-memory
-		// copy (a hard reload mid-session) recover it without re-authenticating.
-		"csrf_token": middleware.CSRFCookieValue(ctx),
+		// Echoing the CSRF cookie lets a page that lost its in-memory copy (a
+		// hard reload mid-session) recover it without re-authenticating.
+		"csrf_token": csrf,
 	})
 }
 
@@ -133,4 +156,23 @@ func (h *Handlers) AuthLogout(ctx *fasthttp.RequestCtx) {
 // its own sign-out without being able to read the token it no longer holds.
 func sessionExpiry(expiryMins int) time.Time {
 	return time.Now().Add(time.Duration(expiryMins) * time.Minute)
+}
+
+// sessionNeedsRenewal reports whether the presented token has less than half of
+// a full session left, and the instant it currently expires.
+//
+// Half is the right threshold: renewing on every page load would rotate the
+// cookie on every view for no benefit, while renewing on the last request
+// before expiry would leave a session that ends between page views. At half,
+// an active shopper's cookie is refreshed roughly once per half-life and the
+// session never lapses while they keep using the shop; an idle one expires on
+// schedule, which is the point of an expiry at all.
+func sessionNeedsRenewal(claims *auth.Claims, expiryMins int) (int64, bool) {
+	if claims == nil || claims.ExpiresAt == nil || expiryMins <= 0 {
+		return 0, false
+	}
+	expires := claims.ExpiresAt.Unix()
+	remaining := time.Until(claims.ExpiresAt.Time)
+	half := time.Duration(expiryMins) * time.Minute / 2
+	return expires, remaining < half
 }

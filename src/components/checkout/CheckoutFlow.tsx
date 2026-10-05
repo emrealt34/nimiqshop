@@ -39,8 +39,8 @@ import { quoteFaceValue } from '../../lib/format';
 import { StakerCashbackLine } from '../staker/StakerCashback';
 import { currentCashbackCode } from '../../lib/cashbackCode';
 import { nimAmountText, nimAmountFor } from '../../lib/nim';
-import { refreshWalletBalance } from '../../lib/walletBalance';
-import { WalletBalance } from '../wallet/WalletBalance';
+import { refreshWalletBalance, SPEND_MARGIN } from '../../lib/walletBalance';
+import { WalletBalance, useWalletBalance } from '../wallet/WalletBalance';
 import { fmtUSD } from '../../lib/format';
 import { deliveryLine, youGetText } from '../../lib/deliveryCopy';
 import {
@@ -67,8 +67,48 @@ type Phase =
   | { kind: 'peritem-pay'; index: number; quote: any; name: string; qty: number; total: number; paidCount: number }
   | { kind: 'item-failed'; issues?: SupplierIssue[]; it: CartItem; reason: string; msg: string; detail?: string; index: number; total: number; paidCount: number }
   | { kind: 'limit-blocked'; limit: DailyLimit; subject: string; paidCount: number; restCount: number }
+  | { kind: 'already-paid'; quoteId: string; status: string }
   | { kind: 'success'; paidCount: number; delivered: CartItem[] }
   | { kind: 'summary'; paid: CartItem[]; kept: CartItem[]; stoppedEarly: boolean };
+
+/**
+ * blockingCheckout — the unresolved checkout that triggered the safety hold.
+ *
+ * The 409 body names it (`quote_id`, `status`). When the buyer answers "continue
+ * anyway" the shop asks this order what it actually is, because the hold fires
+ * on what the shop knew at the LAST SYNC: a payment that has landed since then
+ * (or that was never charged at all) changes the honest answer completely.
+ *
+ * Owner (2026-10-06): "you have unpaid order would you like to continue dedim
+ * evet dedim sonra tamamlandı dedi ordersa attı beni" — saying yes produced a
+ * terminal screen and a redirect instead of either a payment or an explanation.
+ */
+let blockingCheckout: { id: string; status: string } = { id: '', status: '' };
+
+function rememberBlockingCheckout(e: unknown): void {
+  const data = ((e as { data?: Record<string, unknown> })?.data || {}) as Record<string, unknown>;
+  const id = String(data.quote_id || (e as { quote_id?: unknown })?.quote_id || '');
+  if (!id) return;
+  blockingCheckout = { id, status: String(data.status || '') };
+}
+
+/** Ask the shop whether the blocking checkout has been paid since. */
+async function blockingCheckoutPaid(): Promise<{ paid: boolean; status: string; id: string }> {
+  const id = blockingCheckout.id;
+  if (!id) return { paid: false, status: '', id: '' };
+  try {
+    const res: any = await getQuote(id);
+    const q = res?.quote || res || {};
+    const st = String(q.status || '').toLowerCase();
+    const paid = PAID_STATUSES.has(st) || /deliver|complete|paid|confirm/.test(st);
+    return { paid, status: st || blockingCheckout.status, id };
+  } catch {
+    // Could not ask: treat it as unresolved. The server-side gate still refuses
+    // a second money path for an order that really is unresolved, so this
+    // choice can only ever be the conservative one.
+    return { paid: false, status: '', id };
+  }
+}
 
 function blockedFrom(e: any): any[] {
   const list = e && e.data && Array.isArray(e.data.blocked_items) ? e.data.blocked_items : [];
@@ -342,6 +382,7 @@ export function CheckoutFlow({
             batchIssues = supplierIssues(e);
             batchLimit = dailyLimitFromError(e);
             batchActiveCheckout = (e as any)?.code === 'ACTIVE_CHECKOUT';
+            if (batchActiveCheckout) rememberBlockingCheckout(e);
             batchErr = batchLimit
               ? limitSentence(batchLimit, t('checkout.flowCartSubject'))
               : friendlyApiMessage(e, t('checkout.flowBatchRejected'));
@@ -435,7 +476,19 @@ export function CheckoutFlow({
               continue;
             }
             if (c === 'force') {
-              // Buyer chose to start a new payment beside the unresolved one.
+              // "Continue anyway" is not a promise that a second payment is
+              // the right thing to do: first ask what happened to the order
+              // that raised the hold. If it has been paid (or is being
+              // delivered) since the shop last looked, saying so — and NOT
+              // charging twice or claiming a completion — is the only correct
+              // answer.
+              const prior = await blockingCheckoutPaid();
+              if (prior.paid) {
+                setPhase({ kind: 'already-paid', quoteId: prior.id, status: prior.status });
+                return;
+              }
+              // Genuinely unresolved: the buyer's acknowledgement releases the
+              // server-side hold and a fresh payment is created beside it.
               ackRef.current = true;
               await tryBatch();
               continue;
@@ -520,6 +573,7 @@ export function CheckoutFlow({
             qIssues = supplierIssues(e);
             qLimit = dailyLimitFromError(e);
             qReason = (e as any)?.code === 'ACTIVE_CHECKOUT' ? 'active-checkout' : qIssues.length ? 'supplier' : 'quote';
+            if (qReason === 'active-checkout') rememberBlockingCheckout(e);
             qErr = qLimit
               ? limitSentence(qLimit, it.name)
               : friendlyApiMessage(e, t('checkout.flowNoLivePrice'));
@@ -550,6 +604,11 @@ export function CheckoutFlow({
             (window as any).__promptResolver = undefined;
             if (c === 'retry') continue;
             if (c === 'force') {
+              const prior = await blockingCheckoutPaid();
+              if (prior.paid) {
+                setPhase({ kind: 'already-paid', quoteId: prior.id, status: prior.status });
+                return;
+              }
               ackRef.current = true;
               continue;
             }
@@ -700,6 +759,14 @@ export function CheckoutFlow({
       {phase.kind === 'item-failed' && (
         <ItemFailedPrompt issues={phase.issues} it={phase.it} reason={phase.reason} msg={phase.msg} index={phase.index} total={phase.total} paidCount={phase.paidCount} onChoice={(c) => resolvePrompt(c)} onBackToCart={onClose} />
       )}
+      {phase.kind === 'already-paid' && (
+        <AlreadyPaidPhase
+          quoteId={phase.quoteId}
+          status={phase.status}
+          onOpenOrders={goToOrders}
+          onBackToCart={onClose}
+        />
+      )}
       {phase.kind === 'success' && (
         <SuccessBeat paidCount={phase.paidCount} delivered={phase.delivered} onDone={goToOrders} />
       )}
@@ -797,11 +864,32 @@ export function PayScreen({
   onResult: (ok: boolean) => void;
 }) {
   const { t } = useT();
+  const { toast } = useToast();
   const [liveQuote, setLiveQuote] = useState(quote);
   const [expired, setExpired] = useState(false);
   useEffect(() => { setLiveQuote(quote); setExpired(false); }, [quote]);
   const current = { ...quote, ...liveQuote };
   const invoice = quoteBolt11(current);
+
+  /* The buyer's own NIM, already read for the strip above — no extra request. */
+  const { state: walletState, refresh: refreshWallet } = useWalletBalance();
+  const [lowBalDismissed, setLowBalDismissed] = useState(false);
+  const needNim = Number(nimAmountFor(current, cachedNimRate())) || 0;
+  // amount + the 1% cushion (SPEND_MARGIN): what the buyer must actually hold.
+  const needTotal = needNim > 0 ? needNim * (1 + SPEND_MARGIN) : 0;
+  const shortBy = Math.max(0, needTotal - walletState.availableNim);
+  const lowBalance = walletState.status === 'ready' && needTotal > 0 && shortBy > 0 && !lowBalDismissed;
+
+  // One toast per quote, not per render: the buyer gets the warning as soon as
+  // the pay screen is ready, and never gets it again while they think about it.
+  const warnedFor = useRef('');
+  useEffect(() => {
+    const key = quoteIdOf(current);
+    if (!lowBalance || !key || warnedFor.current === key) return;
+    warnedFor.current = key;
+    toast(t('checkout.flowLowBalanceToast', { need: fmtNum(needTotal), have: fmtNum(walletState.availableNim) }), 'warn');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lowBalance, walletState.availableNim]);
   const settled = useRef(false);
   let uri = '';
   try { if (invoice) uri = lightningPaymentURI(invoice); } catch {}
@@ -998,6 +1086,37 @@ export function PayScreen({
           signInHint
           className="mt-2"
         />
+
+        {/* THE SHORT-BALANCE WARNING (owner, 2026-10-06: "öderken uyarı verelim
+            işte toast güzel bir … you still seem … don't have … continue izin
+            ver"). The buyer is told BEFORE the wallet dialog opens, with the
+            numbers, and — this is the point — is still allowed to continue: the
+            shop does not know the exact fee the wallet will charge, so refusing
+            would be a guess and a blocked purchase. The verdict carries the 1%
+            cushion (SPEND_MARGIN); the figure on the strip does not. */}
+        {lowBalance && insidePay && invoice ? (
+          <div className="alert warn mt-2" style={{ marginBottom: 0, textAlign: 'left', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+            <Icon name="alert" size={16} />
+            <div className="small" style={{ flex: 1 }}>
+              <div className="strong">{t('checkout.flowLowBalance')}</div>
+              <div className="mt-1">
+                {t('checkout.flowLowBalanceBody', {
+                  need: fmtNum(needTotal),
+                  have: fmtNum(walletState.availableNim),
+                  short: fmtNum(shortBy),
+                })}
+              </div>
+              <div className="row mt-2" style={{ gap: 8, flexWrap: 'wrap' }}>
+                <button type="button" className="btn btn-sm btn-gold" onClick={() => setLowBalDismissed(true)}>
+                  {t('checkout.flowLowBalanceAnyway')}
+                </button>
+                <button type="button" className="btn btn-sm btn-outline" onClick={refreshWallet}>
+                  <Icon name="refresh" size={13} /> {t('wallet.refresh')}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
         <div className="pay-hero-youget">
           <span className="xs faint">{t('checkout.flowYouGet')}</span>
           <span className="strong pay-you-get">{youGet || t('checkout.instantDelivery')}</span>
@@ -1196,6 +1315,14 @@ function isActiveCheckoutMessage(reason: string, msg: string): boolean {
  * (window.__lastPayDetail) when a payment fails; the prompt that follows reads
  * it once and clears it, so a later unrelated failure never inherits it.
  */
+/** NIM with enough precision to be recognisable in a warning sentence. */
+function fmtNum(n: number): string {
+  const v = Number(n) || 0;
+  const abs = Math.abs(v);
+  const digits = abs >= 1000 ? 2 : abs >= 10 ? 2 : abs >= 1 ? 3 : 5;
+  return v.toLocaleString('en-US', { maximumFractionDigits: digits });
+}
+
 function takeLastPayDetail(): string {
   const w = window as any;
   const detail = String(w.__lastPayDetail || '');
@@ -1390,6 +1517,45 @@ function ItemFailedPrompt({ issues = [], it, reason, msg, detail = '', index, to
         </button>
       </div>
       <div className="xs faint mt-2">{t('checkout.flowUnfinishedStay')}</div>
+    </div>
+  );
+}
+
+/**
+ * AlreadyPaidPhase — the order the safety hold pointed at turns out to be paid.
+ *
+ * This screen exists because the alternative is worse in both directions: a
+ * second payment would charge a shopper for an order they already own, and a
+ * bare "completed" beat (what happened, owner report 2026-10-06) tells them
+ * nothing and drops them on the orders list wondering what they just bought.
+ * So the shop states the fact, names the order, and offers the two things that
+ * make sense: open THAT order, or go back to the cart.
+ */
+function AlreadyPaidPhase({ quoteId, status, onOpenOrders, onBackToCart }: { quoteId: string; status: string; onOpenOrders: () => void; onBackToCart: () => void }) {
+  const { t } = useT();
+  return (
+    <div className="center" style={{ padding: '26px 10px', textAlign: 'center' }}>
+      <div className="pay-check" style={{ margin: '0 auto 12px' }}>
+        <Icon name="check" size={30} />
+      </div>
+      <div className="strong">{t('checkout.flowAlreadyPaid')}</div>
+      <div className="small muted mt-1" style={{ maxWidth: 380, margin: '6px auto 0' }}>
+        {t('checkout.flowAlreadyPaidBody')}
+      </div>
+      <div style={{ maxWidth: 330, margin: '16px auto 0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {quoteId ? (
+          <a className="btn btn-gold btn-block" href={pagePath('/order?type=quote&id=' + encodeURIComponent(quoteId))}>
+            {t('checkout.flowOpenThatOrder')}
+          </a>
+        ) : null}
+        <button type="button" className="btn btn-outline btn-block" onClick={onOpenOrders}>
+          {t('checkout.flowSeeAllOrders')}
+        </button>
+        <button type="button" className="btn btn-ghost btn-block" onClick={onBackToCart}>
+          {t('checkout.flowBackToCartItem')}
+        </button>
+      </div>
+      {status ? <div className="xs faint mt-2">{status}</div> : null}
     </div>
   );
 }

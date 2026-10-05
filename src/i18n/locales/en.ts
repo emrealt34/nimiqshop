@@ -436,6 +436,14 @@ const en = {
     flowUnpaidOrderNote: 'You have an unpaid order. Open Orders, pay or resolve the existing checkout before starting another payment. Changing or splitting the cart cannot bypass this safety hold.',
     flowMayStillLand: 'The payment may still land. Do not create a replacement order. Open the existing order and verify the wallet transaction; a retry only reopens that same checkout.',
     flowForceContinue: 'Continue anyway — start a new payment',
+    flowLowBalance: 'Not enough NIM for this payment',
+    flowLowBalanceBody: 'This payment needs about {{need}} NIM (amount + network fee). Your wallet has {{have}} NIM — {{short}} NIM short. You can still try.',
+    flowLowBalanceAnyway: 'Try anyway',
+    flowLowBalanceToast: 'Your wallet looks short: about {{need}} NIM needed, {{have}} NIM available. You can continue anyway.',
+    flowAlreadyPaid: 'You already paid this order',
+    flowAlreadyPaidBody: 'This order was paid earlier. No second payment was started — your order is being prepared.',
+    flowOpenThatOrder: 'Open that order',
+    flowSeeAllOrders: 'See all orders',
     flowOpenOrdersPayExisting: 'Open Orders — pay existing order',
     flowReopenCheckout: 'Reopen the existing {{name}} checkout',
     flowSkipNextItem: 'Skip — next item ({{n}} left)',
@@ -1769,6 +1777,8 @@ const en = {
     short: 'You are {{nim}} NIM short',
     error: 'Balance could not be read',
     signIn: 'Sign in with your wallet to see your NIM balance',
+    onNetwork: 'on {{network}}',
+    stale: 'refreshing…',
   },
 
   nim: {

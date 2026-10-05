@@ -186,9 +186,12 @@ export function saveSession(info: Partial<SessionInfo>): void {
     address: String(info.address || ''),
     expiresAt: Number(info.expiresAt || 0),
   };
-  writeStored(next);
   memory = next;
   memoryAddr = next.address || memoryAddr;
+  // Storage first, but never fatally: a WebView with storage disabled must
+  // still get a working in-memory session (owner: the session kept "falling
+  // out" in Nimiq Pay). writeStored already swallows storage errors.
+  writeStored(next);
   scheduleExpiry();
   window.dispatchEvent(new CustomEvent('nimshop:session', { detail: { authed: true, address: next.address } }));
 }
@@ -226,6 +229,56 @@ export function signOut(silent = false): void {
     }
   }
   if (!silent) window.dispatchEvent(new CustomEvent('nimshop:session', { detail: { authed: false } }));
+}
+
+/**
+ * confirmSessionEnded — decide whether a 401 really means "you are signed out".
+ *
+ * One failed request is not evidence. The server is asked once (with a short
+ * cooldown so a burst of 401s cannot stampede it) and its answer is final:
+ *
+ *   authed: true  → the session is alive; the 401 belonged to that one call.
+ *   authed: false → the session is over; the local state is dropped and the UI
+ *                   is told why, so the sign-in card can explain itself.
+ *   no answer     → keep the session. Being offline is not being signed out.
+ */
+let sessionCheck: Promise<boolean> | null = null;
+let lastSessionCheck = 0;
+
+async function confirmSessionEnded(): Promise<boolean> {
+  const now = Date.now();
+  if (sessionCheck) return sessionCheck;
+  if (now - lastSessionCheck < 4000) return true; // recently verified: keep it
+  lastSessionCheck = now;
+  sessionCheck = (async () => {
+    try {
+      const base = apiBase();
+      const res = await fetch(base + '/auth/session', {
+        method: 'GET',
+        credentials: credentialsFor(base),
+        cache: 'no-store',
+      });
+      if (!res.ok) return true; // server problem, not an expired session
+      const data = (await res.json()) as { authed?: boolean; reason?: string };
+      if (data && data.authed) {
+        // Still signed in: refresh the cached metadata the 401 may have made
+        // look stale, and say nothing to the user — nothing happened.
+        const info = effective();
+        if (info) saveSession(info);
+        return true;
+      }
+      signOut(true);
+      window.dispatchEvent(new CustomEvent('nimshop:session', {
+        detail: { authed: false, expired: data?.reason === 'expired' },
+      }));
+      return false;
+    } catch {
+      return true;
+    } finally {
+      window.setTimeout(() => { sessionCheck = null; }, 0);
+    }
+  })();
+  return sessionCheck;
 }
 
 // ---- initial state --------------------------------------------------------
@@ -331,9 +384,19 @@ if (typeof window !== 'undefined') {
       detail: { authed: isAuthed(), address: getAddress() },
     }));
   });
+  // A single 401 no longer ends the session by itself.
+  //
+  // Owner (2026-10-06): "sürekli giriş yapıyorum çıkıyor" — the shop kept
+  // signing people out. The old handler took ANY 401 from ANY authenticated
+  // call as proof the session was over and wiped the local state immediately,
+  // so one failing endpoint (a display-only probe, a deploy in progress, a
+  // cookie the browser had not attached yet) was enough to log someone out
+  // mid-shop. Only the server can say whether a session is over, and
+  // /api/auth/session answers exactly that question — so it is asked first.
+  // If it cannot be reached, the session is KEPT: an unreachable server is not
+  // an expired session, and the failing call still reports its own error.
   window.addEventListener('nimshop:unauthorized', () => {
-    signOut(true);
-    window.dispatchEvent(new CustomEvent('nimshop:session', { detail: { authed: false, expired: true } }));
+    void confirmSessionEnded();
   });
   // Ask the server on first load only when a returning session or CSRF cookie
   // exists — anonymous visitors need zero /api/auth/session round-trip.

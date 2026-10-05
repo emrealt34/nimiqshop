@@ -428,6 +428,14 @@ const tr = {
     flowUnpaidOrderNote: 'Ödenmemiş bir siparişin var. Başka bir ödeme başlatmadan önce Siparişler\'i açıp mevcut ödemeyi öde ya da sonuçlandır. Sepeti değiştirmek veya bölmek bu kilidi aşmaz.',
     flowMayStillLand: 'Ödeme hâlâ gelebilir. Yeni bir sipariş oluşturma. Mevcut siparişi açıp cüzdan işlemini doğrula; yeniden denemek yalnızca aynı ödemeyi açar.',
     flowForceContinue: 'Yine de devam et — yeni ödeme başlat',
+    flowLowBalance: 'Bu ödeme için NIM yetersiz',
+    flowLowBalanceBody: 'Bu ödeme için yaklaşık {{need}} NIM gerekiyor (tutar + ağ ücreti). Cüzdanında {{have}} NIM var — {{short}} NIM eksik. Yine de deneyebilirsin.',
+    flowLowBalanceAnyway: 'Yine de dene',
+    flowLowBalanceToast: 'Cüzdanında yeterli NIM görünmüyor: ~{{need}} NIM gerekiyor, {{have}} NIM var. Yine de devam edebilirsin.',
+    flowAlreadyPaid: 'Bu siparişin ödemesi zaten alınmış',
+    flowAlreadyPaidBody: 'Bu sipariş için ödeme daha önce alındı. Seni ikinci kez ücretlendirmemek için yeni bir ödeme başlatmadık — siparişin hazırlanıyor.',
+    flowOpenThatOrder: 'O siparişi aç',
+    flowSeeAllOrders: 'Tüm siparişlerim',
     flowOpenOrdersPayExisting: 'Siparişler\'i aç — mevcut siparişi öde',
     flowReopenCheckout: 'Mevcut {{name}} ödemesini yeniden aç',
     flowSkipNextItem: 'Atla — sonraki ürün ({{n}} kaldı)',
@@ -1761,6 +1769,8 @@ const tr = {
     short: '{{nim}} NIM eksik',
     error: 'Bakiye şu an okunamadı',
     signIn: 'NIM bakiyeni görmek için cüzdanınla giriş yap',
+    onNetwork: '{{network}} ağında',
+    stale: 'güncelleniyor…',
   },
 
   nim: {

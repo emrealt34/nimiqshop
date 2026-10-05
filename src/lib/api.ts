@@ -265,7 +265,8 @@ export async function api(
     auth = false,
     headers = {},
     timeoutMs = 15000,
-  }: { method?: string; body?: unknown; auth?: boolean; headers?: Record<string, string>; timeoutMs?: number } = {}
+    quiet = false,
+  }: { method?: string; body?: unknown; auth?: boolean; headers?: Record<string, string>; timeoutMs?: number; quiet?: boolean } = {}
 ): Promise<Record<string, any>> {
   const h: Record<string, string> = { ...headers };
   if (!h['Accept-Language']) h['Accept-Language'] = langTag();
@@ -317,7 +318,13 @@ export async function api(
     throw new ApiError(0, 'Cannot reach ' + siteName() + ' right now. Check your connection and try again.');
   }
 
-  if (res.status === 401 && auth && typeof window !== 'undefined') {
+  if (res.status === 401 && auth && !quiet && typeof window !== 'undefined') {
+    // `quiet` requests are display-only probes (the balance strip, background
+    // refreshes). A 401 from one of them is a fact about that probe, never
+    // proof that the shopper's session is over — and treating it as proof made
+    // the shop sign people out while they were reading the page (owner,
+    // 2026-10-06: "sürekli giriş yapıyorum çıkıyor"). They still surface the
+    // error to their own caller; they simply cannot end a session.
     window.dispatchEvent(new CustomEvent('nimshop:unauthorized'));
   }
   return readApiResponse(res);
@@ -656,8 +663,13 @@ export interface WalletBalanceResponse {
   observed_at?: string;
 }
 
-export const getWalletBalance = () =>
-  api('/wallet/balance', { auth: true, timeoutMs: 9000 }) as Promise<WalletBalanceResponse>;
+export const getWalletBalance = (opts: { fresh?: boolean } = {}) =>
+  api(`/wallet/balance${opts.fresh ? '?fresh=1' : ''}`, {
+    auth: true,
+    timeoutMs: 9000,
+    // Display-only: a failed balance probe must never end the session.
+    quiet: true,
+  }) as Promise<WalletBalanceResponse>;
 export const getOrder = (id: string) => api(`/orders/${encodeURIComponent(id)}`, { auth: true });
 export const refreshOrder = (id: string) => api(`/orders/${encodeURIComponent(id)}/refresh`, { method: 'POST', auth: true });
 export const getOrderSupport = (id: string) => api(`/orders/${encodeURIComponent(id)}/support`, { auth: true });

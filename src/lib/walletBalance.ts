@@ -44,6 +44,43 @@ import { classifyWalletError, readWalletError, type WalletErrorClass } from './w
 /** 1 NIM = 100,000 luna — the constant the SDK documents for getBalance. */
 export const LUNA_PER_NIM = 100000;
 
+/**
+ * SPEND_MARGIN — the cushion the affordability verdict leaves on top of a
+ * price. Owner (2026-10-06): "o your wallet nime yüzde 1 margin ekle ki hata
+ * olmasın diye".
+ *
+ * WHY IT EXISTS: an exact comparison is a promise the shop cannot keep. The
+ * Nimiq Pay fee rides on top of the converted amount, the rate moves between
+ * the quote and the signature, and the wallet's own fee estimation happens
+ * after both. A buyer told "your balance covers this" one luna short of the
+ * real total gets a REFUSED payment instead — which is exactly the failure the
+ * red box has to explain. One percent is small enough never to hide a real,
+ * affordable purchase and large enough to absorb those three effects.
+ *
+ * The DISPLAYED balance is never adjusted by it: the buyer sees what they hold.
+ * Only verdicts ("you can afford this", "you are short") use the margin.
+ */
+export const SPEND_MARGIN = 0.01;
+
+/** What the balance verdict treats as available: the true figure less 1%. */
+export function spendableWithMargin(availableNim: number): number {
+  return Math.max(0, Math.floor(Number(availableNim || 0) * (1 - SPEND_MARGIN) * 100000) / 100000);
+}
+
+/** True when the spendable balance covers `targetNim` plus the margin. */
+export function coversTarget(targetNim: number, availableNim: number): boolean {
+  const target = Number(targetNim || 0);
+  if (!(target > 0)) return true;
+  return Number(availableNim || 0) >= target * (1 + SPEND_MARGIN);
+}
+
+/** How many `unitNim`-priced units the balance can buy, margin included. */
+export function affordableUnits(availableNim: number, unitNim: number): number {
+  const unit = Number(unitNim || 0);
+  if (!(unit > 0)) return 0;
+  return Math.floor(spendableWithMargin(availableNim) / unit);
+}
+
 /** How long a reading stays fresh. Short on purpose: it sits next to prices. */
 const TTL_MS = 25000;
 
@@ -122,6 +159,7 @@ function emit(next: WalletBalanceState): WalletBalanceState {
 
 interface ShopReading {
   luna: number;
+  address: string;
   stakedNim: number;
   inactiveNim: number;
   totalNim: number;
@@ -150,8 +188,10 @@ function unwrapLuna(raw: unknown): number | null {
 const num = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
 /** Our backend: session-scoped, stake-aware, no address parameter. */
-async function shopReading(): Promise<ShopReading> {
-  const res = await getWalletBalance();
+async function shopReading(fresh = false): Promise<ShopReading> {
+  // `fresh` also bypasses the server's 20-second cache, so the manual refresh
+  // on the card reads the chain rather than a value this tab may have caused.
+  const res = await getWalletBalance({ fresh });
   if (res && res.available === false) {
     const err = new Error(String(res.reason || 'unavailable'));
     (err as any).type = res.reason === 'no_wallet' ? 'NO_WALLET' : 'UNKNOWN_REQUEST';
@@ -165,6 +205,7 @@ async function shopReading(): Promise<ShopReading> {
   }
   return {
     luna,
+    address: String(res.address || ''),
     stakedNim: num(res.staked_nim),
     inactiveNim: num(res.inactive_nim),
     totalNim: num(res.total_nim) || luna / LUNA_PER_NIM,
@@ -225,16 +266,22 @@ function refreshUsdLater(mark: WalletBalanceState): void {
     .catch(() => {});
 }
 
-async function readBalance(): Promise<WalletBalanceState> {
-  const address = String(getAddress() || '').trim();
-  const signedIn = isAuthed() && !!address;
+async function readBalance(force = false): Promise<WalletBalanceState> {
+  let address = String(getAddress() || '').trim();
+  /* The SHOP read is session-scoped and needs no address: it is the only
+     source left when the cached one is missing (a WebView with storage
+     disabled, a hard reload mid-session). Requiring an address here used to
+     blank the whole strip — "balance reading is very wrong" included reading
+     NOTHING while the server could have answered. The host bridge still needs
+     one, so it is gated separately below. */
+  const signedIn = isAuthed();
   const hostAvailable = !!(inNimiqPay() || getNimiqProvider());
 
   let shop: ShopReading | null = null;
   let shopError: unknown = null;
   if (signedIn) {
     try {
-      shop = await shopReading();
+      shop = await shopReading(force);
     } catch (e) {
       shopError = e;
     }
@@ -250,6 +297,7 @@ async function readBalance(): Promise<WalletBalanceState> {
     }
   }
 
+  if (!address && shop?.address) address = shop.address;
   const base = { address, network: shop?.network || '' };
 
   // BOTH: reconcile. The session wallet is the one the shop charges, so it wins
@@ -347,7 +395,7 @@ export function refreshWalletBalance({ force = false }: { force?: boolean } = {}
   if (current.status === 'ready') emit({ ...current, stale: true });
   else emit({ ...current, status: 'loading' });
 
-  inflight = readBalance()
+  inflight = readBalance(force)
     .then((next) => emit(next))
     .catch(() => emit({ ...EMPTY, status: 'error', failure: 'unknown' }))
     .finally(() => {
@@ -378,9 +426,24 @@ if (typeof window !== 'undefined') {
   subscribeSession(() => {
     void refreshWalletBalance({ force: true });
   });
+  // Coming back to the tab, or back to the app (Nimiq Pay switches away for
+  // the wallet dialog), must never show the number from before. Both events
+  // are used because a mobile WebView can fire only one of them.
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && current.status !== 'loading') {
       void refreshWalletBalance();
     }
   });
+  window.addEventListener('focus', () => {
+    if (current.status !== 'loading') void refreshWalletBalance();
+  });
+  // A long-lived page (the home shelf kept open, the checkout left waiting for
+  // a bank transfer) drifts otherwise. One cheap read a minute, visible tabs
+  // only — the server's own 20 s cache absorbs the rest. Owner (2026-10-06):
+  // "balance okuma baya yanlış yapıyor".
+  window.setInterval(() => {
+    if (document.visibilityState === 'visible' && current.status !== 'loading') {
+      void refreshWalletBalance();
+    }
+  }, 60000);
 }
