@@ -3747,3 +3747,24 @@ input[type="range"]:focus-visible { outline: 2px solid var(--stamp); outline-off
   .wal-subrow{ gap:3px 8px; font-size:.72rem }
   .wal-verdict{ font-size:var(--fs-xs) }
 }
+
+/* ================= THE SHORT-BALANCE POPUP =================
+ * Owner (2026-10-06): "abi popup olarak çıkacaktı o yetersiz, seçenek sunacaktı
+ * o kadar, lütfen toast değil". It lives in a sheet (the site's own dialog
+ * surface: backdrop, focus trap, Escape), so its body only has to lay out the
+ * two figures, the reason, and the three choices — full-width, thumb-sized, in
+ * the order of how likely they are: continue, refresh, cancel.
+ */
+.lowbal{ display:flex; flex-direction:column; gap:12px }
+.lowbal-fig{ display:flex; gap:11px; align-items:flex-start; padding:12px 14px;
+  border:1.5px dashed var(--line-dash); border-radius:var(--r-m); background:var(--surface-2) }
+.lowbal-fig.short{ border-color:rgba(199,72,29,.5); background:var(--orange-soft) }
+.lowbal-fig.ok{ border-color:rgba(62,107,79,.5); background:var(--green-soft) }
+.lowbal-fig svg{ flex:0 0 auto; margin-top:1px }
+.lowbal-fig.short svg{ color:var(--stamp) }
+.lowbal-fig.ok svg{ color:var(--green) }
+.lowbal-fig-body{ min-width:0; display:flex; flex-direction:column; gap:3px }
+.lowbal-note{ margin:0; line-height:1.5 }
+.lowbal-opts{ display:flex; flex-direction:column; gap:8px; margin-top:2px }
+.lowbal-opts .btn{ justify-content:center; min-width:0; white-space:normal; line-height:1.25 }
+@media (max-width: 420px){ .lowbal-fig{ padding:10px 12px } .lowbal-opts .btn{ padding-inline:12px } }

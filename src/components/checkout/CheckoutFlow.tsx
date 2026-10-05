@@ -39,7 +39,8 @@ import { quoteFaceValue } from '../../lib/format';
 import { StakerCashbackLine } from '../staker/StakerCashback';
 import { currentCashbackCode } from '../../lib/cashbackCode';
 import { nimAmountText, nimAmountFor } from '../../lib/nim';
-import { refreshWalletBalance, coversTarget, neededWholeNim, shortByWholeNim, SPEND_MARGIN } from '../../lib/walletBalance';
+import { refreshWalletBalance, neededWholeNim, shortByWholeNim, SPEND_MARGIN } from '../../lib/walletBalance';
+import { guardLowBalance } from '../wallet/LowBalanceSheet';
 import { WalletBalance, useWalletBalance } from '../wallet/WalletBalance';
 import { fmtUSD } from '../../lib/format';
 import { deliveryLine, youGetText } from '../../lib/deliveryCopy';
@@ -897,35 +898,24 @@ export function PayScreen({
    * It now fires on the press as well (with a short cooldown, so a double tap
    * does not stack toasts) and the card no longer depends on the host.
    */
-  const warnedFor = useRef('');
-  const lastWarnAt = useRef(0);
-  const warnNow = useCallback(
-    (force = false) => {
-      if (!walletReady || !(needNim > 0)) return;
-      if (coversTarget(needNim, walletState.availableNim)) return;
-      // The 4 s cooldown only guards the press path: the open path must always
-      // announce once per quote, the press path must not stack on a double tap.
-      if (force && Date.now() - lastWarnAt.current < 4000) return;
-      lastWarnAt.current = Date.now();
-      toast(
-        t('checkout.flowLowBalanceToast', {
-          need: needWhole,
-          have: Math.max(0, Math.floor(walletState.availableNim)),
-        }),
-        'warn'
-      );
-    },
-    [needNim, needWhole, walletReady, walletState.availableNim, t, toast]
+  /**
+   * THE POPUP, NOT A TOAST (owner, 2026-10-06: "abi popup olarak çıkacaktı o
+   * yetersiz, seçenek sunacaktı o kadar, lütfen toast değil ya"). Pressing any
+   * pay affordance while the wallet is short now opens a dialog that states the
+   * two figures and offers three ways out: continue anyway, refresh the balance
+   * (re-evaluated live inside the dialog), or cancel. The attempt only proceeds
+   * on an explicit choice — never silently, and never blocked either.
+   */
+  const askBeforePaying = useCallback(
+    () =>
+      guardLowBalance({
+        openSheet,
+        targetNim: needNim,
+        availableNim: walletState.availableNim,
+        ready: walletReady,
+      }),
+    [needNim, openSheet, walletReady, walletState.availableNim]
   );
-
-  useEffect(() => {
-    const key = quoteIdOf(current);
-    if (!lowBalance || !key || warnedFor.current === key) return;
-    warnedFor.current = key;
-    lastWarnAt.current = Date.now();
-    toast(t('checkout.flowLowBalanceToast', { need: needWhole, have: Math.max(0, Math.floor(walletState.availableNim)) }), 'warn');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lowBalance, walletState.availableNim]);
   const settled = useRef(false);
   let uri = '';
   try { if (invoice) uri = lightningPaymentURI(invoice); } catch {}
@@ -1173,7 +1163,7 @@ export function PayScreen({
             <NimiqPayPayButton
               invoice={invoice}
               amountNim={Number(nimAmountFor(current, cachedNimRate())) || 0}
-              onBeforePay={() => warnNow(true)}
+              onBeforePay={askBeforePaying}
               className="btn btn-gold btn-block btn-lg"
             />
           </div>
@@ -1182,9 +1172,9 @@ export function PayScreen({
             type="button"
             className="btn btn-gold btn-block btn-lg"
             style={{ marginTop: 12 }}
-            onClick={() => {
-              // The shortfall is announced on the press too, never blocking.
-              warnNow(true);
+            onClick={async () => {
+              // The popup answers first; "continue anyway" proceeds right here.
+              if (!(await askBeforePaying())) return;
               rememberLightningPayment(invoice, { kind: 'quote', ref: quoteIdOf(current) });
               void authorizePaymentLaunch(quoteIdOf(current)).catch(() => {});
               // Outside Nimiq Pay the button must DO something: desktop gets

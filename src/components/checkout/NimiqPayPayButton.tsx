@@ -114,11 +114,11 @@ export function NimiqPayPayButton({
   onSubmitted?: (outcome: PayLightningOutcome) => void;
   /**
    * Called on the PRESS, before the wallet dialog opens. Owner (2026-10-06):
-   * "bakiyemin yetmediği şeyleri almaya çalışırken karta ve normal toast
-   * çıkmadı" — the warning belongs to the moment the buyer commits, not only to
-   * the moment the screen opened, and it must not block the attempt.
+   * the shortfall is a POPUP with options ("popup olarak çıkacaktı o yetersiz,
+   * seçenek sunacaktı") — so this hook answers whether to continue: `false`
+   * (the buyer cancelled) stops here and the wallet is never asked.
    */
-  onBeforePay?: () => void;
+  onBeforePay?: () => boolean | Promise<boolean>;
   labels?: Partial<NimiqPayPayLabels>;
   /** The NIM this payment costs (amount + the host's fee is added on top). */
   amountNim?: number;
@@ -144,7 +144,15 @@ export function NimiqPayPayButton({
 
   const handleClick = useCallback(async () => {
     if (busy || locked || !invoice) return;
-    onBeforePay?.();
+    if (onBeforePay) {
+      let proceed = true;
+      try {
+        proceed = (await onBeforePay()) !== false;
+      } catch {
+        proceed = true; // a failed prompt must never block a payment
+      }
+      if (!proceed) return;
+    }
     setBusy(true);
     const res = await payLightningInvoice(invoice);
     setOutcome(res);

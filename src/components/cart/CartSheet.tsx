@@ -19,7 +19,8 @@ import { isAuthed } from '../../lib/session';
 import { openLoginSheet } from '../shell/SiteShell';
 import { CheckoutFlow } from '../checkout/CheckoutFlow';
 import { useWalletBalance } from '../wallet/WalletBalance';
-import { coversTarget, neededWholeNim, shortByWholeNim, warnIfShort } from '../../lib/walletBalance';
+import { coversTarget, neededWholeNim, shortByWholeNim } from '../../lib/walletBalance';
+import { guardLowBalance } from '../wallet/LowBalanceSheet';
 import { WalletBalance } from '../wallet/WalletBalance';
 import { CashbackCodeField } from '../cashback/CashbackCodeField';
 import { useRouter } from '../../lib/router';
@@ -211,26 +212,24 @@ export function CartSheetContent({ close }: { close: () => void }) {
     };
   }, [items]);
 
-  const startCheckout = () => {
+  const startCheckout = async () => {
     if (!isAuthed()) {
       openLoginSheet({ openSheet, closeSheet, toast });
       // After login the user re-taps Checkout (login sheet opens on top).
       return;
     }
     if (!items.length) return;
-    // Owner (2026-10-06): "bakiyemin yetmediği şeyleri almaya çalışırken karta
-    // ve normal toast çıkmadı". The cart is where a purchase is attempted for
-    // the WHOLE basket, so the shortfall is announced here too — with the same
-    // numbers, and without stopping the checkout: the inline card right above
-    // this button stays available under "continue anyway".
+    // Owner (2026-10-06): the shortfall is a POPUP with options, not a toast —
+    // the whole basket is priced here, so this is the moment to ask. It opens on
+    // top of the cart sheet and only the buyer's explicit choice continues.
     const cartNim = totals && totals.nim > 0 ? totals.nim : 0;
-    warnIfShort({
+    const proceed = await guardLowBalance({
+      openSheet,
       targetNim: cartNim,
       availableNim: walletState.availableNim,
       ready: walletState.status === 'ready',
-      translate: t,
-      toast,
     });
+    if (!proceed) return;
     setCheckoutItems([...items]);
     setMode('checkout');
   };

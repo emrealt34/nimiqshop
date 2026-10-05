@@ -96,34 +96,6 @@ export function shortByWholeNim(targetNim: number, availableNim: number): number
   return Math.max(1, Math.ceil(need - have));
 }
 
-/**
- * THE pre-purchase warning. Called from every place a purchase can start
- * (product page, cart, checkout pay screen) so "I'm trying to buy something my
- * balance doesn't cover" always answers with the same card + toast, and never
- * blocks the buyer — the shop does not know the wallet's exact fee, and a
- * refusal based on a guess would be worse than the warning.
- * Returns true when the warning fired.
- */
-export function warnIfShort(opts: {
-  targetNim: number;
-  availableNim: number;
-  ready: boolean;
-  translate: (key: string, vars?: Record<string, string | number>) => string;
-  toast: (text: string, kind?: 'success' | 'error' | 'info' | 'warn') => void;
-}): boolean {
-  const { targetNim, availableNim, ready, translate, toast } = opts;
-  if (!ready || !(Number(targetNim) > 0)) return false;
-  if (coversTarget(targetNim, availableNim)) return false;
-  toast(
-    translate('wallet.shortToast', {
-      need: neededWholeNim(targetNim),
-      have: Math.max(0, Math.floor(Number(availableNim || 0))),
-    }),
-    'warn'
-  );
-  return true;
-}
-
 /** How many `unitNim`-priced units the balance can buy, margin included. */
 export function affordableUnits(availableNim: number, unitNim: number): number {
   const unit = Number(unitNim || 0);

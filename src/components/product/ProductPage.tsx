@@ -33,7 +33,7 @@ import {
 import { mapKind, extractLogo } from '../../lib/catalog';
 import { openSingleBuyFlow } from '../checkout/CheckoutFlow';
 import { useWalletBalance } from '../wallet/WalletBalance';
-import { warnIfShort } from '../../lib/walletBalance';
+import { guardLowBalance } from '../wallet/LowBalanceSheet';
 import { safeRichHTML } from '../../lib/format';
 import { useRouter } from '../../lib/router';
 import { useT, t as i18nT } from '../../i18n';
@@ -706,23 +706,22 @@ export function ProductPage() {
 
   const dead = !hasPackages && !product.range;
 
-  /** The one place the product page decides "can this wallet afford it?" —
-      shared with the strip above the buttons, so the sentence and the figure
-      never disagree. Owner (2026-10-06): the warning must exist on the attempt,
-      not only on the pay screen. */
-  const affirmAffordable = () => {
-    warnIfShort({
+  /**
+   * The product page's own gate. Owner (2026-10-06): the shortfall must ask the
+   * buyer directly, "popup olarak … seçenek sunacaktı" — continue anyway,
+   * refresh, or cancel — and it is the SELLING action that asks, not adding an
+   * item to the cart (the cart is priced as a whole at checkout).
+   */
+  const askAffordable = () =>
+    guardLowBalance({
+      openSheet,
       targetNim: currentProductNIM(),
       availableNim: walletState.availableNim,
       ready: walletState.status === 'ready',
-      translate: t,
-      toast,
     });
-  };
 
   const doAddToCart = () => {
     if (!cart) return;
-    affirmAffordable();
     const ok = cart.addToCart(
       {
         id: product.id,
@@ -763,8 +762,8 @@ export function ProductPage() {
   const info = REDEEM_STEPS[effectiveType] || REDEEM_STEPS.gift_card;
   const chips = chipKeys(effectiveType);
 
-  const doBuy = () => {
-    affirmAffordable();
+  const doBuy = async () => {
+    if (!(await askAffordable())) return;
     const selectedPkgForBuy = product.packages?.find((x) => x.package_id === pkg) as any;
     openSingleBuyFlow({
       product: {
