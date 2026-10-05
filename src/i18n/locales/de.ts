@@ -1742,6 +1742,17 @@ const de = {
   },
 
   /* ---- nim ---- */
+  /* The buyer's own NIM balance (wallet lookup strip). */
+  wallet: {
+    label: 'Deine Wallet',
+    loading: 'Guthaben wird gelesen…',
+    afford: { one: 'Dein Guthaben reicht dafür', other: 'Dein Guthaben reicht für bis zu {{count}} davon' },
+    enough: 'Dein Guthaben deckt diese Bestellung',
+    short: 'Es fehlen {{nim}} NIM',
+    error: 'Guthaben konnte nicht gelesen werden',
+    signIn: 'Melde dich mit deiner Wallet an, um dein NIM-Guthaben zu sehen',
+  },
+
   nim: {
     inInvoice: 'in der Rechnung unten',
     shownInPay: 'in deiner Lightning-Wallet angezeigt',

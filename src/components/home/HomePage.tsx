@@ -6,6 +6,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../ui/Icon';
+import { WalletBalance } from '../wallet/WalletBalance';
 import { FlagMark } from '../ui/FlagMark';
 import { ComeBackBanner } from '../ui/uiKit';
 import { flattenBrands, type Product } from '../../lib/catalog';
@@ -353,6 +354,14 @@ export function HomePage() {
           </ul>
         </aside>
       </section>
+
+      {/* Owner (2026-10-05): "ana sayfada NIM kuru gözükse güzel olabilirdi" —
+          the wallet's NIM and its USD value, in its own row right under the
+          hero. It renders NOTHING until there is a wallet to read, so a
+          first-time visitor still sees the untouched marketing hero. */}
+      <div className="container">
+        <WalletBalance variant="card" className="mt-3" />
+      </div>
 
       <div className="container how-strip" aria-label={t('home.howAria', { site: siteName() })}>
         {/* One number + one short line per step, at every width: the sub

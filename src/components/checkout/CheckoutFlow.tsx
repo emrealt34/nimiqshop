@@ -16,7 +16,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../ui/Icon';
 import { useCart, itemKey, type CartItem } from '../../lib/cartStore';
 import { useToast } from '../AppProviders';
-import { createQuote, createQuoteBatch, forgetQuote, getQuote, friendlyApiMessage, authorizePaymentLaunch } from '../../lib/api';
+import { createQuote, createQuoteBatch, forgetQuote, getQuote, friendlyApiMessage, authorizePaymentLaunch, cachedNimRate } from '../../lib/api';
 import { canRenewQuote, paymentInFlight } from '../../lib/pay';
 import { buildOrderRequest, getGiftExtras, type DeliveryInfo } from '../../lib/delivery';
 import { isValidEmail } from '../../lib/validate';
@@ -37,7 +37,9 @@ import { cashbackExclusiveNote, cashbackNimFromQuote, fmtCashbackNIM, loadCashba
 import { quoteFaceValue } from '../../lib/format';
 import { StakerCashbackLine } from '../staker/StakerCashback';
 import { currentCashbackCode } from '../../lib/cashbackCode';
-import { nimAmountText } from '../../lib/nim';
+import { nimAmountText, nimAmountFor } from '../../lib/nim';
+import { refreshWalletBalance } from '../../lib/walletBalance';
+import { WalletBalance } from '../wallet/WalletBalance';
 import { fmtUSD } from '../../lib/format';
 import { deliveryLine, youGetText } from '../../lib/deliveryCopy';
 import {
@@ -254,6 +256,11 @@ export function CheckoutFlow({
   const cart = useCart();
   const { toast } = useToast();
   const [phase, setPhase] = useState<Phase>({ kind: 'delivery' });
+  // Money moved: the cached balance is instantly wrong, so the strips must not
+  // wait out their 25 s TTL after a purchase settles.
+  useEffect(() => {
+    if (phase.kind === 'summary') void refreshWalletBalance({ force: true });
+  }, [phase.kind]);
   // Per-flow auto-renew budget (see AutoRenewOnce): a dead invoice is replaced
   // silently, but a quote that renews into another dead quote falls back to
   // the manual gate instead of creating invoices in a loop.
@@ -965,6 +972,15 @@ export function PayScreen({
             <span className="big-nim">{t('checkout.flowAmountInNimiqPay')}</span>
           )}
         </div>
+        {/* Owner (2026-10-05): "sipariş verecekken ilk gözüm onu aradı" — the
+            buyer checks their own NIM against the amount due BEFORE paying. */}
+        <WalletBalance
+          variant="line"
+          targetNim={Number(nimAmountFor(current, cachedNimRate())) || 0}
+          targetTotal
+          signInHint
+          className="mt-2"
+        />
         <div className="pay-hero-youget">
           <span className="xs faint">{t('checkout.flowYouGet')}</span>
           <span className="strong pay-you-get">{youGet || t('checkout.instantDelivery')}</span>

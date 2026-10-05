@@ -18,6 +18,7 @@ import { readAppliedCashbackCode, CASHBACK_CODE_EVENT } from '../../lib/cashback
 import { isAuthed } from '../../lib/session';
 import { openLoginSheet } from '../shell/SiteShell';
 import { CheckoutFlow } from '../checkout/CheckoutFlow';
+import { WalletBalance } from '../wallet/WalletBalance';
 import { CashbackCodeField } from '../cashback/CashbackCodeField';
 import { useRouter } from '../../lib/router';
 import { useT, t as i18nT } from '../../i18n';
@@ -334,6 +335,9 @@ export function CartSheetContent({ close }: { close: () => void }) {
           {cashbackEarnLine(totals.nim, effectiveBps, cashbackMeta)}
         </div>
       ) : null}
+      {/* Owner (2026-10-05): "your cart" — the buyer's own NIM, and whether the
+          cart actually fits in it, right where the checkout starts. */}
+      <WalletBalance variant="line" targetNim={totals && totals.nim > 0 ? totals.nim : 0} targetTotal signInHint className="mt-2" />
       <details className="checkout-details-min"><summary>{t('cartSheet.detailsSummary')}</summary><div style={{ marginTop: 8 }}><CashbackFeeNotice example="nim" /></div></details>
       <button className="btn btn-gold btn-block btn-lg mt-2" onClick={startCheckout} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', justifyContent: 'center', minWidth: 0, paddingInline: '16px' }}>
         <Icon name="nimiq" size={20} />

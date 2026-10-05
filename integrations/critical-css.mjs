@@ -232,6 +232,10 @@ const ALWAYS_INLINE_SELECTORS = [
   // A few KB of card chrome in the first frame buys a grid whose card boxes
   // are final from the moment they exist — before any logo even loads.
   '.thumb', '.product-img', '.product-card',
+  // The wallet balance strip sits directly under the home hero and above the
+  // buy buttons on a product page: its dashed card chrome is first-paint
+  // layout, not decoration. Inline it, or the row appears a beat late.
+  '.wal-bal',
   // The products grid's column rules exist TWICE in the sheet (readable +
   // minified section). When one copy stayed inline and its duplicate went
   // deferred, the deferred copy landed later in the document and out-ranked

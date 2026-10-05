@@ -1742,6 +1742,17 @@ const fr = {
   },
 
   /* ---- nim ---- */
+  /* The buyer's own NIM balance (wallet lookup strip). */
+  wallet: {
+    label: 'Votre wallet',
+    loading: 'Lecture de votre solde…',
+    afford: { one: 'Votre solde suffit pour celui-ci', other: 'Votre solde couvre jusqu’à {{count}} unités' },
+    enough: 'Votre solde couvre cette commande',
+    short: 'Il vous manque {{nim}} NIM',
+    error: 'Solde illisible pour le moment',
+    signIn: 'Connectez votre wallet pour voir votre solde NIM',
+  },
+
   nim: {
     inInvoice: 'dans la facture ci-dessous',
     shownInPay: 'affiché dans votre wallet Lightning',

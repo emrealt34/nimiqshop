@@ -1743,6 +1743,17 @@ const tr = {
   },
 
   /* ---- nim ---- */
+  /* The buyer's own NIM balance (wallet lookup strip). */
+  wallet: {
+    label: 'Cüzdanın',
+    loading: 'Bakiyen okunuyor…',
+    afford: { one: 'Bakiyen bunun için yetiyor', other: 'Bakiyenle en fazla {{count}} adet alabilirsin' },
+    enough: 'Bakiyen bu sipariş için yeterli',
+    short: '{{nim}} NIM eksik',
+    error: 'Bakiye şu an okunamadı',
+    signIn: 'NIM bakiyeni görmek için cüzdanınla giriş yap',
+  },
+
   nim: {
     inInvoice: 'aşağıdaki faturada',
     shownInPay: 'Lightning cüzdanında gösterilir',

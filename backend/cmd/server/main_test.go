@@ -272,6 +272,7 @@ func TestPublicEndpoints(t *testing.T) {
 		{"GET", "/api/auth/session", 200},
 		{"GET", "/api/quotes", 401},
 		{"GET", "/api/orders", 401},
+		{"GET", "/api/wallet/balance", 401},
 		{"GET", "/api/admin/dashboard", 401},
 		{"GET", "/api/nope", 404},
 	}

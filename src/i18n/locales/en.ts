@@ -1751,6 +1751,17 @@ const en = {
   },
 
   /* ---- nim ---- */
+  /* The buyer's own NIM balance (wallet lookup strip). */
+  wallet: {
+    label: 'Your wallet',
+    loading: 'Reading your balance…',
+    afford: { one: 'Your balance covers one of these', other: 'Your balance covers up to {{count}} of these' },
+    enough: 'Your balance covers this order',
+    short: 'You are {{nim}} NIM short',
+    error: 'Balance could not be read',
+    signIn: 'Sign in with your wallet to see your NIM balance',
+  },
+
   nim: {
     inInvoice: 'in the invoice below',
     shownInPay: 'shown in your Lightning wallet',

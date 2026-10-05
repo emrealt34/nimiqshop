@@ -922,6 +922,11 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 	// Orders are read-only local views. New purchases always go through the
 	// Supplier (CryptoRefills) Lightning quote above; status arrives via webhook.
 	r.GET("/api/orders", authed(h.ListOrders))
+	// The signed-in wallet's own NIM balance (read-only chain data). The client
+	// prefers the Nimiq Pay host bridge when it is available and falls back to
+	// this on the open web, so the buyer can see what they can afford before a
+	// checkout starts. Session-scoped on purpose: no address parameter.
+	r.GET("/api/wallet/balance", authed(h.WalletBalance))
 	r.GET("/api/orders/{id}", authed(h.GetOrder))
 	r.POST("/api/orders/{id}/refresh", authedTiered(aRefresh, h.RefreshOrder))
 	r.GET("/api/orders/{id}/support", authed(h.GetOrderSupport))

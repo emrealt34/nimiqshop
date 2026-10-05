@@ -595,6 +595,8 @@ export const setNotificationPrefs = (enabled: boolean) =>
 
 /* ---------------- Orders ---------------- */
 export const listOrders = () => api('/orders', { auth: true });
+/** The signed-in wallet's own NIM balance (session-scoped; no address param). */
+export const getWalletBalance = () => api('/wallet/balance', { auth: true, timeoutMs: 9000 });
 export const getOrder = (id: string) => api(`/orders/${encodeURIComponent(id)}`, { auth: true });
 export const refreshOrder = (id: string) => api(`/orders/${encodeURIComponent(id)}/refresh`, { method: 'POST', auth: true });
 export const getOrderSupport = (id: string) => api(`/orders/${encodeURIComponent(id)}/support`, { auth: true });

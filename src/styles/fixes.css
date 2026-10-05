@@ -1079,6 +1079,27 @@ html.in-nimiq-pay #main.page {
 .onchain-chip:hover{ border-color:var(--green); color:var(--green-600); text-decoration:none }
 .onchain-chip svg{ flex:0 0 auto }
 
+/* ---- wallet balance strip (home / product / cart / checkout / orders) ----
+   Owner (2026-10-05): the NIM the buyer holds, and what it covers, wherever a
+   purchase can start. It is a quiet sticker like everything else on the page —
+   dashed edge, serif figure — and it is only ever rendered when there is a
+   real reading, so it can never leave an empty band in the layout. */
+.wal-bal{ display:flex; flex-direction:column; gap:5px; min-width:0 }
+.wal-bal-top{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; min-width:0 }
+.wal-bal-label{ display:inline-flex; align-items:center; gap:6px; font-size:var(--fs-xs); font-weight:900;
+  text-transform:uppercase; letter-spacing:.06em; color:var(--ink-faint) }
+.wal-bal-fig{ display:inline-flex; align-items:baseline; gap:7px; min-width:0; flex-wrap:wrap }
+.wal-nim{ font-family:var(--font-serif); font-weight:900; font-size:1.12rem; letter-spacing:.01em; white-space:nowrap }
+.wal-usd{ font-weight:700; white-space:nowrap }
+.wal-verdict{ display:inline-flex; align-items:center; gap:6px; font-size:var(--fs-sm); font-weight:800;
+  line-height:1.35; overflow-wrap:anywhere }
+.wal-verdict.ok{ color:var(--green-600) }
+.wal-verdict.short{ color:var(--stamp) }
+.wal-card{ padding:14px 16px; border:1.5px dashed var(--line-dash); border-radius:var(--r-l); background:var(--surface-1) }
+.wal-line{ padding:10px 12px; border:1.5px dashed var(--line-dash); border-radius:var(--r-m); background:var(--gold-soft) }
+.wal-chip{ gap:5px }
+.wal-chip strong{ font-family:var(--font-serif) }
+
 /* ---- pager ---- */
 .pt-pager{ display:flex; align-items:center; justify-content:space-between; gap:10px;
   margin-top:14px; padding-top:12px; border-top:1px dashed var(--line-dash) }

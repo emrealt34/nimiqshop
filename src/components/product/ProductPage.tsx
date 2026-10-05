@@ -15,6 +15,7 @@ import { AppRoot } from '../AppRoot';
 import { friendlyApiMessage, getProduct, getNimRate, getFXRates, getProductPrice, onRatesChange } from '../../lib/api';
 import { loadCashbackBps, cashbackEarnLine } from '../../lib/cashback';
 import { StakerCashbackLine } from '../staker/StakerCashback';
+import { WalletBalance } from '../wallet/WalletBalance';
 import { brandMetaFor } from '../../lib/catalogMeta';
 import { useCartSafe } from '../../lib/cartStore';
 import { useSheet, useToast } from '../AppProviders';
@@ -863,6 +864,12 @@ export function ProductPage() {
             )}
           </div>
         </div>
+
+        {/* Owner (2026-10-05): the balance used to appear only after an amount
+            was chosen. It now sits above the buy buttons with the number of
+            items the wallet actually covers — "neyi alıp alamayacağımı da
+            göreyim". */}
+        <WalletBalance variant="line" targetNim={currentProductNIM()} className="mt-2" />
 
         <HowToRedeemCard product={product} info={info} termsText={termsText} />
 

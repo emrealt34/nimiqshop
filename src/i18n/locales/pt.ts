@@ -1742,6 +1742,17 @@ const pt = {
   },
 
   /* ---- nim ---- */
+  /* The buyer's own NIM balance (wallet lookup strip). */
+  wallet: {
+    label: 'A sua carteira',
+    loading: 'A ler o seu saldo…',
+    afford: { one: 'O seu saldo cobre este', other: 'O seu saldo cobre até {{count}} destes' },
+    enough: 'O seu saldo cobre esta encomenda',
+    short: 'Faltam {{nim}} NIM',
+    error: 'Não foi possível ler o saldo',
+    signIn: 'Inicie sessão com a sua carteira para ver o saldo em NIM',
+  },
+
   nim: {
     inInvoice: 'na fatura abaixo',
     shownInPay: 'mostrado na sua carteira Lightning',

@@ -118,6 +118,13 @@ function payload(p: string, method: string, o: ApiOptions): unknown {
   if (p === '/quotes') return [];
   if (p === '/support/tickets') return o.authed ? [{ id: 't1', subject: 'Code not received', status: 'open', created_at: iso(1), updated_at: iso(0), messages: [] }] : [];
   if (p.startsWith('/support/tickets/')) return { id: 't1', subject: 'Code not received', status: 'open', created_at: iso(1), messages: [{ id: 'm1', from: 'user', body: 'Hello', created_at: iso(1) }] };
+  if (p === '/wallet/balance') {
+    // The buyer's own NIM balance. Signed-out visitors never ask (the client
+    // gates on session state), but answer 401 faithfully if they do.
+    return o.authed
+      ? { address: 'NQ07 0000 0000 0000 0000 0000 0000 0000 0000', available: true, balance_luna: 12400000, balance_nim: 124, network: 'mainnet', observed_at: iso(0) }
+      : { __status: 401, error: 'unauthorized' };
+  }
   if (p === '/activity') return [];
   if (p.startsWith('/track/')) return { ...order(p.split('/')[2], 'delivered', 0), stage: 'delivered' };
   if (p.startsWith('/catalog/brands')) {
