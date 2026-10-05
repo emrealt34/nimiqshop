@@ -207,7 +207,7 @@ function OrderThumb({ family, country, image = '', bgColor = '' }: any) {
 
   // Unified thumb — same structure as homepage, per-brand bg so dark logos stay visible
   return (
-    <div style={{ width: 160, flex: 'none' }}>
+    <div style={{ width: 'clamp(96px, 42vw, 160px)', flex: 'none' }}>
       <UnifiedThumb src={resolved?.logo || ''} alt={family || t('orderPage.productFallback')} bg={resolved?.bg || bgColor || 'rgb(255,255,255)'} />
     </div>
   );
@@ -219,7 +219,7 @@ function ProductThumbStack({ titles, country }: { titles: string[]; country?: st
     .filter(Boolean)
     .slice(0, 3);
   return (
-    <div style={{ width: 160, flex: 'none' }}>
+    <div style={{ width: 'clamp(96px, 42vw, 160px)', flex: 'none' }}>
       <BrandThumbStack titles={cleanTitles} country={country} />
     </div>
   );

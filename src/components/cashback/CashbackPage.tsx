@@ -735,8 +735,8 @@ export function CashbackView() {
           <li>{rich(t('cashback.fine1', { base: pct(stakerBaseBps), zero: pct(baseBps) }))}</li>
           <li>
             {t('cashback.fine2', {
-              dayCap: `$${params?.daily_cap_usd || 50}`,
-              monthCap: `$${params?.monthly_cap_usd || 500}`,
+              dayCap: `$${params?.daily_cap_usd || 500}`,
+              monthCap: `$${params?.monthly_cap_usd || 1000}`,
             })}
           </li>
           <li>{t('cashback.fine3', { carry: String(Math.round((params?.carry_share ?? 0.1) * 100)) })}</li>

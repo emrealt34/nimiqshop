@@ -2652,7 +2652,7 @@ body {
 .cart-row > div:first-child{ grid-column:1 !important; grid-row:1 / span 2 !important; align-self:center !important; justify-self:start !important; }
 .cart-row .cart-main{ grid-column:2 !important; grid-row:1 !important; align-self:center !important; }
 .cart-row .cart-controls{ grid-column:1 / span 2 !important; justify-self:center !important; display:flex !important; gap:8px !important; align-items:center !important; margin-top:4px !important; }
-.cart-row .thumb.thumb-gc{ width:104px !important; height:104px !important; aspect-ratio:unset !important; display:block !important; position:relative !important; overflow:hidden !important; border-radius:8px !important; }
+.cart-row .thumb.thumb-gc{ width:100% !important; height:auto !important; aspect-ratio:1/1 !important; display:block !important; position:relative !important; overflow:hidden !important; border-radius:8px !important; }
 .cart-row .thumb.thumb-gc .product-img{ position:absolute !important; inset:0 !important; margin:auto !important; max-width:86% !important; max-height:86% !important; object-fit:contain !important; object-position:center !important; }
 
 /* === TOOLBAR FIX — geoNote hidden + Sort arrow centered (Sep 16) === */

@@ -60,7 +60,8 @@ type Params struct {
 // Defaults is the published programme: 80% of the realized fee is credited,
 // 10% of the unused month-end balance carries over, loyalty ramps from x0.5
 // to x1.0 over 1825 days (5 years), entry at 100 NIM, boost capped at 10% of the next
-// $100, ledger capped at $10, spend caps $50/day and $500/month.
+// $100, ledger capped at $10, spend caps $500/day and $1000/month
+	// (owner, 2026-10-05: "günlük harcama limiti 500 dolar, aylık 1000").
 var Defaults = Params{
 	K:               0.8,
 	Q:               0.1,
@@ -69,8 +70,8 @@ var Defaults = Params{
 	MinStakeNIM:     100,
 	MaxBoostBps:     1000,
 	AMaxUSD:         10,
-	DailyCapUSD:     50,
-	MonthlyCapUSD:   500,
+	DailyCapUSD:     500,
+	MonthlyCapUSD:   1000,
 	DisplayBasisUSD: 100,
 }
 
