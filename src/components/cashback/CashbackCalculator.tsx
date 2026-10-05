@@ -11,6 +11,7 @@
  * the operator runs a promotion. The ledger boost stacks on top.
  */
 import { useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Icon } from '../ui/Icon';
 import { getNimRate, cachedNimRate, onRatesChange } from '../../lib/api';
 import { estimateCashback, sliderToValue, valueToSlider } from '../../lib/cashbackCalc';
@@ -81,6 +82,7 @@ export function CashbackCalculator({
   myStakeNIM,
   myLoyaltyDays,
   onUseAmount,
+  footer,
 }: {
   program: StakeCashbackProgram;
   /** Operator's universal base (non-stakers), bps. 0 by default. */
@@ -92,6 +94,8 @@ export function CashbackCalculator({
   myLoyaltyDays?: number;
   /** "Stake this amount" hands the slider value to the stake form. */
   onUseAmount?: (nim: number) => void;
+  /** REQ-63: compact stake block folded into this card by the page. */
+  footer?: ReactNode;
 }) {
   const stakeMin = Math.max(1, program.min_stake_nim || 100);
   const [stake, setStake] = useState<number>(() =>
@@ -414,6 +418,7 @@ export function CashbackCalculator({
           </ul>
         </div>
       </details>
+      {footer}
       <div className="xs faint mt-1">{t('cashback.calcEstimateOnly')}</div>
     </div>
   );

@@ -1634,7 +1634,7 @@ const de = {
     copyCaption: 'Text kopieren',
     postImageCaption: 'Bild + Text posten',
     shareTitle: 'Ich habe NIM-Cashback auf {{site}} verdient ⚡',
-    shareCaption: { one: 'Ich habe {{nim}} NIM Cashback (🔥 {{burned}} NIM verbrannt) bei {{count}} Bestellung auf {{site}} verdient — Sofort-Gutscheine, eSIMs & Aufladungen mit NIM. {{url}}', other: 'Ich habe {{nim}} NIM Cashback (🔥 {{burned}} NIM verbrannt) bei {{count}} Bestellungen auf {{site}} verdient — Sofort-Gutscheine, eSIMs & Aufladungen mit NIM. {{url}}' },
+    shareCaption: { one: 'Ich habe {{nim}} NIM Cashback bei {{count}} Bestellung auf {{site}} verdient — Sofort-Gutscheine, eSIMs & Aufladungen mit NIM. {{url}}', other: 'Ich habe {{nim}} NIM Cashback bei {{count}} Bestellungen auf {{site}} verdient — Sofort-Gutscheine, eSIMs & Aufladungen mit NIM. {{url}}' },
     canvasImpactReceipt: 'CASHBACK-BELEG',
     canvasSerial: '01 · PERSÖNLICH',
     canvasCashbackRoute: 'CASHBACK & BURN',
@@ -1646,7 +1646,7 @@ const de = {
     canvasStatusBurned: '🔥 {{burned}} NIM dauerhaft on-chain verbrannt',
     canvasStatusChoose: 'Wähle beim Bezahlen Meine Wallet oder Verbrennen',
     canvasReceiptFrom: 'EIN TEILBARER BELEG VON',
-    canvasTagline: 'Cashback · Staking-Boost · On-Chain-Burn',
+    canvasTagline: 'cashback · staking boost',
     shareImgAlt: 'Deine Cashback-Belegkarte von {{site}}',
   },
   /* ---- staker ---- */

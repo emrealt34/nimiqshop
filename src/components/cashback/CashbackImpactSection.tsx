@@ -1,22 +1,20 @@
 /**
- * CashbackImpactSection.tsx — public Cashback & Burn stats, Burn wallet card,
+ * CashbackImpactSection.tsx — public Cashback stats,
  * personal shareable Cashback receipt card (1080×1350 PNG export + Web Share /
- * X / Facebook / Copy link), and weekly/monthly/all-time Cashback & Burn
+ * X / Facebook / Copy link), and weekly/monthly/all-time Cashback
  * Leaderboard on the /cashback page.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../ui/Icon';
 import { Identicon } from '../ui/Identicon';
 import { canonicalIdenticonInput, resolveIdenticonUrl } from '../../lib/identicon';
-import { getBurnBalance, getCashbackLeaderboard, getSiteConfig } from '../../lib/api';
+import { getCashbackLeaderboard } from '../../lib/api';
 import { siteName, siteURL } from '../../lib/config';
 import { getAddress, isAuthed } from '../../lib/session';
 import { Clipboard } from '../../lib/clipboard';
-import { fmtNIM } from '../../lib/format';
 import { useT } from '../../i18n';
 import { asset, pagePath } from '../../lib/asset';
 
-const DEFAULT_BURN_ADDRESS = 'NQ07 0000 0000 0000 0000 0000 0000 0000 0000';
 
 type LeaderRow = {
   rank: number;
@@ -43,30 +41,6 @@ function formatNimCompact(n: number): string {
   if (n >= 10) return Math.round(n).toLocaleString('en-US');
   if (n < 1) return n.toFixed(2);
   return n.toFixed(1);
-}
-
-const BURN_BALANCE_CACHE_KEY = 'nimshop:burn-wallet-balance:v1';
-const BURN_BALANCE_CACHE_TTL_MS = 60 * 1000;
-const BURN_BALANCE_STALE_MS = 5 * 60 * 1000;
-
-type CachedBurnBalance = {
-  balance_nim: number;
-  cached_at?: string;
-  stale?: boolean;
-  client_cached_at: number;
-};
-
-function readCachedBurnBalance(): CachedBurnBalance | null {
-  try {
-    const raw = sessionStorage.getItem(BURN_BALANCE_CACHE_KEY);
-    if (!raw) return null;
-    const row = JSON.parse(raw) as Partial<CachedBurnBalance>;
-    if (!Number.isFinite(Number(row.balance_nim)) || !Number.isFinite(Number(row.client_cached_at))) return null;
-    if (Date.now() - Number(row.client_cached_at) > BURN_BALANCE_STALE_MS) return null;
-    return { ...row, balance_nim: Number(row.balance_nim), client_cached_at: Number(row.client_cached_at) } as CachedBurnBalance;
-  } catch {
-    return null;
-  }
 }
 
 export function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
@@ -111,7 +85,6 @@ export function CashbackImpactSection({
 
 }) {
   const { t } = useT();
-  const [cfg, setCfg] = useState<any>(null);
   const [bucket, setBucket] = useState<'week' | 'month' | 'all'>('all');
   const [data, setData] = useState<any>(null);
   const [copied, setCopied] = useState(false);
@@ -119,9 +92,6 @@ export function CashbackImpactSection({
   const [leaderPage, setLeaderPage] = useState(0);
   const [shareImg, setShareImg] = useState<string | null>(null);
   const shareBlobRef = useRef<Blob | null>(null);
-  const [burnAddressCopied, setBurnAddressCopied] = useState(false);
-  const [burnWalletNim, setBurnWalletNim] = useState<number | null>(() => readCachedBurnBalance()?.balance_nim ?? null);
-  const [burnBalanceStale, setBurnBalanceStale] = useState(false);
 
   useEffect(() => {
     if (isAuthed()) setAddress(getAddress() || '');
@@ -130,42 +100,10 @@ export function CashbackImpactSection({
 
   useEffect(() => {
     let alive = true;
-    const cached = readCachedBurnBalance();
-    if (cached) {
-      setBurnWalletNim(cached.balance_nim);
-      setBurnBalanceStale(Boolean(cached.stale));
-      if (Date.now() - cached.client_cached_at < BURN_BALANCE_CACHE_TTL_MS) return () => { alive = false; };
-    }
-    getBurnBalance()
-      .then((row: any) => {
-        const balance = Number(row?.balance_nim);
-        if (!alive || row?.available !== true || !Number.isFinite(balance) || balance < 0) return;
-        const next: CachedBurnBalance = {
-          balance_nim: balance,
-          cached_at: row.cached_at,
-          stale: Boolean(row.stale),
-          client_cached_at: Date.now(),
-        };
-        try {
-          sessionStorage.setItem(BURN_BALANCE_CACHE_KEY, JSON.stringify(next));
-        } catch {}
-        setBurnWalletNim(balance);
-        setBurnBalanceStale(Boolean(row.stale));
-      })
-      .catch(() => {});
-    return () => { alive = false; };
-  }, []);
-
-  useEffect(() => {
-    let alive = true;
     (async () => {
       try {
-        const [c, lbRes] = await Promise.all([
-          getSiteConfig().catch(() => ({})) as any,
-          getCashbackLeaderboard(bucket).catch(() => null) as any,
-        ]);
+        const lbRes = await getCashbackLeaderboard(bucket).catch(() => null);
         if (!alive) return;
-        setCfg(c);
         if (lbRes) setData(lbRes);
       } catch {
         /* best-effort */
@@ -173,16 +111,6 @@ export function CashbackImpactSection({
     })();
     return () => { alive = false; };
   }, [bucket]);
-
-  const burnAddress = String(data?.burn_address || cfg?.burn_nim_address || DEFAULT_BURN_ADDRESS).trim();
-  const copyBurnAddress = () => {
-    if (!burnAddress) return;
-    if (Clipboard.copy(burnAddress)) {
-      setBurnAddressCopied(true);
-      // DS172411 (setTimeout): closure only, never a string — no untrusted data is evaluated.
-      setTimeout(() => setBurnAddressCopied(false), 2200);
-    }
-  };
 
   const totals = data?.totals || {
     total_nim: 0,
@@ -209,7 +137,6 @@ export function CashbackImpactSection({
   const myBurned = Number(myTotals?.burned_nim || 0);
   const myWallet = Number(myTotals?.wallet_nim ?? Math.max(0, myEarned - myBurned));
   const myOrders = Number(myTotals?.orders ?? ((Number(myTotals?.paid_count) || 0) + (Number(myTotals?.pending_count) || 0)));
-  const myDest = myTotals?.preference === 'burn' ? 'burn' : 'cashback';
 
   const cleanUser = String(address || '').replace(/[\s-]/g, '').toUpperCase();
   const myLeaderIndex = cleanUser
@@ -226,18 +153,16 @@ export function CashbackImpactSection({
   }, []);
 
   const myEarnedStr = fmtNimUser(myEarned);
-  const myBurnedStr = fmtNimUser(myBurned);
   const myWalletStr = fmtNimUser(myWallet);
 
   const shareText = useMemo(() => {
     return t('cashbackCard.shareCaption', {
       count: myOrders,
       nim: myEarnedStr,
-      burned: myBurnedStr,
       site: siteName(),
       url: shareUrl,
     });
-  }, [t, myOrders, myEarnedStr, myBurnedStr, shareUrl]);
+  }, [t, myOrders, myEarnedStr, shareUrl]);
 
   const nativeShare = async () => {
     if (navigator.share) {
@@ -537,18 +462,13 @@ export function CashbackImpactSection({
     const numTop = heroTop + 76;
     const numBase = numTop + Math.round(numSize * 0.74);
     const labelTop = sideBySide ? numBase - Math.round(numSize * 0.37) - Math.round(labelBlockH / 2) : numBase + 34;
-    const destination = myDest === 'burn' ? t('cashbackCard.destBurn') : t('cashbackCard.canvasWalletSwitch');
+    const destination = t('cashbackCard.canvasWalletSwitch');
     const destBlock = fitBlock(destination, innerW - 36, 18, 700, 2, font, 14);
     const destLH = Math.round(destBlock.size * 1.3);
     const ruleY = (sideBySide ? numBase : labelTop + labelBlockH) + 38;
     const heroH = ruleY - heroTop + 22 + destLH * destBlock.lines.length + 18;
 
-    const status =
-      myBurned > 0
-        ? t('cashbackCard.canvasStatusBurned', { burned: myBurnedStr })
-        : myEarned > 0
-          ? t('cashbackCard.statusEarned')
-          : t('cashbackCard.canvasStatusChoose');
+    const status = myEarned > 0 ? t('cashbackCard.statusEarned') : t('cashbackCard.canvasStatusChoose');
     const stBlock = fitBlock(status, CW - 72 - 28, 19, 800, 2, font, 14);
     const stLH = Math.round(stBlock.size * 1.35);
     const stH = Math.max(72, 34 + stLH * stBlock.lines.length);
@@ -575,7 +495,7 @@ export function CashbackImpactSection({
     ctx.moveTo(cx, ruleY);
     ctx.lineTo(heroX + heroW - padX, ruleY);
     ctx.stroke();
-    drawIcon(myDest === 'burn' ? 'bolt' : 'wallet', cx, ruleY + 20, 22, 'rgba(255,246,232,.8)', 1.7);
+    drawIcon('wallet', cx, ruleY + 20, 22, 'rgba(255,246,232,.8)', 1.7);
     lines(destBlock.lines, cx + 36, ruleY + 22 + destBlock.size, destBlock.size, destLH, 'rgba(255,246,232,.8)', 700);
     y = heroTop + heroH;
 
@@ -583,8 +503,7 @@ export function CashbackImpactSection({
     text(fpLabel, L, y + extra + 56, fitSize(fpLabel, CW, 16, 900, font, 12), inkFaint, 900);
     y += extra;
     const tileTop = y + 80,
-      tileGap = 24,
-      tileW = (CW - tileGap) / 2;
+      tileW = CW;
     const drawTile = (tx: number, icon: string, label: string, val: string) => {
       fillRound(tx, tileTop, tileW, tileH, 12, recess);
       strokeRound(tx, tileTop, tileW, tileH, 12, 'rgba(78,61,40,.22)', 2);
@@ -597,14 +516,13 @@ export function CashbackImpactSection({
       text(val, txL, tileTop + 92, fitSize(val, txW, 34, 900, serif, 20), ink, 900, 'left', serif);
     };
     drawTile(L, 'wallet', t('cashbackCard.toWalletLabel'), `${myWalletStr} NIM`);
-    drawTile(L + tileW + tileGap, 'bolt', t('cashbackCard.burnedLabel'), `${myBurnedStr} NIM`);
     y = tileTop + tileH;
 
     y += 30 + extra;
     fillRound(L, y, CW, stH, 10, 'rgba(199,72,29,.09)');
     ctx.fillStyle = stamp;
     ctx.fillRect(L, y, 6, stH);
-    drawIcon(myBurned > 0 ? 'bolt' : 'clock', L + 26, y + Math.round((stH - 24) / 2), 24, stamp, 2);
+    drawIcon('clock', L + 26, y + Math.round((stH - 24) / 2), 24, stamp, 2);
     lines(stBlock.lines, L + 66, y + 24 + stBlock.size, stBlock.size, stLH, inkDim, 800);
     y += stH;
 
@@ -681,39 +599,9 @@ export function CashbackImpactSection({
 
   return (
     <div className="pt-page" style={{ padding: '14px 0 0' }}>
-      {/* ------------------------------------------------ public burn wallet */}
-      {burnAddress && (
-        <section
-          className="pt-card"
-          aria-label={t('cashbackCard.burnWalletAria')}
-          style={{ padding: 14, display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}
-        >
-          <div className="pt-icon-inline" style={{ gap: 10 }}>
-            <Identicon address={burnAddress} size={56} />
-            <span>
-              <strong style={{ fontSize: 13 }}>{t('cashbackCard.burnWallet')}</strong>
-              <br />
-              <code className="small mono" style={{ fontSize: '13px', wordBreak: 'normal', overflowWrap: 'anywhere' }}>
-                {burnAddress}
-              </code>
-            </span>
-          </div>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <span className="small" style={{ fontWeight: 800 }}>
-              {burnWalletNim !== null ? <>{fmtNIM(burnWalletNim, 0)} NIM</> : <>{fmtNIM(globalBurned, 0)} NIM</>}
-              {burnBalanceStale ? t('cashbackCard.lastKnown') : ''}
-            </span>
-            <button className="btn btn-sm btn-ghost" onClick={copyBurnAddress}>
-              <Icon name="copy" size={13} /> {burnAddressCopied ? t('actions.copied') : t('actions.copy')}
-            </button>
-          </div>
-        </section>
-      )}
-
-      {/* ------------------------------------------------ global cashback & burn totals */}
+      {/* global cashback totals */}
       <div className="pt-stats">
         <Stat icon="spark" value={`${formatNimCompact(globalEarned)} NIM`} label={t('cashbackCard.statEarned')} />
-        <Stat icon="bolt" value={`${formatNimCompact(globalBurned)} NIM`} label={t('cashbackCard.statBurned')} />
         <Stat icon="wallet" value={`${formatNimCompact(globalWallet)} NIM`} label={t('cashbackCard.statWallet')} />
         <Stat icon="gift" value={String(globalOrders)} label={t('cashbackCard.statOrders')} />
       </div>
@@ -753,7 +641,7 @@ export function CashbackImpactSection({
                   </span>
                   <span className="pt-impact-order-destination">
                     {address ? <Identicon address={address} size={20} /> : <Icon name="wallet" size={15} />}
-                    {myDest === 'burn' ? t('cashbackCard.destBurn') : t('cashbackCard.destWallet')}
+                    {t('cashbackCard.destWallet')}
                   </span>
                 </div>
               </div>
@@ -770,23 +658,9 @@ export function CashbackImpactSection({
                   <strong>{myWalletStr} NIM</strong>
                 </span>
               </div>
-              <div className="pt-impact-metric">
-                <span className="pt-impact-metric-icon">
-                  <Icon name="bolt" size={20} />
-                </span>
-                <span>
-                  <small>{t('cashbackCard.burnedLabel')}</small>
-                  <strong>{myBurnedStr} NIM</strong>
-                </span>
-              </div>
             </div>
 
-            {myBurned > 0 ? (
-              <div className="pt-impact-status">
-                <Icon name="bolt" size={17} />
-                <span>{t('cashbackCard.statusBurned', { burned: myBurnedStr })}</span>
-              </div>
-            ) : myEarned > 0 ? (
+            {myEarned > 0 ? (
               <div className="pt-impact-status">
                 <Icon name="wallet" size={17} />
                 <span>{t('cashbackCard.statusEarned')}</span>
@@ -851,9 +725,6 @@ export function CashbackImpactSection({
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginTop: 4 }}>
                 <span className="chip">
                   <Icon name="spark" size={13} /> {t('cashbackCard.emptyChipEarned')}
-                </span>
-                <span className="chip">
-                  <Icon name="bolt" size={13} /> {t('cashbackCard.emptyChipBurned')}
                 </span>
               </div>
             </div>

@@ -9,7 +9,7 @@ import { Icon } from '../ui/Icon';
 import { BrandThumbStack } from '../ui/UnifiedThumb';
 import { fmtStakeNIM, pctLabel } from '../../lib/stakerCashback';
 import { Pager } from '../ui/Pager';
-import { SkeletonLines } from '../ui/uiKit';
+import { SkeletonRows } from '../ui/uiKit';
 import { t as tr } from '../../i18n';
 
 export type RecentCashbackRow = {
@@ -24,6 +24,8 @@ export type RecentCashbackRow = {
   tx_hash?: string;
   /** The purchase's Lightning payment hash — the tx of what you bought. */
   purchase_tx?: string;
+  /** REQ-62 class fix: the thumb needs the buyer's catalog country. */
+  country?: string;
 };
 
 export function rateSourceLabel(cb: RecentCashbackRow): string {
@@ -49,11 +51,11 @@ export function NimUnitMark({ size = 11 }: { size?: number }) {
   );
 }
 
-function CashbackThumb({ title }: { title: string }) {
+function CashbackThumb({ title, country }: { title: string; country?: string }) {
   const parts = React.useMemo(() => String(title || '').split(' + ').map((s) => s.trim()).filter(Boolean).slice(0, 3), [title]);
   return (
     <div className="cb-thumb">
-      <BrandThumbStack titles={parts} />
+      <BrandThumbStack titles={parts} country={country} />
     </div>
   );
 }
@@ -63,7 +65,7 @@ export function RecentCashbackRowView({ cb }: { cb: RecentCashbackRow }) {
   const bps = Number(cb.bps) || 0;
   return (
     <div className="cb-row">
-      <CashbackThumb title={String(name)} />
+      <CashbackThumb title={String(name)} country={cb.country} />
       <div className="cb-row-main">
         <div className="small strong cb-row-title">
           <span className="cb-row-name" title={name}>{name}</span>
@@ -122,7 +124,7 @@ export function RecentCashbackList({
         )}
       </div>
       {loading && !rows ? (
-        <SkeletonLines n={3} />
+        <SkeletonRows n={3} />
       ) : list.length === 0 ? (
         <div className="small muted">{emptyText}</div>
       ) : (

@@ -92,6 +92,7 @@ func (h *Handlers) CashbackMe(ctx *fasthttp.RequestCtx) {
 		BaseSource          string     `json:"base_source,omitempty"`
 		TxHash              string     `json:"tx_hash,omitempty"`
 		PurchaseTx          string     `json:"purchase_tx,omitempty"`
+		Country             string     `json:"country,omitempty"`
 		PaidAt              *time.Time `json:"paid_at,omitempty"`
 		CreatedAt           time.Time  `json:"created_at"`
 	}
@@ -101,6 +102,17 @@ func (h *Handlers) CashbackMe(ctx *fasthttp.RequestCtx) {
 		dest := cb.CashbackDestination
 		if dest == "" {
 			dest = db.CashbackDestWallet
+		}
+		// The thumb template is shared with every other page (REQ-62 class
+		// fix): it needs the quote's product country to pick the real
+		// catalog logo instead of falling back to the US default.
+		purchaseTx := ""
+		country := ""
+		if cb.QuoteID != "" {
+			if q, qerr := h.Store.GetQuote(cb.QuoteID); qerr == nil {
+				purchaseTx = q.LightningPaymentHash
+				country = q.ProductCountry
+			}
 		}
 		out = append(out, cashbackRow{
 			ID:                  cb.ID,
@@ -117,7 +129,8 @@ func (h *Handlers) CashbackMe(ctx *fasthttp.RequestCtx) {
 			PaidBaseNIM:         cb.PaidBaseNIM,
 			BaseSource:          cb.BaseSource,
 			TxHash:              cb.TxHash,
-			PurchaseTx:          purchaseTxOfQuote(h, cb.QuoteID),
+			PurchaseTx:          purchaseTx,
+			Country:             country,
 			PaidAt:              cb.PaidAt,
 			CreatedAt:           cb.CreatedAt,
 		})

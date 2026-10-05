@@ -1643,7 +1643,7 @@ const en = {
     copyCaption: 'Copy caption',
     postImageCaption: 'Post image + caption',
     shareTitle: 'I earned NIM cashback on {{site}} ⚡',
-    shareCaption: { one: 'I earned {{nim}} NIM cashback (🔥 {{burned}} NIM burned) across {{count}} order on {{site}} — instant gift cards, eSIMs & top-ups with NIM. {{url}}', other: 'I earned {{nim}} NIM cashback (🔥 {{burned}} NIM burned) across {{count}} orders on {{site}} — instant gift cards, eSIMs & top-ups with NIM. {{url}}' },
+    shareCaption: { one: 'I earned {{nim}} NIM cashback across {{count}} order on {{site}} — instant gift cards, eSIMs & top-ups with NIM. {{url}}', other: 'I earned {{nim}} NIM cashback across {{count}} orders on {{site}} — instant gift cards, eSIMs & top-ups with NIM. {{url}}' },
     canvasImpactReceipt: 'CASHBACK RECEIPT',
     canvasSerial: '01 · PERSONAL',
     canvasCashbackRoute: 'CASHBACK & BURN',
@@ -1655,7 +1655,7 @@ const en = {
     canvasStatusBurned: '🔥 {{burned}} NIM permanently burned on-chain',
     canvasStatusChoose: 'Choose My wallet or Burn at checkout to start earning',
     canvasReceiptFrom: 'A SHAREABLE RECEIPT FROM',
-    canvasTagline: 'cashback · staking boost · on-chain burn',
+    canvasTagline: 'cashback · staking boost',
     shareImgAlt: 'Your {{site}} cashback receipt card',
   },
   /* ---- staker ---- */

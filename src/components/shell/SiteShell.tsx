@@ -38,20 +38,19 @@ export type ShellKey =
   | 'track'
   | 'order'
   | 'cashback'
-  | 'leaderboard'
   | 'none';
 
 /**
  * Nav data. The `labelKey` points at a translation entry under `nav.*` so the
  * same data renders in 6 languages without duplication.
  */
-const NAV: { key: ShellKey; labelKey: 'shop' | 'activity' | 'orders' | 'cashback' | 'leaderboard' | 'support'; href: string; icon: Parameters<typeof Icon>[0]['name'] }[] = [
+const NAV: { key: ShellKey; labelKey: 'shop' | 'activity' | 'orders' | 'cashback' | 'support'; href: string; icon: Parameters<typeof Icon>[0]['name'] }[] = [
   { key: 'shop',        labelKey: 'shop',       href: '/',             icon: 'bag' },
   { key: 'activity',    labelKey: 'activity',   href: '/activity',     icon: 'pulse' },
   { key: 'orders',      labelKey: 'orders',     href: '/orders',       icon: 'receipt' },
   { key: 'cashback',    labelKey: 'cashback',   href: '/cashback',     icon: 'spark' },
-  // Owner (2026-10-04): the leaderboard is its OWN page, one nav tab away.
-  { key: 'leaderboard', labelKey: 'leaderboard', href: '/leaderboard', icon: 'trophy' },
+  // Owner (2026-10-05): the leaderboard lives INSIDE the cashback page — no
+  // separate nav tab any more.
   { key: 'support',     labelKey: 'support',    href: '/support',      icon: 'headset' },
 ];
 

@@ -1634,7 +1634,7 @@ const pt = {
     copyCaption: 'Copiar legenda',
     postImageCaption: 'Publicar imagem + legenda',
     shareTitle: 'Ganhei cashback em NIM no {{site}} ⚡',
-    shareCaption: { one: 'Ganhei {{nim}} NIM de cashback (🔥 {{burned}} NIM queimados) em {{count}} encomenda no {{site}} — cartões-presente, eSIM e carregamentos instantâneos com NIM. {{url}}', other: 'Ganhei {{nim}} NIM de cashback (🔥 {{burned}} NIM queimados) em {{count}} encomendas no {{site}} — cartões-presente, eSIM e carregamentos instantâneos com NIM. {{url}}' },
+    shareCaption: { one: 'Ganhei {{nim}} NIM de cashback em {{count}} encomenda no {{site}} — cartões-presente, eSIM e carregamentos instantâneos com NIM. {{url}}', other: 'Ganhei {{nim}} NIM de cashback em {{count}} encomendas no {{site}} — cartões-presente, eSIM e carregamentos instantâneos com NIM. {{url}}' },
     canvasImpactReceipt: 'RECIBO DE CASHBACK',
     canvasSerial: '01 · PESSOAL',
     canvasCashbackRoute: 'CASHBACK E QUEIMA',
@@ -1646,7 +1646,7 @@ const pt = {
     canvasStatusBurned: '🔥 {{burned}} NIM queimados permanentemente on-chain',
     canvasStatusChoose: 'Escolha A minha carteira ou Queimar no pagamento para começar',
     canvasReceiptFrom: 'UM RECIBO PARTILHÁVEL DE',
-    canvasTagline: 'cashback · bónus de staking · queima on-chain',
+    canvasTagline: 'cashback · staking boost',
     shareImgAlt: 'O seu cartão de recibo de cashback do {{site}}',
   },
   /* ---- staker ---- */

@@ -1,4 +1,4 @@
-import { CashbackFeeNotice } from '../checkout/CashbackFeeNotice';
+import { CashbackImpactSection } from './CashbackImpactSection';
 /**
  * CashbackPage.tsx — the buyer-facing "Cashback & staking" page (v2: single
  * ledger, no tiers).
@@ -97,6 +97,8 @@ type CashbackRow = {
   id: string;
   quote_id: string;
   product_id: string;
+  /** REQ-62 class fix: catalog country for the shared thumb template. */
+  country?: string;
   amount_nim: number;
   bps: number;
   status: string;
@@ -254,7 +256,7 @@ export function CashbackView() {
   // flow, not retrying the same button.
   const [moveHint, setMoveHint] = useState(false);
   // Best-effort consensus note (see consensusEstablished): true = synced.
-  const [synced, setSynced] = useState(true);
+  const [, setSynced] = useState(true);
   const [activeNIM, setActiveNIM] = useState<string>('');
   // NIM rate is still tracked (setPrice) for other displays; the caps are
   // now shown in USD directly, so the converted value is no longer read here.
@@ -509,10 +511,110 @@ export function CashbackView() {
   }
 
 
+  // REQ-63 (owner 2026-10-05): "Add to your stake" folded INTO the calculator
+  // card and cut way down — presets, amount and the stake button in one
+  // compact block. No banners, no badge line, no redirect card: outside
+  // Nimiq Pay the stake button itself opens the guided wallet hand-off.
+  const stakeFooter = (
+    <div id="cb-stake-form" className="mt-2" style={{ borderTop: '1px dashed var(--line-dash, #e0d7c2)', paddingTop: 10 }}>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+        {[100_000, 500_000, 1_000_000, 10_000_000].map((n) => (
+          <button
+            key={n}
+            type="button"
+            className="btn btn-sm"
+            style={{
+              borderRadius: 999,
+              ...(Number(amount) === n ? { background: 'var(--gold)', color: 'var(--on-gold)', borderColor: 'var(--gold)' } : {}),
+            }}
+            onClick={() => {
+              setAmount(String(n));
+              setErr('');
+            }}
+          >
+            {stakedHere ? `+${n.toLocaleString('en-US')}` : n.toLocaleString('en-US')}
+          </button>
+        ))}
+      </div>
+      <div className="cb-form-row">
+        <input
+          className="input"
+          type="number"
+          inputMode="decimal"
+          min={MIN_STAKE_NIM}
+          step="1"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          aria-label={t('cashback.formAmountAria')}
+        />
+        <NimUnit size={12} className="cb-unit" />
+        <button className="btn btn-gold cb-primary" onClick={stakeCustom} disabled={!!busy || (inPay && !validator)}>
+          <Icon name={inPay ? 'bolt' : 'external'} size={14} />
+          {stakeBusy ? t('cashback.formWaitingPay') : !inPay ? t('cashback.formOpenWalletStake') : stakedHere ? t('cashback.opAddStake') : t('cashback.opNewStaker')}
+        </button>
+      </div>
+
+      {err && (
+        <div className="alert error mt-2" style={{ marginBottom: 0 }}>
+          <div className="small">{err}</div>
+        </div>
+      )}
+
+      {authed && !stakedHere && moveHint && (
+        <div className="mt-2">
+          <div className="xs faint">{t('cashback.formMoveHint')}</div>
+          <button
+            className="btn btn-outline btn-block mt-1"
+            onClick={doMove}
+            disabled={!!busy || !validator || !supportsOp({ kind: 'changeDelegation', delegation: validator })}
+          >
+            <Icon name="chevron" size={14} />
+            {busy === 'changeDelegation' ? t('cashback.formWaitingPay') : t('cashback.formMoveBtn', { validator: POOL_VALIDATOR_NAME })}
+          </button>
+        </div>
+      )}
+
+      {stakedHere && (
+        <details className="cb-details mt-2" open={manageOpen} onToggle={(e) => setManageOpen((e.target as HTMLDetailsElement).open)}>
+          <summary className="small strong">
+            <Icon name="chevron" size={14} /> {t('cashback.formMoreTools')}
+          </summary>
+          <div className="mt-2">
+            <div className="xs faint">{t('cashback.formActiveStakeLabel')}</div>
+            <div className="cb-form-row">
+              <input
+                className="input"
+                type="number"
+                min={MIN_STAKE_NIM}
+                step="1"
+                value={activeNIM}
+                onChange={(e) => setActiveNIM(e.target.value)}
+                aria-label={t('cashback.formActiveStakeAria')}
+              />
+              <NimUnit size={12} className="cb-unit" />
+              <button className="btn" onClick={doSetActive} disabled={busy === 'setActiveStake' || !supportsOp({ kind: 'setActiveStake', activeNIM: 0 })}>
+                {busy === 'setActiveStake' ? t('cashback.formWaiting') : t('cashback.opSetActiveStake')}
+              </button>
+            </div>
+            <div className="xs faint mt-2">{t('cashback.formRetireNote')}</div>
+            <div className="cb-tools-row">
+              <button className="btn" onClick={doRetire} disabled={busy === 'retireStake'}>
+                {busy === 'retireStake' ? t('cashback.formWaiting') : t('cashback.opRetireStake')}
+              </button>
+              <button className="btn" onClick={doRemove} disabled={busy === 'removeStake'}>
+                {busy === 'removeStake' ? t('cashback.formWaiting') : t('cashback.opRemoveStake')}
+              </button>
+            </div>
+            <div className="xs faint mt-2">{t('cashback.formWithdrawResets', { pct: pct(stakerBaseBps) })}</div>
+          </div>
+        </details>
+      )}
+    </div>
+  );
+
   return (
     <div className="container">
       <Header />
-      <CashbackFeeNotice example="nim" />
 
       {/* ------------------------------------------------------ your rate */}
       <div className="card mt-2 fade-in cb-hero">
@@ -592,35 +694,6 @@ export function CashbackView() {
         )}
       </div>
 
-      {/* --------------------------------------------------- how it works */}
-      {params && (
-        <div className="cb-steps mt-2">
-          <div className="cb-step">
-            <span className="cb-step-n">1</span>
-            <div>
-              <div className="small strong">{t('cashback.step1Title')}</div>
-              <div className="xs faint">{t('cashback.step1Body', { pct: pct(stakerBaseBps) })}</div>
-            </div>
-          </div>
-          <div className="cb-step">
-            <span className="cb-step-n">2</span>
-            <div>
-              <div className="small strong">{t('cashback.step2Title')}</div>
-              <div className="xs faint">{t('cashback.step2Body', { nim: fmtStakeNIM(params.min_stake_nim) })}</div>
-            </div>
-          </div>
-          <div className="cb-step">
-            <span className="cb-step-n">3</span>
-            <div>
-              <div className="small strong">{t('cashback.step3Title')}</div>
-              <div className="xs faint">
-                {t('cashback.step3Body', { pct: pct(stakerBaseBps), max: String(params.max_boost_percent) })}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ------------------------------------------------------ calculator */}
       {/*
         PUBLIC on purpose. The calculator answers "what would I get back?"
@@ -646,176 +719,12 @@ export function CashbackView() {
           myStakeNIM={stakedHere ? mine?.stake_nim : undefined}
           myLoyaltyDays={stakedHere ? mine?.loyalty_days : undefined}
           onUseAmount={useCalcAmount}
+          footer={stakeFooter}
         />
         </>
       ) : (
         <ProgrammeUnavailable loadError={!!program?.loadError} busy={retrying} onRetry={retryProgram} />
       )}
-
-      {/* ------------------------------------------------- stake / manage */}
-      <div className="card mt-2" id="cb-stake-form">
-        <div className="card-title">
-          <Icon name="bolt" size={16} /> {stakedHere ? t('cashback.formAddToStake') : t('cashback.ctaStartStaking')}
-        </div>
-
-        {/*
-          PUBLIC on purpose, like the calculator: a visitor with no shop
-          session still sees the whole form (presets, amount, stake button).
-          Nothing here reads the session — the number, the validator line and
-          the button are the same for everyone. Staking itself happens in the
-          buyer's own Nimiq wallet, so the shop login is not what authorises
-          it: inside Nimiq Pay the native dialog signs the transaction, and in
-          a browser the button opens the guided wallet hand-off. The session
-          only adds what is *personal* — the "add to your stake" wording, the
-          move flow and the manage tools, all of which need the buyer's own
-          stake to mean anything.
-        */}
-        {authed === false && (
-          <div className="xs faint" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-            <Icon name="info" size={13} /> {t('cashback.formNoAccount')}
-          </div>
-        )}
-
-        <>
-          {/* Quick amounts: staking should be a two-tap affair — tap a
-              preset, tap the button. A staked wallet sees "+N" (top-ups),
-              and the preset ladder starts at 100,000 NIM. */}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-            {[100_000, 500_000, 1_000_000, 10_000_000].map((n) => (
-              <button
-                key={n}
-                type="button"
-                className="btn btn-sm"
-                style={{
-                  borderRadius: 999,
-                  ...(Number(amount) === n
-                    ? { background: 'var(--gold)', color: 'var(--on-gold)', borderColor: 'var(--gold)' }
-                    : {}),
-                }}
-                onClick={() => {
-                  setAmount(String(n));
-                  setErr('');
-                }}
-              >
-                {stakedHere ? `+${n.toLocaleString('en-US')}` : n.toLocaleString('en-US')}
-              </button>
-            ))}
-          </div>
-          <div className="cb-form-row">
-            <input
-              className="input"
-              type="number"
-              inputMode="decimal"
-              min={MIN_STAKE_NIM}
-              step="1"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              aria-label={t('cashback.formAmountAria')}
-            />
-            <NimUnit size={12} className="cb-unit" />
-            <button className="btn btn-gold cb-primary" onClick={stakeCustom} disabled={!!busy || (inPay && !validator)}>
-              <Icon name={inPay ? 'bolt' : 'external'} size={14} />
-              {stakeBusy ? t('cashback.formWaitingPay') : !inPay ? t('cashback.formOpenWalletStake') : stakedHere ? t('cashback.opAddStake') : t('cashback.opNewStaker')}
-            </button>
-          </div>
-          <div className="xs faint mt-1" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <img src={POOL_VALIDATOR_BADGE} alt="" width={16} height={16} style={{ borderRadius: 4, background: 'var(--white-card)' }} />
-            {stakedHere
-              ? t('cashback.formAddsExisting')
-              : t('cashback.formDelegates', { validator: POOL_VALIDATOR_NAME, min: String(MIN_STAKE_NIM) })}
-          </div>
-
-          {inPay && !synced && (
-            <div className="xs mt-1" style={{ display: 'flex', gap: 6, alignItems: 'flex-start', color: 'var(--stamp, #B4471C)' }}>
-              <Icon name="clock" size={13} />
-              <span>{t('cashback.formSyncing')}</span>
-            </div>
-          )}
-
-          {/* A wallet that already stakes with ANOTHER validator cannot send
-              a new staker (the chain rejects it) — the move flow is its only
-              way in. Shown inside Pay, and always after such a rejection. */}
-          {authed && !stakedHere && (inPay || moveHint) && (
-            <div className="mt-2" style={{ borderTop: '1px dashed var(--line-dash, #e0d7c2)', paddingTop: 10 }}>
-              <div className="xs faint">
-                {moveHint
-                  ? t('cashback.formMoveHint')
-                  : t('cashback.formMovePrompt', { validator: POOL_VALIDATOR_NAME })}
-              </div>
-              <button
-                className="btn btn-outline btn-block mt-1"
-                onClick={doMove}
-                disabled={!!busy || !validator || !supportsOp({ kind: 'changeDelegation', delegation: validator })}
-              >
-                <Icon name="chevron" size={14} />
-                {busy === 'changeDelegation' ? t('cashback.formWaitingPay') : t('cashback.formMoveBtn', { validator: POOL_VALIDATOR_NAME })}
-              </button>
-            </div>
-          )}
-
-          {err && (
-            <div className="alert error mt-2" style={{ marginBottom: 0 }}>
-              <div className="small">{err}</div>
-            </div>
-          )}
-
-          {!inPay && (
-            <div className="cb-wallet-redirect-inline mt-2">
-              <div className="cb-wallet-redirect-inline-copy">
-                <span className="cb-wallet-redirect-inline-icon"><Icon name="info" size={15} /></span>
-                <span>
-                  <strong>{t('cashback.formNotInPay')}</strong>
-                  <small>{t('cashback.formNotInPayBody')}</small>
-                </span>
-              </div>
-              <button type="button" className="btn btn-outline btn-sm" onClick={showWalletRedirect}>
-                <Icon name="external" size={14} /> {t('cashback.wrOpenTab')}
-              </button>
-            </div>
-          )}
-
-          {stakedHere && (
-            <details className="cb-details mt-2" open={manageOpen} onToggle={(e) => setManageOpen((e.target as HTMLDetailsElement).open)}>
-              <summary className="small strong">
-                <Icon name="chevron" size={14} /> {t('cashback.formMoreTools')}
-              </summary>
-              <div className="mt-2">
-                <div className="xs faint">{t('cashback.formActiveStakeLabel')}</div>
-                <div className="cb-form-row">
-                  <input
-                    className="input"
-                    type="number"
-                    min={MIN_STAKE_NIM}
-                    step="1"
-                  value={activeNIM}
-                  onChange={(e) => setActiveNIM(e.target.value)}
-                  aria-label={t('cashback.formActiveStakeAria')}
-                />
-                <NimUnit size={12} className="cb-unit" />
-                  <button
-                    className="btn"
-                    onClick={doSetActive}
-                    disabled={busy === 'setActiveStake' || !supportsOp({ kind: 'setActiveStake', activeNIM: 0 })}
-                  >
-                    {busy === 'setActiveStake' ? t('cashback.formWaiting') : t('cashback.opSetActiveStake')}
-                  </button>
-                </div>
-
-                <div className="xs faint mt-2">{t('cashback.formRetireNote')}</div>
-                <div className="cb-tools-row">
-                  <button className="btn" onClick={doRetire} disabled={busy === 'retireStake'}>
-                    {busy === 'retireStake' ? t('cashback.formWaiting') : t('cashback.opRetireStake')}
-                  </button>
-                  <button className="btn" onClick={doRemove} disabled={busy === 'removeStake'}>
-                    {busy === 'removeStake' ? t('cashback.formWaiting') : t('cashback.opRemoveStake')}
-                  </button>
-                </div>
-                <div className="xs faint mt-2">{t('cashback.formWithdrawResets', { pct: pct(stakerBaseBps) })}</div>
-              </div>
-            </details>
-          )}
-        </>
-      </div>
 
       {/* ------------------------------------------------------ fine print */}
       <details className="cb-details cb-fineprint mt-2">
@@ -835,6 +744,9 @@ export function CashbackView() {
           <li>{t('cashback.fine5')}</li>
         </ul>
       </details>
+
+      {/* Leaderboard merged in (owner 2026-10-05): ONE cashback page. */}
+      <CashbackImpactSection authed={authed === true} myTotals={ledger?.totals ?? null} />
     </div>
   );
 

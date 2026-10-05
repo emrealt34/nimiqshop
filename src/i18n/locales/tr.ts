@@ -1635,7 +1635,7 @@ const tr = {
     copyCaption: 'Metni kopyala',
     postImageCaption: 'Görsel + metin paylaş',
     shareTitle: '{{site}} üzerinde NIM cashback kazandım ⚡',
-    shareCaption: { one: '{{site}} üzerinde {{count}} siparişte {{nim}} NIM cashback kazandım (🔥 {{burned}} NIM yakıldı) — NIM ile anında hediye kartı, eSIM ve TL/paket yükleme. {{url}}', other: '{{site}} üzerinde {{count}} siparişte {{nim}} NIM cashback kazandım (🔥 {{burned}} NIM yakıldı) — NIM ile anında hediye kartı, eSIM ve TL/paket yükleme. {{url}}' },
+    shareCaption: { one: '{{site}} üzerinde {{count}} siparişte {{nim}} NIM cashback kazandım — NIM ile anında hediye kartı, eSIM ve TL/paket yükleme. {{url}}', other: '{{site}} üzerinde {{count}} siparişte {{nim}} NIM cashback kazandım — NIM ile anında hediye kartı, eSIM ve TL/paket yükleme. {{url}}' },
     canvasImpactReceipt: 'CASHBACK MAKBUZU',
     canvasSerial: '01 · KİŞİSEL',
     canvasCashbackRoute: 'CASHBACK & YAKIM',
@@ -1647,7 +1647,7 @@ const tr = {
     canvasStatusBurned: '🔥 {{burned}} NIM zincir üstünde kalıcı olarak yakıldı',
     canvasStatusChoose: 'Kazanmaya başlamak için ödemede Cüzdanım veya Yak seçin',
     canvasReceiptFrom: 'PAYLAŞILABİLİR MAKBUZ',
-    canvasTagline: 'cashback · staking artışı · zincir üstü yakım',
+    canvasTagline: 'cashback · staking boost',
     shareImgAlt: '{{site}} cashback makbuz kartınız',
   },
   /* ---- staker ---- */

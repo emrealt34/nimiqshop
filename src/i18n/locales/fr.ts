@@ -1634,7 +1634,7 @@ const fr = {
     copyCaption: 'Copier la légende',
     postImageCaption: 'Publier image + légende',
     shareTitle: 'J’ai gagné du cashback NIM sur {{site}} ⚡',
-    shareCaption: { one: 'J’ai gagné {{nim}} NIM de cashback (🔥 {{burned}} NIM brûlés) sur {{count}} commande sur {{site}} — cartes cadeaux, eSIM et recharges instantanées en NIM. {{url}}', other: 'J’ai gagné {{nim}} NIM de cashback (🔥 {{burned}} NIM brûlés) sur {{count}} commandes sur {{site}} — cartes cadeaux, eSIM et recharges instantanées en NIM. {{url}}' },
+    shareCaption: { one: 'J’ai gagné {{nim}} NIM de cashback sur {{count}} commande sur {{site}} — cartes cadeaux, eSIM et recharges instantanées en NIM. {{url}}', other: 'J’ai gagné {{nim}} NIM de cashback sur {{count}} commandes sur {{site}} — cartes cadeaux, eSIM et recharges instantanées en NIM. {{url}}' },
     canvasImpactReceipt: 'REÇU CASHBACK',
     canvasSerial: '01 · PERSONNEL',
     canvasCashbackRoute: 'CASHBACK & BRÛLAGE',
@@ -1646,7 +1646,7 @@ const fr = {
     canvasStatusBurned: '🔥 {{burned}} NIM définitivement brûlés on-chain',
     canvasStatusChoose: 'Choisissez Mon portefeuille ou Brûler au paiement pour commencer',
     canvasReceiptFrom: 'UN REÇU PARTAGEABLE DE',
-    canvasTagline: 'cashback · boost de staking · brûlage on-chain',
+    canvasTagline: 'cashback · staking boost',
     shareImgAlt: 'Votre carte reçu cashback {{site}}',
   },
   /* ---- staker ---- */

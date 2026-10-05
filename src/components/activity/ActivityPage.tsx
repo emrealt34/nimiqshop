@@ -15,6 +15,7 @@ import { cleanProductLabel, cleanBatchProductLabels, fmtNIM, timeAgo, countryNam
 import { Clipboard } from '../../lib/clipboard';
 import { useInterval } from '../../lib/useInterval';
 import { useToast } from '../AppProviders';
+import { SkeletonRows } from '../ui/uiKit';
 import { StatusBadge, StarsDisplay, EmptyState, ErrorState, SkeletonLines, NimMark } from '../ui/uiKit';
 import { Pager } from '../ui/Pager';
 import { useT, t as i18nT } from '../../i18n';
@@ -251,7 +252,7 @@ export function ActivityView() {
       <div id="summary" className="mt-2" style={{ minHeight: 300 }}>
         {!loaded ? (
           <div className="card">
-            <SkeletonLines n={3} />
+            <SkeletonRows n={3} />
           </div>
         ) : (
           <div className="card rating-summary fade-in">

@@ -1,7 +1,16 @@
 ---
-import BaseLayout from '../layouts/Base.astro';
-import { LeaderboardPage } from '../components/cashback/LeaderboardPage';
+// REQ-63 (owner 2026-10-05): the leaderboard merged INTO the cashback page.
+// There is no separate leaderboard any more — old links and bookmarks land
+// on /cashback, where the leaderboard card now lives.
 ---
-<BaseLayout title="Leaderboard — shop.nimiqbase.com" titleKey="pageTitle.leaderboard" activeKey="leaderboard">
-  <LeaderboardPage client:load />
-</BaseLayout>
+
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Cashback — shop.nimiqbase.com</title>
+    <meta http-equiv="refresh" content="0; url=/cashback" />
+    <script is:inline>location.replace('/cashback');</script>
+  </head>
+  <body></body>
+</html>
