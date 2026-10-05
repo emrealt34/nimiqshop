@@ -318,13 +318,13 @@ func (s *Store) patchAdminSettings(adminID string, now time.Time, mutate func(*a
 // dolar, aylık ise 1000 dolar"). Any other stored values are deliberate
 // admin choices and stay untouched; once migrated the guard never fires
 // again, so the write happens at most once.
-func (s *Store) MigrateOldSpendCaps() error {
+func (s *Store) MigrateOldSpendCaps() (bool, error) {
 	cur, err := s.GetAdminSettings(0)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if cur.StakeCashback == nil || cur.StakeCashback.DailyCapUSD != 50 || cur.StakeCashback.MonthlyCapUSD != 500 {
-		return nil
+		return false, nil
 	}
 	_, err = s.patchAdminSettings("system:migrate-spend-caps", time.Now().UTC(), func(st *adminmodel.Settings) error {
 		if st.StakeCashback == nil {
@@ -334,7 +334,7 @@ func (s *Store) MigrateOldSpendCaps() error {
 		st.StakeCashback.MonthlyCapUSD = 1000
 		return nil
 	})
-	return err
+	return err == nil, err
 }
 
 func (s *Store) SetGlobalMarginBps(marginBps int, adminID string, now time.Time) (adminmodel.Settings, error) {

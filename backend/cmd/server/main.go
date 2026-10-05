@@ -203,9 +203,17 @@ func main() {
 		log.Fatalf("db init: %v", err)
 	}
 	// One-time spend-cap migration: stored rows still on the old published
-	// caps ($50/$500) move to the new ones ($500/$1000).
-	if err := store.MigrateOldSpendCaps(); err != nil {
+	// caps ($50/$500) move to the new ones ($500/$1000). The boot line after
+	// it makes the live programme visible in the Railway log without any
+	// admin access.
+	if migrated, err := store.MigrateOldSpendCaps(); err != nil {
 		log.Printf("cashback: spend-cap migration: %v", err)
+	} else if migrated {
+		log.Printf("cashback: spend caps migrated 50/500 -> 500/1000")
+	}
+	if st, serr := store.GetAdminSettings(0); serr == nil {
+		pc := st.EffectiveStakeCashback()
+		log.Printf("cashback: programme caps day=$%.0f month=$%.0f (stored_row=%v)", pc.DailyCapUSD, pc.MonthlyCapUSD, st.StakeCashback != nil)
 	}
 	// Wire cashback runtime enrichment: burn wallet address. Both payment
 	// rails (Nimiq Pay and USDT Polygon) pay the same cashback rate.
