@@ -17,7 +17,7 @@ export function SupplierProblemNotice({ issues }: { issues: SupplierIssue[] }) {
         </ul>
         {/* Owner (2026-10-04): the two actions rendered as one glued blob —
             they are separate buttons and need air between them. */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4, justifyContent: 'center' }}>
           <a className="btn btn-outline btn-sm" href={pagePath("/support")}>{t('checkout.spnContactSupport')}</a>
           {account && <a className="btn btn-outline btn-sm" href="https://www.cryptorefills.com/en" target="_blank" rel="noopener noreferrer">{t('checkout.spnOpenCryptorefills')}</a>}
         </div>

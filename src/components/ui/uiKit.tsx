@@ -315,6 +315,50 @@ export function CopyButton({ getText, label }: { getText: string | (() => string
 
 /* ---------------- Skeletons & empty states ---------------- */
 
+/** Shimmer block primitive. Every list skeleton on the site is built from
+ *  the SAME classes and geometry as the row it stands in for (see
+ *  KvSkeleton / OrderCardSkeleton here, CbRowSkeleton in RecentCashbackList,
+ *  FeedItemSkeleton in ActivityPage) — so restyling a row automatically
+ *  restyles its loading twin (owner, 2026-10-05: "skeletonlar gerçek olsun,
+ *  içerik değişince skeleton da değişsin"). */
+export function Skel({ w, h, r = 6, style }: { w?: number | string; h?: number | string; r?: number; style?: CSSProperties }) {
+  return <span className="skel" aria-hidden="true" style={{ display: 'inline-block', width: w, height: h, borderRadius: r, ...style }} />;
+}
+
+/** Skeleton twin of <Kv>: the same dl.kv row grid, shimmer instead of dt/dd. */
+export function KvSkeleton({ n = 5 }: { n?: number }) {
+  return (
+    <dl className="kv" aria-hidden="true">
+      {Array.from({ length: n }).map((_, i) => (
+        <div key={i}>
+          <dt><Skel w={i % 2 ? '68%' : '84%'} h={12} /></dt>
+          <dd><Skel w={i % 3 ? '46%' : '62%'} h={12} /></dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/** Skeleton twin of the order-list row (.order-card): the same thumb column
+ *  width, the same three-column flex geometry as the real card. */
+export function OrderCardSkeleton() {
+  return (
+    <div className="order-card" aria-hidden="true">
+      <div style={{ width: 'clamp(64px, 30vw, 140px)', flex: 'none' }}>
+        <Skel w="100%" h={64} r={10} style={{ display: 'block' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 7 }}>
+        <Skel w="52%" h={13} style={{ display: 'block' }} />
+        <Skel w="30%" h={11} style={{ display: 'block' }} />
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 7, alignItems: 'flex-end' }}>
+        <Skel w={72} h={13} />
+        <Skel w={52} h={11} />
+      </div>
+    </div>
+  );
+}
+
 export function SkeletonCards({ n = 8, cls = 'skel card' }: { n?: number; cls?: string }) {
   return (
     <>

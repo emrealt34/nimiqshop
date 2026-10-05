@@ -9,7 +9,7 @@ import { Icon } from '../ui/Icon';
 import { BrandThumbStack } from '../ui/UnifiedThumb';
 import { fmtStakeNIM, pctLabel } from '../../lib/stakerCashback';
 import { Pager } from '../ui/Pager';
-import { SkeletonRows } from '../ui/uiKit';
+import { Skel } from '../ui/uiKit';
 import { t as tr } from '../../i18n';
 
 export type RecentCashbackRow = {
@@ -92,6 +92,27 @@ export function RecentCashbackRowView({ cb }: { cb: RecentCashbackRow }) {
   );
 }
 
+/** Loading twin of a cashback row: same .cb-row grid (thumb, title + rate
+ *  chip, status line, right amount column) as <RecentCashbackRowView>. */
+function CbRowSkeleton() {
+  return (
+    <div className="cb-row" aria-hidden="true">
+      <div className="cb-thumb"><Skel w="100%" h="100%" r={10} style={{ display: 'block' }} /></div>
+      <div className="cb-row-main">
+        <div className="small strong cb-row-title">
+          <Skel w="46%" h={12} />
+          <Skel w={54} h={18} r={999} />
+        </div>
+        <div className="xs faint"><Skel w="34%" h={10} /></div>
+      </div>
+      <div className="cb-row-right">
+        <Skel w={72} h={12} />
+        <Skel w={48} h={10} />
+      </div>
+    </div>
+  );
+}
+
 export function RecentCashbackList({
   rows,
   loading = false,
@@ -124,7 +145,11 @@ export function RecentCashbackList({
         )}
       </div>
       {loading && !rows ? (
-        <SkeletonRows n={3} />
+        <>
+          <CbRowSkeleton />
+          <CbRowSkeleton />
+          <CbRowSkeleton />
+        </>
       ) : list.length === 0 ? (
         <div className="small muted">{emptyText}</div>
       ) : (

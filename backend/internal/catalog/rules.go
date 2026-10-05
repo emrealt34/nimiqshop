@@ -118,7 +118,19 @@ func (r *Rules) FamilyVisible(family, category, kind string, minFaceUSD, maxFace
 }
 
 // IsFamilyHidden matches a family/brand name case-insensitively.
+// hardHiddenFamilies: brands the shop never lists and never sells, in ANY
+// country, regardless of operator config (owner, 2026-10-05: "hiçbir e money
+// ürünü hiçbir ülkede alınabilir ya da gösterilir olmasın"). Matched as a
+// folded substring so every spelling of the brand is caught.
+var hardHiddenFamilies = []string{"emoney", "e-money", "e money"}
+
 func (r *Rules) IsFamilyHidden(family string) bool {
+	lf := strings.ToLower(strings.TrimSpace(family))
+	for _, h := range hardHiddenFamilies {
+		if lf != "" && strings.Contains(lf, h) {
+			return true
+		}
+	}
 	return containsFold(r.HiddenFamilies, family)
 }
 

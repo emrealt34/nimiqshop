@@ -16,7 +16,7 @@ import { inNimiqPay } from '../../lib/miniapp';
 import { fmtNIM, fmtUSD, formatWalletAddress, fmtCountdown } from '../../lib/format';
 import { useInterval } from '../../lib/useInterval';
 import { useSheet, useToast } from '../AppProviders';
-import { SkeletonRows } from '../ui/uiKit';
+import { KvSkeleton } from '../ui/uiKit';
 import { CopyButton, LockedSignInCard } from '../ui/uiKit';
 import { getMyCashback } from '../../lib/api';
 import { RecentCashbackList } from '../cashback/RecentCashbackList';
@@ -119,7 +119,7 @@ export function ProfileView() {
         <Header />
         <div className="mt-2">
           <div className="card">
-            <SkeletonRows n={4} />
+            <KvSkeleton n={4} />
           </div>
         </div>
       </div>
@@ -152,7 +152,7 @@ export function ProfileView() {
         <Header />
         <div className="mt-2">
           <div className="card">
-            <SkeletonRows n={4} />
+            <KvSkeleton n={4} />
           </div>
         </div>
       </div>

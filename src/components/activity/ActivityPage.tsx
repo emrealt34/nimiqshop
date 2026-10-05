@@ -15,8 +15,7 @@ import { cleanProductLabel, cleanBatchProductLabels, fmtNIM, timeAgo, countryNam
 import { Clipboard } from '../../lib/clipboard';
 import { useInterval } from '../../lib/useInterval';
 import { useToast } from '../AppProviders';
-import { SkeletonRows } from '../ui/uiKit';
-import { StatusBadge, StarsDisplay, EmptyState, ErrorState, SkeletonLines, NimMark } from '../ui/uiKit';
+import { StatusBadge, StarsDisplay, EmptyState, ErrorState, Skel, NimMark } from '../ui/uiKit';
 import { Pager } from '../ui/Pager';
 import { useT, t as i18nT } from '../../i18n';
 import { pagePath } from '../../lib/asset';
@@ -232,8 +231,16 @@ export function ActivityView() {
           0.10 CLS before this. */}
       <div id="stats" className="act-stats mt-2" style={{ minHeight: 132 }}>
         {!loaded ? (
-          <div className="card" style={{ padding: '18px' }}>
-            <SkeletonLines n={1} />
+          <div className="act-stats-grid" aria-hidden="true">
+            {[0, 1, 2, 3].map((i) => (
+              <div className="act-tile" key={i}>
+                <div className="act-tile-ico"><Skel w={26} h={26} r={8} /></div>
+                <div className="act-tile-body">
+                  <div className="act-tile-num"><Skel w={64} h={20} style={{ display: 'block' }} /></div>
+                  <div className="act-tile-label"><Skel w={92} h={11} style={{ display: 'block' }} /></div>
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
           <div className="act-stats-grid fade-in">
@@ -251,8 +258,24 @@ export function ActivityView() {
 
       <div id="summary" className="mt-2" style={{ minHeight: 300 }}>
         {!loaded ? (
-          <div className="card">
-            <SkeletonRows n={3} />
+          <div className="card rating-summary" aria-hidden="true">
+            <div className="rs-body">
+              <div className="rs-left">
+                <div className="rs-avg">
+                  <Skel w={104} h={42} r={10} style={{ display: 'block' }} />
+                  <Skel w={128} h={13} style={{ display: 'block', marginTop: 8 }} />
+                </div>
+              </div>
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {[5, 4, 3, 2, 1].map((star, i) => (
+                  <div className="dist-row" key={star}>
+                    <span className="dist-star"><Skel w={64} h={13} /></span>
+                    <div className="dist-track"><Skel w={`${26 + i * 13}%`} h={8} r={4} style={{ display: 'block' }} /></div>
+                    <span className="dist-count xs mono faint"><Skel w={16} h={11} /></span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         ) : (
           <div className="card rating-summary fade-in">
@@ -303,7 +326,13 @@ export function ActivityView() {
             heading-order audit. The section is visually self-evident, so the
             heading stays for assistive tech only. */}
         <h2 className="sr-only">{t('activityPage.title')}</h2>
-        {!loaded ? null : err ? (
+        {!loaded ? (
+          <div className="feed-list" aria-hidden="true">
+            <FeedItemSkeleton />
+            <FeedItemSkeleton />
+            <FeedItemSkeleton />
+          </div>
+        ) : err ? (
           <ErrorState message={err} retry={load} />
         ) : !filtered.length ? (
           <EmptyState
@@ -329,6 +358,37 @@ export function ActivityView() {
             <Pager page={pageSafe} pageCount={pageCount} onPage={setFeedPage} />
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** Loading twin of <FeedItem>: same .feed-item geometry (thumb, title row
+ *  with flag + status, amounts row, wallet chip row). */
+function FeedItemSkeleton() {
+  return (
+    <div className="feed-item" aria-hidden="true">
+      <div className="feed-thumb"><Skel w="100%" h="100%" r={10} style={{ display: 'block' }} /></div>
+      <div className="feed-main">
+        <div className="feed-row-1">
+          <div className="feed-title-wrap">
+            <span className="feed-flag"><Skel w={16} h={16} r={4} /></span>
+            <Skel w={124} h={13} />
+          </div>
+          <div className="feed-side">
+            <Skel w={64} h={18} r={999} />
+            <Skel w={44} h={11} />
+          </div>
+        </div>
+        <div className="feed-row-2">
+          <div className="feed-amounts">
+            <Skel w={82} h={13} />
+            <Skel w={112} h={11} />
+          </div>
+        </div>
+        <div className="feed-row-3">
+          <Skel w={152} h={20} r={999} />
+        </div>
       </div>
     </div>
   );

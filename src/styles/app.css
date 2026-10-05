@@ -3329,10 +3329,17 @@ html { overflow-x: clip; }
    evenly around it instead of piling up on the right, so SHOP…SUPPORT sit
    visually centred between the brand and the control cluster. */
 @media (min-width: 1200px) {
-  .topbar-inner { position: relative; }
-  /* Absolute centre of the bar itself: neighbour margins (brand spacing,
-     control-cluster gap) can no longer skew the optical centre, and the
-     spacer keeps pinning the controls to the right edge. fitText still
-     shrinks the labels if a language ever outgrows the free space. */
-  .mainnav { display: flex; position: absolute; left: 50%; transform: translateX(-50%); margin: 0; }
+  /* Flex centring instead of the old absolute centre: an absolutely
+     positioned nav can slide UNDER the right-hand control cluster at tight
+     widths (owner screenshot at ~1210px, 2026-10-05). Auto margins keep the
+     nav centred in the free space and make overlap impossible — flexbox
+     refuses to cross siblings. The spacer steps aside while the nav is up. */
+  .mainnav { display: flex; margin-inline: auto; }
+  .topbar-spacer { display: none; }
+}
+/* Breathing room on the first desktop stretch: tighter pills so the tabs
+   plus the full control cluster never feel glued together. */
+@media (min-width: 1200px) and (max-width: 1399px) {
+  .mainnav { gap: 2px; }
+  .mainnav a { padding: 7px 9px; }
 }

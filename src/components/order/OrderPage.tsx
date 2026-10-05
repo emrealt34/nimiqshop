@@ -53,7 +53,7 @@ import {
   KvCard,
   EmptyState,
   ErrorState,
-  SkeletonLines,
+  KvSkeleton,
   kindMeta,
   StarsDisplay,
   StarPicker,
@@ -874,7 +874,7 @@ export function OrderView() {
         <BackRow onRefresh={() => load(true)} />
         <div className="mt-2">
           <div className="card">
-            <SkeletonLines n={5} />
+            <KvSkeleton n={5} />
           </div>
         </div>
       </div>
@@ -908,7 +908,7 @@ export function OrderView() {
         <BackRow onRefresh={() => load(true)} />
         <div className="mt-2">
           <div className="card">
-            <SkeletonLines n={5} />
+            <KvSkeleton n={5} />
           </div>
         </div>
       </div>

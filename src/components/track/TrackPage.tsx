@@ -17,7 +17,7 @@ import { useInterval } from '../../lib/useInterval';
 import { useRouter } from '../../lib/router';
 import { useSheet, useToast } from '../AppProviders';
 import { deliverySummary, payRail } from '../../lib/deliveryCopy';
-import { SkeletonRows } from '../ui/uiKit';
+import { KvSkeleton } from '../ui/uiKit';
 import { StatusBadge, StageTimeline, EmptyState, ErrorState, AlertBox, CopyButton, KvCard } from '../ui/uiKit';
 import { useT } from '../../i18n';
 import { pagePath } from '../../lib/asset';
@@ -120,7 +120,7 @@ export function TrackView() {
         <Header />
         <div className="mt-2">
           <div className="card">
-            <SkeletonRows n={5} thumb={false} />
+            <KvSkeleton n={6} />
           </div>
         </div>
       </div>
