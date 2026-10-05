@@ -709,6 +709,7 @@ func (h *Handlers) TrackStatus(ctx *fasthttp.RequestCtx) {
 			"status":       q.Status,
 			"nim":          q.EstimatedNIM,
 			"title":        publicTitle,
+			"country":      q.ProductCountry,
 			"usd":          q.ProductUSD.String(),
 			"created_at":   q.CreatedAt,
 			"updated_at":   q.UpdatedAt,
