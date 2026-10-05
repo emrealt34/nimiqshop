@@ -2351,6 +2351,11 @@ label.oos-toggle > span {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  /* The static 404 header carries the same control (a ghost link home). Its
+     long French label ("Connecter le portefeuille") squeezed "nim.shop" to
+     55px at 360/390 and the scan read the wordmark as truncated. */
+  .topbar .btn.btn-ghost .btn-label { display: none; }
+  .topbar .btn.btn-ghost .btn-label-short { display: inline; }
 }
 
 /* The band above phones gets the same treatment one step gentler: long

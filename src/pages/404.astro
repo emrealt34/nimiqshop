@@ -19,7 +19,13 @@ import { asset, pagePath } from '../lib/asset';
         <a href={pagePath("/support")} data-i18n="nav.support">Support</a>
       </nav>
       <div class="topbar-spacer"></div>
-      <a class="btn btn-ghost" style="min-height: 40px; padding: 8px 14px;" href={pagePath("/")} data-i18n="ui.connectWallet">Connect wallet</a>
+      <!-- Same two-label swap as the React TopBar (see SiteShell.tsx): the
+           phone band shows the short label instead of squeezing the wordmark
+           with "Connecter le portefeuille" (deep scan, 404 · fr · 360/390). -->
+      <a class="btn btn-ghost" style="min-height: 40px; padding: 8px 14px;" href={pagePath("/")}>
+        <span class="btn-label" data-i18n="account.connect">Connect wallet</span>
+        <span class="btn-label-short" data-i18n="account.connectShort" aria-hidden="true">Connect</span>
+      </a>
     </div>
   </header>
 
