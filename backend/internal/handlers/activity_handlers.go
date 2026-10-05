@@ -702,7 +702,6 @@ func (h *Handlers) TrackStatus(ctx *fasthttp.RequestCtx) {
 		// Supplier order IDs are not public tracking identifiers. They can
 		// expose redemption data via a partner API and are owner/admin-only.
 
-
 		resp := map[string]interface{}{
 			"id":           q.ID,
 			"type":         "cryptorefills_purchase",
