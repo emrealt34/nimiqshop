@@ -566,6 +566,12 @@ function PayNowCard({ q }: { q: any }) {
   const del = deliverySummary(q);
   const giftMsg = String(q.gift_message || (q._rows || []).find((r: any) => r && r.gift_message)?.gift_message || '');
   const invoice = quoteBolt11(q);
+  // A terminal order (delivered/fulfilled/refunded/complete) must NEVER show
+  // the "Payment received — waiting for the supplier to confirm" card: the
+  // delivery timeline below already says the order arrived, and paymentInFlight()
+  // stays true for supplier_status "Done" (owner, 2026-10-05: "delivery
+  // confirmed var zaten, onun üstünde bu kart saçmalık").
+  if (['fulfilled', 'refunded', 'delivered', 'complete'].includes(String(q.status || ''))) return null;
   // NOT payable any more — but never silently vanish. The order page used to
   // render nothing at all here, which left the buyer staring at a raw supplier
   // state with no button: the exact dead end reported on 2026-10-04. Three
