@@ -1045,8 +1045,9 @@ html.in-nimiq-pay #main.page {
    count beside the amount…). On phones the row is now a FIXED two-line grid:
    rank + identicon + address on line 1, the amount/orders/YOU group
    right-aligned on line 2. The cells can never change place between rows, and
-   the address ellipsises instead of pushing the numbers around, so tall and
-   short rows stay aligned and nothing jumps when the viewport shrinks. A 4th
+   the address ends in an ellipsis instead of pushing the numbers around, so
+   tall and short rows stay aligned and nothing jumps when the viewport
+   shrinks. A 4th
    column is deliberately avoided: five fixed cells overflow a 320px card,
    which is what the old flex row did. */
 @media (max-width: 560px) {
