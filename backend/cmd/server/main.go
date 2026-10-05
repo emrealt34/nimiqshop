@@ -234,6 +234,22 @@ func main() {
 	defer cr.Close()
 
 	h := handlers.New(store, cfg, cr)
+
+	// Owner (2026-10-05): the order-DB wipe is NOT a button — it runs by
+	// itself, exactly once per install, on the first boot after this change.
+	// Keep-rule: the real (non-simulated) UniPin purchase; every other quote
+	// leaves the store. The meta marker makes it one-shot across restarts,
+	// so orders created AFTER this wipe are never touched.
+	if raw, _ := store.LoadMeta("purge_all_except_unipin_v1"); raw == nil {
+		if n, orders, err := store.PurgeQuotesAllExceptUnipin(); err != nil {
+			log.Printf("startup purge: %v", err)
+		} else {
+			log.Printf("startup purge: deleted %d quotes (%d supplier rows), UniPin kept", n, orders)
+		}
+		if err := store.SaveMeta("purge_all_except_unipin_v1", []byte(time.Now().UTC().Format(time.RFC3339)), 0); err != nil {
+			log.Printf("startup purge: marker not saved: %v", err)
+		}
+	}
 	h.Presence = presence.New()
 	// A shared (CDN) cache is keyed on the URL alone, so it may only store a
 	// response whose Access-Control-Allow-Origin is DETERMINISTIC. With zero
@@ -839,7 +855,6 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 	// Operator sandbox: buy a real product on the simulated supplier, then
 	// fake-pay it through the real state machine (see admin_test_center.go).
 	r.POST("/api/admin/test-purchase", adminOnly(h.AdminTestPurchase))
-	r.POST("/api/admin/purge-test-orders", adminOnly(h.AdminPurgeTestOrders))
 	// The simulated-pay ENGINE stays for the e2e suite; every customer-facing
 	// button that called it is gone (owner, 2026-10-05).
 	r.POST("/api/quotes/{id}/test-pay", authedTiered(aCheckout, h.UserTestPay))

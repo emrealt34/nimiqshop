@@ -889,52 +889,6 @@ func (s *Store) SweepExpiredQuotes(now time.Time, limit int) (int, error) {
 	return expired, nil
 }
 
-// PurgeTestQuotes hard-deletes every quote stamped TestMode — the admin
-// sandbox purchases and TEST_MODE quotes (owner, 2026-10-05: the fake test
-// orders leave the shop for good). Real orders carry TestMode=false and are
-// never touched. The idempotency index entry goes with its quote so the same
-// buyer key can never point at a deleted record.
-func (s *Store) PurgeTestQuotes() (int, error) {
-	type victim struct {
-		id     string
-		userID string
-		idem   string
-	}
-	var victims []victim
-	err := s.View(func(txn *badger.Txn) error {
-		return scanJSONPrefix(txn, []byte(prefixQuote), func(item *badger.Item) error {
-			var q Quote
-			if err := item.Value(func(value []byte) error { return unmarshal(value, &q) }); err != nil {
-				return err
-			}
-			if q.TestMode {
-				victims = append(victims, victim{id: q.ID, userID: q.UserID, idem: q.IdempotencyKey})
-			}
-			return nil
-		})
-	})
-	if err != nil || len(victims) == 0 {
-		return 0, err
-	}
-	err = s.Update(func(txn *badger.Txn) error {
-		for _, v := range victims {
-			if err := txn.Delete(quoteKey(v.id)); err != nil {
-				return err
-			}
-			if v.userID != "" && v.idem != "" {
-				if err := txn.Delete(quoteIdempotencyIndexKey(v.userID, v.idem)); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return 0, err
-	}
-	return len(victims), nil
-}
-
 // PurgeQuotesAllExceptUnipin is the owner's "wipe the order DB, keep ONLY the
 // real UniPin purchase" button (2026-10-05). Keep-rule: a non-simulated quote
 // whose product id names UniPin. Safety: when no such quote exists NOTHING is

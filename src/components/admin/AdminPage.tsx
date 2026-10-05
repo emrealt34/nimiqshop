@@ -22,7 +22,6 @@ import {
   adminGetStakeLedger,
   adminResetStakeLedger,
   adminListQuotes,
-  adminPurgeTestOrders,
 } from '../../lib/api';
 import { fmtNIM, formatWalletAddress } from '../../lib/format';
 import { siteName } from '../../lib/config';
@@ -978,8 +977,6 @@ function PromoCodesEditor({ data, onChanged, basePct }: { data: any; onChanged: 
 }
 
 function OrdersPanel() {
-  const { toast } = useToast();
-  const [purging, setPurging] = useState(false);
   const [rows, setRows] = useState<any[] | null>(null);
   const [err, setErr] = useState('');
   // Paged like the rest of the console: 5 orders per page.
@@ -1001,26 +998,7 @@ function OrdersPanel() {
       <div className="card-title">
         <Icon name="pulse" size={18} />
         <span>Orders — amount, tx, cashback status</span>
-        <button
-          type="button"
-          className="btn btn-gold btn-sm"
-          style={{ marginLeft: 8 }}
-          disabled={purging}
-          onClick={() => {
-            if (!window.confirm('Delete EVERY order except the real UniPin purchase? Test orders, old quotes, their supplier orders — all gone. Only UniPin stays.')) return;
-            setPurging(true);
-            adminPurgeTestOrders({ scope: 'all-except-unipin' })
-              .then((d: any) => {
-                toast(`Deleted ${Number(d?.deleted || 0)} orders (+${Number(d?.deleted_orders || 0)} supplier rows) — UniPin kept`, 'success');
-                setRows(null);
-                adminListQuotes(50).then((r) => setRows(r.quotes || [])).catch(() => {});
-              })
-              .catch((e: Error) => toast(e.message || 'Purge failed', 'error'))
-              .finally(() => setPurging(false));
-          }}
-        >
-          Delete all orders except UniPin
-        </button>
+
         <span className="xs faint" style={{ marginLeft: 'auto' }}>
           {rows && rows.length > ORDERS_PAGE_SIZE
             ? `${from + 1}–${Math.min(rows.length, from + ORDERS_PAGE_SIZE)} of ${rows.length} orders`
