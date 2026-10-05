@@ -26,7 +26,6 @@ import {
   getWalletBalanceState,
   refreshWalletBalance,
   subscribeWalletBalance,
-  nimText,
   affordableUnits,
   coversTarget,
   SPEND_MARGIN,
