@@ -1646,7 +1646,7 @@ const de = {
     canvasStatusBurned: '🔥 {{burned}} NIM dauerhaft on-chain verbrannt',
     canvasStatusChoose: 'Wähle beim Bezahlen Meine Wallet oder Verbrennen',
     canvasReceiptFrom: 'EIN TEILBARER BELEG VON',
-    canvasTagline: 'cashback · staking boost',
+    canvasTagline: 'Cashback · Staking-Boost',
     shareImgAlt: 'Deine Cashback-Belegkarte von {{site}}',
   },
   /* ---- staker ---- */

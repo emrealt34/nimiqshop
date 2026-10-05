@@ -35,17 +35,6 @@ func cashbackStatusLabel(status string) string {
 // purchaseTxOfQuote is the Lightning payment hash of the purchase behind a
 // cashback row — the owner wants the product's tx on his own summary too
 // (2026-10-05). Empty when the quote is gone or was paid off-chain.
-func purchaseTxOfQuote(h *Handlers, quoteID string) string {
-	if quoteID == "" {
-		return ""
-	}
-	q, err := h.Store.GetQuote(quoteID)
-	if err != nil {
-		return ""
-	}
-	return q.LightningPaymentHash
-}
-
 // CashbackMe is the signed-in buyer's cashback ledger: the paid-vs-pending
 // totals plus the per-order rows the Cashback & staking page renders.
 func (h *Handlers) CashbackMe(ctx *fasthttp.RequestCtx) {

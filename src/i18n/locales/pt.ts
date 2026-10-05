@@ -1646,7 +1646,7 @@ const pt = {
     canvasStatusBurned: '🔥 {{burned}} NIM queimados permanentemente on-chain',
     canvasStatusChoose: 'Escolha A minha carteira ou Queimar no pagamento para começar',
     canvasReceiptFrom: 'UM RECIBO PARTILHÁVEL DE',
-    canvasTagline: 'cashback · staking boost',
+    canvasTagline: 'cashback · impulso de staking',
     shareImgAlt: 'O seu cartão de recibo de cashback do {{site}}',
   },
   /* ---- staker ---- */

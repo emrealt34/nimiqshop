@@ -1646,7 +1646,7 @@ const fr = {
     canvasStatusBurned: '🔥 {{burned}} NIM définitivement brûlés on-chain',
     canvasStatusChoose: 'Choisissez Mon portefeuille ou Brûler au paiement pour commencer',
     canvasReceiptFrom: 'UN REÇU PARTAGEABLE DE',
-    canvasTagline: 'cashback · staking boost',
+    canvasTagline: 'cashback · boost de staking',
     shareImgAlt: 'Votre carte reçu cashback {{site}}',
   },
   /* ---- staker ---- */

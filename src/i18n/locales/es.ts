@@ -1646,7 +1646,7 @@ const es = {
     canvasStatusBurned: '🔥 {{burned}} NIM quemados permanentemente en cadena',
     canvasStatusChoose: 'Elige Mi cartera o Quemar al pagar para empezar a ganar',
     canvasReceiptFrom: 'UN RECIBO COMPARTIBLE DE',
-    canvasTagline: 'cashback · staking boost',
+    canvasTagline: 'cashback · impulso de staking',
     shareImgAlt: 'Tu tarjeta de recibo de cashback de {{site}}',
   },
   /* ---- staker ---- */

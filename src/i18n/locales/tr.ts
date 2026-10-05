@@ -1647,7 +1647,7 @@ const tr = {
     canvasStatusBurned: '🔥 {{burned}} NIM zincir üstünde kalıcı olarak yakıldı',
     canvasStatusChoose: 'Kazanmaya başlamak için ödemede Cüzdanım veya Yak seçin',
     canvasReceiptFrom: 'PAYLAŞILABİLİR MAKBUZ',
-    canvasTagline: 'cashback · staking boost',
+    canvasTagline: 'cashback · staking güçlendirmesi',
     shareImgAlt: '{{site}} cashback makbuz kartınız',
   },
   /* ---- staker ---- */
