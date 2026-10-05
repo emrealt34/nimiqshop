@@ -122,7 +122,22 @@ function payload(p: string, method: string, o: ApiOptions): unknown {
     // The buyer's own NIM balance. Signed-out visitors never ask (the client
     // gates on session state), but answer 401 faithfully if they do.
     return o.authed
-      ? { address: 'NQ07 0000 0000 0000 0000 0000 0000 0000 0000', available: true, balance_luna: 12400000, balance_nim: 124, network: 'mainnet', observed_at: iso(0) }
+      /* A wallet that also STAKES — the shape that used to be rendered as a
+         single wrong number: 124 NIM spendable, 800 NIM delegated, and the
+         total (924) is what the wallet app itself shows its owner. */
+      ? {
+          address: 'NQ07 0000 0000 0000 0000 0000 0000 0000 0000',
+          available: true,
+          balance_luna: 12400000,
+          balance_nim: 124,
+          staked_nim: 800,
+          inactive_nim: 0,
+          retired_nim: 0,
+          total_nim: 924,
+          network: 'mainnet',
+          cached: false,
+          observed_at: iso(0),
+        }
       : { __status: 401, error: 'unauthorized' };
   }
   if (p === '/activity') return [];

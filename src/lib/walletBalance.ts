@@ -3,43 +3,43 @@
  *
  * WHY THIS EXISTS (owner, 2026-10-05): the first thing a buyer looks for is the
  * NIM they hold — to know what they can afford before they start a checkout.
- * It used to appear only after choosing an amount inside a product page. This
- * module is the ONE source of that number for the home, product, cart, checkout
- * and orders surfaces.
  *
- * TWO SOURCES, IN THIS ORDER
+ * FIXED 2026-10-05: "your wallet'deki NIM miktarım yanlış". One number was the
+ * bug, in two ways:
  *
- *   1. Nimiq Pay, through the host bridge: `getBalance(address)` (Mini App SDK
- *      0.2.1+, see developer-center PR 216). No RPC endpoint is involved, the
- *      lookup follows the host's active network, and no account approval or
- *      ownership check happens — any valid address works. Older hosts have no
- *      `getBalance`, so the documented generic form
- *      `request({ method: 'getBalance', params: { address } })` is tried second.
+ *   1. `getAccountByAddress` (and the SDK's `getBalance`, which reads the same
+ *      chain state) returns the LIQUID balance. A buyer who stakes — the shop's
+ *      own cashback programme asks them to — holds far more than that. The
+ *      module now carries `available`, `staked` and `total`, so the strip can
+ *      be reconciled with the wallet while the affordability maths still uses
+ *      only what a payment can actually spend.
+ *   2. Two sources could disagree without anyone noticing (a stale cached
+ *      address, a host reporting a different unit, a different account). Both
+ *      are now read whenever possible and reconciled: a factor-of-100,000 gap
+ *      is a unit mismatch and is corrected, anything else keeps the SESSION
+ *      wallet's figure — the one the shop will actually charge — and is
+ *      flagged so the UI can say so.
  *
- *   2. Our own backend (`/api/wallet/balance`, session-scoped) for everything
- *      else: the plain browser, and hosts old enough to reject the bridge call
- *      with `UNKNOWN_REQUEST`. Same constant, same meaning: luna, 1 NIM =
- *      100,000 luna.
+ * SOURCES
+ *   1. Nimiq Pay host bridge: `getBalance(address)` (Mini App SDK 0.2.1+, see
+ *      developer-center PR 216), with the documented generic
+ *      `request({ method: 'getBalance', params: { address } })` form for hosts
+ *      that do not expose the method directly. No RPC endpoint is involved and
+ *      it follows the host's active network.
+ *   2. `GET /api/wallet/balance` — session-scoped, stake-aware, and the only
+ *      source that can answer when the shop is opened in a plain browser.
  *
- * ERRORS ARE THE FEATURE, NOT AN AFTERTHOUGHT
- *
- * `init()` throws a plain Error when no provider is injected (not inside Pay),
- * the bridge rejects with `NimiqProviderError` on SDK 0.2.x, older bundles
- * RESOLVE with `{ error: { type, message } }`, and a direct `window.nimiq` call
- * keeps the host's raw shape. All four are normalized here into one small
- * vocabulary — the six documented types plus the numeric fallbacks (4001,
- * 4200, -32602, -32000, -32603) — and anything unrecognized stays `unknown`
- * instead of being guessed at (PR 215). A failed lookup NEVER blocks a screen:
- * it resolves to a state value, not a throw.
- *
- * The cached value is deliberately short-lived (25 s): a balance shown next to
- * a buy button must not be minutes old. Paying calls
- * `refreshWalletBalance({ force: true })` so the figure drops immediately
- * instead of waiting for the TTL.
+ * ERRORS (PR 215): every shape the wallet throws is normalized by
+ * `walletErrors.ts` into one small vocabulary, and a failed lookup resolves to
+ * a STATE, never a throw — a cancelled dialog, a 30-second bridge timeout or
+ * "not signed in" all end in a quiet row that keeps the page usable. The USD
+ * figure is refreshed as soon as the live rate arrives, so it is never a stale
+ * conversion of a fresh number.
  */
 import { getWalletBalance, getNimRate, cachedNimRate } from './api';
 import { initNimiqMiniApp, getNimiqProvider, inNimiqPay } from './miniapp';
 import { getAddress, isAuthed, subscribeSession } from './session';
+import { classifyWalletError, readWalletError, type WalletErrorClass } from './walletErrors';
 
 /** 1 NIM = 100,000 luna — the constant the SDK documents for getBalance. */
 export const LUNA_PER_NIM = 100000;
@@ -47,44 +47,62 @@ export const LUNA_PER_NIM = 100000;
 /** How long a reading stays fresh. Short on purpose: it sits next to prices. */
 const TTL_MS = 25000;
 
-export type WalletBalanceFailure =
-  /** PERMISSION_DENIED (4001): the user cancelled the host dialog. Normal. */
-  | 'denied'
-  /** UNKNOWN_REQUEST (4200) / no bridge method: this host cannot do it. */
-  | 'unsupported'
-  /** INVALID_REQUEST (-32602): the address we asked about is not valid. */
-  | 'invalid'
-  /** NETWORK_ERROR (-32000, incl. the host's 30 s timeout). */
-  | 'network'
-  /** INTERNAL_ERROR (-32603). */
-  | 'internal'
-  /** UNKNOWN_ERROR: an unmapped code or an unlisted host-supplied type. */
-  | 'unknown'
-  /** Not signed in (and no host wallet): there is no address to read. */
-  | 'signed-out'
-  /** The account has no wallet address attached. */
-  | 'no-wallet';
+/** A unit mix-up looks like this and only this: five orders of magnitude. */
+const UNIT_FACTOR = LUNA_PER_NIM;
+const looksLikeUnitMixUp = (a: number, b: number) => {
+  if (!(a > 0) || !(b > 0)) return false;
+  const r = a / b;
+  return r > UNIT_FACTOR / 10 && r < UNIT_FACTOR * 10;
+};
+
+export type WalletBalanceFailure = WalletErrorClass | 'signed-out' | 'no-wallet';
 
 export interface WalletBalanceState {
   status: 'loading' | 'ready' | 'error' | 'unavailable';
+  /** Spendable NIM — the address balance. This is what a payment can use. */
+  availableNim: number;
+  /** Active stake delegated to a validator. Not spendable. */
+  stakedNim: number;
+  /** Stake that is no longer active. Not spendable by itself. */
+  inactiveNim: number;
+  /** What a wallet shows as the buyer's NIM: available + staked + inactive. */
+  totalNim: number;
+  /** Alias for `availableNim`, kept so affordability maths reads naturally. */
+  nim: number;
   /** Balance in luna exactly as the chain reports it. */
   luna: number;
-  /** Balance in NIM (luna / 100,000). 0 is a real, successful reading. */
-  nim: number;
-  /** USD equivalent from the live rate, when one is known. 0 = unknown. */
+  /** USD equivalent of the spendable balance, when a rate is known. */
   usd: number;
-  /** Where the reading came from. */
-  source: 'nimiq-pay' | 'shop' | 'none';
-  /** Present when status is 'error' (and for 'unavailable' context). */
-  failure?: WalletBalanceFailure;
+  source: 'nimiq-pay' | 'shop' | 'both' | 'none';
+  /** The address the figures belong to ('' when unknown). */
+  address: string;
+  /** Which chain the reading came from, as reported by the shop endpoint. */
+  network: string;
+  /** The host and the chain disagreed beyond a unit fix: the chain value won. */
+  mismatch?: boolean;
+  /** A unit mismatch was detected and corrected (host reported NIM, not luna). */
+  unitCorrected?: boolean;
   /** True while a previous reading is on screen during a refresh. */
   stale?: boolean;
   at?: number;
+  failure?: WalletBalanceFailure;
 }
 
-const EMPTY: WalletBalanceState = { status: 'loading', luna: 0, nim: 0, usd: 0, source: 'none' };
+const EMPTY: WalletBalanceState = {
+  status: 'unavailable',
+  availableNim: 0,
+  stakedNim: 0,
+  inactiveNim: 0,
+  totalNim: 0,
+  nim: 0,
+  luna: 0,
+  usd: 0,
+  source: 'none',
+  address: '',
+  network: '',
+};
 
-let current: WalletBalanceState = { ...EMPTY, status: 'unavailable' };
+let current: WalletBalanceState = EMPTY;
 let inflight: Promise<WalletBalanceState> | null = null;
 const listeners = new Set<(s: WalletBalanceState) => void>();
 
@@ -100,93 +118,27 @@ function emit(next: WalletBalanceState): WalletBalanceState {
   return next;
 }
 
-/* ---------------- error normalization (PR 215) ---------------- */
-
-/** An Error carrying the bridge's `type`/`code`, so one reader handles both. */
-function bridgeError(type: string, message: string, code?: number): Error {
-  const err = new Error(message) as Error & { type?: string; code?: number };
-  err.type = type;
-  if (typeof code === 'number') err.code = code;
-  return err;
-}
-
-const BY_CODE: Record<number, WalletBalanceFailure> = {
-  4001: 'denied',
-  4200: 'unsupported',
-  [-32602]: 'invalid',
-  [-32000]: 'network',
-  [-32603]: 'internal',
-};
-
-const BY_TYPE: Record<string, WalletBalanceFailure> = {
-  PERMISSION_DENIED: 'denied',
-  UNKNOWN_REQUEST: 'unsupported',
-  // Both appear in the reference with -32602: INVALID_REQUEST on this method
-  // (getBalance) and INVALID_TRANSACTION on the transaction methods. For a
-  // balance read the address is what can be invalid.
-  INVALID_REQUEST: 'invalid',
-  INVALID_TRANSACTION: 'invalid',
-  NETWORK_ERROR: 'network',
-  INTERNAL_ERROR: 'internal',
-  UNKNOWN_ERROR: 'unknown',
-};
-
-interface BridgeError {
-  type?: string;
-  message?: string;
-  code?: number;
-}
-
-/**
- * Pull { type, message, code } out of whatever the host threw. Covers:
- * NimiqProviderError instances, plain objects, JSON-RPC shaped errors nested
- * under `.data` or `.error`, and legacy resolved `{ error: {...} }` responses.
- */
-function readErrorDetail(err: unknown): BridgeError {
-  if (!err || typeof err !== 'object') {
-    return typeof err === 'string' ? { message: err } : {};
-  }
-  const e = err as Record<string, any>;
-  const legacy = e.error && typeof e.error === 'object' ? e.error : null;
-  const data = e.data && typeof e.data === 'object' ? e.data : null;
-  const code = [
-    e.code,
-    legacy?.code,
-    data?.code,
-  ].find((v) => typeof v === 'number');
-  const type = [e.type, legacy?.type, data?.type].find((v) => typeof v === 'string' && v);
-  const message = [e.message, legacy?.message, data?.message].find((v) => typeof v === 'string' && v);
-  return {
-    type: type as string | undefined,
-    message: message as string | undefined,
-    code: code as number | undefined,
-  };
-}
-
-/** The documented vocabulary, plus a numeric fallback, plus `unknown`. */
-export function classifyBalanceError(err: unknown): WalletBalanceFailure {
-  const { type, code } = readErrorDetail(err);
-  if (type && BY_TYPE[type]) return BY_TYPE[type];
-  if (typeof code === 'number' && BY_CODE[code]) return BY_CODE[code];
-  // An unlisted type supplied by the host is preserved, not reinterpreted:
-  // we know a failure happened, not what caused it.
-  if (type) return 'unknown';
-  return 'unknown';
-}
-
 /* ---------------- the reading itself ---------------- */
+
+interface ShopReading {
+  luna: number;
+  stakedNim: number;
+  inactiveNim: number;
+  totalNim: number;
+  network: string;
+}
 
 function isNimiqAddress(value: string): boolean {
   const a = String(value || '').replace(/\s+/g, '').toUpperCase();
   return /^NQ\d{2}[0-9A-HJ-NP-VXY]{32}$/.test(a);
 }
 
-/** A bridge result may be a raw number or a wrapped payload; unwrap safely. */
+/** A result may be a raw number or a wrapped payload; unwrap safely. */
 function unwrapLuna(raw: unknown): number | null {
   if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
   if (raw && typeof raw === 'object') {
     const o = raw as Record<string, any>;
-    for (const k of ['balance', 'balance_luna', 'result']) {
+    for (const k of ['balance_luna', 'balance', 'result']) {
       const v = o[k];
       if (typeof v === 'number' && Number.isFinite(v)) return v;
       if (typeof v === 'string' && v && Number.isFinite(Number(v))) return Number(v);
@@ -195,104 +147,197 @@ function unwrapLuna(raw: unknown): number | null {
   return null;
 }
 
-/** true when a bridge error means "this host simply cannot do it". */
-const isUnsupported = (err: unknown) => classifyBalanceError(err) === 'unsupported';
+const num = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
-/**
- * Ask the host for the balance of `address`. Rejects with the host's own error
- * (normalized by classifyBalanceError) so the caller can decide whether to fall
- * back to the shop API.
- */
-async function bridgeBalance(address: string): Promise<number> {
-  const provider: any = (await initNimiqMiniApp()) || getNimiqProvider();
-  if (!provider) throw bridgeError('UNKNOWN_REQUEST', 'no provider');
-  // A missing, non-string or malformed address is rejected by the host; check
-  // here too so we never send a request the host will refuse anyway.
-  if (!isNimiqAddress(address)) throw bridgeError('INVALID_REQUEST', 'invalid address');
-
-  if (typeof provider.getBalance === 'function') {
-    const raw = await provider.getBalance(address); // SDK 0.2.1+ / supported host
-    const luna = unwrapLuna(raw);
-    if (luna === null) throw bridgeError('UNKNOWN_ERROR', 'unreadable balance');
-    return luna;
-  }
-  if (typeof provider.request === 'function') {
-    // Documented generic form. Same lookup, same network, no external RPC.
-    const raw = await provider.request({ method: 'getBalance', params: { address } });
-    const luna = unwrapLuna(raw);
-    if (luna === null) throw bridgeError('UNKNOWN_ERROR', 'unreadable balance');
-    return luna;
-  }
-  throw bridgeError('UNKNOWN_REQUEST', 'getBalance not supported by this host');
-}
-
-/** Our backend: session-scoped, no address parameter, no open proxy. */
-async function shopBalance(): Promise<number> {
+/** Our backend: session-scoped, stake-aware, no address parameter. */
+async function shopReading(): Promise<ShopReading> {
   const res = await getWalletBalance();
   if (res && res.available === false) {
-    throw bridgeError(res.reason === 'no_wallet' ? 'NO_WALLET' : 'UNKNOWN_REQUEST', String(res.reason || ''));
+    const err = new Error(String(res.reason || 'unavailable'));
+    (err as any).type = res.reason === 'no_wallet' ? 'NO_WALLET' : 'UNKNOWN_REQUEST';
+    throw err;
   }
   const luna = unwrapLuna(res);
-  if (luna === null) throw bridgeError('UNKNOWN_ERROR', 'unreadable balance');
-  return luna;
+  if (luna === null) {
+    const err = new Error('unreadable balance');
+    (err as any).type = 'UNKNOWN_ERROR';
+    throw err;
+  }
+  return {
+    luna,
+    stakedNim: num(res.staked_nim),
+    inactiveNim: num(res.inactive_nim),
+    totalNim: num(res.total_nim) || luna / LUNA_PER_NIM,
+    network: String(res.network || ''),
+  };
 }
 
-/** Attach the live USD equivalent when a rate is already cached. */
+/** Ask the host for the balance of `address`, in luna. */
+async function bridgeLuna(address: string): Promise<number> {
+  const provider: any = (await initNimiqMiniApp()) || getNimiqProvider();
+  if (!provider) {
+    const err = new Error('no provider');
+    (err as any).type = 'UNKNOWN_REQUEST';
+    throw err;
+  }
+  // A missing, non-string or malformed address is rejected by the host; check
+  // here too so we never send a request the host will refuse anyway.
+  if (!isNimiqAddress(address)) {
+    const err = new Error('invalid address');
+    (err as any).type = 'INVALID_REQUEST';
+    throw err;
+  }
+  const call = async (fn: () => Promise<unknown>) => {
+    const luna = unwrapLuna(await fn());
+    if (luna === null) {
+      const err = new Error('unreadable balance');
+      (err as any).type = 'UNKNOWN_ERROR';
+      throw err;
+    }
+    return luna;
+  };
+  if (typeof provider.getBalance === 'function') {
+    return call(() => provider.getBalance(address)); // SDK 0.2.1+ / supported host
+  }
+  if (typeof provider.request === 'function') {
+    // Documented generic form: same lookup, same network, no external RPC.
+    return call(() => provider.request({ method: 'getBalance', params: { address } }));
+  }
+  const err = new Error('getBalance not supported by this host');
+  (err as any).type = 'UNKNOWN_REQUEST';
+  throw err;
+}
+
+/** Attach the live USD equivalent from the cached rate. */
 function withUsd(state: WalletBalanceState): WalletBalanceState {
-  const rate = Number(cachedNimRate()?.usd_per_nim) || 0;
-  if (!(rate > 0) || !(state.nim >= 0)) return { ...state, usd: 0 };
-  return { ...state, usd: state.nim * rate };
+  const rate = num(cachedNimRate()?.usd_per_nim);
+  return { ...state, usd: rate > 0 ? state.availableNim * rate : 0 };
+}
+
+/** Fire-and-forget rate fetch, then REPAINT with the USD figure it produced. */
+function refreshUsdLater(mark: WalletBalanceState): void {
+  const seenAt = mark.at;
+  void getNimRate()
+    .then(() => {
+      // Only update if the reading has not been replaced meanwhile.
+      if (current.at === seenAt && current.status === 'ready') emit(withUsd(current));
+    })
+    .catch(() => {});
 }
 
 async function readBalance(): Promise<WalletBalanceState> {
   const address = String(getAddress() || '').trim();
   const signedIn = isAuthed() && !!address;
+  const hostAvailable = !!(inNimiqPay() || getNimiqProvider());
 
-  // Inside Nimiq Pay the host is the fastest and most correct source: it reads
-  // through its own client on its active network.
-  if (address && (inNimiqPay() || getNimiqProvider())) {
+  let shop: ShopReading | null = null;
+  let shopError: unknown = null;
+  if (signedIn) {
     try {
-      const luna = await bridgeBalance(address);
-      // Fire-and-forget: a missing rate must not delay the balance.
-      void getNimRate().catch(() => {});
-      return withUsd({ status: 'ready', luna, nim: luna / LUNA_PER_NIM, usd: 0, source: 'nimiq-pay', at: Date.now() });
-    } catch (err) {
-      if (!isUnsupported(err)) {
-        // A real answer from the wallet (cancelled, network, internal, unknown)
-        // is NOT retried behind the user's back — only "this host cannot do it"
-        // falls through to our own endpoint.
-        return { status: 'error', luna: 0, nim: 0, usd: 0, source: 'none', failure: classifyBalanceError(err) };
-      }
-      /* fall through to the shop endpoint */
+      shop = await shopReading();
+    } catch (e) {
+      shopError = e;
     }
   }
 
-  if (!signedIn) {
-    return { status: 'unavailable', luna: 0, nim: 0, usd: 0, source: 'none', failure: 'signed-out' };
+  let host: number | null = null;
+  let hostError: unknown = null;
+  if (address && hostAvailable) {
+    try {
+      host = await bridgeLuna(address);
+    } catch (e) {
+      hostError = e;
+    }
   }
 
-  try {
-    const luna = await shopBalance();
-    void getNimRate().catch(() => {});
-    return withUsd({ status: 'ready', luna, nim: luna / LUNA_PER_NIM, usd: 0, source: 'shop', at: Date.now() });
-  } catch (err) {
-    const detail = readErrorDetail(err);
-    if (detail.type === 'NO_WALLET') {
-      return { status: 'unavailable', luna: 0, nim: 0, usd: 0, source: 'none', failure: 'no-wallet' };
-    }
-    const status = Number((err as any)?.status) || 0;
-    if (status === 401) {
-      return { status: 'unavailable', luna: 0, nim: 0, usd: 0, source: 'none', failure: 'signed-out' };
-    }
-    return { status: 'error', luna: 0, nim: 0, usd: 0, source: 'none', failure: 'network' };
+  const base = { address, network: shop?.network || '' };
+
+  // BOTH: reconcile. The session wallet is the one the shop charges, so it wins
+  // any disagreement — but a clean five-orders-of-magnitude gap is a unit
+  // mistake, not a disagreement, and is corrected silently.
+  if (shop && host !== null) {
+    const unitCorrected = !looksLikeUnitMixUp(host, shop.luna) ? false : true;
+    const mismatch = !unitCorrected && Math.abs(host - shop.luna) > Math.max(1, shop.luna * 0.01);
+    const state: WalletBalanceState = {
+      status: 'ready',
+      luna: shop.luna,
+      availableNim: shop.luna / LUNA_PER_NIM,
+      stakedNim: shop.stakedNim,
+      inactiveNim: shop.inactiveNim,
+      totalNim: shop.totalNim,
+      nim: shop.luna / LUNA_PER_NIM,
+      usd: 0,
+      source: 'both',
+      unitCorrected,
+      mismatch,
+      at: Date.now(),
+      ...base,
+    };
+    refreshUsdLater(state);
+    return withUsd(state);
   }
+
+  // HOST ONLY: not signed in to the shop, but the wallet can still answer. The
+  // host reports one figure (the address balance); staking is not visible here.
+  if (host !== null) {
+    const state: WalletBalanceState = {
+      status: 'ready',
+      luna: host,
+      availableNim: host / LUNA_PER_NIM,
+      stakedNim: 0,
+      inactiveNim: 0,
+      totalNim: host / LUNA_PER_NIM,
+      nim: host / LUNA_PER_NIM,
+      usd: 0,
+      source: 'nimiq-pay',
+      at: Date.now(),
+      ...base,
+    };
+    refreshUsdLater(state);
+    return withUsd(state);
+  }
+
+  // SHOP ONLY — the plain-browser case, and the one that carries the stake.
+  if (shop) {
+    const state: WalletBalanceState = {
+      status: 'ready',
+      luna: shop.luna,
+      availableNim: shop.luna / LUNA_PER_NIM,
+      stakedNim: shop.stakedNim,
+      inactiveNim: shop.inactiveNim,
+      totalNim: shop.totalNim,
+      nim: shop.luna / LUNA_PER_NIM,
+      usd: 0,
+      source: 'shop',
+      at: Date.now(),
+      ...base,
+    };
+    refreshUsdLater(state);
+    return withUsd(state);
+  }
+
+  // Nothing answered. Report WHY, precisely.
+  const detail = readWalletError(hostError || shopError);
+  if (detail.type === 'NO_WALLET') {
+    return { ...EMPTY, ...base, failure: 'no-wallet' };
+  }
+  if (!signedIn && (!hostError || classifyWalletError(hostError) === 'unsupported')) {
+    return { ...EMPTY, ...base, failure: 'signed-out' };
+  }
+  const status = Number((shopError as any)?.status) || 0;
+  if (status === 401) return { ...EMPTY, ...base, failure: 'signed-out' };
+  const failure: WalletBalanceFailure = hostError
+    ? (classifyWalletError(hostError) as WalletBalanceFailure)
+    : signedIn
+      ? 'network'
+      : 'signed-out';
+  return { ...EMPTY, ...base, status: 'error', failure };
 }
 
 /**
  * The current reading. `force` skips the TTL cache (post-payment refresh, the
- * retry button, a pull-to-refresh style gesture). Concurrent callers share one
- * request, so the home page, the cart and the product page mounting together
- * still cost exactly one lookup.
+ * retry/refresh button). Concurrent callers share one request, so the home
+ * page, the cart and a product page mounting together cost one lookup.
  */
 export function refreshWalletBalance({ force = false }: { force?: boolean } = {}): Promise<WalletBalanceState> {
   const fresh = current.status === 'ready' && current.at && Date.now() - current.at < TTL_MS;
@@ -304,7 +349,7 @@ export function refreshWalletBalance({ force = false }: { force?: boolean } = {}
 
   inflight = readBalance()
     .then((next) => emit(next))
-    .catch(() => emit({ status: 'error', luna: 0, nim: 0, usd: 0, source: 'none', failure: 'unknown' }))
+    .catch(() => emit({ ...EMPTY, status: 'error', failure: 'unknown' }))
     .finally(() => {
       inflight = null;
     });
@@ -323,7 +368,7 @@ export function subscribeWalletBalance(fn: (s: WalletBalanceState) => void): () 
 /** Forget the reading. Used by tests and by a full sign-out. */
 export function resetWalletBalance(): void {
   inflight = null;
-  emit({ status: 'unavailable', luna: 0, nim: 0, usd: 0, source: 'none' });
+  emit(EMPTY);
 }
 
 /* Auto-refresh wiring: a sign-in, a sign-out or coming back to the tab must not

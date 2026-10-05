@@ -94,6 +94,41 @@ export function friendlyApiMessage(err: unknown, fallback = tr('api.generic')): 
   return fallback;
 }
 
+/**
+ * errorFacts — the EXACT failure, for the line under a friendly message.
+ *
+ * Owner (2026-10-05): "satın alırken … bir 'haa oluştu' diyo o kırmızı yerde;
+ * tam hataları söyleyebilirdi". The red boxes used to show only the mapped
+ * sentence, so a buyer (and support) had nothing to act on. `friendlyApiMessage`
+ * still owns the human sentence; this owns the facts behind it — the backend's
+ * code, the HTTP status and the raw message — and the UI renders it in small
+ * print instead of hiding it.
+ */
+export interface ErrorFacts {
+  code: string;
+  status: number;
+  message: string;
+}
+
+export function errorFacts(err: unknown): ErrorFacts {
+  const e = err as { status?: number; message?: string; code?: string; data?: any } | null;
+  const status = Number(e?.status) || 0;
+  const code = String(e?.code || e?.data?.code || '').trim();
+  const raw = String(e?.message || e?.data?.detail || '').trim();
+  return { code, status, message: raw };
+}
+
+/** "PEER_LIMIT · 429 · too many quotes in flight" — '' when there is nothing. */
+export function errorDetailLine(err: unknown): string {
+  const { code, status, message } = errorFacts(err);
+  const parts: string[] = [];
+  if (code) parts.push(code);
+  if (status) parts.push(String(status));
+  const msg = message.replace(/\s+/g, ' ').trim();
+  if (msg && msg.length <= 200 && !/ALLOWED_ORIGINS/i.test(msg)) parts.push(msg);
+  return parts.join(' · ');
+}
+
 let sessionGetter: () => string | null = () => null;
 export function _setSessionGetter(fn: () => string | null) {
   sessionGetter = fn;
@@ -595,8 +630,34 @@ export const setNotificationPrefs = (enabled: boolean) =>
 
 /* ---------------- Orders ---------------- */
 export const listOrders = () => api('/orders', { auth: true });
-/** The signed-in wallet's own NIM balance (session-scoped; no address param). */
-export const getWalletBalance = () => api('/wallet/balance', { auth: true, timeoutMs: 9000 });
+/**
+ * The signed-in wallet's own NIM balance (session-scoped; no address param).
+ *
+ * Stake-aware on purpose (owner, 2026-10-05: "your wallet'deki NIM miktarım
+ * yanlış"): `getAccountByAddress` reports the LIQUID balance only, so a buying
+ * wallet that also stakes looked 50x smaller than it is. `balance_nim` /
+ * `balance_luna` are what a payment can spend; `total_nim` is what the wallet
+ * app shows its owner.
+ */
+export interface WalletBalanceResponse {
+  /** false when the backend could not answer — see `reason`. */
+  available: boolean;
+  /** no_wallet | rpc_unavailable | … */
+  reason?: string;
+  address?: string;
+  balance_luna?: number;
+  balance_nim?: number;
+  staked_nim?: number;
+  inactive_nim?: number;
+  retired_nim?: number;
+  total_nim?: number;
+  network?: string;
+  cached?: boolean;
+  observed_at?: string;
+}
+
+export const getWalletBalance = () =>
+  api('/wallet/balance', { auth: true, timeoutMs: 9000 }) as Promise<WalletBalanceResponse>;
 export const getOrder = (id: string) => api(`/orders/${encodeURIComponent(id)}`, { auth: true });
 export const refreshOrder = (id: string) => api(`/orders/${encodeURIComponent(id)}/refresh`, { method: 'POST', auth: true });
 export const getOrderSupport = (id: string) => api(`/orders/${encodeURIComponent(id)}/support`, { auth: true });

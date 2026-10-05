@@ -12,7 +12,7 @@ import { openLoginSheet } from '../shell/SiteShell';
 import { listOrders, listQuotes, rateOrder, rateQuote } from '../../lib/api';
 import { brandMetaFor } from '../../lib/catalogMeta';
 import { cleanProductLabel, cleanBatchProductLabels, fmtDate, fmtDuration, fmtNum, quoteFaceValue, countryName } from '../../lib/format';
-import { friendlyApiMessage } from '../../lib/api';
+import { friendlyApiMessage, errorDetailLine } from '../../lib/api';
 import { isAuthed } from '../../lib/session';
 import { useSession } from '../../lib/useSession';
 import { quoteStages, isTerminalStatus, isDeliveredStatus, isIssueStatus } from '../../lib/orderTrack';
@@ -96,6 +96,9 @@ export function OrdersView() {
   const [orderPage, setOrderPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
+  /* The exact failure behind `err` (code · status · backend message), shown in
+     small print so a failed list is actionable instead of just "went wrong". */
+  const [errDetail, setErrDetail] = useState('');
   const [lastRefresh, setLastRefresh] = useState('');
   const [awaitingCount, setAwaitingCount] = useState(0);
   const { toast } = useToast();
@@ -251,8 +254,10 @@ export function OrdersView() {
         setAwaitingCount(countAwaiting(r));
         setLastRefresh(t('ordersPage.updated', { time: new Date().toLocaleTimeString(lang === 'en' ? 'en-US' : lang, { hour: '2-digit', minute: '2-digit', second: '2-digit' }) }));
         setErr('');
+        setErrDetail('');
       } catch (e) {
         setErr(friendlyApiMessage(e, t('ordersPage.loadError')));
+        setErrDetail(errorDetailLine(e));
       } finally {
         setLoading(false);
       }
@@ -339,7 +344,7 @@ export function OrdersView() {
       </div>
       <div id="list" className="orders-surface">
         {err ? (
-          <ErrorState message={err} retry={() => load()} />
+          <ErrorState message={err} detail={errDetail} retry={() => load()} />
         ) : loading && !rows.length ? (
           <div className="grid products">
             <SkeletonCards n={6} />

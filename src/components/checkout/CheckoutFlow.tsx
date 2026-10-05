@@ -14,9 +14,10 @@ import { selectionPayload } from '../../lib/productMoney';
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../ui/Icon';
+import { ErrorDetail } from '../ui/uiKit';
 import { useCart, itemKey, type CartItem } from '../../lib/cartStore';
 import { useToast } from '../AppProviders';
-import { createQuote, createQuoteBatch, forgetQuote, getQuote, friendlyApiMessage, authorizePaymentLaunch, cachedNimRate } from '../../lib/api';
+import { createQuote, createQuoteBatch, forgetQuote, getQuote, friendlyApiMessage, authorizePaymentLaunch, cachedNimRate, errorDetailLine } from '../../lib/api';
 import { canRenewQuote, paymentInFlight } from '../../lib/pay';
 import { buildOrderRequest, getGiftExtras, type DeliveryInfo } from '../../lib/delivery';
 import { isValidEmail } from '../../lib/validate';
@@ -61,10 +62,10 @@ type Phase =
   | { kind: 'pick-payment'; info: DeliveryInfo }
   | { kind: 'preparing'; label: string }
   | { kind: 'batch-pay'; quote: any; items: CartItem[] }
-  | { kind: 'batch-failed'; issues?: SupplierIssue[]; message: string; activeCheckout?: boolean; items?: CartItem[] }
+  | { kind: 'batch-failed'; issues?: SupplierIssue[]; message: string; detail?: string; activeCheckout?: boolean; items?: CartItem[] }
   | { kind: 'batch-blocked'; issues?: SupplierIssue[]; blocked: any[]; items: CartItem[] }
   | { kind: 'peritem-pay'; index: number; quote: any; name: string; qty: number; total: number; paidCount: number }
-  | { kind: 'item-failed'; issues?: SupplierIssue[]; it: CartItem; reason: string; msg: string; index: number; total: number; paidCount: number }
+  | { kind: 'item-failed'; issues?: SupplierIssue[]; it: CartItem; reason: string; msg: string; detail?: string; index: number; total: number; paidCount: number }
   | { kind: 'limit-blocked'; limit: DailyLimit; subject: string; paidCount: number; restCount: number }
   | { kind: 'success'; paidCount: number; delivered: CartItem[] }
   | { kind: 'summary'; paid: CartItem[]; kept: CartItem[]; stoppedEarly: boolean };
@@ -318,6 +319,7 @@ export function CheckoutFlow({
         setPhase({ kind: 'preparing', label: t('checkout.flowPreparing', { n: items.length }) });
         let batch: any = null;
         let batchErr = '';
+        let batchDetail = '';
         let batchBlocked: any[] = [];
         let batchLimit: DailyLimit | null = null;
         let batchActiveCheckout = false;
@@ -326,6 +328,7 @@ export function CheckoutFlow({
         const tryBatch = async () => {
           batch = null;
           batchErr = '';
+          batchDetail = '';
           batchBlocked = [];
           batchLimit = null;
           batchActiveCheckout = false;
@@ -342,6 +345,8 @@ export function CheckoutFlow({
             batchErr = batchLimit
               ? limitSentence(batchLimit, t('checkout.flowCartSubject'))
               : friendlyApiMessage(e, t('checkout.flowBatchRejected'));
+            // Exact failure (code · status · backend message) for the red screen.
+            batchDetail = errorDetailLine(e);
             batchBlocked = blockedFrom(e);
           }
         };
@@ -421,7 +426,7 @@ export function CheckoutFlow({
             }
             // Generic batch failure
             const c = await new Promise<'retry' | 'onebyone' | 'stop' | 'force'>((resolve) => {
-              setPhase({ kind: 'batch-failed', message: batchErr || t('checkout.flowBatchUnconfirmed'), activeCheckout: batchActiveCheckout, items, issues: batchIssues });
+              setPhase({ kind: 'batch-failed', message: batchErr || t('checkout.flowBatchUnconfirmed'), detail: batchDetail, activeCheckout: batchActiveCheckout, items, issues: batchIssues });
               (window as any).__promptResolver = (x: any) => resolve(x);
             });
             (window as any).__promptResolver = undefined;
@@ -467,7 +472,11 @@ export function CheckoutFlow({
           }
           // batch payment failed
           const c = await new Promise<'retry' | 'onebyone' | 'stop'>((resolve) => {
-            setPhase({ kind: 'batch-failed', message: t('checkout.flowUnresolvedPayment'), items });
+            // The pay step wrote the wallet's exact failure here (see
+            // NimiqPayPayButton): the red screen names it instead of only
+            // saying that the payment stayed unresolved.
+            const payDetail = takeLastPayDetail();
+            setPhase({ kind: 'batch-failed', message: t('checkout.flowUnresolvedPayment'), detail: payDetail, items });
             (window as any).__promptResolver = (x: any) => resolve(x);
           });
           (window as any).__promptResolver = undefined;
@@ -501,6 +510,7 @@ export function CheckoutFlow({
           forgetQuote(buildReq(it));
           let quote: any = null;
           let qErr = '';
+          let qDetail = '';
           let qReason = 'quote';
           let qLimit: DailyLimit | null = null;
           let qIssues: SupplierIssue[] = [];
@@ -513,6 +523,10 @@ export function CheckoutFlow({
             qErr = qLimit
               ? limitSentence(qLimit, it.name)
               : friendlyApiMessage(e, t('checkout.flowNoLivePrice'));
+            // The RED screen explains what happened; this line carries the
+            // exact code/status/message so the buyer (and support) can act on
+            // the real failure instead of a generic sentence.
+            qDetail = errorDetailLine(e);
           }
           if (!quote) {
             const lim = qLimit;
@@ -530,7 +544,7 @@ export function CheckoutFlow({
               continue;
             }
             const c = await new Promise<'retry' | 'skip' | 'stop' | 'force'>((resolve) => {
-              setPhase({ kind: 'item-failed', it, reason: qReason, msg: qErr, index: i, total: items.length, paidCount: paidIdx.length, issues: qIssues });
+              setPhase({ kind: 'item-failed', it, reason: qReason, msg: qErr, detail: qDetail, index: i, total: items.length, paidCount: paidIdx.length, issues: qIssues });
               (window as any).__promptResolver = (x: any) => resolve(x);
             });
             (window as any).__promptResolver = undefined;
@@ -563,7 +577,10 @@ export function CheckoutFlow({
             break;
           }
           const c = await new Promise<'retry' | 'skip' | 'stop'>((resolve) => {
-            setPhase({ kind: 'item-failed', it, reason: (window as any).__lastPayReason || 'failed', msg: '', index: i, total: items.length, paidCount: paidIdx.length });
+            // Read once, then use for both: takeLastPayDetail clears the
+            // handoff, so a second call would return an empty string.
+            const payDetail = takeLastPayDetail();
+            setPhase({ kind: 'item-failed', it, reason: (window as any).__lastPayReason || 'failed', msg: payDetail, detail: payDetail, index: i, total: items.length, paidCount: paidIdx.length });
             (window as any).__promptResolver = (x: any) => resolve(x);
           });
           (window as any).__promptResolver = undefined;
@@ -665,7 +682,7 @@ export function CheckoutFlow({
         />
       )}
       {phase.kind === 'batch-failed' && (
-        <FailurePrompt issues={phase.issues} message={phase.message} activeCheckout={phase.activeCheckout} items={phase.items} onChoice={(c) => resolvePrompt(c)} onBackToCart={onClose} />
+        <FailurePrompt issues={phase.issues} message={phase.message} detail={phase.detail} activeCheckout={phase.activeCheckout} items={phase.items} onChoice={(c) => resolvePrompt(c)} onBackToCart={onClose} />
       )}
       {phase.kind === 'batch-blocked' && (
         <BlockedPrompt issues={phase.issues} blocked={phase.blocked} items={phase.items} onChoice={(c) => resolvePrompt(c)} />
@@ -998,7 +1015,11 @@ export function PayScreen({
             hero card, right under the amount — not one card further down. */}
         {invoice && (insidePay ? (
           <div style={{ marginTop: 12 }}>
-            <NimiqPayPayButton invoice={invoice} className="btn btn-gold btn-block btn-lg" />
+            <NimiqPayPayButton
+              invoice={invoice}
+              amountNim={Number(nimAmountFor(current, cachedNimRate())) || 0}
+              className="btn btn-gold btn-block btn-lg"
+            />
           </div>
         ) : uri ? (
           <button
@@ -1062,7 +1083,7 @@ function PerItemPayPhase({ quote, name, qty = 1, index, total, paidCount, onResu
   return <PayScreen quote={quote} name={name} stepNote={stepNote} youGetLabel={`${name} ×${qty}`} onResult={onResult} />;
 }
 
-function FailurePrompt({ issues = [], message, activeCheckout = false, items = [], onChoice, onBackToCart }: { issues?: SupplierIssue[]; message: string; activeCheckout?: boolean; items?: CartItem[]; onChoice: (c: 'retry' | 'onebyone' | 'stop' | 'force') => void; onBackToCart: () => void }) {
+function FailurePrompt({ issues = [], message, detail = '', activeCheckout = false, items = [], onChoice, onBackToCart }: { issues?: SupplierIssue[]; message: string; detail?: string; activeCheckout?: boolean; items?: CartItem[]; onChoice: (c: 'retry' | 'onebyone' | 'stop' | 'force') => void; onBackToCart: () => void }) {
   const { t } = useT();
   const productLabel = items.length === 1 ? items[0].name : items.length > 1 ? t('checkout.flowTheseItems') : t('checkout.flowYourCart');
   const displayMessage = activeCheckout
@@ -1076,6 +1097,7 @@ function FailurePrompt({ issues = [], message, activeCheckout = false, items = [
       <div className="strong">{t('checkout.flowCheckoutPaused')}</div>
       <SupplierProblemNotice issues={issues} />
       {!issues.length && !activeCheckout && <div className="small muted mt-1" style={{ maxWidth: 380, margin: '6px auto 0' }}>{displayMessage}</div>}
+      {!issues.length && <ErrorDetail detail={detail} className="center" />}
       {activeCheckout && (
         <div className="alert info mt-2" style={{ maxWidth: 380, marginLeft: 'auto', marginRight: 'auto', marginBottom: 0, textAlign: 'left', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
           <div className="small">{t('checkout.flowUnpaidOrderHold')}</div>
@@ -1166,12 +1188,31 @@ function isActiveCheckoutMessage(reason: string, msg: string): boolean {
   return reason === 'active-checkout' || (reason === 'quote' && /unpaid order|unpaid checkout|existing payment|existing order|safety hold/i.test(msg));
 }
 
+/**
+ * takeLastPayDetail — the exact failure the wallet reported at the pay step.
+ *
+ * Owner (2026-10-05): "o kırmızı yerde tam hataları söyleyebilirdi". The pay
+ * button writes the wallet's own type/code/message to a module-level handoff
+ * (window.__lastPayDetail) when a payment fails; the prompt that follows reads
+ * it once and clears it, so a later unrelated failure never inherits it.
+ */
+function takeLastPayDetail(): string {
+  const w = window as any;
+  const detail = String(w.__lastPayDetail || '');
+  w.__lastPayDetail = '';
+  return detail;
+}
+
 function whyFor(reason: string, name: string, msg: string): string {
   if (isActiveCheckoutMessage(reason, msg)) {
     return tr('checkout.flowActiveCheckoutPrice', { name });
   }
+  // The backend's own sentence belongs on EVERY failure screen, not just the
+  // pricing one: a buyer staring at "the checkout paused" needs to know whether
+  // it was the wallet, the supplier or the price.
+  const suffix = msg ? ' — ' + msg : '';
   const map: Record<string, string> = {
-    quote: tr('checkout.flowWhyQuote', { name, msg: msg ? ' — ' + msg : '' }),
+    quote: tr('checkout.flowWhyQuote', { name, msg: suffix }),
     expired: tr('checkout.flowWhyExpired', { name }),
     timeout: tr('checkout.flowWhyTimeout', { name }),
     failed: tr('checkout.flowWhyFailed', { name }),
@@ -1179,8 +1220,14 @@ function whyFor(reason: string, name: string, msg: string): string {
     cancel: tr('checkout.flowWhyCancel', { name }),
     limit: tr('checkout.flowWhyLimit', { name }),
     invalid: tr('checkout.flowWhyInvalid', { name }),
+    // The wallet refused the spend for want of NIM. "The checkout paused" is
+    // true and useless; this says what actually happened, and the wallet's own
+    // sentence is appended below it.
+    insufficient: tr('orderPage.nimiqPay.insufficient'),
   };
-  return map[reason] || tr('checkout.flowWhyGeneric', { name });
+  const base = map[reason] || tr('checkout.flowWhyGeneric', { name });
+  if (reason === 'quote' || !msg) return base;
+  return base + suffix;
 }
 
 /**
@@ -1285,7 +1332,7 @@ function LimitBar({ pct }: { pct: number }) {
   );
 }
 
-function ItemFailedPrompt({ issues = [], it, reason, msg, index, total, paidCount, onChoice, onBackToCart }: { issues?: SupplierIssue[]; it: CartItem; reason: string; msg: string; index: number; total: number; paidCount: number; onChoice: (c: 'retry' | 'skip' | 'stop' | 'force') => void; onBackToCart: () => void }) {
+function ItemFailedPrompt({ issues = [], it, reason, msg, detail = '', index, total, paidCount, onChoice, onBackToCart }: { issues?: SupplierIssue[]; it: CartItem; reason: string; msg: string; detail?: string; index: number; total: number; paidCount: number; onChoice: (c: 'retry' | 'skip' | 'stop' | 'force') => void; onBackToCart: () => void }) {
   const { t } = useT();
   const why = whyFor(reason, it.name, msg);
   const activeCheckout = isActiveCheckoutMessage(reason, msg);
@@ -1298,6 +1345,7 @@ function ItemFailedPrompt({ issues = [], it, reason, msg, index, total, paidCoun
       <div className="strong">{t('checkout.flowCheckoutPaused')}</div>
       <SupplierProblemNotice issues={issues} />
       {!issues.length && !activeCheckout && <div className="small muted mt-1" style={{ maxWidth: 380, margin: '6px auto 0' }}>{why}</div>}
+      {!issues.length && !activeCheckout && <ErrorDetail detail={detail} className="center" />}
       {activeCheckout && (
         <div className="alert info mt-2" style={{ marginBottom: 0, textAlign: 'left', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
           <div className="small">{t('checkout.flowUnpaidOrderNote')}</div>

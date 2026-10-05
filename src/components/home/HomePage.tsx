@@ -93,6 +93,7 @@ export function HomePage() {
   const [fx, setFx] = useState<Record<string, number> | null>(() => (typeof cachedFX === 'function' ? cachedFX() : null));
   const [showPayInstall, setShowPayInstall] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadErrorDetail, setLoadErrorDetail] = useState('');
   const [shelfNote, setShelfNote] = useState('');
   const [busy, setBusy] = useState(true);
   // Which country's catalog is on screen right now. Together with `busy` it is
@@ -192,6 +193,7 @@ export function HomePage() {
       setShelfNote(t('home.shelfNote'));
     } else {
       setLoadError(t('home.loadError'));
+      setLoadErrorDetail(missing.length ? missing.join(' · ') : '');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -457,7 +459,7 @@ export function HomePage() {
         </div>}
         <div id="gridWrap" aria-busy={busy || (!!searchTerm.trim() && searchResults === null)}>
           {loadError ? (
-            <ErrorState message={loadError} onRetry={() => loadCatalogs(country)} />
+            <ErrorState message={loadError} detail={loadErrorDetail} onRetry={() => loadCatalogs(country)} />
           ) : (busy && !catalogHasItems(catalogs)) || (!!searchTerm.trim() && searchResults === null) ? (
             <SkeletonGrid />
           ) : items.length === 0 ? (

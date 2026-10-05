@@ -10,7 +10,7 @@ import { BrandThumbStack } from '../ui/UnifiedThumb';
 import { FlagMark } from '../ui/FlagMark';
 import { AppRoot } from '../AppRoot';
 import { openLoginSheet } from '../shell/SiteShell';
-import { friendlyApiMessage, trackOrder } from '../../lib/api';
+import { friendlyApiMessage, trackOrder, errorDetailLine } from '../../lib/api';
 import { useSession } from '../../lib/useSession';
 import { cleanProductLabel, cleanBatchProductLabels, fmtUSD, fmtNIM, fmtDate, queryParam, countryName, shortAddr } from '../../lib/format';
 import { useInterval } from '../../lib/useInterval';
@@ -57,6 +57,8 @@ export function TrackView() {
   const [queryReady, setQueryReady] = useState(false);
   const [data, setData] = useState<TrackData | null>(null);
   const [err, setErr] = useState('');
+  /* The exact failure behind `err` (code · status · backend message). */
+  const [errDetail, setErrDetail] = useState('');
   const [loading, setLoading] = useState(true);
   const inFlight = useRef(false);
   const alive = useRef(true);
@@ -86,8 +88,11 @@ export function TrackView() {
     } catch (err: any) {
       if (!alive.current) return;
       setData(null);
-      if (err.status === 404) setErr('__404__');
-      else setErr(friendlyApiMessage(err, t('errors.loadOrder')));
+      if (err.status === 404) { setErr('__404__'); setErrDetail(''); }
+      else {
+        setErr(friendlyApiMessage(err, t('errors.loadOrder')));
+        setErrDetail(errorDetailLine(err));
+      }
     } finally {
       inFlight.current = false;
       if (alive.current) setLoading(false);
@@ -145,7 +150,7 @@ export function TrackView() {
         <BackRow />
         <Header />
         <div className="mt-2">
-          <ErrorState message={err} retry={load} />
+          <ErrorState message={err} detail={errDetail} retry={load} />
         </div>
       </div>
     );

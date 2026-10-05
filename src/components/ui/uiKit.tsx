@@ -10,7 +10,7 @@ import { CFG } from '../../lib/config';
 import { Identicon } from './Identicon';
 import { fmtDate, fmtNIM } from '../../lib/format';
 import { Clipboard } from '../../lib/clipboard';
-import { getNimRate, cachedNimRate } from '../../lib/api';
+import { getNimRate, cachedNimRate, errorDetailLine } from '../../lib/api';
 import { nimAmountFor, nimFallbackText } from '../../lib/nim';
 import { useT, t as i18nT } from '../../i18n';
 import { asset, pagePath } from '../../lib/asset';
@@ -387,7 +387,27 @@ export function EmptyState({ iconName = 'bag', title, text, action }: { iconName
   );
 }
 
-export function ErrorState({ message, retry }: { message?: string; retry?: () => void }) {
+/**
+ * ErrorDetail — the exact error, in small print, under a friendly sentence.
+ *
+ * Owner (2026-10-05): the red areas said "something went wrong" and nothing
+ * else, so a buyer could not tell an insufficient balance from an expired
+ * invoice and support had nothing to trace. The mapped sentence stays the
+ * headline; this is the fact line beneath it (backend code · status · message),
+ * copyable, and rendered only when there is something to show.
+ */
+export function ErrorDetail({ err, detail, className = '' }: { err?: unknown; detail?: string; className?: string }) {
+  const { t } = useT();
+  const text = detail || (err !== undefined ? errorDetailLine(err) : '');
+  if (!text) return null;
+  return (
+    <p className={`xs faint mono wal-note ${className}`.trim()} style={{ margin: '6px 0 0', wordBreak: 'break-word' }}>
+      {t('ui.errorDetail')}: {text}
+    </p>
+  );
+}
+
+export function ErrorState({ message, retry, detail }: { message?: string; retry?: () => void; detail?: string }) {
   const { t } = useT();
   return (
     <div className="empty fade-in">
@@ -396,6 +416,7 @@ export function ErrorState({ message, retry }: { message?: string; retry?: () =>
       </div>
       <h3>{t('errors.wentWrong')}</h3>
       <p>{message || t('ui.pleaseTryAgain')}</p>
+      <ErrorDetail detail={detail} />
       {retry ? (
         <button className="btn btn-ghost" onClick={retry}>
           <Icon name="refresh" size={18} /> {t('common.tryAgain')}

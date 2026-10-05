@@ -12,7 +12,7 @@ import { UnifiedThumb, BrandThumbStack } from '../ui/UnifiedThumb';
 import { FlagMark } from '../ui/FlagMark';
 import { AppRoot } from '../AppRoot';
 import { openLoginSheet } from '../shell/SiteShell';
-import { friendlyApiMessage, getOrder, refreshOrder, getQuote, refreshQuote, rateOrder, rateQuote, getProduct, allowNewPurchase, createQuote } from '../../lib/api';
+import { friendlyApiMessage, getOrder, refreshOrder, getQuote, refreshQuote, rateOrder, rateQuote, getProduct, allowNewPurchase, createQuote, errorDetailLine } from '../../lib/api';
 import { isAuthed } from '../../lib/session';
 import { useSession } from '../../lib/useSession';
 import { quoteStages, isTerminalStatus, shouldAskRating, ratingDismissedKey } from '../../lib/orderTrack';
@@ -777,6 +777,8 @@ export function OrderView() {
   const [queryReady, setQueryReady] = useState(false);
   const [data, setData] = useState<any>(null);
   const [err, setErr] = useState('');
+  /* The exact failure behind `err`, in small print (code · status · message). */
+  const [errDetail, setErrDetail] = useState('');
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { openSheet, closeSheet } = useSheet();
@@ -805,10 +807,14 @@ export function OrderView() {
         const res = isQuote ? (manual ? await refreshQuote(id) : await getQuote(id)) : manual ? await refreshOrder(id) : await getOrder(id);
         setData(isQuote ? res : res);
         setErr('');
+        setErrDetail('');
       } catch (e: any) {
         setData(null);
-        if (e.status === 404) setErr('404');
-        else setErr(friendlyApiMessage(e, t('orderPage.loadError')));
+        if (e.status === 404) { setErr('404'); setErrDetail(''); }
+        else {
+          setErr(friendlyApiMessage(e, t('orderPage.loadError')));
+          setErrDetail(errorDetailLine(e));
+        }
       } finally {
         setLoading(false);
       }
@@ -947,7 +953,7 @@ export function OrderView() {
       <div className="container">
         <BackRow onRefresh={() => load(true)} />
         <div className="mt-2">
-          <ErrorState message={err} retry={() => load()} />
+          <ErrorState message={err} detail={errDetail} retry={() => load()} />
         </div>
       </div>
     );

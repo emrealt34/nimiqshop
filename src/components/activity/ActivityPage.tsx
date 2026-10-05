@@ -10,7 +10,7 @@ import { Icon } from '../ui/Icon';
 import { FlagMark } from '../ui/FlagMark';
 import { Identicon } from '../ui/Identicon';
 import { AppRoot } from '../AppRoot';
-import { getActivity, cachedNimRate, friendlyApiMessage } from '../../lib/api';
+import { getActivity, cachedNimRate, friendlyApiMessage, errorDetailLine } from '../../lib/api';
 import { cleanProductLabel, cleanBatchProductLabels, fmtNIM, timeAgo, countryName, shortAddr, fmtDuration } from '../../lib/format';
 import { Clipboard } from '../../lib/clipboard';
 import { useInterval } from '../../lib/useInterval';
@@ -134,6 +134,8 @@ export function ActivityView() {
   const [starFilter, setStarFilter] = useState(0);
   const [feedPage, setFeedPage] = useState(0);
   const [err, setErr] = useState('');
+  /* The exact failure behind `err` (code · status · backend message). */
+  const [errDetail, setErrDetail] = useState('');
   const [loaded, setLoaded] = useState(false);
   const { toast } = useToast();
 
@@ -156,8 +158,10 @@ export function ActivityView() {
       setAllItems(items);
       renderSummary(res.summary || {}, items);
       setErr('');
+      setErrDetail('');
     } catch (e) {
       setErr(friendlyApiMessage(e, t('errors.loadActivity')));
+      setErrDetail(errorDetailLine(e));
     } finally {
       setLoaded(true);
     }
@@ -333,7 +337,7 @@ export function ActivityView() {
             <FeedItemSkeleton />
           </div>
         ) : err ? (
-          <ErrorState message={err} retry={load} />
+          <ErrorState message={err} detail={errDetail} retry={load} />
         ) : !filtered.length ? (
           <EmptyState
             iconName={starFilter ? 'star' : 'pulse'}

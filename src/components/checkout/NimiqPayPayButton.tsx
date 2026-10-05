@@ -25,6 +25,14 @@ import {
   isTerminalOutcome,
   type PayLightningOutcome,
 } from '../../lib/nimiqPay';
+import { useWalletBalance } from '../wallet/WalletBalance';
+
+/** NIM with enough precision to be recognisable (see WalletBalance.nimText). */
+function nim(n: number): string {
+  const abs = Math.abs(n);
+  const decimals = abs >= 1000 ? 2 : abs >= 10 ? 2 : abs >= 1 ? 3 : 5;
+  return abs.toLocaleString('en-US', { maximumFractionDigits: decimals });
+}
 
 export type NimiqPayPayLabels = {
   idle: string;
@@ -39,6 +47,12 @@ export type NimiqPayPayLabels = {
   unavailable: string;
   error: string;
   waiting: string;
+  /** The wallet refused the spend and named the balance as the reason. */
+  insufficient: string;
+  /** "You need about X NIM — your wallet has Y NIM." */
+  needHave: string;
+  /** "Nimiq Pay said: …" — the wallet's own words, never paraphrased. */
+  said: string;
 };
 
 // English fallback — used when a locale has not (yet) defined the key.
@@ -53,8 +67,11 @@ const DEFAULT_LABELS: NimiqPayPayLabels = {
   noProvider: 'Could not reach Nimiq Pay. Close and reopen the app, then try again — nothing was charged.',
   invalid: 'This payment request is invalid or expired. Refresh the order and try again.',
   unavailable: 'Open this shop inside Nimiq Pay to pay with NIM or USDT.',
-  error: 'Something went wrong starting the payment. Please try again.',
+  error: 'The payment could not be started.',
   waiting: 'Keep this page open — your order updates automatically once the merchant is paid.',
+  insufficient: 'The wallet refused this payment: not enough NIM for the amount plus the network fee.',
+  needHave: 'You need about {{need}} NIM — your wallet has {{have}} NIM.',
+  said: 'Nimiq Pay said: {{message}}',
 };
 
 type Tone = 'success' | 'warn' | 'error' | 'info';
@@ -65,6 +82,7 @@ function toneFor(o: PayLightningOutcome): Tone {
     case 'unknown': return 'warn';
     case 'network':
     case 'noProvider': return 'warn';
+    case 'insufficient': return 'error';
     case 'declined':
     case 'unavailable': return 'info';
     default: return 'error';
@@ -81,15 +99,22 @@ export function NimiqPayPayButton({
   invoice,
   onSubmitted,
   labels,
+  amountNim = 0,
   className = 'btn btn-gold btn-block',
 }: {
   invoice: string;
   /** Called once the spend was submitted (submitted / duplicate / unknown). */
   onSubmitted?: (outcome: PayLightningOutcome) => void;
   labels?: Partial<NimiqPayPayLabels>;
+  /** The NIM this payment costs (amount + the host's fee is added on top). */
+  amountNim?: number;
   className?: string;
 }) {
   const { t } = useT();
+  // The balance is already on screen; a refusal can therefore say HOW short the
+  // wallet is instead of only that something failed. Shared reading: no extra
+  // network call.
+  const { state: wallet, refresh: refreshWallet } = useWalletBalance();
   // Label priority: explicit prop → i18n key → built-in English fallback.
   const label = (k: keyof NimiqPayPayLabels): string => {
     if (labels && labels[k] != null) return labels[k] as string;
@@ -111,13 +136,35 @@ export function NimiqPayPayButton({
     setBusy(false);
     if (res.status === 'submitted' || res.status === 'duplicate' || res.status === 'unknown') {
       onSubmitted?.(res);
+    } else {
+      // A refusal: hand the exact failure to whatever prompt comes next
+      // (type · code · the wallet's own message), so the red screen that
+      // follows names the real reason instead of "something went wrong".
+      const w = window as any;
+      const facts = 'wallet' in res && res.wallet ? res.wallet : undefined;
+      w.__lastPayReason = res.status;
+      w.__lastPayDetail = [facts?.label, facts?.message].filter(Boolean).join(' · ') || res.message || '';
     }
-  }, [busy, locked, invoice, onSubmitted]);
+    // Any outcome may have moved money (or been refused for want of it), so the
+    // balance shown above the button is re-read instead of waiting out its TTL.
+    refreshWallet();
+  }, [busy, locked, invoice, onSubmitted, refreshWallet]);
 
-  const message = outcome ? label(outcome.status) : '';
+  const message = outcome ? label(outcome.status as keyof NimiqPayPayLabels) : '';
   const tone = outcome ? toneFor(outcome) : 'info';
   const hash = outcome && 'hash' in outcome ? outcome.hash : undefined;
   const swapId = outcome && 'swapId' in outcome ? outcome.swapId : undefined;
+
+  // The wallet's own account of the failure, shown verbatim. Owner
+  // (2026-10-05): "o kırmızı yerde tam hataları söyleyebilirdi" — our sentence
+  // explains, the wallet's sentence is the evidence, and support can trace it.
+  const walletErr = outcome && 'wallet' in outcome ? outcome.wallet : undefined;
+  const shortfall = (() => {
+    if (outcome?.status !== 'insufficient' || !(amountNim > 0)) return 0;
+    if (wallet.status !== 'ready') return 0;
+    return Math.max(0, amountNim - wallet.availableNim);
+  })();
+  const needHave = outcome?.status === 'insufficient' && amountNim > 0 && wallet.status === 'ready';
 
   return (
     <div className="nimiq-pay-trigger mt-2">
@@ -136,6 +183,19 @@ export function NimiqPayPayButton({
       {message ? (
         <p className="xs mt-1" role="status" aria-live="polite" style={{ color: TONE_COLOR[tone], margin: '6px 2px 0' }}>
           {message}
+        </p>
+      ) : null}
+
+      {needHave ? (
+        <p className="xs" style={{ color: TONE_COLOR.error, margin: '4px 2px 0', fontWeight: 700 }}>
+          {t('orderPage.nimiqPay.needHave', { need: nim(amountNim), have: nim(wallet.availableNim) })}
+          {shortfall > 0 ? ' ' + t('wallet.short', { nim: nim(shortfall) }) : ''}
+        </p>
+      ) : null}
+
+      {walletErr?.message ? (
+        <p className="xs faint" style={{ margin: '4px 2px 0', wordBreak: 'break-word' }}>
+          {t('orderPage.nimiqPay.said', { message: walletErr.message })}
         </p>
       ) : null}
 

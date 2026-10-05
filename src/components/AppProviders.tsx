@@ -9,6 +9,7 @@
  */
 import { Component, createContext, useCallback, useContext, useEffect, useRef, useState, type ErrorInfo, type ReactNode } from 'react';
 import { Icon } from './ui/Icon';
+import { ErrorDetail } from './ui/uiKit';
 import { siteName } from '../lib/config';
 import { useT, type Translator } from '../i18n';
 
@@ -78,16 +79,20 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { err: Error | nu
   }
   render() {
     if (!this.state.err) return this.props.children;
-    return <ErrorFallback />;
+    // The fallback keeps its calm copy, and carries the actual error underneath
+    // (owner, 2026-10-05: "böyle şeyleri" — a screen that only says "something
+    // went wrong" gives the buyer and support nothing to work with).
+    return <ErrorFallback detail={String(this.state.err?.message || '')} />;
   }
 }
 
-function ErrorFallback() {
+function ErrorFallback({ detail = '' }: { detail?: string }) {
   const { t } = useT();
   return (
     <div className="container" style={{ padding: '40px 16px', textAlign: 'center' }}>
       <div className="strong" style={{ fontSize: '1.2rem' }}>{t('errors.wentWrong')}</div>
       <p className="small muted mt-1" style={{ maxWidth: 420, margin: '8px auto 0' }}>{t('errors.crashedBody')}</p>
+      {detail ? <ErrorDetail detail={detail} /> : null}
       <button className="btn btn-gold mt-2" type="button" onClick={() => window.location.reload()}>
         {t('errors.reload')}
       </button>
