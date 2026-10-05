@@ -200,10 +200,13 @@ type Quote struct {
 	// bgcolor-cell mosaic — Gmail blocks data: images, so the avatar cannot
 	// ride as an <img>. Never stored for an anonymous gift.
 	GifterIdenticonDataURI string `json:"gifter_identicon,omitempty"`
-	// GiftNotifiedAt is the durable "gift notification dispatched" marker:
-	// once set, the same quote never re-sends the email. Combined with
-	// the supplier-side fulfilled transition this gives us at-most-once
-	// delivery without a separate queue worker.
+	// GiftNotifiedAt is the durable "fulfilled-order email dispatched"
+	// marker: once set, the same quote never re-sends the email. It covers
+	// BOTH shapes of mail the one hook sends — a gift note to the recipient
+	// and the order confirmation a plain purchase gets at its delivery
+	// address (owner, 2026-10-05). Combined with the supplier-side
+	// fulfilled transition this gives us at-most-once delivery without a
+	// separate queue worker.
 	GiftNotifiedAt time.Time `json:"gift_notified_at,omitempty"`
 	// CashbackCode is a buyer-entered promo/redeem code whose cashback rate is
 	// locked onto this quote at creation time. When present it is EXCLUSIVE:

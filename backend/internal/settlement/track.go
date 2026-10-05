@@ -702,24 +702,38 @@ func notifyFn() func(q db.Quote) {
 	return fn
 }
 
-// GiftNotifyFn is the seam for the gift channel notifier; main wires it.
-// It runs after a quote reaches the fulfilled state and the quote carries
-// the buyer-supplied GiftChannel/GiftMessage. When this
-// hook returns, the notifier has already persisted GiftNotifiedAt so a
-// subsequent retry will be a no-op.
-var giftNotifyFnVal atomic.Value // func(db.Quote)
+// MailNotifyFn is the seam for the fulfilled-order EMAIL hook; main wires it.
+// Both shapes of mail ride it:
+//
+//   - a gift note for the recipient, when the quote carries the buyer-supplied
+//     GiftChannel/GiftMessage, and
+//   - the order confirmation every OTHER purchase gets at its delivery address
+//     (owner, 2026-10-05: "satın alımlarda hediye olsun olmasın e-posta gider").
+//
+// So the gate is the RECIPIENT ADDRESS, never the gift channel: a plain
+// purchase used to be skipped here, which is exactly why its buyer never heard
+// from the shop. The mailtrap builder picks the wording (gift note vs. self
+// confirmation) from the quote itself, so one hook serves both.
+//
+// When this hook returns, the notifier has already persisted GiftNotifiedAt
+// (the durable "fulfilled-order email dispatched" marker), so a subsequent
+// retry over the same quote is a no-op.
+var mailNotifyFnVal atomic.Value // func(db.Quote)
 
-// SetGiftNotifyFn wires the gift-channel hook. Safe to call at any time.
-func SetGiftNotifyFn(fn func(q db.Quote)) { giftNotifyFnVal.Store(fn) }
+// SetMailNotifyFn wires the fulfilled-order email hook. Safe to call at any
+// time; a nil fn simply detaches it again (tests).
+func SetMailNotifyFn(fn func(q db.Quote)) { mailNotifyFnVal.Store(fn) }
 
-func giftNotifyFn() func(q db.Quote) {
-	fn, _ := giftNotifyFnVal.Load().(func(q db.Quote))
+func mailNotifyFn() func(q db.Quote) {
+	fn, _ := mailNotifyFnVal.Load().(func(q db.Quote))
 	return fn
 }
 
-// GiftHasChannel is a tiny helper so the tracker can decide whether to fire
-// the gift notifier without importing the db package's full field set here.
-func GiftHasChannel(q db.Quote) bool { return q.GiftChannel != "" }
+// HasMailRecipient reports whether a fulfilled quote has an inbox to mail —
+// the buyer's own address on a plain purchase, the recipient's on an emailed
+// gift. Phone-only top-ups carry no address at all (the credit lands on the
+// number), so they stay silent instead of mailing nobody.
+func HasMailRecipient(q db.Quote) bool { return strings.TrimSpace(q.CustomerEmail) != "" }
 
 // Notify is the seam for the notification package; main wires it.
 func (w *OrderTracker) notifyFulfilled(q db.Quote) {
@@ -731,9 +745,11 @@ func (w *OrderTracker) notifyFulfilled(q db.Quote) {
 		qq := q
 		safe.Go("settlement:notify", func() { fn(qq) })
 	}
-	if fn := giftNotifyFn(); fn != nil && GiftHasChannel(q) {
+	// Fulfilled-order email: EVERY purchase with a delivery address, gift or
+	// not (owner, 2026-10-05). The hook owns its own send-once marker.
+	if fn := mailNotifyFn(); fn != nil && HasMailRecipient(q) {
 		qq := q
-		safe.Go("settlement:gift-notify", func() { fn(qq) })
+		safe.Go("settlement:mail-notify", func() { fn(qq) })
 	}
 }
 

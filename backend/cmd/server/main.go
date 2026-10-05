@@ -379,24 +379,28 @@ func main() {
 		}
 	})
 
-	// Gift notification: the recipient-facing email, sent through Mailtrap
-	// (the only mail transport — no SMTP client, no SMS sender exists in
-	// this build). Fires once per fulfilled gift order; the GiftNotifiedAt
-	// marker makes it at-most-once across crashes and tracker re-runs.
-	settlement.SetGiftNotifyFn(func(q db.Quote) {
+	// Fulfilled-order email, sent through Mailtrap (the only mail transport —
+	// no SMTP client, no SMS sender exists in this build). EVERY fulfilled
+	// purchase with a delivery address is mailed, gift or not (owner,
+	// 2026-10-05: "satın alımlarda hediye olsun olmasın e-posta gider"): a
+	// gift note to the recipient when the buyer wrote one, the order
+	// confirmation to the buyer otherwise — the builder picks the wording
+	// (mailtrap.GiftNote.Self). One marker (GiftNotifiedAt) makes it
+	// at-most-once across crashes and tracker re-runs.
+	settlement.SetMailNotifyFn(func(q db.Quote) {
 		// Idempotency: skip when the marker is already set. This is the
 		// gate that turns the fulfilled transition into at-most-once
 		// delivery.
 		if !q.GiftNotifiedAt.IsZero() {
 			return
 		}
-		// Owner (2026-10-05): plain purchases mail the buyer too — the note
-		// builder flips itself into order-confirmation wording (Self).
+		// Defense in depth: the tracker already refuses a quote with no
+		// address, and the builder refuses one too.
 		if strings.TrimSpace(q.CustomerEmail) == "" {
 			return // nobody to mail
 		}
 		if h.Mail == nil || !h.Mail.Enabled() {
-			log.Printf("mailtrap: gift note for quote %s skipped (transport not configured)", q.ID)
+			log.Printf("mailtrap: order email for quote %s skipped (transport not configured)", q.ID)
 			return
 		}
 		// The same builder the admin retry uses: both senders render the
@@ -409,14 +413,14 @@ func main() {
 		if err != nil {
 			// Not marked: a failure leaves the door open for a manual
 			// retry from the admin console.
-			log.Printf("mailtrap: gift note for quote %s failed: %v", q.ID, err)
+			log.Printf("mailtrap: order email for quote %s failed: %v", q.ID, err)
 			return
 		}
 		if err := store.MarkGiftNotified(q.ID); err != nil {
-			log.Printf("mailtrap: gift note for quote %s sent (ids=%s) but failed to mark: %v", q.ID, strings.Join(ids, ","), err)
+			log.Printf("mailtrap: order email for quote %s sent (ids=%s) but failed to mark: %v", q.ID, strings.Join(ids, ","), err)
 			return
 		}
-		log.Printf("mailtrap: gift note for quote %s sent (ids=%s anonymous=%v)", q.ID, strings.Join(ids, ","), q.Anonymous)
+		log.Printf("mailtrap: order email for quote %s sent (ids=%s gift=%v anonymous=%v)", q.ID, strings.Join(ids, ","), q.GiftChannel != "", q.Anonymous)
 	})
 
 	// Serve the storefront from disk snapshots BEFORE the first request
