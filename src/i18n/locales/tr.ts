@@ -1096,6 +1096,7 @@ const tr = {
     rowCountry: 'Ülke',
     rowQuantity: 'Adet',
     rowCreated: 'Oluşturuldu',
+    rowTx: 'Tx',
     rowUpdated: 'Güncellendi',
     txTitle: 'İşlemler (herkese açık)',
     openMyOrder: 'Siparişimi aç (teslimatı gör)',

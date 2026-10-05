@@ -177,6 +177,11 @@ export function TrackView() {
     ]);
   if (trk.quantity && trk.quantity > 1) rows.push([t('trackPage.rowQuantity'), '×' + trk.quantity]);
   if (trk.created_at) rows.push([t('trackPage.rowCreated'), fmtDate(trk.created_at)]);
+  if (trk.tx)
+    rows.push([
+      t('trackPage.rowTx'),
+      <span key="tx" className="mono small" style={{ wordBreak: 'break-all' }}>{String(trk.tx)}</span>,
+    ]);
   if (trk.updated_at) rows.push([t('trackPage.rowUpdated'), fmtDate(trk.updated_at)]);
 
   // Anonymous activity remains visible, but the buyer's payment transaction

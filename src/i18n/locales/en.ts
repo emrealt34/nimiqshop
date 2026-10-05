@@ -1104,6 +1104,7 @@ const en = {
     rowCountry: 'Country',
     rowQuantity: 'Quantity',
     rowCreated: 'Created',
+    rowTx: 'Tx',
     rowUpdated: 'Updated',
     txTitle: 'Transactions (public)',
     openMyOrder: 'Open my order (view delivery)',

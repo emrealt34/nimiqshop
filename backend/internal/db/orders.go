@@ -3,7 +3,6 @@ package db
 import (
 	"encoding/json"
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/dgraph-io/badger/v4"
@@ -15,52 +14,6 @@ import (
 // including `idempotency_key TEXT NOT NULL UNIQUE` — enforced here by
 // writing the guard key in the same transaction, so a duplicate HTTP retry
 // still gets ErrConflict rather than a second order.
-// PurgeOrdersAllExceptUnipin wipes the legacy o: order records the same way
-// the quote wipe did (owner, 2026-10-05): keep only rows whose product names
-// UniPin, delete the rest with their idempotency index entries. The public
-// feed and tracking run on quotes; these rows only surface in the admin
-// transactions view, which is exactly where stale fakes must not linger.
-func (s *Store) PurgeOrdersAllExceptUnipin() (int, error) {
-	type victim struct {
-		key  []byte
-		idem string
-	}
-	var victims []victim
-	err := s.View(func(txn *badger.Txn) error {
-		return scanJSONPrefix(txn, []byte(prefixOrder), func(item *badger.Item) error {
-			var o Order
-			if err := item.Value(func(value []byte) error { return unmarshal(value, &o) }); err != nil {
-				return err
-			}
-			if strings.Contains(strings.ToLower(o.ProductID), "unipin") {
-				return nil
-			}
-			victims = append(victims, victim{key: item.KeyCopy(nil), idem: o.IdempotencyKey})
-			return nil
-		})
-	})
-	if err != nil || len(victims) == 0 {
-		return 0, err
-	}
-	err = s.Update(func(txn *badger.Txn) error {
-		for _, v := range victims {
-			if err := txn.Delete(v.key); err != nil {
-				return err
-			}
-			if v.idem != "" {
-				if err := txn.Delete(orderIdempotencyIndexKey(v.idem)); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return 0, err
-	}
-	return len(victims), nil
-}
-
 func (s *Store) CreateOrder(o Order) error {
 	if o.CreatedAt.IsZero() {
 		o.CreatedAt = time.Now().UTC()

@@ -798,62 +798,6 @@ func (s *Store) ListCashbacksByStatus(status string, limit int) ([]Cashback, err
 	return out, err
 }
 
-// PurgeOrphanCashbacks deletes cashback rows whose quote no longer exists —
-// the ledger orphans the owner's one-shot order wipe left behind (2026-10-05).
-// They inflated the public totals and the leaderboard with fake "pending"
-// NIM. A row with no QuoteID or a lookup error other than not-found is kept.
-func (s *Store) PurgeOrphanCashbacks() (int, error) {
-	type victim struct {
-		key    []byte
-		userID string
-		id     string
-	}
-	var victims []victim
-	err := s.View(func(txn *badger.Txn) error {
-		return scanJSONPrefix(txn, []byte("cb:"), func(item *badger.Item) error {
-			var cb Cashback
-			if err := item.Value(func(value []byte) error { return unmarshal(value, &cb) }); err != nil {
-				return err
-			}
-			if cb.QuoteID != "" {
-				var q Quote
-				e := getJSON(txn, quoteKey(cb.QuoteID), &q)
-				if e == nil {
-					return nil // quote alive — row stays
-				}
-				if !errors.Is(e, ErrNotFound) {
-					return nil // lookup broken — never delete on uncertainty
-				}
-			}
-			// Orphaned by the wipe, OR an adjustment/boost row with no quote
-			// link at all — both are test-era ledger dust (owner: only the
-			// real UniPin survives).
-			victims = append(victims, victim{key: item.KeyCopy(nil), userID: cb.UserID, id: cb.ID})
-			return nil
-		})
-	})
-	if err != nil || len(victims) == 0 {
-		return 0, err
-	}
-	err = s.Update(func(txn *badger.Txn) error {
-		for _, v := range victims {
-			if err := txn.Delete(v.key); err != nil {
-				return err
-			}
-			if v.userID != "" {
-				if err := txn.Delete(cashbackUserIndexKey(v.userID, v.id)); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return 0, err
-	}
-	return len(victims), nil
-}
-
 func (s *Store) ListRecentCashbacks(limit int) ([]Cashback, error) {
 	if limit <= 0 {
 		limit = 50

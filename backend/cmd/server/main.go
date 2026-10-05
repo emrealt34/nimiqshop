@@ -235,49 +235,6 @@ func main() {
 
 	h := handlers.New(store, cfg, cr)
 
-	// Owner (2026-10-05): the order-DB wipe is NOT a button — it runs by
-	// itself, exactly once per install, on the first boot after this change.
-	// Keep-rule: the real (non-simulated) UniPin purchase; every other quote
-	// leaves the store. The meta marker makes it one-shot across restarts,
-	// so orders created AFTER this wipe are never touched.
-	if raw, _ := store.LoadMeta("purge_all_except_unipin_v1"); raw == nil {
-		if n, orders, err := store.PurgeQuotesAllExceptUnipin(); err != nil {
-			log.Printf("startup purge: %v", err)
-		} else {
-			log.Printf("startup purge: deleted %d quotes (%d supplier rows), UniPin kept", n, orders)
-		}
-		if err := store.SaveMeta("purge_all_except_unipin_v1", []byte(time.Now().UTC().Format(time.RFC3339)), 0); err != nil {
-			log.Printf("startup purge: marker not saved: %v", err)
-		}
-	}
-
-	// Owner (2026-10-05), pass 2: the wipe deleted the fake ORDERS but their
-	// cashback ledger rows stayed behind — orphans that kept inflating the
-	// public totals and the leaderboard with fake "pending" NIM. One-shot,
-	// its own marker, same boot-time discipline.
-	if raw, _ := store.LoadMeta("purge_orphan_cashbacks_v3"); raw == nil {
-		if n, err := store.PurgeOrphanCashbacks(); err != nil {
-			log.Printf("startup purge v3: %v", err)
-		} else {
-			log.Printf("startup purge v3: deleted %d ledger rows without a live quote", n)
-		}
-		if err := store.SaveMeta("purge_orphan_cashbacks_v3", []byte(time.Now().UTC().Format(time.RFC3339)), 0); err != nil {
-			log.Printf("startup purge v3: marker not saved: %v", err)
-		}
-	}
-
-	// Owner (2026-10-05), pass 3: the legacy o: order records (admin
-	// transactions view) never went through the wipe. Same rule, same
-	// one-shot discipline: everything except UniPin leaves.
-	if raw, _ := store.LoadMeta("purge_legacy_orders_v4"); raw == nil {
-		if n, err := store.PurgeOrdersAllExceptUnipin(); err != nil {
-			log.Printf("startup purge v4: %v", err)
-		} else {
-			log.Printf("startup purge v4: deleted %d legacy order rows", n)
-		}
-		if err := store.SaveMeta("purge_legacy_orders_v4", []byte(time.Now().UTC().Format(time.RFC3339)), 0); err != nil {
-			log.Printf("startup purge v4: marker not saved: %v", err)
-		}
 	}
 	h.Presence = presence.New()
 	// A shared (CDN) cache is keyed on the URL alone, so it may only store a

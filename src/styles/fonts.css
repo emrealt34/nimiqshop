@@ -37,14 +37,17 @@
 /* Nunito — body copy, UI, prices. Variable wght 200..1000, latin + Turkish.
  * font-display:optional — see the note above the fallbacks: text either uses
  * the real face from the first paint (cached, or fast enough to win the ~100 ms
- * window the woff2 preload opens) or the metric-matched fallback for the whole
- * pageview. There is no third state, i.e. no visible typeface change after
- * load, which `swap` produced on every cold visit. */
+ * window the woff2 preload opens). Owner verdict 2026-10-05: `optional` could
+ * lock an ENTIRE pageview into the fallback face whenever the ~100 ms window
+ * was missed (cold edge, evicted mobile cache) — that is exactly the
+ * "fonts suddenly went cheap" bug he kept seeing mid-session. With `swap` the
+ * real face always wins the moment it lands; the metric-matched fallback
+ * below keeps the brief cold-load window layout-neutral. */
 @font-face {
   font-family: "NunitoLocal";
   font-style: normal;
   font-weight: 100 1000;
-  font-display: optional;
+  font-display: swap;
   src: url("../assets/fonts/nunito-var.woff2") format("woff2");
   unicode-range: U+0000-00FF, U+0100-017F, U+0131, U+0152-0153, U+02BB-02BC,
     U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2082,
@@ -58,26 +61,23 @@
   font-family: "FrauncesLocal";
   font-style: normal;
   font-weight: 700 900;
-  font-display: optional;
+  font-display: swap;
   src: url("../assets/fonts/fraunces-900.woff2") format("woff2");
   unicode-range: U+0000-00FF, U+0100-017F, U+0131, U+0152-0153, U+2000-206F,
     U+20A0-20BF, U+2122, U+2190-2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 /* ---------------------------------------------------------------------------
- * Metric-matched fallbacks — and why `optional` is safe.
+ * Metric-matched fallbacks — why the brief swap window is invisible.
  *
- * The webfonts above use font-display:optional: the browser gives a preloaded
- * face ~100 ms from first layout to arrive; if it does (warm cache, fast
- * network) the page paints in the real font from frame one, and if it does
- * not, the fallback below is used for that pageview and the downloaded file
- * simply seeds the cache for the next one. Either way the typeface NEVER
- * changes after paint — the `swap` repaint users saw ("fonts change after
- * loading") cannot happen by construction.
+ * The webfonts above use font-display:swap: the fallback below paints first
+ * on a cold load and the real face replaces it the instant the (preloaded,
+ * edge-cached) woff2 lands — warm visits paint in the real face from frame
+ * one, so the swap is normally invisible.
  *
  * That is only acceptable because the fallbacks are metric-matched to the
  * webfonts: same line boxes AND same line breaks (measured, see the width
- * ratios below), so a fallback pageview is visually near-identical and
+ * ratios below), so the fallback window is visually near-identical and
  * layout-identical. History: with `swap` the post-paint repaint measured
  * 0.055 CLS on a throttled mobile load before the matching existed; after
  * matching it was layout-neutral but still a visible glyph change.

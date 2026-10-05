@@ -1095,6 +1095,7 @@ const de = {
     rowCountry: 'Land',
     rowQuantity: 'Menge',
     rowCreated: 'Erstellt',
+    rowTx: 'Tx',
     rowUpdated: 'Aktualisiert',
     txTitle: 'Transaktionen (öffentlich)',
     openMyOrder: 'Meine Bestellung öffnen (Lieferung ansehen)',

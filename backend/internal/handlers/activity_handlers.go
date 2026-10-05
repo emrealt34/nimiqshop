@@ -702,7 +702,6 @@ func (h *Handlers) TrackStatus(ctx *fasthttp.RequestCtx) {
 		// Supplier order IDs are not public tracking identifiers. They can
 		// expose redemption data via a partner API and are owner/admin-only.
 
-		// No underlying payment-network details in the customer timeline.
 
 		resp := map[string]interface{}{
 			"id":           q.ID,
@@ -724,7 +723,12 @@ func (h *Handlers) TrackStatus(ctx *fasthttp.RequestCtx) {
 			"coin":             q.Coin,
 			"lines":            publicLines(q),
 		}
-		writeJSON(ctx, fasthttp.StatusOK, resp)
+			// Owner (2026-10-05): the purchase tx IS public summary content — the
+	// old "no payment-network details here" policy is superseded by him.
+	if !q.Anonymous && q.LightningPaymentHash != "" {
+		resp["tx"] = q.LightningPaymentHash
+	}
+writeJSON(ctx, fasthttp.StatusOK, resp)
 		return
 	}
 
