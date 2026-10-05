@@ -1356,7 +1356,8 @@ const emailBodyMaxLen = 2000
 // or a wrong recipient email the buyer just corrected.
 //
 // Request: POST /api/admin/quotes/{id}/send-order-email?force=1
-//	 (legacy path /send-gift-notification is still served)
+// The legacy /api/admin/quotes/{id}/send-gift-notification path is still served
+// as an alias.
 //
 //	force=1  -> bypass the GiftNotifiedAt idempotency marker (re-send even
 //	             after a successful delivery; providers may bill twice).
