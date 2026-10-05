@@ -2647,17 +2647,29 @@ body {
 
 
 /* === PICKER SIMPLE — hide heavy promo header and stake, keep only compare cards === */
-/* === CART THUMB — one responsive track, and the tile can never reach the controls ===
+/* === CART THUMB — the tile and the −/+ cluster can never reach each other ===
    Sep 16: "left middle centering" — the tile shares the row with the name/price
    and the control cluster sits centred underneath.
    Oct 5 (owner): "küçük ekranda görsel − butonunun üstüne taşıyor" — the column
    was a FIXED 104px and the tile spanned BOTH rows, so on a 320-400px phone the
-   centred −/+ cluster drifted left and landed ON the artwork. The track is now a
-   clamp the wrapper shares (--cart-thumb), and below 561px the tile gets its OWN
-   row while the cluster is left-aligned: the two boxes cannot intersect at any
-   viewport width, and the text column keeps its full width.
-   The clamp floor is 84px (≈26vw on a 320px screen) and its ceiling stays the
-   published 104px tile, so nothing shrinks where the old layout still fit. */
+   centred −/+ cluster drifted left and landed ON the artwork.
+   Oct 5, second report (same screen, the cart sheet): the phone layout hung on
+   ONE breakpoint, so anything that lost that breakpoint — a media query the
+   engine drops, or the deferred stylesheet not flipped yet — quietly restored
+   the broken geometry. The SAFE layout is now the BASE layout and it needs no
+   breakpoint at all:
+     · the track is the shared clamp --cart-thumb (floor 84px ≈ 26vw at 320px,
+       ceiling the published 104px so nothing shrinks where the old tile fit),
+     · the tile and the text block share row 1 (the wrapper is exactly as wide
+       as its column, so the artwork cannot slide under the text either),
+     · the control cluster takes row 2, flush left — a DIFFERENT grid row from
+       the tile at every width, so the two boxes cannot intersect by geometry.
+   The desktop look (tile spanning both rows, cluster centred across the row) is
+   re-applied below in a min-width query, so a dropped media query can only cost
+   the centring — never bring the two boxes back together.
+   These selectors are ALSO in integrations/critical-css.mjs
+   ALWAYS_INLINE_SELECTORS: the cart sheet is interactive chrome like every other
+   sheet, and the first frame must already have the final geometry. */
 .cart-row{
   --cart-thumb: clamp(84px, 26vw, 104px);
   display:grid !important;
@@ -2665,24 +2677,23 @@ body {
   gap:10px 12px !important; align-items:center !important; padding:10px !important;
 }
 .cart-row > div:first-child{
-  grid-column:1 !important; grid-row:1 / span 2 !important;
-  align-self:center !important; justify-self:start !important;
+  grid-column:1 !important; grid-row:1 !important;
+  align-self:start !important; justify-self:start !important;
   /* The SAME number as the track: a wrapper wider than its column was the other
      half of the overflow (the tile slid under the text / the actions row). */
   width: var(--cart-thumb) !important;
 }
-.cart-row .cart-main{ grid-column:2 !important; grid-row:1 !important; align-self:center !important; }
-.cart-row .cart-controls{ grid-column:1 / span 2 !important; justify-self:center !important; display:flex !important; gap:8px !important; align-items:center !important; margin-top:4px !important; }
+.cart-row .cart-main{ grid-column:2 !important; grid-row:1 !important; align-self:start !important; }
+.cart-row .cart-controls{ grid-column:1 / span 2 !important; grid-row:2 !important; justify-self:start !important; display:flex !important; gap:8px !important; align-items:center !important; margin-top:4px !important; }
 .cart-row .thumb.thumb-gc{ width:100% !important; height:auto !important; aspect-ratio:1/1 !important; display:block !important; position:relative !important; overflow:hidden !important; border-radius:8px !important; }
 .cart-row .thumb.thumb-gc .product-img{ position:absolute !important; inset:0 !important; margin:auto !important; max-width:86% !important; max-height:86% !important; object-fit:contain !important; object-position:center !important; }
 
-/* Phones: the tile keeps its own row, the cluster starts at the tile's right
-   edge + gap instead of being centred across the row. Both halves are needed —
-   own row alone still lets a centred cluster walk left under the artwork. */
-@media (max-width: 560px){
-  .cart-row > div:first-child{ grid-row:1 !important; align-self:start !important; }
-  .cart-row .cart-main{ align-self:start !important; }
-  .cart-row .cart-controls{ justify-self:start !important; }
+/* Wide screens: the published look only — tile across both rows, its centre on
+   the text block's centre, the cluster back under the middle of the row. */
+@media (min-width: 561px){
+  .cart-row > div:first-child{ grid-row:1 / span 2 !important; align-self:center !important; }
+  .cart-row .cart-main{ align-self:center !important; }
+  .cart-row .cart-controls{ justify-self:center !important; }
 }
 
 /* === TOOLBAR FIX — geoNote hidden + Sort arrow centered (Sep 16) === */

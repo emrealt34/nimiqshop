@@ -239,6 +239,14 @@ const ALWAYS_INLINE_SELECTORS = [
   // every card visibly shrank ~350 ms in. Grid rules are two lines; keep
   // them all in the first frame.
   '.grid',
+  // The cart sheet's row geometry — the responsive thumb track, the text
+  // column and the −/+ cluster. The owner reported this screen twice
+  // ("küçük ekranda görsel − butonunun üstüne taşıyor", "sepet panelinde
+  // hâlâ taşıyor"): the fix must not depend on the deferred sheet having
+  // flipped, nor on which viewport the capture tour happened to open the
+  // sheet at. Inline it on every page — a few hundred bytes against a layout
+  // the buyer sees the moment they open the cart.
+  '.cart-row', '.cart-main', '.cart-controls', '.cart-q', '.cart-price', '.cart-copy',
 ];
 function alwaysInline(rule) {
   if (rule.selector === ':root') return true;
