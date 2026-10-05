@@ -255,10 +255,13 @@ export function LiveAgo({ ts, className = '' }: { ts?: string | number | Date; c
     return () => window.clearInterval(timer);
   }, [ts]);
   if (!ts) return null;
-  const text = timeAgo(ts);
+  // number → Date: timeAgo/fmtDate take a string or a Date, and the timeline
+  // hands this component `Date.now()` for a step that has no timestamp yet.
+  const when = typeof ts === 'number' ? new Date(ts) : ts;
+  const text = timeAgo(when);
   if (!text) return null;
   return (
-    <span className={className} title={fmtDate(ts)}>
+    <span className={className} title={fmtDate(when)}>
       {text}
     </span>
   );
