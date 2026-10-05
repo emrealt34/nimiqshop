@@ -623,7 +623,7 @@ func Load() Config {
 	cfg := Config{
 		SiteHost:   host,
 		ListenAddr: env("LISTEN_ADDR", ":8084"), StaticDir: strings.TrimSpace(os.Getenv("STATIC_DIR")), BadgerDir: env("BADGER_DIR", "./data/badger"),
-		JWTSecret: env("JWT_SECRET", ""), JWTExpiryMins: envInt("JWT_EXPIRY_MINS", 60*24*7),
+		JWTSecret: env("JWT_SECRET", ""), JWTExpiryMins: envInt("JWT_EXPIRY_MINS", 60*24*30),
 		AllowedOrigins: allowedOriginsFromEnv(), FrontendURL: strings.TrimRight(strings.TrimSpace(os.Getenv("FRONTEND_URL")), "/"), MaxRequestBodyBytes: envInt("MAX_REQUEST_BODY_BYTES", 1<<20), MaxOrderQuantity: envInt("MAX_ORDER_QUANTITY", 10),
 		PriceFeedURL: env("PRICE_FEED_URL", "https://api.coingecko.com/api/v3/simple/price?ids=nimiq-2&vs_currencies=usd"),
 		// Default 2: at least TWO independent price feeds are used for the

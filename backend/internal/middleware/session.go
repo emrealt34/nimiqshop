@@ -22,7 +22,8 @@ import (
 // any script running on the page. A single XSS — a compromised dependency, a
 // reflected value in a template, a malicious browser extension with page
 // access — reads the token out and exfiltrates a session that is valid for
-// seven days (JWT_EXPIRY_MINS defaults to 10080). The token is a bearer
+// thirty days (JWT_EXPIRY_MINS defaults to 43200; owner, 2026-10-05:
+// "1 ay cookie tutsun"). The token is a bearer
 // credential, so possession is authentication: the attacker does not need the
 // user's password, wallet, or signature to spend the session, and because it
 // left no cookie behind the victim's browser keeps working normally while the
@@ -62,7 +63,7 @@ import (
 // deface the page or steal whatever the DOM contains. What it does is stop the
 // session credential itself from being *copied and taken away*, which is the
 // difference between an attack that ends when the victim closes the tab and
-// one that lasts seven days.
+// one that lasts thirty days.
 
 const (
 	// SessionCookieName carries the JWT. HttpOnly, so no script can read it.
