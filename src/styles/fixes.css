@@ -3337,16 +3337,6 @@ input[type="range"]:focus-visible { outline: 2px solid var(--stamp); outline-off
 .cb-tab.active { background: var(--gold); border-color: var(--gold); color: var(--on-gold); }
 
 /* ---- Leaderboard tab: one day/night switch for the whole tab (owner 2026-10-04) ---- */
-.lb-mode-seg { flex: 0 0 auto; }
-.lb-wrap.lb-night { color: #e9ecf4; }
-.lb-wrap.lb-night .pt-card, .lb-wrap.lb-night .card { background: #141721; border-color: #2b3140; }
-.lb-wrap.lb-night .pt-section-title, .lb-wrap.lb-night .pt-leader-code, .lb-wrap.lb-night .cb-row-name, .lb-wrap.lb-night .small.strong { color: #e9ecf4; }
-.lb-wrap.lb-night .muted, .lb-wrap.lb-night .faint, .lb-wrap.lb-night .pt-leader-orders, .lb-wrap.lb-night .pt-sub { color: #9aa3b5; }
-.lb-wrap.lb-night .pt-badge, .lb-wrap.lb-night .chip { background: #1e2434; color: #c6cddd; border-color: #333a4b; }
-.lb-wrap.lb-night .pt-leader > li, .lb-wrap.lb-night .cb-row { border-color: #2b3140; }
-.lb-wrap.lb-night .pt-leader-trees { color: #7fd6a4; }
-.lb-wrap.lb-night .pt-yourank { background: rgba(62, 107, 79, .18); border-color: rgba(62, 107, 79, .45); }
-.lb-wrap.lb-night .btn-outline { background: #1a1f2c; border-color: #333a4b; color: #dfe4ee; }
 .lb-wrap.lb-day { color: #26221c; }
 .lb-wrap.lb-day .pt-card, .lb-wrap.lb-day .card { background: #faf8f4; border-color: #d9d2c4; }
 .lb-wrap.lb-day .pt-section-title, .lb-wrap.lb-day .pt-leader-code, .lb-wrap.lb-day .cb-row-name, .lb-wrap.lb-day .small.strong { color: #26221c; }

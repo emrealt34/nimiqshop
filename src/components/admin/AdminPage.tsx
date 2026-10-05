@@ -408,7 +408,9 @@ function ResultBlock({ r }: { r: any }) {
 
 function cashbackPaidLabel(cb: any) {
   if (!cb) return 'not queued';
-  if (cb.paid || cb.status === 'paid') return 'paid';
+  // Owner (2026-10-05): "paid" means the tx REALLY left the wallet — a queued
+  // or confirming row must never wear the paid badge.
+  if (cb.status === 'paid' && cb.tx_hash && !String(cb.tx_hash).startsWith('TEST')) return 'paid';
   return cb.status || 'unknown';
 }
 
@@ -992,18 +994,18 @@ function OrdersPanel() {
     <div className="card mt-2">
       <div className="card-title">
         <Icon name="pulse" size={18} />
-        <span>Orders — cashback paid, amount, tx</span>
+        <span>Orders — amount, tx, cashback status</span>
         <button
           type="button"
           className="btn btn-ghost btn-sm"
           style={{ marginLeft: 8 }}
           disabled={purging}
           onClick={() => {
-            if (!window.confirm('Delete EVERY simulated test order from the store? Real orders are untouched.')) return;
+            if (!window.confirm('Delete EVERY order except the real UniPin purchase? Test orders, old quotes, their supplier orders — all gone. Only UniPin stays.')) return;
             setPurging(true);
-            adminPurgeTestOrders()
+            adminPurgeTestOrders({ scope: 'all-except-unipin' })
               .then((d: any) => {
-                toast(`Deleted ${Number(d?.deleted || 0)} simulated test orders`, 'success');
+                toast(`Deleted ${Number(d?.deleted || 0)} orders (+${Number(d?.deleted_orders || 0)} supplier rows) — UniPin kept`, 'success');
                 setRows(null);
                 adminListQuotes(50).then((r) => setRows(r.quotes || [])).catch(() => {});
               })
@@ -1011,7 +1013,7 @@ function OrdersPanel() {
               .finally(() => setPurging(false));
           }}
         >
-          Delete fake test orders
+          Delete all orders except UniPin
         </button>
         <span className="xs faint" style={{ marginLeft: 'auto' }}>
           {rows && rows.length > ORDERS_PAGE_SIZE

@@ -23,13 +23,8 @@ export function LeaderboardView() {
   const { t } = useT();
   const authed = useSession();
   const [ledger, setLedger] = useState<any>(null);
-  const [lbMode, setLbMode] = useState<'night' | 'day'>(() => {
-    try { return localStorage.getItem('nimshop:lb-theme') === 'day' ? 'day' : 'night'; } catch { return 'night'; }
-  });
-  useEffect(() => {
-    try { localStorage.setItem('nimshop:lb-theme', lbMode); } catch {}
-  }, [lbMode]);
-  useEffect(() => {
+
+    useEffect(() => {
     if (!authed) { setLedger(null); return; }
     let alive = true;
     getMyCashback()
@@ -43,7 +38,7 @@ export function LeaderboardView() {
       <h1 className="cb-title" style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '4px 0 2px' }}>
         <Icon name="trophy" size={28} /> {t('cashbackCard.leaderboard')}
       </h1>
-      <div className={`lb-wrap lb-${lbMode}`}>
+      <div className="lb-wrap">
         {/* Visible logged in or not — the owner's standing rule for the
             cashback rows carries over to their new home. */}
         {authed ? (
@@ -61,7 +56,7 @@ export function LeaderboardView() {
             </div>
           </div>
         )}
-        <CashbackImpactSection authed={authed === true} myTotals={ledger?.totals || null} lbMode={lbMode} onLbMode={setLbMode} />
+        <CashbackImpactSection authed={authed === true} myTotals={ledger?.totals || null} />
       </div>
     </div>
   );

@@ -847,7 +847,7 @@ export const adminSend = (req: Record<string, unknown>) => api('/admin/notificat
 export const adminTestEmail = (req: Record<string, unknown>) => api('/admin/test-email', { method: 'POST', body: req });
 // Owner (2026-10-05): the simulated-pay sandbox is gone — this hard-deletes
 // the quotes it left behind (admin only).
-export const adminPurgeTestOrders = () => api('/admin/purge-test-orders', { method: 'POST' });
+export const adminPurgeTestOrders = (body?: Record<string, unknown>) => api('/admin/purge-test-orders', { method: 'POST', body: body || {} });
 export const adminCatalogRules = (opts: { path?: string; method?: string; body?: unknown } = {}) =>
   api('/admin/catalog-rules' + (opts.path || ''), opts.method ? { method: opts.method, body: opts.body } : {});
 export const adminGetCashback = () => api('/admin/settings/cashback');

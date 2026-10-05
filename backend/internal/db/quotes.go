@@ -935,6 +935,82 @@ func (s *Store) PurgeTestQuotes() (int, error) {
 	return len(victims), nil
 }
 
+// PurgeQuotesAllExceptUnipin is the owner's "wipe the order DB, keep ONLY the
+// real UniPin purchase" button (2026-10-05). Keep-rule: a non-simulated quote
+// whose product id names UniPin. Safety: when no such quote exists NOTHING is
+// deleted (an empty keep-set means the rule misfired, not that the shop is
+// empty). Supplier order rows whose quote vanishes go with it.
+func (s *Store) PurgeQuotesAllExceptUnipin() (int, int, error) {
+	type victim struct {
+		id     string
+		userID string
+		idem   string
+	}
+	var victims []victim
+	keep := 0
+	err := s.View(func(txn *badger.Txn) error {
+		return scanJSONPrefix(txn, []byte(prefixQuote), func(item *badger.Item) error {
+			var q Quote
+			if err := item.Value(func(value []byte) error { return unmarshal(value, &q) }); err != nil {
+				return err
+			}
+			if !q.TestMode && strings.Contains(strings.ToLower(q.ProductID), "unipin") {
+				keep++
+				return nil
+			}
+			victims = append(victims, victim{id: q.ID, userID: q.UserID, idem: q.IdempotencyKey})
+			return nil
+		})
+	})
+	if err != nil {
+		return 0, 0, err
+	}
+	if keep == 0 {
+		return 0, 0, errors.New("no real UniPin order found — refusing to delete everything")
+	}
+	dead := make(map[string]bool, len(victims))
+	for _, v := range victims {
+		dead[v.id] = true
+	}
+	var ordersDeleted int
+	err = s.Update(func(txn *badger.Txn) error {
+		var orderKeys [][]byte
+		if err := scanJSONPrefix(txn, []byte(prefixOrder), func(item *badger.Item) error {
+			var o Order
+			if err := item.Value(func(value []byte) error { return unmarshal(value, &o) }); err != nil {
+				return err
+			}
+			if dead[o.QuoteID] {
+				orderKeys = append(orderKeys, item.KeyCopy(nil))
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+		for _, k := range orderKeys {
+			if err := txn.Delete(k); err != nil {
+				return err
+			}
+		}
+		ordersDeleted = len(orderKeys)
+		for _, v := range victims {
+			if err := txn.Delete(quoteKey(v.id)); err != nil {
+				return err
+			}
+			if v.userID != "" && v.idem != "" {
+				if err := txn.Delete(quoteIdempotencyIndexKey(v.userID, v.idem)); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return 0, 0, err
+	}
+	return len(victims), ordersDeleted, nil
+}
+
 /* ------------------------- activity feed + ratings ------------------------ */
 
 // ListFeedQuotes returns the most recently fulfilled purchases (newest

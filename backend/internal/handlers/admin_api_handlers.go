@@ -660,6 +660,19 @@ func (h *Handlers) AdminListQuotes(ctx *fasthttp.RequestCtx) {
 // "the fake test orders are gone" button (2026-10-05). Real quotes are
 // untouched: the predicate is the TestMode stamp the sandbox itself set.
 func (h *Handlers) AdminPurgeTestOrders(ctx *fasthttp.RequestCtx) {
+	var req struct {
+		Scope string `json:"scope"`
+	}
+	_ = json.Unmarshal(ctx.PostBody(), &req)
+	if req.Scope == "all-except-unipin" {
+		n, orders, err := h.Store.PurgeQuotesAllExceptUnipin()
+		if err != nil {
+			writeError(ctx, fasthttp.StatusConflict, err.Error())
+			return
+		}
+		writeJSON(ctx, fasthttp.StatusOK, map[string]any{"deleted": n, "deleted_orders": orders})
+		return
+	}
 	n, err := h.Store.PurgeTestQuotes()
 	if err != nil {
 		adminStoreError(ctx)

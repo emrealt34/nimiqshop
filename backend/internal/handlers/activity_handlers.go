@@ -344,6 +344,11 @@ func (h *Handlers) ListActivity(ctx *fasthttp.RequestCtx) {
 			if q.Network != "" {
 				e["network"] = q.Network
 			}
+			// Owner (2026-10-05): the purchase's Lightning payment hash rides
+			// on the public feed row — the tx of what you bought, in the open.
+			if q.LightningPaymentHash != "" {
+				e["tx"] = q.LightningPaymentHash
+			}
 		}
 		r := q.Rating
 		e["rating"] = &r

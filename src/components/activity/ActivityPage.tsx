@@ -371,6 +371,11 @@ function FeedItem({ it }: { it: any }) {
         <div className="feed-row-2">
           <div className="feed-amounts">
             {main ? <span className="feed-amt-main">{main}</span> : <span className="feed-amt-main muted">{t('activityPage.amountInWallet')}</span>}
+            {it.tx ? (
+              <span className="xs mono faint" title={String(it.tx)} style={{ wordBreak: 'break-all' }}>
+                {String(it.tx).slice(0, 10)}…{String(it.tx).slice(-8)}
+              </span>
+            ) : null}
             {chips.length ? (
               <span className="feed-amt-chips">
                 {chips.map((c, i) => (

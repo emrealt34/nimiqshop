@@ -705,6 +705,9 @@ function PayNowCard({ q }: { q: any }) {
               </dd>
             </div>
             <div><dt>{t('orderPage.paymentMethod')}</dt><dd>{rail.isUsdt ? rail.label : t('orderPage.payBtcLightning')}</dd></div>
+            {String(q.lightning_payment_hash || '') ? (
+              <div><dt>{t('orderPage.rowTx')}</dt><dd className="mono small" style={{ wordBreak: 'break-all' }}>{String(q.lightning_payment_hash)}</dd></div>
+            ) : null}
             <div>
               <dt>{t('orderPage.finalTotal')}</dt>
               <dd>{rail.isUsdt ? t('orderPage.finalTotalUsdt', { coin: rail.short }) : (coinAmountLabelFor(q, 'BTC') || t('orderPage.amountNote'))}</dd>
@@ -1393,6 +1396,9 @@ function QuoteContent({ q, refund, fulfillment }: { q: any; refund?: any; fulfil
       ? [t('orderPage.topupNumber'), <span key="tp" className="mono small">{qDel.creditPhones.join(', ')}</span>]
       : null,
     qGiftMessage ? [t('orderPage.giftMessage'), t('orderPage.giftMessagePresent')] : null,
+    String(q.lightning_payment_hash || '')
+      ? [t('orderPage.rowTx'), <span key="tx" className="mono small" style={{ wordBreak: 'break-all' }}>{String(q.lightning_payment_hash)}</span>]
+      : null,
     [t('orderPage.rowTotal'), qRail.isUsdt && coinAmountLabel(q) ? coinAmountLabel(q) : <NimAmount key="t" q={q} fallback="—" />],
     [t('orderPage.orderId'), copyIdNode(q.id || '')],
     [t('orderPage.rowUpdated'), fmtDate(q.updated_at || q.created_at)],

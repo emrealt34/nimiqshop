@@ -105,15 +105,10 @@ export type MyCashbackTotalsProp = {
 export function CashbackImpactSection({
   authed,
   myTotals,
-  lbMode,
-  onLbMode,
 }: {
   authed: boolean;
   myTotals: MyCashbackTotalsProp;
 
-  /** Day/night mode of the whole Leaderboard tab (owner-controlled card switch). */
-  lbMode: 'night' | 'day';
-  onLbMode: (m: 'night' | 'day') => void;
 }) {
   const { t } = useT();
   const [cfg, setCfg] = useState<any>(null);
@@ -872,26 +867,6 @@ export function CashbackImpactSection({
           <h2 className="pt-section-title">
             <Icon name="trophy" size={20} /> {t('cashbackCard.leaderboard')}
           </h2>
-          {/* Day/night switch lives ON the card (owner: "şu karta ekle"),
-              and themes the whole Leaderboard tab, both cards included. */}
-          <div className="pt-seg lb-mode-seg">
-            <button
-              type="button"
-              className={lbMode === 'day' ? 'btn btn-sm btn-gold' : 'btn btn-sm btn-outline'}
-              aria-pressed={lbMode === 'day'}
-              onClick={() => onLbMode('day')}
-            >
-              <Icon name="sun" size={14} /> {t('cashbackCard.themeDay')}
-            </button>
-            <button
-              type="button"
-              className={lbMode === 'night' ? 'btn btn-sm btn-gold' : 'btn btn-sm btn-outline'}
-              aria-pressed={lbMode === 'night'}
-              onClick={() => onLbMode('night')}
-            >
-              <Icon name="moon" size={14} /> {t('cashbackCard.themeNight')}
-            </button>
-          </div>
           <div className="pt-seg">
             {(['week', 'month', 'all'] as const).map((b) => (
               <button
