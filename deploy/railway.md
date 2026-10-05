@@ -75,6 +75,23 @@ allowlist above covers Railway's private ranges and the request is served.
 > launcher documents, or `PROXY_HEADER_MODE=cloudflare` with the connector
 > talking to the API directly).
 
+### Cashback payout wallet (`CASHBACK_WALLET_SEED`)
+
+- **Where it lives:** ONLY as a Railway Variable on the `zetas` service.
+  Never in this repo, never in GitHub Secrets, never in CI, never in chat or
+  notes. GitHub Secrets would expose the payout key to every workflow run
+  while production does not read it from there at all.
+- **Accepted formats:** a 24-word BIP39 recovery phrase as ONE line
+  (lowercase, single spaces, no numbering) or a 32-byte hex seed (64 chars,
+  optional `0x`). The server derives BIP39 → SLIP-10 ed25519 →
+  `m/44'/242'/<account>'` itself (`CASHBACK_WALLET_ACCOUNT`, default 0).
+- **Self-check:** at startup the server logs the derived address
+  ("verify this address matches your wallet"). Compare it with your wallet
+  before funding anything; the admin status also reports `wallet_configured`.
+- **Rotation rule:** a phrase that was ever pasted into a chat, mail or
+  document is compromised. Generate a fresh wallet offline, move the funds,
+  replace the Variable, restart. The old phrase goes to the trash.
+
 ## 3. Staking-pool integration (shop ↔ pool)
 
 Both features are server-to-server only; the pool sends no CORS headers.
