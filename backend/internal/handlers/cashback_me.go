@@ -150,7 +150,7 @@ func (h *Handlers) CashbackMe(ctx *fasthttp.RequestCtx) {
 	})
 }
 
-// CashbackLeaderboard returns global cashback & burn totals plus the public
+// CashbackLeaderboard returns the global cashback totals plus the public
 // leaderboard for ?bucket=week|month|all (default all).
 func (h *Handlers) CashbackLeaderboard(ctx *fasthttp.RequestCtx) {
 	bucket := strings.ToLower(strings.TrimSpace(string(ctx.QueryArgs().Peek("bucket"))))
@@ -180,4 +180,3 @@ func (h *Handlers) CashbackLeaderboard(ctx *fasthttp.RequestCtx) {
 		"leaderboard": leaderboard,
 	})
 }
-

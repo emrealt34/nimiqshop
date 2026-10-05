@@ -641,7 +641,6 @@ export const getPoolStake = () => api('/poolstake/me', { auth: true });
 export const getMyCashback = () => api('/cashback/me', { auth: true });
 export const getCashbackLeaderboard = (bucket: 'week' | 'month' | 'all' | string = 'all') =>
   api('/cashback/leaderboard?bucket=' + encodeURIComponent(bucket));
-export const getBurnBalance = () => api('/cashback/burn-balance');
 export const refreshPoolStake = () => api('/poolstake/refresh', { method: 'POST', auth: true });
 
 /* ---------------- FX / NIM rate (sessionStorage cached) ---------------- */

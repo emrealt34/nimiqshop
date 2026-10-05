@@ -268,7 +268,6 @@ func TestPublicEndpoints(t *testing.T) {
 		{"GET", "/api/ratings/summary", 200},
 		{"GET", "/api/activity", 200},
 		{"GET", "/api/cashback/leaderboard", 200},
-		{"GET", "/api/cashback/burn-balance", 200},
 		{"GET", "/api/track/does-not-exist", 404},
 		{"GET", "/api/auth/session", 200},
 		{"GET", "/api/quotes", 401},
