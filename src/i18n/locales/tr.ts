@@ -1771,6 +1771,7 @@ const tr = {
     signIn: 'NIM bakiyeni görmek için cüzdanınla giriş yap',
     onNetwork: '{{network}} ağında',
     stale: 'güncelleniyor…',
+    updatePay: 'Bakiyeyi burada okumak için Nimiq Pay’i güncelle — gösterilen tutar dükkandan geliyor.',
   },
 
   nim: {

@@ -1770,6 +1770,7 @@ const es = {
     signIn: 'Inicia sesión con tu wallet para ver tu saldo en NIM',
     onNetwork: 'en {{network}}',
     stale: 'actualizando…',
+    updatePay: 'Actualiza Nimiq Pay para leer tu saldo aquí — el importe mostrado viene de la tienda.',
   },
 
   nim: {

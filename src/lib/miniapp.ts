@@ -54,6 +54,35 @@ export function applyNimiqPayChrome(): void {
   }
 }
 
+/**
+ * nimiqPayBalanceSupport — can THIS host look up a balance? (developer-center
+ * PR 216: "Use SDK 0.2.1 or later and a version of Nimiq Pay that exposes this
+ * method. Updating the SDK alone does not add it to older hosts. After init(),
+ * check `typeof nimiq.getBalance === 'function'` and ask the user to update
+ * Nimiq Pay if it is unavailable.")
+ *
+ * The shop ships the SDK, so the SDK half is always satisfied; the host half is
+ * not, and no amount of client code can add the method to an old Nimiq Pay.
+ * That is why this is its own question with its own answer and its own copy:
+ * "your app is too old for this" is actionable, "no provider" is not.
+ *
+ *   'ready'            — the host can read balances (direct method).
+ *   'via-request'      — the direct method is missing but the documented
+ *                        generic `request({ method: 'getBalance' })` form is
+ *                        available: the same native bridge, the same lookup.
+ *   'update-required'  — the host is present and too old: tell the buyer.
+ *   'no-provider'      — not inside Nimiq Pay at all.
+ */
+export type BalanceSupport = 'ready' | 'via-request' | 'update-required' | 'no-provider';
+
+export async function nimiqPayBalanceSupport(): Promise<BalanceSupport> {
+  const provider: any = (await initNimiqMiniApp()) || getNimiqProvider();
+  if (!provider) return 'no-provider';
+  if (typeof provider.getBalance === 'function') return 'ready';
+  if (typeof provider.request === 'function') return 'via-request';
+  return 'update-required';
+}
+
 let sdkReady: Promise<unknown | null> | null = null;
 // The official SDK returns the provider from init(). Do not assume that every
 // host also mirrors that object on window.nimiq: the returned provider is the

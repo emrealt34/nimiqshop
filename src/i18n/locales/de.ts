@@ -1770,6 +1770,7 @@ const de = {
     signIn: 'Melde dich mit deiner Wallet an, um dein NIM-Guthaben zu sehen',
     onNetwork: 'auf {{network}}',
     stale: 'wird aktualisiert…',
+    updatePay: 'Aktualisiere Nimiq Pay, um dein Guthaben hier zu lesen — der Wert stammt aus dem Shop.',
   },
 
   nim: {

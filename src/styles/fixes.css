@@ -3510,3 +3510,88 @@ input[type="range"]:focus-visible { outline: 2px solid var(--stamp); outline-off
   .pt-pager .btn { flex: 1 1 auto; justify-content: center; }
   .cb-row-right { display: flex; flex-direction: row; align-items: baseline; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 }
+
+/* ================= ACTIVITY / ORDERS ON PHONES =================
+ * Owner (2026-10-06): "hala mobilde activity ve ordersdaki siparişler hiç
+ * responsive gözükmüyor saçma sapan … ordersdaki biraz iyi gözüküyor
+ * activitydeki ondanda kötü".
+ *
+ * The Orders list already has a phone layout: at ≤640px the row becomes a
+ * two-column grid and the amount/status block (.o-side) drops to a full-width
+ * line of its own. The Activity feed never got the same treatment — it stayed a
+ * single flex row, so on a 390px screen the 117px thumbnail (30vw) sat beside a
+ * ~230px text column that wrapped the title, the status chip, the time, the
+ * amount, the tx hash, the wallet chip and the country into a narrow ribbon.
+ *
+ * This is the same idea applied to the feed: thumbnail and title share the top
+ * line, and every other row spans the full card underneath, which is what makes
+ * the two pages finally read the same on a phone. The JSX is untouched — the
+ * feed's three rows are promoted into grid areas through `display: contents`
+ * on .feed-main, so the desktop layout is byte-for-byte what it was.
+ */
+@media (max-width: 640px) {
+  .feed-item {
+    display: grid;
+    grid-template-columns: clamp(76px, 22vw, 96px) minmax(0, 1fr);
+    grid-template-areas:
+      "thumb head"
+      "b2 b2"
+      "b3 b3";
+    column-gap: 12px;
+    row-gap: 10px;
+    align-items: start;
+    padding: 12px;
+  }
+  /* The wrapper is a pure size box (see the unified-thumb block); inside the
+     grid it takes the column width and keeps its 16/10 tile shape. */
+  .feed-thumb {
+    grid-area: thumb;
+    width: 100% !important;
+    max-width: 96px;
+  }
+  /* Promote the three rows out of .feed-main so they can span the card. */
+  .feed-main { display: contents; }
+  .feed-row-1 {
+    grid-area: head;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 6px;
+  }
+  .feed-title-wrap { width: 100%; }
+  .feed-title { white-space: normal; overflow: visible; text-overflow: clip; }
+  /* Status + time sit under the title on their own line, left-aligned: the old
+     rule pushed them right and left a ragged gap beside the thumbnail. */
+  .feed-side { flex: 0 1 auto; flex-wrap: wrap; justify-content: flex-start; gap: 6px 8px; }
+  .feed-row-2 { grid-area: b2; }
+  .feed-row-3 { grid-area: b3; justify-content: space-between; }
+  /* The rating stars stay pinned to the right of the last line, and the wallet
+     chip never pushes them off it. */
+  .feed-row-3 .feed-wallet { min-width: 0; }
+  .feed-row-3 .cell-rate { margin-left: auto; }
+  /* Batch rows put a stacked thumbnail inside .feed-thumb; the stack is
+     absolutely positioned against it, so the grid column must not stretch it. */
+  .feed-thumb, .feed-thumb.feed-thumb-stack { align-self: start; }
+}
+
+@media (max-width: 420px) {
+  /* Tighter tiles: two columns must still show the labels without a 3-line
+     wrap at 320–360px. */
+  .act-stats-grid { gap: 8px; }
+  .act-tile { padding: 10px; gap: 9px; border-radius: var(--r-m); }
+  .act-tile-ico { width: 30px; height: 30px; border-radius: 8px; }
+  .act-tile-ico svg { width: 16px; height: 16px; }
+  .act-tile-nim-mark { width: 18px; height: 18px; }
+  .act-tile-num { font-size: 1.05rem; }
+  .act-tile-label { letter-spacing: 0.04em; }
+  /* Long product names and the tx hash must not force a horizontal scroll. */
+  .feed-amt-main { font-size: 0.98rem; }
+  .feed-item .mono, .feed-item .xs.mono { word-break: break-all; }
+  /* Orders: the same tightening — the 104px tile at ≤640px leaves too little
+     room for the name at 320px, and the side row needs to wrap rather than
+     squeeze the price. */
+  .order-card { padding: 10px; gap: 10px; }
+  .order-card .thumb, .order-card .thumb.thumb-bp { width: 88px !important; height: 88px !important; }
+  .order-card .o-side { flex-wrap: wrap; row-gap: 4px; }
+  .order-card .o-price { font-size: 0.92rem; }
+}

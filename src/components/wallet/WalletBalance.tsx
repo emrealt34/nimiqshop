@@ -194,6 +194,16 @@ export function WalletBalance({
         </span>
       )}
 
+      {/* PR 216: a host that is too old to read balances is the BUYER's to fix,
+          so the strip says exactly that instead of silently showing the shop's
+          own figure. Only inside Nimiq Pay — a plain browser has no wallet
+          version to update, and the cache ('via-request') is fine either way. */}
+      {ready && state.hostBalance === 'update-required' && (
+        <span className="wal-note xs">
+          <Icon name="info" size={12} /> {t('wallet.updatePay')}
+        </span>
+      )}
+
       {/* Two sources answered differently and it was NOT a unit slip: the chain
           (the wallet the shop charges) won, and the buyer is told. */}
       {ready && state.mismatch && (

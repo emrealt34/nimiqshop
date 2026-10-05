@@ -37,7 +37,7 @@
  * conversion of a fresh number.
  */
 import { getWalletBalance, getNimRate, cachedNimRate } from './api';
-import { initNimiqMiniApp, getNimiqProvider, inNimiqPay } from './miniapp';
+import { initNimiqMiniApp, getNimiqProvider, inNimiqPay, nimiqPayBalanceSupport } from './miniapp';
 import { getAddress, isAuthed, subscribeSession } from './session';
 import { classifyWalletError, readWalletError, type WalletErrorClass } from './walletErrors';
 
@@ -115,6 +115,13 @@ export interface WalletBalanceState {
   address: string;
   /** Which chain the reading came from, as reported by the shop endpoint. */
   network: string;
+  /**
+   * What the Nimiq Pay host can do (PR 216). 'update-required' is its own
+   * state because it is the one case only the BUYER can fix — the SDK cannot
+   * add a method to an old wallet, so the strip says so instead of quietly
+   * falling back to the shop's figure.
+   */
+  hostBalance?: 'ready' | 'via-request' | 'update-required' | 'no-provider';
   /** The host and the chain disagreed beyond a unit fix: the chain value won. */
   mismatch?: boolean;
   /** A unit mismatch was detected and corrected (host reported NIM, not luna). */
@@ -214,7 +221,39 @@ async function shopReading(fresh = false): Promise<ShopReading> {
 }
 
 /** Ask the host for the balance of `address`, in luna. */
+/**
+ * A hard cap on the bridge call, longer than the host's own documented
+ * 30-second timeout on purpose: the wallet's NETWORK_ERROR (-32000) is the
+ * answer we want to render, and this only fires when the bridge itself is
+ * wedged (a backgrounded WebView, a killed app) and nothing will ever come
+ * back. Without it the strip could spin forever.
+ */
+const BRIDGE_TIMEOUT_MS = 32000;
+
+function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      const err = new Error('the wallet did not answer the balance lookup in time');
+      (err as any).type = 'NETWORK_ERROR';
+      (err as any).code = -32000;
+      reject(err);
+    }, ms);
+    work.then(
+      (v) => { clearTimeout(timer); resolve(v); },
+      (e) => { clearTimeout(timer); reject(e); }
+    );
+  });
+}
+
 async function bridgeLuna(address: string): Promise<number> {
+  // PR 216's availability rule, applied before anything is called: the method
+  // is a property of the HOST version, not of the SDK the shop ships.
+  const support = await nimiqPayBalanceSupport();
+  if (support === 'no-provider' || support === 'update-required') {
+    const err = new Error(support === 'update-required' ? 'update Nimiq Pay to read balances' : 'no provider');
+    (err as any).type = 'UNKNOWN_REQUEST';
+    throw err;
+  }
   const provider: any = (await initNimiqMiniApp()) || getNimiqProvider();
   if (!provider) {
     const err = new Error('no provider');
@@ -229,7 +268,7 @@ async function bridgeLuna(address: string): Promise<number> {
     throw err;
   }
   const call = async (fn: () => Promise<unknown>) => {
-    const luna = unwrapLuna(await fn());
+    const luna = unwrapLuna(await withTimeout(Promise.resolve(fn()), BRIDGE_TIMEOUT_MS));
     if (luna === null) {
       const err = new Error('unreadable balance');
       (err as any).type = 'UNKNOWN_ERROR';
@@ -238,7 +277,8 @@ async function bridgeLuna(address: string): Promise<number> {
     return luna;
   };
   if (typeof provider.getBalance === 'function') {
-    return call(() => provider.getBalance(address)); // SDK 0.2.1+ / supported host
+    // The documented direct method (SDK 0.2.1+ on a host that exposes it).
+    return call(() => provider.getBalance(address));
   }
   if (typeof provider.request === 'function') {
     // Documented generic form: same lookup, same network, no external RPC.
@@ -289,6 +329,14 @@ async function readBalance(force = false): Promise<WalletBalanceState> {
 
   let host: number | null = null;
   let hostError: unknown = null;
+  let hostSupport: WalletBalanceState['hostBalance'] | undefined;
+  if (hostAvailable) {
+    try {
+      hostSupport = await nimiqPayBalanceSupport();
+    } catch {
+      hostSupport = undefined;
+    }
+  }
   if (address && hostAvailable) {
     try {
       host = await bridgeLuna(address);
@@ -298,7 +346,7 @@ async function readBalance(force = false): Promise<WalletBalanceState> {
   }
 
   if (!address && shop?.address) address = shop.address;
-  const base = { address, network: shop?.network || '' };
+  const base = { address, network: shop?.network || '', hostBalance: hostSupport };
 
   // BOTH: reconcile. The session wallet is the one the shop charges, so it wins
   // any disagreement — but a clean five-orders-of-magnitude gap is a unit

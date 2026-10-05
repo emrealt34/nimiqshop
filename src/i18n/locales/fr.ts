@@ -1770,6 +1770,7 @@ const fr = {
     signIn: 'Connectez votre wallet pour voir votre solde NIM',
     onNetwork: 'sur {{network}}',
     stale: 'actualisation…',
+    updatePay: 'Mettez à jour Nimiq Pay pour lire votre solde ici — le montant affiché vient de la boutique.',
   },
 
   nim: {
