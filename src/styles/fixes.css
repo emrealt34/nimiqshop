@@ -2169,15 +2169,15 @@ label.oos-toggle > span {
    phone/tablet widths (owner, 2026-10-05). Two readable lines beat one
    microscopic one; the tail becomes an atomic inline so the browser gets
    a real break opportunity after the dot. */
+/* ONE-LINE wordmark at one constant size (owner, 2026-10-05, round 3:
+   "logo tek satırda olmalı"): no wrapping, no runtime shrink. Below the
+   desktop band the brand drops its width cap so the single line is never
+   clipped; the narrowest rails yield the globe icon instead of the name. */
 @media (max-width: 1199px) {
-  .topbar .brand { max-width: min(46vw, 360px); }
-  .topbar #site-wordmark {
-    white-space: normal;
-    overflow: visible;
-    text-overflow: clip;
-    line-height: 1.2;
-  }
-  .topbar #site-wordmark .wm-tail { display: inline-block; }
+  .topbar .brand { max-width: none; }
+}
+@media (max-width: 560px) {
+  .topbar .lang-toggle > svg { display: none; }
 }
 .topbar .mainnav {
   flex: 1 1 auto;
@@ -2325,15 +2325,6 @@ label.oos-toggle > span {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-  /* Phones: the wordmark WRAPS onto two lines at the same constant size
-     (owner, 2026-10-05: no more fluid shrink/grow). The tail is an atomic
-     inline (<=1199px band), so the break lands after the dot. */
-  .topbar #site-wordmark {
-    white-space: normal;
-    overflow: visible;
-    text-overflow: clip;
-    line-height: 1.2;
   }
   .topbar .btn.btn-gold { padding: 7px 9px; gap: 5px; }
   /* The connect label yields by shrinking, not by staying full-size next to

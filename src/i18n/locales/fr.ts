@@ -1436,6 +1436,8 @@ const fr = {
     paySeenBody: 'Vous n’avez rien à faire : le fournisseur vérifie le paiement et lancera la livraison. Cette page se met à jour toute seule ; ne lancez pas un second paiement pour la même commande.',
     verifyTitle: 'La fenêtre de la facture est terminée — nous vérifions si le paiement est arrivé',
     verifyBody: 'La facture à usage unique ne peut plus être payée. Nous vérifions auprès du fournisseur si votre paiement est arrivé ; d’ici quelques minutes, la commande avancera d’elle-même ou vous pourrez créer une nouvelle facture ici. Entre-temps, ne lancez pas un second paiement.',
+    renewTitle: "Paiement non finalisé",
+    renewBody: "Aucun paiement n'a été prélevé pour cette commande. Crée une nouvelle facture pour continuer avec les mêmes articles.",
     renewCta: 'Créer une nouvelle facture',
     renewBusy: 'Préparation d’une nouvelle facture…',
     renewFailed: 'Impossible de créer la nouvelle facture. Réessayez dans un instant.',

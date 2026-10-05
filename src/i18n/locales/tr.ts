@@ -1437,6 +1437,8 @@ const tr = {
     paySeenBody: 'Ekstra bir şey yapmanıza gerek yok: tedarikçi ödemeyi doğrulayıp teslimatı başlatacak. Bu sayfa kendini yeniler; aynı sipariş için ikinci bir ödeme başlatmayın.',
     verifyTitle: 'Faturanın süresi doldu — ödemenin gelip gelmediğini kontrol ediyoruz',
     verifyBody: 'Tek kullanımlık fatura artık ödenemiyor. Ödemenin gelip gelmediğini tedarikçiden doğruluyoruz; birkaç dakika içinde ya sipariş kendiliğinden ilerler ya da buradan taze bir fatura oluşturabilirsiniz. Bu sırada ikinci bir ödeme başlatmayın.',
+    renewTitle: 'Ödeme tamamlanmadı',
+    renewBody: 'Bu sipariş için ödeme alınmadı. Aynı ürünlerle devam etmek için yeni bir fatura oluştur.',
     renewCta: 'Yeni fatura oluştur',
     renewBusy: 'Yeni fatura hazırlanıyor…',
     renewFailed: 'Yeni fatura oluşturulamadı. Birazdan tekrar deneyin.',

@@ -1436,6 +1436,8 @@ const de = {
     paySeenBody: 'Du musst nichts tun: Der Lieferant prüft die Zahlung und startet die Lieferung. Diese Seite aktualisiert sich selbst; starte keine zweite Zahlung für dieselbe Bestellung.',
     verifyTitle: 'Das Zahlungsfenster ist abgelaufen — wir prüfen, ob die Zahlung eingegangen ist',
     verifyBody: 'Die Einmal-Rechnung kann nicht mehr bezahlt werden. Wir klären mit dem Lieferanten, ob deine Zahlung eingegangen ist; in wenigen Minuten geht die Bestellung entweder von selbst weiter oder du kannst hier eine neue Rechnung erzeugen. Starte in der Zwischenzeit keine zweite Zahlung.',
+    renewTitle: 'Zahlung nicht abgeschlossen',
+    renewBody: 'Für diese Bestellung wurde keine Zahlung eingezogen. Erstelle eine neue Rechnung, um mit denselben Artikeln fortzufahren.',
     renewCta: 'Neue Rechnung erzeugen',
     renewBusy: 'Neue Rechnung wird vorbereitet…',
     renewFailed: 'Die neue Rechnung konnte nicht erzeugt werden. Bitte gleich erneut versuchen.',

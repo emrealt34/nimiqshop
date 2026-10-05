@@ -629,15 +629,20 @@ function PayNowCard({ q }: { q: any }) {
     // A quote that cannot be re-quoted (no product/country in the payload) must
     // not offer a button whose only possible outcome is a backend refusal.
     const rebuildable = canRebuildRequest(q);
-    // Owner (2026-10-04): the "window is over" lecture misfired and read
-    // like a block — the card is now the action itself: one gold button.
+    // Owner (2026-10-05): an empty stamped box — or a lone button with no
+    // words around it — reads as broken. The card says in one title + one
+    // line what happened and what the button does; a quote that cannot be
+    // re-quoted gets NO card at all (the timeline already tells the story).
+    if (!rebuildable) return null;
     return (
       <div className="card" style={{ borderColor: 'var(--stamp)', borderWidth: '2px' }}>
-        {rebuildable && (
+        <div className="card-title">
+          <Icon name="bolt" size={16} /> {t('orderPage.renewTitle')}
+        </div>
+        <div className="small muted">{t('orderPage.renewBody')}</div>
         <button type="button" className="btn btn-gold btn-block mt-2" disabled={renewBusy} onClick={() => { void renew(); }}>
           <Icon name="bolt" size={14} /> <span className="btn-label">{renewBusy ? t('orderPage.renewBusy') : t('orderPage.renewCta')}</span>
         </button>
-        )}
         {renewErr && <div className="small mt-1" style={{ color: 'var(--stamp)' }}>{renewErr}</div>}
       </div>
     );

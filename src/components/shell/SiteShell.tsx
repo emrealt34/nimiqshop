@@ -141,10 +141,10 @@ function Brand() {
           onError={() => setLogoFailed(true)}
         />
       )}
-      {/* No runtime re-fit any more (owner, 2026-10-05: "site adının
-          küçülüp büyülmesini doğru bulmuyorum"): ONE constant type size at
-          every width, wrapping after the dot when the rail is narrow,
-          hidden under 380px — see fixes.css "Header width budget". */}
+      {/* No runtime re-fit, no wrapping (owner, 2026-10-05: "site adının
+          küçülüp büyülmesini doğru bulmuyorum" + "logo tek satırda
+          olmalı"): ONE constant type size, ONE line at every width; the
+          narrow rails yield controls instead — see fixes.css. */}
       <span id="site-wordmark" title={name}>
         {before !== null ? (
           <>

@@ -1436,6 +1436,8 @@ const es = {
     paySeenBody: 'No tienes que hacer nada: el proveedor verificará el pago e iniciará la entrega. Esta página se actualiza sola; no inicies un segundo pago para el mismo pedido.',
     verifyTitle: 'La ventana de la factura terminó — estamos comprobando si el pago llegó',
     verifyBody: 'La factura de un solo uso ya no se puede pagar. Estamos verificando con el proveedor si tu pago llegó; en unos minutos el pedido avanzará solo o podrás crear una factura nueva aquí mismo. Mientras tanto, no inicies un segundo pago.',
+    renewTitle: 'Pago no completado',
+    renewBody: 'No se cobró ningún pago por este pedido. Crea una factura nueva para continuar con los mismos artículos.',
     renewCta: 'Crear una factura nueva',
     renewBusy: 'Preparando una factura nueva…',
     renewFailed: 'No se pudo crear la factura nueva. Inténtalo de nuevo en un momento.',

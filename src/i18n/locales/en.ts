@@ -1445,6 +1445,8 @@ const en = {
     paySeenBody: 'You do not need to do anything: the supplier will verify the payment and start delivery. This page refreshes itself; do not start a second payment for the same order.',
     verifyTitle: 'The invoice\'s window is over — we are checking whether the payment arrived',
     verifyBody: 'The single-use invoice can no longer be paid. We are verifying with the supplier whether your payment arrived; within a few minutes the order will either move on by itself or you can create a fresh invoice right here. Do not start a second payment in the meantime.',
+    renewTitle: 'Payment not completed',
+    renewBody: 'No payment was taken for this order. Create a new invoice to continue with the same items.',
     renewCta: 'Create a new invoice',
     renewBusy: 'Preparing a new invoice…',
     renewFailed: 'Could not create a new invoice. Please try again in a moment.',
