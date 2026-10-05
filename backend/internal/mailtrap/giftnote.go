@@ -53,6 +53,10 @@ import (
 type GiftNote struct {
 	// Recipient is who gets the note. Required.
 	Recipient Address
+	// Self marks a plain (non-gift) purchase: the buyer IS the recipient, so
+	// the note drops the donor identity and the "someone sent you" framing
+	// and reads as an order confirmation instead (owner, 2026-10-05).
+	Self bool
 	// Anonymous mirrors the checkout's anonymous flag. When true, NOTHING that
 	// could identify the sender is rendered — no name in the subject, no
 	// identicon, no wallet address — and the note says the sender chose to
@@ -181,9 +185,12 @@ func (n GiftNote) Build(cfg Config) (Message, error) {
 
 	subject := strings.TrimSpace(n.Subject)
 	if subject == "" {
-		if n.Anonymous {
+		switch {
+		case n.Self:
+			subject = tr("email.subjectSelf")
+		case n.Anonymous:
 			subject = tr("email.subjectAnonymous")
-		} else {
+		default:
 			subject = tr("email.subjectNamed")
 		}
 	}
@@ -286,18 +293,24 @@ func (n GiftNote) deliveryLine() string {
 // still gets every fact: who, what, the donation, where it is, and a way back.
 func (n GiftNote) textBody(site, product, message string) string {
 	var b strings.Builder
-	b.WriteString("You received a gift.\n\n")
-	if n.Anonymous {
-		// Nothing that could identify the sender — and say WHY, so the
-		// missing name reads as a choice, not a bug.
-		b.WriteString("Someone sent you this" + viaSite(site) + " — the sender chose to stay anonymous.\n")
+	if n.Self {
+		b.WriteString("Your purchase was paid and is on its way.\n\n")
 	} else {
-		// No name anywhere: the sender is "someone", and the wallet below is
-		// the honest identity of a named gift.
-		b.WriteString("Someone sent you this" + viaSite(site) + ".\n")
-		if n.GifterNimiqAddress != "" {
-			b.WriteString("\nThe sender's Nimiq wallet:\n")
-			b.WriteString("  " + groupAddress(n.GifterNimiqAddress) + "\n")
+		b.WriteString("You received a gift.\n\n")
+	}
+	if !n.Self {
+		if n.Anonymous {
+			// Nothing that could identify the sender — and say WHY, so the
+			// missing name reads as a choice, not a bug.
+			b.WriteString("Someone sent you this" + viaSite(site) + " — the sender chose to stay anonymous.\n")
+		} else {
+			// No name anywhere: the sender is "someone", and the wallet below is
+			// the honest identity of a named gift.
+			b.WriteString("Someone sent you this" + viaSite(site) + ".\n")
+			if n.GifterNimiqAddress != "" {
+				b.WriteString("\nThe sender's Nimiq wallet:\n")
+				b.WriteString("  " + groupAddress(n.GifterNimiqAddress) + "\n")
+			}
 		}
 	}
 	if product != "" {
@@ -306,13 +319,16 @@ func (n GiftNote) textBody(site, product, message string) string {
 			b.WriteString("Sent: " + n.PurchasedAt.UTC().Format("2 Jan 2006") + "\n")
 		}
 	}
-	if message != "" {
-		b.WriteString("\nTheir message:\n" + indent(message) + "\n")
-	} else {
-		b.WriteString("\nNo personal message was left with the gift.\n")
+	if !n.Self {
+		if message != "" {
+			b.WriteString("\nTheir message:\n" + indent(message) + "\n")
+		} else {
+			b.WriteString("\nNo personal message was left with the gift.\n")
+		}
 	}
 	b.WriteString("\nWhere is " + n.itemWord() + "?\n")
 	b.WriteString(wrap(n.deliveryLine(), 76) + "\n")
+	b.WriteString("\nIt arrives from noreply@cryptorefills.com — watch that inbox (and the spam folder).\n")
 	if u := safeURL(n.ShopURL); u != "" {
 		b.WriteString("\nWant to give back? Browse gifts and top-ups:\n")
 		b.WriteString("  " + u + "\n")
@@ -351,6 +367,9 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 
 	// ---- preheader (inbox snippet) ---------------------------------------
 	pre := preWho + " sent you a gift via " + site
+	if n.Self {
+		pre = "Your order via " + site
+	}
 	if product != "" {
 		pre += " — " + product
 	}
@@ -400,9 +419,15 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 	b.WriteString(`            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">` + "\n")
 	b.WriteString("              <tr>\n")
 	b.WriteString(`                <td class="px-card" style="padding:26px 26px 0 26px;font-family:` + emailFont + `">` + "\n")
-	b.WriteString(`<div style="font-size:26px">🎁</div>` + "\n")
-	b.WriteString(`<div class="h1" style="font-size:22px;font-weight:800;color:#2f2a24;margin:6px 0 2px">You received a gift</div>` + "\n")
-	if n.Anonymous {
+	emo := "🎁"
+	heading := "You received a gift"
+	if n.Self {
+		emo = "✅"
+		heading = "Your order is on its way"
+	}
+	b.WriteString(`<div style="font-size:26px">` + emo + `</div>` + "\n")
+	b.WriteString(`<div class="h1" style="font-size:22px;font-weight:800;color:#2f2a24;margin:6px 0 2px">` + esc(heading) + `</div>` + "\n")
+	if n.Anonymous && !n.Self {
 		b.WriteString(`<div class="greet" style="font-size:14px;color:#6b6157">from someone anonymous via ` + esc(site) + "</div>\n")
 	} else {
 		b.WriteString(`<div class="greet" style="font-size:14px;color:#6b6157">via ` + esc(site) + "</div>\n")
@@ -411,10 +436,12 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 	b.WriteString("              </tr>\n")
 	b.WriteString("\n")
 	b.WriteString("              <!-- donor identity: side-by-side on desktop, stacked+centred on phones -->\n")
-	if n.Anonymous {
-		b.WriteString(anonymousCard())
-	} else if strings.TrimSpace(n.GifterNimiqAddress) != "" {
-		b.WriteString(identityCard(esc(groupAddress(n.GifterNimiqAddress)), n.GifterIdenticonDataURI))
+	if !n.Self {
+		if n.Anonymous {
+			b.WriteString(anonymousCard())
+		} else if strings.TrimSpace(n.GifterNimiqAddress) != "" {
+			b.WriteString(identityCard(esc(groupAddress(n.GifterNimiqAddress)), n.GifterIdenticonDataURI))
+		}
 	}
 	b.WriteString("\n\n" + `<tr><td class="px-card" style="padding:0 26px"><div style="border-top:1px dashed #e3d9c6;margin-top:18px"></div></td></tr>` + "\n")
 	b.WriteString("\n              <!-- body -->\n")
@@ -436,14 +463,14 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 	b.WriteString("\n")
 
 	// ---- the buyer's message ----------------------------------------------
-	if para != "" {
+	if !n.Self && para != "" {
 		b.WriteString("\n          <tr>\n")
 		b.WriteString(`            <td class="px-card" style="padding:0 26px 16px 26px">` + "\n")
 		b.WriteString(`<div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#b0a287;margin-bottom:4px;font-family:` + emailFont + `">Their message</div>` + "\n")
 		b.WriteString(`<div style="border-left:3px solid #d8c9a8;padding:2px 0 2px 12px;font-size:15px;line-height:1.55;color:#2f2a24;font-style:italic;font-family:` + emailFont + `">` + para + "</div>\n")
 		b.WriteString("            </td>\n")
 		b.WriteString("          </tr>")
-	} else {
+	} else if !n.Self {
 		b.WriteString(`<tr><td class="px-card" style="padding:0 26px 6px 26px;color:#8a7f72;font-size:14px;font-family:` + emailFont + `">No personal message was left with the gift.</td></tr>`)
 	}
 	b.WriteString("\n")
@@ -452,7 +479,7 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 	b.WriteString("\n          <tr>\n")
 	b.WriteString(`            <td class="px-card" style="padding:0 26px">` + "\n")
 	b.WriteString(`              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#fbf6ea;border:1px dashed #e3d9c6;border-radius:10px">` + "\n")
-	b.WriteString(`                <tr><td style="padding:12px 14px;font-size:13px;line-height:1.55;color:#5d544a;font-family:` + emailFont + `"><strong>Where is ` + esc(n.itemWord()) + `?</strong> ` + esc(n.deliveryLine()) + "</td></tr>\n")
+	b.WriteString(`                <tr><td style="padding:12px 14px;font-size:13px;line-height:1.55;color:#5d544a;font-family:` + emailFont + `"><strong>Where is ` + esc(n.itemWord()) + `?</strong> ` + esc(n.deliveryLine()) + " It arrives from <strong>noreply@cryptorefills.com</strong> — watch that inbox (and the spam folder).</td></tr>\n")
 	b.WriteString("              </table>\n")
 	b.WriteString("            </td>\n")
 	b.WriteString("          </tr>")

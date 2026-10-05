@@ -885,6 +885,7 @@ const tr = {
         giftTag: 'hediye',
     subjectAnonymous: 'Sana bir hediye gönderildi 🎁',
     subjectNamed: 'Sana bir hediye geldi 🎁',
+    subjectSelf: 'Siparişin yolda ✅',
 
     youGotAGift: 'Bir hediye aldın.',
     anonymousLine: 'Biri sana {{site}} üzerinden bir hediye gönderdi — gönderen anonim kalmayı seçti.',
@@ -957,7 +958,6 @@ const tr = {
     heroLede: 'Nimiq Pay cüzdanınla veya BTC Lightning destekleyen herhangi bir cüzdanla öde.',
     browseShelf: 'Rafa göz at',
     earnCashback: 'Cashback kazan',
-    runningInPay: 'Nimiq Pay içinde çalışıyor',
     payNotInstalled: 'Nimiq Pay kurulu değil. Uygulama mağazası açılıyor…',
     payOpenFailed: 'Nimiq Pay açılamadı.',
     openInPay: 'Nimiq Pay\'de aç',

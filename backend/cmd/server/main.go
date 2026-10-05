@@ -376,8 +376,10 @@ func main() {
 		if !q.GiftNotifiedAt.IsZero() {
 			return
 		}
-		if strings.TrimSpace(q.GiftChannel) != "email" {
-			return // not a gift
+		// Owner (2026-10-05): plain purchases mail the buyer too — the note
+		// builder flips itself into order-confirmation wording (Self).
+		if strings.TrimSpace(q.CustomerEmail) == "" {
+			return // nobody to mail
 		}
 		if h.Mail == nil || !h.Mail.Enabled() {
 			log.Printf("mailtrap: gift note for quote %s skipped (transport not configured)", q.ID)

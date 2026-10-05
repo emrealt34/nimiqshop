@@ -884,6 +884,7 @@ const fr = {
         giftTag: 'cadeau',
     subjectAnonymous: 'Quelqu\'un vous a envoyé un cadeau 🎁',
     subjectNamed: 'Un cadeau est arrivé pour vous 🎁',
+    subjectSelf: 'Votre commande est en route ✅',
 
     youGotAGift: 'Vous avez reçu un cadeau.',
     anonymousLine: 'Quelqu\'un vous a envoyé ceci via {{site}} — l\'expéditeur a choisi de rester anonyme.',
@@ -956,7 +957,6 @@ const fr = {
     heroLede: 'Payez avec votre wallet Nimiq Pay ou tout wallet compatible BTC Lightning.',
     browseShelf: 'Parcourir le catalogue',
     earnCashback: 'Gagner du cashback',
-    runningInPay: 'Ouvert dans Nimiq Pay',
     payNotInstalled: 'Nimiq Pay n\'est pas installé. Ouverture de la boutique d\'applications…',
     payOpenFailed: 'Impossible d\'ouvrir Nimiq Pay.',
     openInPay: 'Ouvrir dans Nimiq Pay',

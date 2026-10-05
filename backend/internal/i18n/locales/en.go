@@ -7,6 +7,7 @@ var En = map[string]string{
 	// --- Gift email subjects ---
 	"email.subjectAnonymous": "Someone sent you a gift 🎁",
 	"email.subjectNamed":     "A gift arrived for you 🎁",
+	"email.subjectSelf":     "Your order is on its way ✅",
 
 	// --- Gift email body ---
 	"email.youGotAGift":       "You received a gift.",

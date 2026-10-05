@@ -892,6 +892,7 @@ const en = {
   email: {
     subjectAnonymous: 'Someone sent you a gift 🎁',
     subjectNamed: 'A gift arrived for you 🎁',
+    subjectSelf: 'Your order is on its way ✅',
 
     youGotAGift: 'You received a gift.',
     anonymousLine: 'Someone sent you this via {{site}} — the sender chose to stay anonymous.',
@@ -965,7 +966,6 @@ const en = {
     heroLede: 'Pay with your Nimiq Pay wallet or any BTC-Lightning-enabled wallet.',
     browseShelf: 'Browse the shelf',
     earnCashback: 'Earn cashback',
-    runningInPay: 'Running in Nimiq Pay',
     payNotInstalled: 'Nimiq Pay is not installed. Opening the app store...',
     payOpenFailed: 'Nimiq Pay could not be opened.',
     openInPay: 'Open in Nimiq Pay',

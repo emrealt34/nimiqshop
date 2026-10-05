@@ -315,12 +315,7 @@ export function HomePage() {
               <Icon name="spark" size={20} />
               <span>{t('home.earnCashback')}</span>
             </a>
-            {inPay ? (
-              <span className="chip" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                <Icon name="check" size={15} />
-                {t('home.runningInPay')}
-              </span>
-            ) : (
+            {!inPay && (
               <button
                 className="btn btn-ghost btn-lg"
                 onClick={() => {

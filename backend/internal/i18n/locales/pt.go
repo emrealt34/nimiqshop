@@ -4,6 +4,7 @@ package locales
 var Pt = map[string]string{
 	"email.subjectAnonymous": "Alguém te enviou um presente 🎁",
 	"email.subjectNamed":     "Chegou um presente para você 🎁",
+	"email.subjectSelf":     "Seu pedido está a caminho ✅",
 
 	"email.youGotAGift":       "Você recebeu um presente.",
 	"email.anonymousLine":     "Alguém enviou isto para você via {{site}} — o remetente escolheu permanecer anônimo.",

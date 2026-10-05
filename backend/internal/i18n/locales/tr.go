@@ -4,6 +4,7 @@ package locales
 var Tr = map[string]string{
 	"email.subjectAnonymous": "Sana bir hediye gönderildi 🎁",
 	"email.subjectNamed":     "Sana bir hediye geldi 🎁",
+	"email.subjectSelf":     "Siparişin yolda ✅",
 
 	"email.youGotAGift":       "Bir hediye aldın.",
 	"email.anonymousLine":     "Biri sana {{site}} üzerinden bir hediye gönderdi — gönderen anonim kalmayı seçti.",

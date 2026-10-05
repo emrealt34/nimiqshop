@@ -45,6 +45,7 @@ func (h *Handlers) BuildGiftNoteFromQuote(q db.Quote, lang string) mailtrap.Gift
 		Delivery:     giftNoteDelivery(q),
 		Lang:         lang,
 	}
+	note.Self = strings.TrimSpace(q.GiftChannel) != "email"
 	if !q.Anonymous {
 		if q.UserID != "" {
 			if u, err := h.Store.GetUser(q.UserID); err == nil {

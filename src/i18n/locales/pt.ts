@@ -884,6 +884,7 @@ const pt = {
         giftTag: 'presente',
     subjectAnonymous: 'Alguém te enviou um presente 🎁',
     subjectNamed: 'Chegou um presente para você 🎁',
+    subjectSelf: 'Seu pedido está a caminho ✅',
 
     youGotAGift: 'Você recebeu um presente.',
     anonymousLine: 'Alguém enviou isto para você via {{site}} — o remetente escolheu permanecer anônimo.',
@@ -956,7 +957,6 @@ const pt = {
     heroLede: 'Pague com a sua carteira Nimiq Pay ou qualquer carteira compatível com BTC Lightning.',
     browseShelf: 'Ver o catálogo',
     earnCashback: 'Ganhar cashback',
-    runningInPay: 'A correr no Nimiq Pay',
     payNotInstalled: 'O Nimiq Pay não está instalado. A abrir a loja de aplicações…',
     payOpenFailed: 'Não foi possível abrir o Nimiq Pay.',
     openInPay: 'Abrir no Nimiq Pay',
