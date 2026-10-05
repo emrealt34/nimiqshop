@@ -2160,6 +2160,21 @@ label.oos-toggle > span {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Below the desktop band the wordmark wraps instead of shrinking: the
+   single-line fit used to walk "shop.nimiqbase.com" down to ~10px at
+   phone/tablet widths (owner, 2026-10-05). Two readable lines beat one
+   microscopic one; the tail becomes an atomic inline so the browser gets
+   a real break opportunity after the dot. */
+@media (max-width: 1199px) {
+  .topbar .brand { max-width: min(46vw, 360px); }
+  .topbar #site-wordmark {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    line-height: 1.2;
+  }
+  .topbar #site-wordmark .wm-tail { display: inline-block; }
+}
 .topbar .mainnav {
   flex: 1 1 auto;
   min-width: 0;

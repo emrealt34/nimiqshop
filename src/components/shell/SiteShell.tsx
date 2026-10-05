@@ -141,13 +141,13 @@ function Brand() {
           onError={() => setLogoFailed(true)}
         />
       )}
-      {/* data-fit: on a narrow phone the four icon controls leave the brand
-          less room than "shop.<host>" needs, so the wordmark first gives up
-          type size (down to 10px; hidden below 380px, see fixes.css) and, on the narrowest phones, gets one break
-          opportunity after the dot ("shop." / "<host>") — it is never
-          ellipsized. Rearranged by src/lib/fitText.ts on every language
-          switch and on every resize. */}
-      <span id="site-wordmark" title={name} data-fit data-fit-min="10">
+      {/* data-fit="wrap": below the desktop band the wordmark would rather
+          BREAK after the dot ("shop." / "<host>") than shrink: the old
+          single-line fit walked the type down to 10px at phone-tablet
+          widths and the owner called it out (2026-10-05: "yazı inanılmaz
+          küçülüyor"). The floor is now 12px and wrapping absorbs the rest;
+          under 380px the wordmark hides entirely (fixes.css). */}
+      <span id="site-wordmark" title={name} data-fit="wrap" data-fit-min="12">
         {before !== null ? (
           <>
             <span className="wm-head">{before}<span className="dot">.</span></span>
