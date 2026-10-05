@@ -914,11 +914,16 @@ html.in-nimiq-pay #main.page {
    be their own full-width row at the very top, above the receipt card). */
 .pt-stats.pt-stats-inline{ gap:8px; grid-template-columns:repeat(3,minmax(0,1fr)); margin:0 0 12px }
 .pt-stats.pt-stats-inline .pt-stat{ flex-direction:row; align-items:center; gap:8px; text-align:left;
-  padding:8px 10px; border-style:solid }
+  padding:8px 10px; border-style:solid; flex-wrap:wrap }
 .pt-stats.pt-stats-inline .pt-stat-ico{ width:30px; height:30px; border-radius:9px }
 .pt-stats.pt-stats-inline .pt-stat-ico svg{ width:16px; height:16px }
-.pt-stats.pt-stats-inline .pt-stat-num{ font-size:var(--fs-md); font-family:inherit }
-.pt-stats.pt-stats-inline .pt-stat-label{ font-size:var(--fs-xs) }
+/* The number is the fact; the label is the caption — so the number keeps
+   its natural width and the caption wraps onto a second line when the
+   3-up row gets tight (deep scan, tablet 768/820 + phone 320: the shared
+   row squeezed "1.3M NIM"/"800.0k NIM" to 59-87px and ellipsized it). */
+.pt-stats.pt-stats-inline .pt-stat-num{ font-size:var(--fs-md); font-family:inherit;
+  flex:0 0 auto; overflow:visible; text-overflow:clip }
+.pt-stats.pt-stats-inline .pt-stat-label{ font-size:var(--fs-xs); flex:1 1 auto; min-width:0 }
 @media (max-width:430px){ .pt-stats.pt-stats-inline{ grid-template-columns:1fr } }
 
 /* --- "Your cashback right now" strip (owner, 2026-10-05) ---------------------
