@@ -4,7 +4,7 @@ package handlers
  * gift_note_builder.go — the ONE place a fulfilled quote becomes a Mailtrap
  * gift note. Both senders build from here so the automatic fulfillment mail
  * (settlement tracker, wired in cmd/server/main.go) and the admin retry
- * (AdminSendGiftNotification) can never drift apart: what the tracker sent is
+ * (AdminSendQuoteEmail) can never drift apart: what the tracker sent is
  * what a retry re-sends. It only assembles the note — no store writes, no
  * sends; callers keep their own send-once discipline (db.Quote.GiftNotifiedAt).
  *

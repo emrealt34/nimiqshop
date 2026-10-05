@@ -849,7 +849,11 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 	r.GET("/api/admin/transactions", adminOnly(h.AdminListTransactions))
 	r.GET("/api/admin/manual-review", adminOnly(h.AdminManualReview))
 	r.POST("/api/admin/quotes/{id}/resolve", adminOnly(h.AdminResolveQuote))
-	r.POST("/api/admin/quotes/{id}/send-gift-notification", adminOnly(h.AdminSendGiftNotification))
+	// Order-email retry: one handler for both shapes of mail (gift note and
+	// plain-purchase confirmation). The /send-gift-notification path is kept as
+	// a legacy alias so older operator scripts keep working.
+	r.POST("/api/admin/quotes/{id}/send-order-email", adminOnly(h.AdminSendQuoteEmail))
+	r.POST("/api/admin/quotes/{id}/send-gift-notification", adminOnly(h.AdminSendQuoteEmail))
 	// Operator-direct notifications (no quote required): email — the one channel.
 	r.POST("/api/admin/notification/send", adminOnly(h.AdminSendNotification))
 	r.GET("/api/admin/notification/status", adminOnly(h.AdminNotificationStatus))

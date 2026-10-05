@@ -1348,18 +1348,26 @@ func (h *Handlers) AdminSendNotification(ctx *fasthttp.RequestCtx) {
 // always was.
 const emailBodyMaxLen = 2000
 
-// AdminSendGiftNotification lets the operator manually re-send the buyer-
-// authored gift message to the recipient. Useful for retrying after a
-// provider outage or a wrong recipient email the buyer just corrected.
+// AdminSendQuoteEmail lets the operator manually re-send the order email for
+// a quote: the buyer-authored gift note to the recipient on a gift, and — since
+// the owner asked for every purchase to be mailed (2026-10-05: "satın alımlarda
+// hediye olsun olmasın e-posta gider") — the order confirmation to the delivery
+// address on every other purchase. Useful for retrying after a provider outage
+// or a wrong recipient email the buyer just corrected.
 //
-// Request: POST /api/admin/quotes/{id}/send-gift-notification?force=1
+// Request: POST /api/admin/quotes/{id}/send-order-email?force=1
+//	 (legacy path /send-gift-notification is still served)
 //
 //	force=1  -> bypass the GiftNotifiedAt idempotency marker (re-send even
 //	             after a successful delivery; providers may bill twice).
 //	force=0  -> no-op when already notified (default).
 //
+// The ONE quote it cannot mail is a purchase that captured no address at all
+// (a phone-only top-up: the credit lands on the number, the storefront never
+// asked for an inbox) — that is the same gate the tracker applies.
+//
 // Response: { "ok": true, "email": "sent|failed", "message_ids": [...], "notified_at": ... }
-func (h *Handlers) AdminSendGiftNotification(ctx *fasthttp.RequestCtx) {
+func (h *Handlers) AdminSendQuoteEmail(ctx *fasthttp.RequestCtx) {
 	id, _ := ctx.UserValue("id").(string)
 	identity := adminIdentity(ctx)
 
@@ -1376,8 +1384,11 @@ func (h *Handlers) AdminSendGiftNotification(ctx *fasthttp.RequestCtx) {
 		writeError(ctx, fasthttp.StatusServiceUnavailable, "mail transport is not configured (set MAILTRAP_API_TOKEN and MAILTRAP_FROM_EMAIL in .env)")
 		return
 	}
-	if strings.TrimSpace(quote.GiftChannel) != "email" {
-		writeError(ctx, fasthttp.StatusConflict, "quote has no gift channel (gift_channel is empty)")
+	// Every fulfilled purchase with an inbox is mailable — gift or not. The
+	// old guard demanded a gift channel here, so a plain purchase could not be
+	// re-sent even when its buyer wrote in asking where the email went.
+	if strings.TrimSpace(quote.CustomerEmail) == "" {
+		writeError(ctx, fasthttp.StatusConflict, "quote has no delivery email (customer_email is empty)")
 		return
 	}
 	force := string(ctx.QueryArgs().Peek("force")) == "1"
@@ -1416,8 +1427,8 @@ func (h *Handlers) AdminSendGiftNotification(ctx *fasthttp.RequestCtx) {
 		}
 	}
 
-	h.audit(identity.User.ID, "admin.gift.notification_sent", ctx,
-		"quote="+id+" email="+fmt.Sprint(out["email"])+" anonymous="+fmt.Sprint(quote.Anonymous))
+	h.audit(identity.User.ID, "admin.order_email.sent", ctx,
+		"quote="+id+" email="+fmt.Sprint(out["email"])+" gift="+fmt.Sprint(quote.GiftChannel != "")+" anonymous="+fmt.Sprint(quote.Anonymous))
 	writeJSON(ctx, fasthttp.StatusOK, out)
 }
 
