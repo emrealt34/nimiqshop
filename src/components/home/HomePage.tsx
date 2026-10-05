@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../ui/Icon';
 import { WalletBalance } from '../wallet/WalletBalance';
 import { FlagMark } from '../ui/FlagMark';
-import { ComeBackBanner } from '../ui/uiKit';
+import { ComeBackBanner, ErrorDetail } from '../ui/uiKit';
 import { flattenBrands, type Product } from '../../lib/catalog';
 import { UnifiedThumb } from '../ui/UnifiedThumb';
 import { orderedCountries } from '../../lib/countries';
@@ -787,7 +787,7 @@ function EmptyState({ title, text }: { title: string; text: string }) {
   );
 }
 
-function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+function ErrorState({ message, detail, onRetry }: { message: string; detail?: string; onRetry: () => void }) {
   const { t } = useT();
   return (
     <div className="center" style={{ padding: '40px 10px', textAlign: 'center' }}>
@@ -796,6 +796,8 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
       </div>
       <div className="strong">{t('errors.wentWrong')}</div>
       <div className="small muted mt-1">{message}</div>
+      {/* Which shelves could not be loaded — the exact failure, not just "went wrong". */}
+      <ErrorDetail detail={detail} />
       <button className="btn btn-gold mt-2" onClick={onRetry}>
         {t('home.tryAgain')}
       </button>

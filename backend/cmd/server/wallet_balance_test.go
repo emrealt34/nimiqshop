@@ -165,7 +165,8 @@ func chainStub(t *testing.T, opts chainStubOptions) *httptest.Server {
 				_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":1,"error":{"code":-32603,"message":"chain unavailable"}}`))
 				return
 			}
-			_, _ = w.Write([]byte(fmt.Sprintf(`{"jsonrpc":"2.0","id":1,"result":{"data":{"address":"stub","balance":%d,"type":"basic"},"metadata":{"blockNumber":1}}}`, opts.liquidLuna)))
+			// staticcheck QF1012: write the formatted line straight to the response.
+			_, _ = fmt.Fprintf(w, `{"jsonrpc":"2.0","id":1,"result":{"data":{"address":"stub","balance":%d,"type":"basic"},"metadata":{"blockNumber":1}}}`, opts.liquidLuna)
 		case "getStakerByAddress":
 			if !opts.staking {
 				// What the public RPC answers for an address that stakes nothing.
