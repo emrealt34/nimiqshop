@@ -1401,6 +1401,7 @@ const en = {
     refundTx: 'Refund tx',
     labelTxHash: 'Tx hash',
     refundDoneDesc: 'The exact NIM you paid was sent back to the wallet that paid.',
+    refundUnconfirmedDesc: 'The supplier could not complete this payment. A refund has not been confirmed yet. If you sent funds, contact Cryptorefills before trying another payment.',
     creditApplied: 'Credit applied to the number',
     sentToDelivery: 'Sent to your delivery address',
     deliveredHeadline: 'Your order was delivered.',

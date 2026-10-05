@@ -1393,6 +1393,7 @@ const tr = {
     refundTx: 'İade işlemi',
     labelTxHash: 'İşlem hash\'i',
     refundDoneDesc: 'Ödediğin NIM tam olarak ödemeyi yapan cüzdana geri gönderildi.',
+    refundUnconfirmedDesc: 'Tedarikçi bu ödemeyi tamamlayamadı. Henüz onaylanmış bir iade yok. Fon gönderdiysen, başka bir ödeme denemeden önce Cryptorefills ile iletişime geç.',
     creditApplied: 'Kontör numaraya yüklendi',
     sentToDelivery: 'Teslimat adresine gönderildi',
     deliveredHeadline: 'Siparişin teslim edildi.',

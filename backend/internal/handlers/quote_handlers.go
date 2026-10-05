@@ -951,6 +951,13 @@ func quoteRefundView(q db.Quote) map[string]interface{} {
 		return out
 	case "failed":
 		if q.RefundReason != "" {
+			// A refund block only means something when money actually
+			// moved. A quote that failed before any payment (owner,
+			// 2026-10-05: "ödeme yapmadım ama iade yazıyor, saçma") gets
+			// NO refund card at all.
+			if q.PaidAt == nil && q.LightningPaymentHash == "" {
+				return nil
+			}
 			out := map[string]interface{}{
 				"status": "failed",
 				"detail": "The supplier could not complete this payment. A refund has not been confirmed. If you sent funds, contact Cryptorefills or open a support ticket before another payment.",

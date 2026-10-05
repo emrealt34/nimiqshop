@@ -2149,6 +2149,10 @@ label.oos-toggle > span {
   flex: 0 0 auto;
   min-width: 0;
   max-width: min(38vw, 360px);
+  /* ONE size at every width (owner, 2026-10-05: the wordmark must stop
+     shrinking/growing between breakpoints). Narrow rails wrap it onto two
+     lines instead — see the <=1199px band below. */
+  font-size: 1.15rem;
 }
 .topbar .brand img,
 .topbar .brand svg { flex-shrink: 0; }
@@ -2298,7 +2302,6 @@ label.oos-toggle > span {
     flex: 1 1 auto;
     overflow: hidden;
     gap: 6px;
-    font-size: 1.15rem;
     /* The desktop cap (min(38vw,360px)) is 163px at 430vw — it clipped the
        wordmark even with free space in the row. Phones have no nav to
        protect; the controls are flex-none and the brand shrinks first when
@@ -2323,14 +2326,15 @@ label.oos-toggle > span {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  /* Phones: the wordmark now SHRINKS ITS TYPE instead of wrapping onto two
-     lines. The old wrap permission absorbed the row overflow, which kept the
-     runtime row-budget from ever seeing a tight row — so the long French
-     connect label never compacted either (user: "logo yazısı hiçbir şekilde
-     küçülmez"). One line + fluid size; ellipsis and the runtime data-fit
-     re-fit remain as last resorts. */
-  .topbar .brand { font-size: clamp(0.82rem, 0.55rem + 1.5vw, 1.15rem); }
-  .topbar #site-wordmark { white-space: nowrap; }
+  /* Phones: the wordmark WRAPS onto two lines at the same constant size
+     (owner, 2026-10-05: no more fluid shrink/grow). The tail is an atomic
+     inline (<=1199px band), so the break lands after the dot. */
+  .topbar #site-wordmark {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    line-height: 1.2;
+  }
   .topbar .btn.btn-gold { padding: 7px 9px; gap: 5px; }
   /* The connect label yields by shrinking, not by staying full-size next to
      a wrapped logo: ~10.9px here, ellipsized only if a locale is extreme. */

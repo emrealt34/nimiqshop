@@ -1392,6 +1392,7 @@ const fr = {
     refundTx: 'Tx de remboursement',
     labelTxHash: 'Hash de tx',
     refundDoneDesc: 'Les NIM exacts que vous avez payés ont été renvoyés au portefeuille payeur.',
+    refundUnconfirmedDesc: "Le fournisseur n'a pas pu finaliser ce paiement. Aucun remboursement n'est confirmé pour le moment. Si tu as envoyé des fonds, contacte Cryptorefills avant un nouveau paiement.",
     creditApplied: 'Crédit appliqué au numéro',
     sentToDelivery: 'Envoyé à votre adresse de livraison',
     deliveredHeadline: 'Votre commande a été livrée.',

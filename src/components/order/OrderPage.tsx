@@ -331,7 +331,11 @@ function refundCardForQuote(refund: any, t: Translator) {
       <div className="card-title">{t('orderPage.yourRefund')}</div>
       <Kv
         rows={[
-          [t('orderPage.rowAmount'), `${refund.amount_nim} NIM`],
+          /* Never paint "undefined NIM": the row exists only when the
+             backend actually knows an amount. */
+          refund.amount_nim !== undefined && refund.amount_nim !== null && refund.amount_nim !== ''
+            ? [t('orderPage.rowAmount'), `${refund.amount_nim} NIM`]
+            : null,
           refund.refund_address
             ? [
                 t('orderPage.backToYourWallet'),
@@ -352,7 +356,9 @@ function refundCardForQuote(refund: any, t: Translator) {
             : null,
         ].filter(Boolean) as any}
       />
-      <div className="small muted mt-1">{refund.detail || t('orderPage.refundDoneDesc')}</div>
+      <div className="small muted mt-1">
+        {s === 'failed' ? t('orderPage.refundUnconfirmedDesc') : t('orderPage.refundDoneDesc')}
+      </div>
     </div>
   );
 }

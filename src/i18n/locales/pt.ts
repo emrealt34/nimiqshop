@@ -1392,6 +1392,7 @@ const pt = {
     refundTx: 'Tx de reembolso',
     labelTxHash: 'Hash da tx',
     refundDoneDesc: 'Os NIM exatos que pagou foram devolvidos à carteira que pagou.',
+    refundUnconfirmedDesc: 'O fornecedor não conseguiu concluir este pagamento. Ainda não há reembolso confirmado. Se enviou fundos, fale com a Cryptorefills antes de tentar outro pagamento.',
     creditApplied: 'Saldo aplicado ao número',
     sentToDelivery: 'Enviado para o seu endereço de entrega',
     deliveredHeadline: 'A sua encomenda foi entregue.',

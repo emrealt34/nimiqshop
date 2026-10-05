@@ -141,13 +141,11 @@ function Brand() {
           onError={() => setLogoFailed(true)}
         />
       )}
-      {/* data-fit="wrap": below the desktop band the wordmark would rather
-          BREAK after the dot ("shop." / "<host>") than shrink: the old
-          single-line fit walked the type down to 10px at phone-tablet
-          widths and the owner called it out (2026-10-05: "yazı inanılmaz
-          küçülüyor"). The floor is now 12px and wrapping absorbs the rest;
-          under 380px the wordmark hides entirely (fixes.css). */}
-      <span id="site-wordmark" title={name} data-fit="wrap" data-fit-min="12">
+      {/* No runtime re-fit any more (owner, 2026-10-05: "site adının
+          küçülüp büyülmesini doğru bulmuyorum"): ONE constant type size at
+          every width, wrapping after the dot when the rail is narrow,
+          hidden under 380px — see fixes.css "Header width budget". */}
+      <span id="site-wordmark" title={name}>
         {before !== null ? (
           <>
             <span className="wm-head">{before}<span className="dot">.</span></span>

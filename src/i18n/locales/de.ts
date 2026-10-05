@@ -1392,6 +1392,7 @@ const de = {
     refundTx: 'Erstattungs-Tx',
     labelTxHash: 'Tx-Hash',
     refundDoneDesc: 'Die exakten NIM, die du gezahlt hast, gingen an die zahlende Wallet zurück.',
+    refundUnconfirmedDesc: 'Der Lieferant konnte diese Zahlung nicht abschließen. Eine Rückerstattung ist noch nicht bestätigt. Wenn du Geld gesendet hast, kontaktiere Cryptorefills, bevor du erneut zahlst.',
     creditApplied: 'Guthaben auf die Nummer gebucht',
     sentToDelivery: 'An deine Lieferadresse gesendet',
     deliveredHeadline: 'Deine Bestellung wurde geliefert.',
