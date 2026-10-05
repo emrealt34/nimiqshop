@@ -9,7 +9,7 @@ import { CashbackImpactSection } from './CashbackImpactSection';
  *
  * The base is earned by staking (any amount) plus one staker boost that
  * grows out of the pool fees the buyer's stake actually earns — capped at
- * $50/day and $500/month. There are no levels to climb and no locks to
+ * $500/day and $1000/month. There are no levels to climb and no locks to
  * choose: the page shows the programme once, then the buyer's own ledger.
  *
  * All stake figures come from the operator's own pool (GET /api/poolstake/me).

@@ -6,7 +6,7 @@
  *   1. the programme itself (public, unauthenticated): ONE parameter set —
  *      the flat base rate every order earns, plus the staker boost ceiling
  *      (up to max_boost_percent on top, funded by the pool fees the staker
- *      actually earned) with a $50/day and $500/month cap;
+ *      actually earned) with a $500/day and $1000/month cap;
  *   2. the signed-in buyer's own standing (authenticated): their live stake
  *      and their single ledger — how much cashback money they have accrued,
  *      the boost rate it buys right now, and how much of today's / this
@@ -38,9 +38,9 @@ export type StakeCashbackProgram = {
   max_boost_percent: number;
   /** Minimum active stake (NIM) for the ledger to accrue at all. */
   min_stake_nim: number;
-  /** Daily cap on cashback-eligible spend, USD (50). */
+  /** Daily cap on cashback-eligible spend, USD (500). */
   daily_cap_usd: number;
-  /** Monthly cap on cashback-eligible spend, USD (500). */
+  /** Monthly cap on cashback-eligible spend, USD (1000). */
   monthly_cap_usd: number;
   /** Days of loyalty age until the multiplier reaches 1.0 (360). */
   ramp_days: number;
@@ -202,8 +202,12 @@ function normLedger(l: any): StakerLedgerCard | null {
 const BUNDLED_PROGRAM: StakeCashbackProgram = {
   max_boost_percent: 10, // MaxBoostBps 1000 / 100
   min_stake_nim: 100,
-  daily_cap_usd: 50,
-  monthly_cap_usd: 500,
+  // $500/day and $1000/month (owner, 2026-10-05). This fallback is what the
+  // calculator shows when the API cannot be read at all, so it must stay in
+  // lockstep with stakeledger.Defaults — otherwise a degraded page quietly
+  // advertises the old $50/$500 programme while the backend pays the new one.
+  daily_cap_usd: 500,
+  monthly_cap_usd: 1000,
   ramp_days: 1825,
   display_basis_usd: 100,
   ledger_max_usd: 10,

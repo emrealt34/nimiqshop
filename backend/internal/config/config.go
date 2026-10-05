@@ -630,8 +630,12 @@ func Load() Config {
 		// informational NIM estimate shown in the UI (never the payment
 		// authority — the supplier's coin amount is authoritative).
 		OracleMinSources: envInt("ORACLE_MIN_SOURCES", 2), OracleMaxSpreadBps: int64(envInt("ORACLE_MAX_SPREAD_BPS", 250)),
-		DailyOrderLimit: envOrderLimit("DAILY_ORDER_LIMIT", 9), DailySpendLimitUSD: envBudgetUSD("DAILY_SPEND_LIMIT_USD", 250),
-		MonthlySpendLimitUSD: envBudgetUSD("MONTHLY_SPEND_LIMIT_USD", 500),
+		// Published purchase budgets (owner, 2026-10-05): $500/day and
+		// $1000/month — the same numbers the staking spend caps carry, so a
+		// buyer never reads two different ceilings on two screens. The daily
+		// ORDER ceiling stays a separate knob (DAILY_ORDER_LIMIT).
+		DailyOrderLimit: envOrderLimit("DAILY_ORDER_LIMIT", 9), DailySpendLimitUSD: envBudgetUSD("DAILY_SPEND_LIMIT_USD", 500),
+		MonthlySpendLimitUSD: envBudgetUSD("MONTHLY_SPEND_LIMIT_USD", 1000),
 		CRBaseURL:            env("CRYPTOREFILLS_BASE_URL", "https://api.cryptorefills.com"), CRPartnerID: os.Getenv("CRYPTOREFILLS_PARTNER_ID"), CRAppVersion: env("CRYPTOREFILLS_APP_VERSION", "nimshop/1.0"), CRUserAgent: env("CRYPTOREFILLS_USER_AGENT", "nimshop/1.0 +https://"+host), CRWebhookKey: os.Getenv("CRYPTOREFILLS_WEBHOOK_KEY"), PublicWebhookBaseURL: strings.TrimRight(os.Getenv("PUBLIC_WEBHOOK_BASE_URL"), "/"),
 		CRPollSecs: envInt("WORKER_ORDER_POLL_SECS", 5), CRStaleSecs: envInt("WORKER_ORDER_STALE_SECS", 300), TestMode: envBool("TEST_MODE", false),
 		AdminUsername: os.Getenv("ADMIN_USERNAME"), AdminPassword: os.Getenv("ADMIN_PASSWORD"), AdminPasswordHash: os.Getenv("ADMIN_PASSWORD_HASH"), AdminTOTPSecret: os.Getenv("ADMIN_TOTP_SECRET"), AdminSessionSecret: os.Getenv("ADMIN_SESSION_SECRET"),

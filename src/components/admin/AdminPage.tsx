@@ -558,8 +558,10 @@ function StakeCashbackEditor({ data, onChanged, basePct }: { data: any; onChange
       min_stake_nim: String(p.min_stake_nim ?? 100),
       max_boost_percent: String((p.max_boost_bps ?? 1000) / 100),
       a_max_usd: String(p.a_max_usd ?? 10),
-      daily_cap_usd: String(p.daily_cap_usd ?? 50),
-      monthly_cap_usd: String(p.monthly_cap_usd ?? 500),
+      // Published caps (owner, 2026-10-05): $500/day · $1000/month. The form
+      // prefill must not re-introduce the retired $50/$500 defaults.
+      daily_cap_usd: String(p.daily_cap_usd ?? 500),
+      monthly_cap_usd: String(p.monthly_cap_usd ?? 1000),
       display_basis_usd: String(p.display_basis_usd ?? 100),
     };
   });
@@ -614,8 +616,8 @@ function StakeCashbackEditor({ data, onChanged, basePct }: { data: any; onChange
         min_stake_nim: String(p.min_stake_nim ?? 100),
         max_boost_percent: String((p.max_boost_bps ?? 1000) / 100),
         a_max_usd: String(p.a_max_usd ?? 10),
-        daily_cap_usd: String(p.daily_cap_usd ?? 50),
-        monthly_cap_usd: String(p.monthly_cap_usd ?? 500),
+        daily_cap_usd: String(p.daily_cap_usd ?? 500),
+        monthly_cap_usd: String(p.monthly_cap_usd ?? 1000),
         display_basis_usd: String(p.display_basis_usd ?? 100),
       });
       toast('Staker programme saved — it applies to orders fulfilled from now on', 'success');
@@ -674,8 +676,8 @@ function StakeCashbackEditor({ data, onChanged, basePct }: { data: any; onChange
       </div>
       <div className="row mt-1" style={{ gap: 10, flexWrap: 'wrap' }}>
         {field('min_stake_nim', 'Minimum stake (NIM)', 'Ledger accrues only above this active stake', '1')}
-        {field('daily_cap_usd', 'Daily cap ($)', 'Max cashback-eligible spend per day — $50', '1')}
-        {field('monthly_cap_usd', 'Monthly cap ($)', 'Max cashback-eligible spend per month — $500', '1')}
+        {field('daily_cap_usd', 'Daily cap ($)', 'Max cashback-eligible spend per day — $500', '1')}
+        {field('monthly_cap_usd', 'Monthly cap ($)', 'Max cashback-eligible spend per month — $1000', '1')}
       </div>
       <div className="row mt-1" style={{ gap: 10, flexWrap: 'wrap' }}>
         {field('a_max_usd', 'Book ceiling (A_MAX, $)', 'Max NIM a single ledger may hold', '1')}
