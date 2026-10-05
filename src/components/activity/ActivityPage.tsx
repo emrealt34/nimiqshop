@@ -11,7 +11,7 @@ import { FlagMark } from '../ui/FlagMark';
 import { Identicon } from '../ui/Identicon';
 import { AppRoot } from '../AppRoot';
 import { getActivity, cachedNimRate, friendlyApiMessage, errorDetailLine } from '../../lib/api';
-import { cleanProductLabel, cleanBatchProductLabels, fmtNIM, timeAgo, countryName, shortAddr, fmtDuration } from '../../lib/format';
+import { cleanProductLabel, cleanBatchProductLabels, fmtNIM, countryName, shortAddr, fmtDuration } from '../../lib/format';
 import { Clipboard } from '../../lib/clipboard';
 import { useInterval } from '../../lib/useInterval';
 import { useToast } from '../AppProviders';
