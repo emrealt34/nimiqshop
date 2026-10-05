@@ -815,17 +815,19 @@ func (s *Store) PurgeOrphanCashbacks() (int, error) {
 			if err := item.Value(func(value []byte) error { return unmarshal(value, &cb) }); err != nil {
 				return err
 			}
-			if cb.QuoteID == "" {
-				return nil
+			if cb.QuoteID != "" {
+				var q Quote
+				e := getJSON(txn, quoteKey(cb.QuoteID), &q)
+				if e == nil {
+					return nil // quote alive — row stays
+				}
+				if !errors.Is(e, ErrNotFound) {
+					return nil // lookup broken — never delete on uncertainty
+				}
 			}
-			var q Quote
-			e := getJSON(txn, quoteKey(cb.QuoteID), &q)
-			if e == nil {
-				return nil // quote alive — row stays
-			}
-			if !errors.Is(e, ErrNotFound) {
-				return nil // lookup broken — never delete on uncertainty
-			}
+			// Orphaned by the wipe, OR an adjustment/boost row with no quote
+			// link at all — both are test-era ledger dust (owner: only the
+			// real UniPin survives).
 			victims = append(victims, victim{key: item.KeyCopy(nil), userID: cb.UserID, id: cb.ID})
 			return nil
 		})

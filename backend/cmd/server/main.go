@@ -255,14 +255,14 @@ func main() {
 	// cashback ledger rows stayed behind — orphans that kept inflating the
 	// public totals and the leaderboard with fake "pending" NIM. One-shot,
 	// its own marker, same boot-time discipline.
-	if raw, _ := store.LoadMeta("purge_orphan_cashbacks_v2"); raw == nil {
+	if raw, _ := store.LoadMeta("purge_orphan_cashbacks_v3"); raw == nil {
 		if n, err := store.PurgeOrphanCashbacks(); err != nil {
-			log.Printf("startup purge v2: %v", err)
+			log.Printf("startup purge v3: %v", err)
 		} else {
-			log.Printf("startup purge v2: deleted %d orphan cashback rows", n)
+			log.Printf("startup purge v3: deleted %d ledger rows without a live quote", n)
 		}
-		if err := store.SaveMeta("purge_orphan_cashbacks_v2", []byte(time.Now().UTC().Format(time.RFC3339)), 0); err != nil {
-			log.Printf("startup purge v2: marker not saved: %v", err)
+		if err := store.SaveMeta("purge_orphan_cashbacks_v3", []byte(time.Now().UTC().Format(time.RFC3339)), 0); err != nil {
+			log.Printf("startup purge v3: marker not saved: %v", err)
 		}
 	}
 	h.Presence = presence.New()
