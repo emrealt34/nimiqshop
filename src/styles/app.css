@@ -2535,10 +2535,13 @@ html { overflow-x: clip; }
 /* ================= CART SHEET MOBILE CLEANUP =================
  * The quantity controls were stacking vertically in a random narrow column,
  * which made the cart look broken on phones. Keep the product text + price in
- * one area and move the controls into a clean horizontal action row below. */
+ * one area and move the controls into a clean horizontal action row below.
+ * The thumb track is a variable shared with the wrapper (fixes.css owns the
+ * value): a fixed 104px column plus a row-spanning tile is what let the
+ * artwork slide under the −/+ cluster on small screens. */
 .cart-row {
   display: grid;
-  grid-template-columns: 104px minmax(0, 1fr);
+  grid-template-columns: var(--cart-thumb, 104px) minmax(0, 1fr);
   grid-template-areas:
     'thumb main'
     'thumb actions';
@@ -2575,7 +2578,7 @@ html { overflow-x: clip; }
 
 @media (max-width: 560px) {
   .cart-row {
-    grid-template-columns: 92px minmax(0, 1fr);
+    grid-template-columns: var(--cart-thumb, 92px) minmax(0, 1fr);
     grid-template-areas:
       'thumb main'
       'actions actions';

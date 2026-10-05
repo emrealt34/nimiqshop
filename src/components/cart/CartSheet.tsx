@@ -257,7 +257,10 @@ export function CartSheetContent({ close }: { close: () => void }) {
           const k = itemKey(it);
           return (
             <div className="cart-row" key={k}>
-              <div style={{ width: "clamp(92px, 28vw, 104px)", flex: 'none' }}>
+              {/* Size comes from the row's --cart-thumb track (fixes.css): the
+                  wrapper may never be wider than its column, or the artwork
+                  slides under the −/+ cluster on phones. */}
+              <div style={{ minWidth: 0 }}>
                 <UnifiedThumb src={it.image || ''} alt={it.name} bg={it.bgColor || 'rgb(255,255,255)'} />
               </div>
               <div className="cart-main">
