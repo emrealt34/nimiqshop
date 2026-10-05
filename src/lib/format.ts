@@ -69,6 +69,25 @@ export function fmtDate(iso: string | Date, withTime = true): string {
   return date + ', ' + d.toLocaleTimeString(localeTag(), { hour: '2-digit', minute: '2-digit' });
 }
 
+/**
+ * fmtClock — the EXACT time, with seconds.
+ *
+ * Owner (2026-10-06): "ben saniyede azsın derken 6 saat önce değil hani 10 am
+ * tam saniyesi yazsın ki anladın mı". A relative age answers "how long ago" and
+ * hides the moment; what he wants is the moment itself, to the second:
+ * "10:32:07". Today shows the clock alone, another day prefixes the date. The
+ * seconds are what make a refresh (a live read, a new stage) visibly land.
+ */
+export function fmtClock(iso?: string | number | Date | null): string {
+  if (iso === null || iso === undefined || iso === '') return '';
+  const d = iso instanceof Date ? iso : new Date(iso as any);
+  if (isNaN(d as unknown as number)) return '';
+  const time = d.toLocaleTimeString(localeTag(), { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  const now = new Date();
+  const sameDay = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+  return sameDay ? time : d.toLocaleDateString(localeTag(), { day: 'numeric', month: 'short' }) + ' ' + time;
+}
+
 export function timeAgo(iso: string | Date): string {
   const d = iso instanceof Date ? iso : new Date(iso);
   if (isNaN(d as unknown as number)) return '';

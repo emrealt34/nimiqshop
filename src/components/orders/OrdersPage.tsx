@@ -19,7 +19,7 @@ import { quoteStages, isTerminalStatus, isDeliveredStatus, isIssueStatus } from 
 import { deliverySummary, payRail } from '../../lib/deliveryCopy';
 import { useInterval } from '../../lib/useInterval';
 import { useToast, useSheet } from '../AppProviders';
-import { StatusBadge, MiniProgress, StarsDisplay, StarPicker, EmptyState, ErrorState, LockedSignInCard, SkeletonCards, NimAmount, OnChainProof, LiveAgo } from '../ui/uiKit';
+import { StatusBadge, MiniProgress, StarsDisplay, StarPicker, EmptyState, ErrorState, LockedSignInCard, SkeletonCards, NimAmount, OnChainProof, ClockTime } from '../ui/uiKit';
 import { WalletBalance } from '../wallet/WalletBalance';
 import { Pager } from '../ui/Pager';
 import { useT, t as i18nT } from '../../i18n';
@@ -507,7 +507,7 @@ function OrderRow({ r, onRate }: { r: any; onRate: (r: any, val: number) => void
           </span>
           <span className="o-side">
             <StatusBadge status={r.status} />
-            <span className="xs faint o-time">{r.created_at ? <LiveAgo ts={r.created_at} /> : null}</span>
+            <span className="xs faint o-time">{r.created_at ? <ClockTime ts={r.created_at} /> : null}</span>
           </span>
         </div>
         <div className="o-row-2">

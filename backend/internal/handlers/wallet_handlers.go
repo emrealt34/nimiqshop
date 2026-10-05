@@ -164,8 +164,18 @@ func (h *Handlers) readWalletBalance(address string, fresh bool) (walletBalanceE
 	// Staking is a SECOND public read on the same provider. An address with no
 	// staking record makes the RPC answer an error; that means "not staked",
 	// never "the lookup failed".
+	//
+	// It gets its OWN deadline (owner, 2026-10-06: "kesinlikle hata var,
+	// spendable NIM yazıyor Nimiq Pay'de ama…"). Sharing the account read's
+	// context meant a slow first call could eat the whole budget, the stake read
+	// would time out, and the balance would be reported as if the wallet had
+	// nothing staked — which is exactly how a figure ends up disagreeing with
+	// Nimiq Pay, where the stake IS part of what the buyer sees. Two reads, two
+	// budgets, so the stake is missing only when the chain itself did not answer.
+	stakeCtx, cancelStake := context.WithTimeout(context.Background(), 6*time.Second)
+	defer cancelStake()
 	entry := walletBalanceEntry{luna: luna, at: now}
-	if staker, sErr := h.NIMRPC.GetStaker(ctxN, address); sErr == nil {
+	if staker, sErr := h.NIMRPC.GetStaker(stakeCtx, address); sErr == nil {
 		entry.staked = staker.Balance
 		entry.inactive = staker.InactiveBalance
 		entry.retired = staker.RetiredBalance

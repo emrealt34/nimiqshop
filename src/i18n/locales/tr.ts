@@ -1772,6 +1772,10 @@ const tr = {
     onNetwork: '{{network}} ağında',
     stale: 'güncelleniyor…',
     shortToast: 'Bu alışveriş için NIM yetersiz görünüyor: ~{{need}} NIM gerekiyor, {{have}} NIM var. Yine de devam edebilirsin.',
+    srcShop: 'dükkandan okundu',
+    srcBoth: 'dükkan + Nimiq Pay',
+    compareLine: 'Nimiq Pay: {{pay}} NIM · dükkan: {{shop}} NIM',
+    stakeNote: '{{nim}} NIM stake’te ya da bir kontratta görünüyor — harcanabilir değil.',
     updatePay: 'Bakiyeyi burada okumak için Nimiq Pay’i güncelle — gösterilen tutar dükkandan geliyor.',
   },
 

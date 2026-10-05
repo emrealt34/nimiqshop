@@ -1780,6 +1780,10 @@ const en = {
     onNetwork: 'on {{network}}',
     stale: 'refreshing…',
     shortToast: 'Your wallet looks short for this: about {{need}} NIM needed, {{have}} NIM available. You can continue anyway.',
+    srcShop: 'read from the shop',
+    srcBoth: 'shop + Nimiq Pay',
+    compareLine: 'Nimiq Pay: {{pay}} NIM · shop: {{shop}} NIM',
+    stakeNote: '{{nim}} NIM appears to be staked or in a contract — not spendable.',
     updatePay: 'Update Nimiq Pay to read your balance here — the figure shown comes from the shop.',
   },
 

@@ -8,7 +8,7 @@ import { Icon } from './Icon';
 import { explorerUrl, shortTx } from '../../lib/chain';
 import { CFG } from '../../lib/config';
 import { Identicon } from './Identicon';
-import { fmtDate, fmtNIM, timeAgo } from '../../lib/format';
+import { fmtClock, fmtDate, fmtNIM } from '../../lib/format';
 import { Clipboard } from '../../lib/clipboard';
 import { getNimRate, cachedNimRate, errorDetailLine } from '../../lib/api';
 import { nimAmountFor, nimFallbackText } from '../../lib/nim';
@@ -239,30 +239,38 @@ const DELIVERY_DONE_DESC: Record<string, string> = {
 };
 
 /**
- * LiveAgo — the age of a moment, refreshed EVERY SECOND while it is younger
- * than a minute, then every second still (cheap: a text node).
+ * ClockTime — the EXACT moment, with seconds ("10:32:07").
  *
- * Owner (2026-10-06): "live trackingde saniyede gösterirsen sevinirim, dakika
- * gösteriyorsun saniyede göstersen". The live-tracking card and the public feed
- * answer "when?" — with a per-second tick the newest events read "3 saniye
- * önce" and climb, instead of sitting on "az önce" until a minute has passed.
+ * Owner (2026-10-06): "6 saat önce değil, 10 am tam saniyesi yazsın" — the
+ * tracking card, the public feed and the orders list now answer with the clock
+ * rather than with an age, so two people looking at the same order read the
+ * same string.
  */
-export function LiveAgo({ ts, className = '' }: { ts?: string | number | Date; className?: string }) {
+export function ClockTime({ ts, className = '' }: { ts?: string | number | Date | null; className?: string }) {
+  const text = fmtClock(ts as any);
+  if (!text) return null;
+  const d = ts instanceof Date ? ts : new Date(ts as any);
+  return (
+    <span className={className} title={isNaN(d as unknown as number) ? undefined : fmtDate(d)}>
+      {text}
+    </span>
+  );
+}
+
+/**
+ * LiveClock — a clock that ticks every second. Used where a step is RUNNING and
+ * has no timestamp yet: the buyer watches the second change, which is the whole
+ * point of showing seconds (owner, 2026-10-06).
+ */
+export function LiveClock({ className = '' }: { className?: string }) {
   const [, force] = useState(0);
   useEffect(() => {
-    if (!ts) return;
     const timer = window.setInterval(() => force((n) => n + 1), 1000);
     return () => window.clearInterval(timer);
-  }, [ts]);
-  if (!ts) return null;
-  // number → Date: timeAgo/fmtDate take a string or a Date, and the timeline
-  // hands this component `Date.now()` for a step that has no timestamp yet.
-  const when = typeof ts === 'number' ? new Date(ts) : ts;
-  const text = timeAgo(when);
-  if (!text) return null;
+  }, []);
   return (
-    <span className={className} title={fmtDate(when)}>
-      {text}
+    <span className={className} role="timer">
+      {fmtClock(new Date())}
     </span>
   );
 }
@@ -294,18 +302,17 @@ export function StageTimeline({ stages, channel, usdt }: { stages?: any[]; chann
             </div>
             <div className="tl-title">{title}</div>
             {desc ? <div className="tl-desc">{desc}</div> : null}
-            {/* Absolute clock + LIVE age. The in-progress step is the one the
-                buyer stares at, so its age ticks in seconds. */}
+            {/* EXACT time, to the second (owner, 2026-10-06: "6 saat önce
+                değil, 10 am tam saniyesi yazsın"). A step that is RUNNING has
+                no timestamp yet, so it shows a live clock instead of an age. */}
             {st.timestamp ? (
               <div className="tl-time">
-                {fmtDate(st.timestamp)}
-                {' · '}
-                <LiveAgo ts={st.timestamp} className={status === 'in_progress' ? 'live' : undefined} />
+                <ClockTime ts={st.timestamp} className={status === 'in_progress' ? 'live' : undefined} />
               </div>
             ) : status === 'in_progress' ? (
               <div className="tl-time">
                 <span className="live-pulse-dot" aria-hidden="true" />
-                <LiveAgo ts={Date.now()} />
+                <LiveClock className="live" />
               </div>
             ) : null}
           </div>

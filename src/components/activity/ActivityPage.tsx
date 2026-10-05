@@ -15,7 +15,7 @@ import { cleanProductLabel, cleanBatchProductLabels, fmtNIM, countryName, shortA
 import { Clipboard } from '../../lib/clipboard';
 import { useInterval } from '../../lib/useInterval';
 import { useToast } from '../AppProviders';
-import { StatusBadge, StarsDisplay, EmptyState, ErrorState, Skel, NimMark, OnChainProof, LiveAgo } from '../ui/uiKit';
+import { StatusBadge, StarsDisplay, EmptyState, ErrorState, Skel, NimMark, OnChainProof, ClockTime } from '../ui/uiKit';
 import { Pager } from '../ui/Pager';
 import { useT, t as i18nT } from '../../i18n';
 import { pagePath } from '../../lib/asset';
@@ -430,7 +430,7 @@ function FeedItem({ it }: { it: any }) {
           </div>
           <div className="feed-side">
             {it.status ? <StatusBadge status={it.status} /> : null}
-            <span className="xs faint feed-time"><LiveAgo ts={it.time} /></span>
+            <span className="xs faint feed-time"><ClockTime ts={it.time} /></span>
           </div>
         </div>
         <div className="feed-row-2">

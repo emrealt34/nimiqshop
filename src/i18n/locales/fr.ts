@@ -1771,6 +1771,10 @@ const fr = {
     onNetwork: 'sur {{network}}',
     stale: 'actualisation…',
     shortToast: 'Votre wallet semble insuffisant pour cet achat : environ {{need}} NIM requis, {{have}} NIM disponibles. Vous pouvez continuer quand même.',
+    srcShop: 'lu depuis la boutique',
+    srcBoth: 'boutique + Nimiq Pay',
+    compareLine: 'Nimiq Pay : {{pay}} NIM · boutique : {{shop}} NIM',
+    stakeNote: '{{nim}} NIM semble staké ou dans un contrat — non dépensable.',
     updatePay: 'Mettez à jour Nimiq Pay pour lire votre solde ici — le montant affiché vient de la boutique.',
   },
 

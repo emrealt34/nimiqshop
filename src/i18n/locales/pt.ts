@@ -1771,6 +1771,10 @@ const pt = {
     onNetwork: 'em {{network}}',
     stale: 'a atualizar…',
     shortToast: 'A tua carteira parece insuficiente para esta compra: cerca de {{need}} NIM necessários, {{have}} NIM disponíveis. Podes continuar mesmo assim.',
+    srcShop: 'lido da loja',
+    srcBoth: 'loja + Nimiq Pay',
+    compareLine: 'Nimiq Pay: {{pay}} NIM · loja: {{shop}} NIM',
+    stakeNote: '{{nim}} NIM parece estar em stake ou num contrato — não gastável.',
     updatePay: 'Atualiza a Nimiq Pay para ler o teu saldo aqui — o valor mostrado vem da loja.',
   },
 

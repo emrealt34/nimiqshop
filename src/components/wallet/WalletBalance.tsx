@@ -20,7 +20,7 @@
  */
 import { useEffect, useState } from 'react';
 import { useT } from '../../i18n';
-import { fmtNIM } from '../../lib/format';
+import { fmtNIM, fmtClock } from '../../lib/format';
 import { NIM_LOGO } from '../../lib/nim';
 import {
   getWalletBalanceState,
@@ -78,12 +78,9 @@ function shortAddress(addr: string): string {
 }
 
 function clockOf(at?: number): string {
-  if (!at) return '';
-  try {
-    return new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  } catch {
-    return '';
-  }
+  /* EXACT, to the second: owner (2026-10-06) — "6 saat önce değil, 10 am tam
+     saniyesi yazsın". On the card this also proves the refresh landed. */
+  return fmtClock(at);
 }
 
 export function WalletBalance({
@@ -145,35 +142,77 @@ export function WalletBalance({
       : { ok: false, text: t('wallet.short', { nim: nimShortText(missing) }) };
   })();
 
+  /* WHERE the figure came from, in three words. The buyer is holding a wallet
+     that shows its own number (owner, 2026-10-06: "spendable NIM yazıyor Nimiq
+     Pay'de ama…"), so the card must never leave the source implicit. */
+  const sourceLabel =
+    state.source === 'nimiq-pay' ? 'Nimiq Pay'
+    : state.source === 'shop' ? t('wallet.srcShop')
+    : state.source === 'both' ? t('wallet.srcBoth')
+    : '';
+
+  const figure = ready ? (
+    <span className="wal-bal-fig">
+      <img src={NIM_LOGO} alt="NIM" width={15} height={15} style={{ borderRadius: 3 }} />
+      <strong className="wal-nim">{nimText(state.availableNim)} NIM</strong>
+      {state.usd > 0 && (
+        <span className="wal-usd small faint">
+          ≈ ${state.usd.toLocaleString('en-US', { maximumFractionDigits: 2 })}
+        </span>
+      )}
+    </span>
+  ) : state.status === 'loading' ? (
+    <span className="small muted">{t('wallet.loading')}</span>
+  ) : state.status === 'unavailable' ? (
+    <span className="small muted">{t('wallet.signIn')}</span>
+  ) : (
+    <span className="wal-bal-fig">
+      <span className="small muted">{t('wallet.error')}</span>
+      <button type="button" className="btn btn-sm btn-outline" onClick={refresh}>
+        {t('actions.retry')}
+      </button>
+    </span>
+  );
+
+  /* THE CARD IS ONE OBJECT (owner, 2026-10-06: "o spendable kartında baya şey
+     sorunu var … ayrı ayrı saçma gözüküyor her şey"). It used to be five
+     independent lines — label, figure, total, verdict, meta — each with its own
+     alignment, which is what read as scattered. Now: ONE headline row with the
+     figure and the refresh control, ONE sub-row carrying every fact about the
+     reading (what · from where · which address · when · which chain), and then
+     at most the verdict and the reconciliation. */
   const body = (
     <>
-      <span className="wal-bal-top">
-        <span className="wal-bal-label">
-          <Icon name="wallet" size={14} /> {ready ? t('wallet.available') : t('wallet.label')}
-        </span>
-        {state.status === 'loading' ? (
-          <span className="small muted">{t('wallet.loading')}</span>
-        ) : ready ? (
-          <span className="wal-bal-fig">
-            <img src={NIM_LOGO} alt="NIM" width={14} height={14} style={{ borderRadius: 3 }} />
-            <strong className="wal-nim">{nimText(state.availableNim)} NIM</strong>
-            {state.usd > 0 && (
-              <span className="wal-usd small faint">
-                ≈ ${state.usd.toLocaleString('en-US', { maximumFractionDigits: 2 })}
-              </span>
-            )}
-          </span>
-        ) : state.status === 'unavailable' ? (
-          <span className="small muted">{t('wallet.signIn')}</span>
-        ) : (
-          <span className="wal-bal-fig">
-            <span className="small muted">{t('wallet.error')}</span>
-            <button type="button" className="btn btn-sm btn-outline" onClick={refresh}>
-              {t('actions.retry')}
-            </button>
-          </span>
+      <span className="wal-head">
+        {figure}
+        {ready && (
+          <button type="button" className="wal-refresh" onClick={refresh} aria-label={t('wallet.refresh')}>
+            <Icon name="refresh" size={13} />
+          </button>
         )}
       </span>
+
+      {variant === 'card' && (
+        <span className="wal-subrow xs faint">
+          <span className="wal-bal-label">
+            <Icon name="wallet" size={14} /> {ready ? t('wallet.available') : t('wallet.label')}
+          </span>
+          {ready && sourceLabel ? <span className="wal-src">{sourceLabel}</span> : null}
+          {ready && state.address ? <span className="mono">{shortAddress(state.address)}</span> : null}
+          {ready && clockOf(state.at) ? <span className="wal-when">{clockOf(state.at)}</span> : null}
+          {/* WHICH CHAIN the figure was read from. A testnet balance shown as a
+              real one is a wrong reading in every sense — this line makes the
+              mix-up visible instead of mysterious. */}
+          {ready && state.network ? <span>{t('wallet.onNetwork', { network: state.network })}</span> : null}
+          {ready && state.stale ? <span>{t('wallet.stale')}</span> : null}
+        </span>
+      )}
+
+      {variant !== 'card' && !ready && (
+        <span className="wal-bal-label">
+          <Icon name="wallet" size={14} /> {t('wallet.label')}
+        </span>
+      )}
 
       {/* The reconciliation line. Without it the strip answers "how much NIM do
           I have?" with the spendable figure and looks wrong to anyone counting
@@ -193,28 +232,6 @@ export function WalletBalance({
         </span>
       )}
 
-      {ready && variant === 'card' && (
-        <span className="wal-meta xs faint">
-          {/* Owner (2026-10-06): the address · read time · network row is cut on
-              a phone — it was the longest line on the card and pushed the
-              refresh control off the edge. The whole line (and its transparency:
-              which address, which chain, when) stays on wider screens, and the
-              refresh button is always reachable. */}
-          <span className="wal-meta-text">
-            {state.address && <span className="mono">{shortAddress(state.address)}</span>}
-            {state.address && clockOf(state.at) ? ' · ' : ''}
-            {clockOf(state.at) ? t('wallet.updated', { time: clockOf(state.at) }) : ''}
-            {/* WHICH CHAIN the figure was read from. A testnet balance shown as a
-                real one is a wrong reading in every sense — this line makes the
-                mix-up visible instead of mysterious. */}
-            {state.network ? ' · ' + t('wallet.onNetwork', { network: state.network }) : ''}
-            {state.stale ? ' · ' + t('wallet.stale') : ''}
-          </span>
-          <button type="button" className="wal-refresh" onClick={refresh} aria-label={t('wallet.refresh')}>
-            <Icon name="refresh" size={13} />
-          </button>
-        </span>
-      )}
 
       {/* PR 216: a host that is too old to read balances is the BUYER's to fix,
           so the strip says exactly that instead of silently showing the shop's
@@ -226,11 +243,24 @@ export function WalletBalance({
         </span>
       )}
 
-      {/* Two sources answered differently and it was NOT a unit slip: the chain
-          (the wallet the shop charges) won, and the buyer is told. */}
-      {ready && state.mismatch && (
-        <span className="wal-note xs short">
-          <Icon name="info" size={12} /> {t('wallet.mismatch')}
+      {/* THE COMPARISON, NOT A VERDICT. Two live reads of one address can
+          differ honestly (a few seconds of cache, or a wallet view that folds in
+          stake). The card therefore states what each source said, and the total
+          above is reconciled from both, so the line adds up to the number the
+          buyer sees in Nimiq Pay (owner, 2026-10-06). */}
+      {ready && state.mismatch && state.hostNim !== undefined && state.shopNim !== undefined && (
+        <span className="wal-note xs faint">
+          <Icon name="info" size={12} />
+          {t('wallet.compareLine', { pay: nimText(state.hostNim), shop: nimText(state.shopNim) })}
+        </span>
+      )}
+
+      {/* When the wallet's own reading is the higher one, the difference is
+          stake (or a contract balance) the plain chain read could not see — the
+          reason the reconciliation line exists at all. */}
+      {ready && state.stakeInferred && (
+        <span className="wal-note xs faint">
+          <Icon name="info" size={12} /> {t('wallet.stakeNote', { nim: nimText(state.stakedNim) })}
         </span>
       )}
     </>

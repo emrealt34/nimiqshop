@@ -1105,9 +1105,9 @@ html.in-nimiq-pay #main.page {
    border, so it is the same object language as every other card, and the dark
    theme swaps it for the recessed surface instead of glare. */
 .wal-card{ padding:14px 16px; border:1.5px dashed var(--line-dash); border-radius:var(--r-l);
-  background:var(--white-card, #FFFFFF) }
+  background:var(--paper-1, #FFF9EC) }
 .wal-line{ padding:10px 12px; border:1.5px dashed var(--line-dash); border-radius:var(--r-m);
-  background:var(--white-card, #FFFFFF) }
+  background:var(--paper-1, #FFF9EC) }
 [data-theme="dark"] .wal-card, [data-theme="dark"] .wal-line{
   background:var(--surface-2); border-color:var(--line-strong) }
 .wal-chip{ gap:5px }
@@ -3720,4 +3720,30 @@ input[type="range"]:focus-visible { outline: 2px solid var(--stamp); outline-off
 @media (max-width: 640px) {
   .wal-meta { justify-content: flex-end; }
   .wal-meta-text { display: none; }
+}
+
+/* ================= THE BALANCE CARD, AS ONE OBJECT =================
+ * Owner (2026-10-06): "o spendable kartında baya şey sorunu var … ayrı ayrı
+ * saçma gözüküyor her şey". It was five independently aligned lines (label,
+ * figure, total, verdict, meta). It is now a headline row — figure left,
+ * refresh right — and ONE sub-row carrying every fact about the reading. The
+ * sub-row WRAPS as a whole on a phone instead of each item taking its own line.
+ */
+.wal-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; min-width:0 }
+.wal-subrow{ display:flex; align-items:center; gap:4px 10px; flex-wrap:wrap; min-width:0; line-height:1.5 }
+.wal-subrow .wal-bal-label{ font-size:inherit }
+.wal-subrow .mono{ letter-spacing:.02em }
+.wal-src{ font-weight:800; color:var(--ink-dim) }
+.wal-when{ font-variant-numeric:tabular-nums }
+/* The refresh control sits with the figure, not at the end of a long line:
+   it can never be pushed off the card (owner, 2026-10-06). */
+.wal-refresh{ flex:0 0 auto; width:30px; height:30px; border-radius:var(--r-s);
+  border:1.5px dashed var(--line-dash); background:var(--surface-2); color:var(--ink-dim);
+  display:grid; place-items:center; cursor:pointer; box-shadow:2px 2px 0 rgba(78,61,40,.14) }
+.wal-refresh:hover{ background:var(--stamp); border-color:var(--stamp); color:var(--on-stamp) }
+@media (max-width: 640px) {
+  .wal-card{ padding:12px 13px; display:flex; flex-direction:column; gap:6px }
+  .wal-nim{ font-size:1.22rem }
+  .wal-subrow{ gap:3px 8px; font-size:.72rem }
+  .wal-verdict{ font-size:var(--fs-xs) }
 }

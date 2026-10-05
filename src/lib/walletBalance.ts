@@ -174,6 +174,17 @@ export interface WalletBalanceState {
   hostBalance?: 'ready' | 'via-request' | 'update-required' | 'no-provider';
   /** The host and the chain disagreed beyond a unit fix: the chain value won. */
   mismatch?: boolean;
+  /**
+   * What each source said, in NIM, when BOTH answered. Owner (2026-10-06):
+   * "kesinlikle hata var, spendable NIM yazıyor Nimiq Pay'de ama…" — the buyer
+   * compares our figure with the number their wallet shows, so the card now
+   * carries the comparison instead of a verdict, and the total below is
+   * reconciled from both, which is what makes the two agree.
+   */
+  hostNim?: number;
+  shopNim?: number;
+  /** The stake figure was derived from the wallet's own (higher) reading. */
+  stakeInferred?: boolean;
   /** A unit mismatch was detected and corrected (host reported NIM, not luna). */
   unitCorrected?: boolean;
   /** True while a previous reading is on screen during a refresh. */
@@ -402,20 +413,48 @@ async function readBalance(force = false): Promise<WalletBalanceState> {
   // any disagreement — but a clean five-orders-of-magnitude gap is a unit
   // mistake, not a disagreement, and is corrected silently.
   if (shop && host !== null) {
-    const unitCorrected = !looksLikeUnitMixUp(host, shop.luna) ? false : true;
-    const mismatch = !unitCorrected && Math.abs(host - shop.luna) > Math.max(1, shop.luna * 0.01);
+    /* NORMALISE THE UNIT FIRST. A host that reports NIM where the docs promise
+       luna is off by 100,000 — the one disagreement that can be corrected from
+       the data alone. */
+    const unitCorrected = looksLikeUnitMixUp(host, shop.luna);
+    const hostLuna = unitCorrected ? Math.round(host * UNIT_FACTOR) : host;
+
+    /* RECONCILE, DON'T ACCUSE (owner, 2026-10-06: "kesinlikle hata var,
+       spendable NIM yazıyor Nimiq Pay'de ama…"). Two live reads of ONE address
+       can differ for exactly two honest reasons: the shop's figure is a few
+       seconds old, or the wallet's view folds in something a plain chain read
+       cannot see — stake, or a contract balance. So:
+         • SPENDABLE takes the LOWER of the two: what can be spent is never
+           overstated, in either world;
+         • the difference becomes the stake/total the wallet is showing, so the
+           reconciliation line ALWAYS adds up to the number in Nimiq Pay;
+         • what each source said is carried on the state, so the card can show
+           the comparison instead of a claim. */
+    const spendLuna = Math.min(shop.luna, hostLuna);
+    const higherLuna = Math.max(shop.luna, hostLuna);
+    const shopStakeNim = shop.stakedNim + shop.inactiveNim;
+    const inferredStakeNim = Math.max(0, (higherLuna - spendLuna) / LUNA_PER_NIM);
+    const stakedNim = Math.max(shopStakeNim, inferredStakeNim);
+    const differs = higherLuna - spendLuna > Math.max(1, spendLuna * 0.01);
+    const availableNim = spendLuna / LUNA_PER_NIM;
+    /* The total is whatever makes the line below equal the wallet's own view:
+       the higher reading itself when the difference is the stake. */
+    const totalNim = Math.max(shop.totalNim, availableNim + stakedNim);
     const state: WalletBalanceState = {
       status: 'ready',
-      luna: shop.luna,
-      availableNim: shop.luna / LUNA_PER_NIM,
-      stakedNim: shop.stakedNim,
+      luna: spendLuna,
+      availableNim,
+      stakedNim,
       inactiveNim: shop.inactiveNim,
-      totalNim: shop.totalNim,
-      nim: shop.luna / LUNA_PER_NIM,
+      totalNim,
+      nim: availableNim,
       usd: 0,
       source: 'both',
       unitCorrected,
-      mismatch,
+      mismatch: differs,
+      hostNim: hostLuna / LUNA_PER_NIM,
+      shopNim: shop.luna / LUNA_PER_NIM,
+      stakeInferred: inferredStakeNim > shopStakeNim + 0.0000001,
       at: Date.now(),
       ...base,
     };
