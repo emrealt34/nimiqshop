@@ -839,7 +839,7 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 	// Operator sandbox: buy a real product on the simulated supplier, then
 	// fake-pay it through the real state machine (see admin_test_center.go).
 	r.POST("/api/admin/test-purchase", adminOnly(h.AdminTestPurchase))
-	r.POST("/api/admin/test-pay", adminOnly(h.AdminTestPay))
+	r.POST("/api/admin/purge-test-orders", adminOnly(h.AdminPurgeTestOrders))
 	r.GET("/api/admin/test-quote/{id}", adminOnly(h.AdminTestQuoteStatus))
 	r.GET("/api/admin/oracle", adminOnly(h.AdminOracleHealth))
 	r.POST("/api/admin/settings/margin", adminOnly(h.AdminUpdateMargin))
@@ -954,7 +954,6 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 	r.POST("/api/quotes/{id}/payment-launch", authedTiered(aWrite, h.PaymentLaunch))
 	// TEST MODE: the customer's simulated "pay" button — drives the quote
 	// through the real state machine without any on-chain payment.
-	r.POST("/api/quotes/{id}/test-pay", authedTiered(aCheckout, h.UserTestPay))
 	r.POST("/api/quotes/{id}/refresh", authedTiered(aRefresh, h.RefreshQuote))
 
 	// Customer Support Tickets

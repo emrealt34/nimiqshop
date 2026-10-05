@@ -845,17 +845,9 @@ export const adminStatus = () => api('/admin/notification/status');
 export const adminMe = () => api('/admin/auth/me');
 export const adminSend = (req: Record<string, unknown>) => api('/admin/notification/send', { method: 'POST', body: req });
 export const adminTestEmail = (req: Record<string, unknown>) => api('/admin/test-email', { method: 'POST', body: req });
-// TEST MODE: the customer's simulated "pay" button — drives the quote through
-// the real state machine without any on-chain payment.
-export const payQuoteSimulated = (id: string, action = 'auto') =>
-  api(`/quotes/${encodeURIComponent(id)}/test-pay`, { method: 'POST', body: { action }, auth: true, timeoutMs: 30000 });
-// Operator sandbox: buy a real product on the simulated supplier, fake-pay it
-// through the real state machine, and poll the result.
-export const adminTestPurchase = (req: Record<string, unknown>) =>
-  api('/admin/test-purchase', { method: 'POST', body: req, timeoutMs: 30000 });
-export const adminTestPay = (req: Record<string, unknown>) =>
-  api('/admin/test-pay', { method: 'POST', body: req, timeoutMs: 30000 });
-export const adminTestQuote = (id: string) => api(`/admin/test-quote/${encodeURIComponent(id)}`, { timeoutMs: 15000 });
+// Owner (2026-10-05): the simulated-pay sandbox is gone — this hard-deletes
+// the quotes it left behind (admin only).
+export const adminPurgeTestOrders = () => api('/admin/purge-test-orders', { method: 'POST' });
 export const adminCatalogRules = (opts: { path?: string; method?: string; body?: unknown } = {}) =>
   api('/admin/catalog-rules' + (opts.path || ''), opts.method ? { method: opts.method, body: opts.body } : {});
 export const adminGetCashback = () => api('/admin/settings/cashback');

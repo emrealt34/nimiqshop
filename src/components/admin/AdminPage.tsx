@@ -22,8 +22,8 @@ import {
   adminGetStakeLedger,
   adminResetStakeLedger,
   adminListQuotes,
+  adminPurgeTestOrders,
 } from '../../lib/api';
-import { TestCenterCard } from './TestCenterCard';
 import { fmtNIM, formatWalletAddress } from '../../lib/format';
 import { siteName } from '../../lib/config';
 import { orderedCountries } from '../../lib/countries';
@@ -45,7 +45,7 @@ function badge(label: string, on: boolean, detail?: string) {
   );
 }
 
-type AdminSection = 'overview' | 'catalog' | 'test' | 'orders' | 'cashback' | 'people' | 'email';
+type AdminSection = 'overview' | 'catalog' | 'orders' | 'cashback' | 'people' | 'email';
 
 type RuleOption = { value: string; label: string };
 
@@ -91,7 +91,6 @@ const ADMIN_COUNTRY_OPTIONS: RuleOption[] = (() => {
 const ADMIN_SECTIONS: Array<{ id: AdminSection; label: string; hint: string; icon: IconName }> = [
   { id: 'overview', label: 'Overview', hint: 'health & players', icon: 'pulse' },
   { id: 'catalog', label: 'Catalog', hint: 'types & visibility', icon: 'package' },
-  { id: 'test', label: 'Test center', hint: 'buy & fake-pay', icon: 'spark' },
   { id: 'orders', label: 'Orders', hint: 'cashback & tx', icon: 'receipt' },
   { id: 'cashback', label: 'Cashback', hint: 'rates & ledgers', icon: 'wallet' },
   { id: 'people', label: 'People', hint: 'users & players', icon: 'user' },
@@ -971,6 +970,8 @@ function PromoCodesEditor({ data, onChanged, basePct }: { data: any; onChanged: 
 }
 
 function OrdersPanel() {
+  const { toast } = useToast();
+  const [purging, setPurging] = useState(false);
   const [rows, setRows] = useState<any[] | null>(null);
   const [err, setErr] = useState('');
   // Paged like the rest of the console: 5 orders per page.
@@ -992,6 +993,26 @@ function OrdersPanel() {
       <div className="card-title">
         <Icon name="pulse" size={18} />
         <span>Orders — cashback paid, amount, tx</span>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          style={{ marginLeft: 8 }}
+          disabled={purging}
+          onClick={() => {
+            if (!window.confirm('Delete EVERY simulated test order from the store? Real orders are untouched.')) return;
+            setPurging(true);
+            adminPurgeTestOrders()
+              .then((d: any) => {
+                toast(`Deleted ${Number(d?.deleted || 0)} simulated test orders`, 'success');
+                setRows(null);
+                adminListQuotes(50).then((r) => setRows(r.quotes || [])).catch(() => {});
+              })
+              .catch((e: Error) => toast(e.message || 'Purge failed', 'error'))
+              .finally(() => setPurging(false));
+          }}
+        >
+          Delete fake test orders
+        </button>
         <span className="xs faint" style={{ marginLeft: 'auto' }}>
           {rows && rows.length > ORDERS_PAGE_SIZE
             ? `${from + 1}–${Math.min(rows.length, from + ORDERS_PAGE_SIZE)} of ${rows.length} orders`
@@ -1327,8 +1348,6 @@ export function AdminContent() {
     switch (section) {
       case 'catalog':
         return <CatalogRulesPanel />;
-      case 'test':
-        return <TestCenterCard />;
       case 'orders':
         return <OrdersPanel />;
       case 'cashback':

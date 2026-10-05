@@ -656,6 +656,18 @@ func (h *Handlers) AdminListQuotes(ctx *fasthttp.RequestCtx) {
 	writeJSON(ctx, fasthttp.StatusOK, map[string]any{"quotes": out})
 }
 
+// AdminPurgeTestOrders deletes every simulated (TestMode) quote — the owner's
+// "the fake test orders are gone" button (2026-10-05). Real quotes are
+// untouched: the predicate is the TestMode stamp the sandbox itself set.
+func (h *Handlers) AdminPurgeTestOrders(ctx *fasthttp.RequestCtx) {
+	n, err := h.Store.PurgeTestQuotes()
+	if err != nil {
+		adminStoreError(ctx)
+		return
+	}
+	writeJSON(ctx, fasthttp.StatusOK, map[string]any{"deleted": n})
+}
+
 func (h *Handlers) AdminListTransactions(ctx *fasthttp.RequestCtx) {
 	orders, err := h.Store.ListAllOrders(adminLimit(ctx))
 	if err != nil {

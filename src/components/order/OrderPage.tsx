@@ -61,8 +61,6 @@ import {
 } from '../ui/uiKit';
 import { LightningPayBlock } from '../checkout/LightningPayBlock';
 import { NimiqPayPayButton } from '../checkout/NimiqPayPayButton';
-import { SimulatedPayBlock } from '../checkout/SimulatedPayBlock';
-import { isTestMode } from '../../lib/config';
 import { UsdtPayBlock } from '../checkout/UsdtPayBlock';
 import { PaymentCountdown } from '../checkout/PaymentCountdown';
 import { deliverySummary, payRail, payActionLine, linesOf , coinAmountLabel, coinAmountLabelFor } from '../../lib/deliveryCopy';
@@ -647,8 +645,6 @@ function PayNowCard({ q }: { q: any }) {
   // (recap · countdown · real QR/wallet block) gains ONE extra button, the
   // simulated pay button, right at the payment spot. The page's 12s poll
   // hides this card once the simulated payment settles.
-  // Backend verdict first, static flag only as a fallback — see isTestMode().
-  const testMode = isTestMode(q as Record<string, unknown>);
   // Mirror of the checkout pay screen: same hero (big NIM + fee, you-get,
   // delivery, local fiat), same collapsed summary — the order page must not
   // invent a second, different recap (owner, 2026-10-04).
@@ -745,7 +741,6 @@ function PayNowCard({ q }: { q: any }) {
           />
         </>
       ) : null}
-      {testMode ? <SimulatedPayBlock quoteId={String(q.id || q.quote_id)} /> : null}
       <div className="xs faint mt-1">{t('orderPage.reloadSafe')}</div>
     </div>
   );

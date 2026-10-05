@@ -29,8 +29,6 @@ import { LightningPayBlock, useNimiqPayMissingToast } from './LightningPayBlock'
 import { LightningRailPills } from './payRailKit';
 import { NimiqPayPayButton } from './NimiqPayPayButton';
 import { inNimiqPay, detectMobilePlatform } from '../../lib/miniapp';
-import { SimulatedPayBlock } from './SimulatedPayBlock';
-import { isTestMode } from '../../lib/config';
 import { UsdtPayBlock } from './UsdtPayBlock';
 import { PaymentCountdown } from './PaymentCountdown';
 import { lightningPaymentURI, rememberLightningPayment } from '../../lib/hub';
@@ -820,28 +818,6 @@ export function PayScreen({
     };
   }, [quote, liveQuote]);
 
-  // TEST MODE: there is NO separate simulated pay screen. The customer sees
-  // this exact real pay screen — real invoice, real QR, real countdown — and
-  // the ONLY addition is one extra button (SimulatedPayBlock) at the payment
-  // spot, which drives the quote through the same state machine a real
-  // payment uses. Everything else on this screen is the real thing.
-  // Resolved through isTestMode() so the BACKEND's explicit verdict on this
-  // order wins over the static config.js flag. See src/lib/config.ts for why
-  // merging the two with `||` was wrong.
-  const testMode = isTestMode(quote, current);
-  const testPayButton = testMode ? (
-    <SimulatedPayBlock
-      quoteId={quoteIdOf(current)}
-      onPaid={(result) => {
-        // The simulated pay endpoint walks the quote through the same state
-        // machine as a real payment. Complete this checkout as soon as the
-        // endpoint confirms that transition; the poll remains as the
-        // fallback for a delayed response.
-        const simulatedStatus = String(result?.status || result?.quote?.status || '');
-        if (result?.ok === true || PAID_STATUSES.has(simulatedStatus)) finish(true, simulatedStatus || 'payment_received');
-      }}
-    />
-  ) : null;
 
   if (isUsdt) {
     // The stablecoin sheet must answer the SAME questions as the NIM one: what
@@ -887,7 +863,6 @@ export function PayScreen({
             // Stablecoin payments are self-wallet sends; keep polling.
           }}
         />
-        {testPayButton}
 
       </div>
     );
@@ -940,8 +915,7 @@ export function PayScreen({
           <div className="strong">{t('checkout.flowPaymentSeen')}</div>
           <div className="small mt-1">{t('checkout.flowWaitForSettlement')}</div>
           <a className="btn btn-gold btn-block mt-2" href={pagePath('/order?type=quote&id=' + encodeURIComponent(quoteIdOf(current)))}>{t('checkout.flowOpenOrder')}</a>
-          {testPayButton}
-        </div>
+          </div>
       );
     }
     return (
@@ -950,7 +924,6 @@ export function PayScreen({
           <Icon name="bolt" size={14} /> {t('checkout.flowRenewInvoice')}
         </button>
         <a className="btn btn-outline btn-block mt-2" href={pagePath('/order?type=quote&id=' + encodeURIComponent(quoteIdOf(current)))}>{t('checkout.flowOpenOrder')}</a>
-        {testPayButton}
       </div>
     );
   }
@@ -1035,7 +1008,6 @@ export function PayScreen({
       <details className="checkout-details-min"><summary>{t('checkout.flowDetailsSummary')}</summary><div style={{ marginTop: 8 }}><div className="small" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}><span className="muted">{t('orderPage.finalTotal')}</span><span className="mono strong">{coinAmountLabelFor(current, 'BTC') || t('orderPage.amountNote')}</span></div><div className="small muted">{t('checkout.flowNimEstimateNote')}</div><CashbackFeeNotice example="nim" /><StakerCashbackLine quote={current} />{cbExclusive && (<div className="small muted mt-1" style={{ textAlign: 'center' }}><Icon name="lock" size={13} /> {cbExclusive}</div>)}<div className="alert info mt-1" style={{ marginBottom: 0, display: 'flex', gap: '8px', alignItems: 'center' }}><Icon name="bolt" size={18} /><div className="small">{payRail(current).note}</div></div><div className="small muted mt-1">{payActionLine(current)}</div></div></details>
       {note}
       {uri ? <LightningPayBlock quoteId={quoteIdOf(current)} invoice={invoice} uri={uri} onLaunch={() => rememberLightningPayment(invoice, { kind: 'quote', ref: quoteIdOf(current) })} avatarAddress={getAddress()} hidePayButton /> : null}
-      {testPayButton}
     </div>
   );
 }
