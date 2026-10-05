@@ -2035,10 +2035,16 @@ label.oos-toggle > span {
   white-space: nowrap;
 }
 .come-back-cta {
-  flex: 0 1 auto;
+  /* The pill is NEVER squeezed: it keeps its intrinsic width at every width and
+     the sentence column gives instead. Both columns used to be shrinkable, so
+     the row's shortfall was split between them and the pill lost 10-20px —
+     "[text-truncated] <span.come-back-cta> \"Cashback y staking →\"" in the deep
+     scan at 320px and at 768/820/1024 in es/fr/de/tr/pt. The sentence has
+     data-fit="wrap" (never cut, it wraps), so it is the one that may give. */
+  flex: 0 0 auto;
   width: auto !important;
   min-width: 0;
-  max-width: min(48%, 260px);
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2084,7 +2090,10 @@ label.oos-toggle > span {
     text-overflow: clip;
   }
   .come-back-cta {
-    max-width: 48%;
+    /* No 48% cap: on a 320px rail it landed on ~130px while the pill needs
+       ~135 — the cap itself was the cut. The pill keeps its intrinsic width
+       and the wrapping sentence takes the remainder. */
+    max-width: 100%;
     padding: 5px 8px;
     font-size: .66rem;
     /* One-line pill: a three-line CTA bubble looked broken next to the
@@ -3326,7 +3335,9 @@ input[type="range"]:focus-visible { outline: 2px solid var(--stamp); outline-off
   .topbar .brand { flex: 0 1 auto; }
 }
 .come-back-cta {
-  flex: 0 1 auto;
+  /* flex-shrink stays 0 here too: this tail guard used to undo the pill's
+     own "never shrink" rule for every width (it is later in the file). */
+  flex: 0 0 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

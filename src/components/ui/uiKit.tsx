@@ -80,8 +80,11 @@ export function ComeBackBanner({
         {textNode != null ? <>{textNode}</> : null}
       </span>
       {/* No data-fit here: the runtime wrap escape injected an inline
-          white-space that broke the pill into three lines on phones. The
-          CTA is short in every locale; CSS nowrap + ellipsis is enough. */}
+          white-space that broke the pill into three lines on phones. The pill
+          is short in every locale and CSS keeps it at its intrinsic width
+          (flex: 0 0 auto, no % cap) — the wrapping SENTENCE gives instead, so
+          "Cashback y staking →" is never ellipsized (deep scan: it was, at
+          320px and 768/820/1024). */}
       <span className="come-back-cta">{t('ui.comeBackCta')}</span>
     </a>
   );
