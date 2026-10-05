@@ -15,9 +15,15 @@ import { CashbackImpactSection } from './CashbackImpactSection';
  * All stake figures come from the operator's own pool (GET /api/poolstake/me).
  * The chain is never queried from here.
  *
- * v3 layout: rate hero → three-step explainer → calculator → stake form →
- * payouts → fine print (collapsed). The calculator replays the backend
- * ledger model (lib/cashbackCalc.ts).
+ * v8 layout (owner, 2026-10-05: "o sayfayı basitleştir çok uzun"): receipt
+ * card → compact "your cashback right now" strip → leaderboard → calculator →
+ * stake card → fine print. The three ordering blocks come from ONE component
+ * (CashbackImpactSection, `between` prop) so they cannot drift apart, the
+ * calculator lost its second result box, its breakdown table and its prose
+ * (all behind one "Assumptions & fine print" disclosure — see
+ * CashbackCalculator.tsx), and the stake form is its own card so it survives a
+ * failed programme load. The calculator replays the backend ledger model
+ * (lib/cashbackCalc.ts).
  *
  * v4: the base is the POOL's call — any positive stake earns the staker base
  * (0.5%), no stake earns nothing (unless the operator runs a promotion).
@@ -511,12 +517,121 @@ export function CashbackView() {
   }
 
 
+  /**
+   * The compact "your cashback right now" strip that sits between the receipt
+   * card and the leaderboard (owner, 2026-10-05: "sonra şu anki cashbackiniz").
+   *
+   * It IS the old hero, reduced to one row: the same live rate, the same three
+   * numbers (stake, boost credit, pending/paid) and — for a visitor with no
+   * stake — the same one-line pitch and wallet CTA. The paragraph the hero led
+   * with ("stake any amount of NIM with our pool → …") lives HERE only when it
+   * is the visitor's actual situation; the rest of the page explains the
+   * programme where the numbers come from, not above them.
+   */
+  const rateStrip = (
+    <div className="card mt-2 fade-in cb-rate-strip">
+      {authed ? (
+        <>
+          <div className="cb-rate-now">
+            <span className="xs faint">{t('cashback.heroNow')}</span>
+            <span className="cb-rate-value">
+              {pct(myRate)}
+              {stakedHere && (
+                <span className="chip cb-rate-chip">
+                  <Icon name="check" size={12} /> {boosted && (mine?.boost_bps || 0) > 0 ? t('cashback.heroBaseBoost') : t('cashback.heroBase')}
+                </span>
+              )}
+            </span>
+            <span className="small muted">
+              {stakedHere
+                ? t('cashback.heroStaked', {
+                    nim: fmtStakeNIM(mine?.stake_nim || 0),
+                    loyalty: (mine?.loyalty_days || 0) > 0 ? t('cashback.heroLoyalty', { days: String(mine?.loyalty_days) }) : '',
+                  })
+                : t('cashback.heroNoStake', { pct: pct(stakerBaseBps), max: String(params?.max_boost_percent ?? '?') })}
+            </span>
+          </div>
+
+          <div className="cb-rate-stats">
+            {stakedHere && (
+              <div>
+                <div className="xs faint">{t('cashback.statYourStake')}</div>
+                <div className="strong">{fmtStakeNIM(mine?.stake_nim || 0)} <NimUnit size={13} /></div>
+              </div>
+            )}
+            {myLedger && (
+              <div>
+                <div className="xs faint">{t('cashback.statBoostCredit')}</div>
+                <div className="strong" style={{ color: accruedNIM > 0 ? 'var(--green)' : undefined }}>
+                  {fmtStakeNIM(accruedNIM)} <NimUnit size={13} />
+                </div>
+              </div>
+            )}
+            {ledger && (
+              <>
+                <div>
+                  <div className="xs faint">{t('cashback.statPending')}</div>
+                  <div className="strong">{fmtStakeNIM(ledger.totals.pending_nim)} <NimUnit size={13} /></div>
+                </div>
+                <div>
+                  <div className="xs faint">{t('cashback.statPaid')}</div>
+                  <div className="strong">{fmtStakeNIM(ledger.totals.paid_nim)} <NimUnit size={13} /></div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {!stakedHere && (
+            <div className="cb-rate-cta">
+              {inPay ? (
+                <a className="btn btn-gold btn-sm" href="#cb-stake-form">
+                  <Icon name="bolt" size={14} /> {t('cashback.ctaStartStaking')}
+                </a>
+              ) : (
+                <button type="button" className="btn btn-gold btn-sm" onClick={showWalletRedirect}>
+                  <Icon name="external" size={14} /> {t('cashback.ctaStartInWallet')}
+                </button>
+              )}
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="cb-rate-now">
+            <span className="xs faint">{t('cashback.heroNow')}</span>
+            <span className="small muted">
+              {t('cashback.heroStakePrompt', { pct: pct(stakerBaseBps), max: String(params?.max_boost_percent ?? '?') })}
+            </span>
+          </div>
+          <div className="cb-rate-cta">
+            {inPay ? (
+              <a className="btn btn-gold btn-sm" href="#cb-stake-form">
+                <Icon name="bolt" size={14} /> {t('cashback.ctaStartStaking')}
+              </a>
+            ) : (
+              <button type="button" className="btn btn-gold btn-sm" onClick={showWalletRedirect}>
+                <Icon name="external" size={14} /> {t('cashback.ctaStartInWallet')}
+              </button>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+
   // REQ-63 (owner 2026-10-05): "Add to your stake" folded INTO the calculator
   // card and cut way down — presets, amount and the stake button in one
   // compact block. No banners, no badge line, no redirect card: outside
   // Nimiq Pay the stake button itself opens the guided wallet hand-off.
+  // Later the same day it became its OWN card again, rendered below the
+  // calculator for everyone — the stake form must not disappear when the
+  // programme fails to load (staking needs no programme: the buyer's wallet
+  // signs it).
   const stakeFooter = (
-    <div id="cb-stake-form" className="mt-2" style={{ borderTop: '1px dashed var(--line-dash, #e0d7c2)', paddingTop: 10 }}>
+    <div id="cb-stake-form">
+      <div className="card-title">
+        <Icon name="bolt" size={16} /> {t('cashback.formAddToStake')}
+      </div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
         {[100_000, 500_000, 1_000_000, 10_000_000].map((n) => (
           <button
@@ -553,6 +668,11 @@ export function CashbackView() {
           {stakeBusy ? t('cashback.formWaitingPay') : !inPay ? t('cashback.formOpenWalletStake') : stakedHere ? t('cashback.opAddStake') : t('cashback.opNewStaker')}
         </button>
       </div>
+      {/* The two lines the form always promised and quietly lost: no account is
+          needed (the buyer's own wallet signs) and where the delegation goes.
+          The e2e suite has asserted the first one since v7. */}
+      <div className="xs faint mt-1">{t('cashback.formNoAccount')}</div>
+      <div className="xs faint">{t('cashback.formDelegates', { validator: POOL_VALIDATOR_NAME, min: MIN_STAKE_NIM })}</div>
 
       {err && (
         <div className="alert error mt-2" style={{ marginBottom: 0 }}>
@@ -616,83 +736,13 @@ export function CashbackView() {
     <div className="container">
       <Header />
 
-      {/* ------------------------------------------------------ your rate */}
-      <div className="card mt-2 fade-in cb-hero">
-        <div className="cb-hero-main">
-          <div className="xs faint">{t('cashback.heroNow')}</div>
-          <div className="strong cb-rate">
-            {pct(myRate)}
-            {stakedHere && (
-              <span className="chip" style={{ fontSize: 12, color: 'var(--green)' }}>
-                <Icon name="check" size={12} /> {boosted && (mine?.boost_bps || 0) > 0 ? t('cashback.heroBaseBoost') : t('cashback.heroBase')}
-              </span>
-            )}
-          </div>
-          <div className="small muted mt-1">
-            {!authed
-              ? t('cashback.heroStakePrompt', { pct: pct(stakerBaseBps), max: String(params?.max_boost_percent ?? '?') })
-              : stakedHere
-                ? t('cashback.heroStaked', {
-                    nim: fmtStakeNIM(mine?.stake_nim || 0),
-                    loyalty: (mine?.loyalty_days || 0) > 0 ? t('cashback.heroLoyalty', { days: String(mine?.loyalty_days) }) : '',
-                  })
-                : t('cashback.heroNoStake', { pct: pct(stakerBaseBps), max: String(params?.max_boost_percent ?? '?') })}
-          </div>
-        </div>
-
-        {/* The buyer's own numbers, at a glance: what they stake (the asset),
-            what it has earned (boost credit) and what the shop has paid. The
-            stake stat leads — it is the number a staked buyer manages here. */}
-        {authed && (ledger || stakedHere) && (
-          <div className="cb-hero-stats">
-            {stakedHere && (
-              <div>
-                <div className="xs faint">{t('cashback.statYourStake')}</div>
-                <div className="strong">
-                  {fmtStakeNIM(mine?.stake_nim || 0)} <NimUnit size={13} />
-                </div>
-              </div>
-            )}
-            {myLedger && (
-              <div>
-                <div className="xs faint">{t('cashback.statBoostCredit')}</div>
-                <div className="strong" style={{ color: accruedNIM > 0 ? 'var(--green)' : undefined }}>
-                  {fmtStakeNIM(accruedNIM)} <NimUnit size={13} />
-                </div>
-              </div>
-            )}
-            {ledger && (
-              <>
-                <div>
-                  <div className="xs faint">{t('cashback.statPending')}</div>
-                  <div className="strong">{fmtStakeNIM(ledger.totals.pending_nim)} <NimUnit size={13} /></div>
-                </div>
-                <div>
-                  <div className="xs faint">{t('cashback.statPaid')}</div>
-                  <div className="strong">{fmtStakeNIM(ledger.totals.paid_nim)} <NimUnit size={13} /></div>
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* Public, like everything else on this page: the CTA is a hand-off to
-            the stake form (or to the wallet guide), and neither needs the shop
-            session. A signed-out visitor used to get no CTA at all. */}
-        {!stakedHere && (
-          <div className="cb-hero-cta">
-            {inPay ? (
-              <a className="btn btn-gold" href="#cb-stake-form">
-                <Icon name="bolt" size={14} /> {t('cashback.ctaStartStaking')}
-              </a>
-            ) : (
-              <button type="button" className="btn btn-gold" onClick={showWalletRedirect}>
-                <Icon name="external" size={14} /> {t('cashback.ctaStartInWallet')}
-              </button>
-            )}
-          </div>
-        )}
-      </div>
+      {/* ------------------------------------------------------ your card */}
+      {/* ORDER (owner, 2026-10-05: "en üste o sayfada cashback kartınızı
+          koy, sonra şu anki cashbackiniz, sonra leaderboard, sonra
+          hesaplayıcı"): the receipt card leads, the live rate follows it, the
+          board comes next and the calculator closes the page. ONE component
+          renders all three blocks so the order can never drift apart again. */}
+      <CashbackImpactSection authed={authed === true} myTotals={ledger?.totals ?? null} between={rateStrip} />
 
       {/* ------------------------------------------------------ calculator */}
       {/*
@@ -719,12 +769,17 @@ export function CashbackView() {
           myStakeNIM={stakedHere ? mine?.stake_nim : undefined}
           myLoyaltyDays={stakedHere ? mine?.loyalty_days : undefined}
           onUseAmount={useCalcAmount}
-          footer={stakeFooter}
         />
         </>
       ) : (
         <ProgrammeUnavailable loadError={!!program?.loadError} busy={retrying} onRetry={retryProgram} />
       )}
+
+      {/* The stake form is its OWN card now, always rendered (it used to be
+          folded into the calculator, which meant it only existed when the
+          programme had loaded). Staking needs no programme: it is signed by
+          the buyer's wallet. */}
+      <div className="card mt-2 cb-stake-card">{stakeFooter}</div>
 
       {/* ------------------------------------------------------ fine print */}
       <details className="cb-details cb-fineprint mt-2">
@@ -744,9 +799,6 @@ export function CashbackView() {
           <li>{t('cashback.fine5')}</li>
         </ul>
       </details>
-
-      {/* Leaderboard merged in (owner 2026-10-05): ONE cashback page. */}
-      <CashbackImpactSection authed={authed === true} myTotals={ledger?.totals ?? null} />
     </div>
   );
 

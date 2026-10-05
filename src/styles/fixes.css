@@ -66,9 +66,9 @@
   line-height: 1.16;
   letter-spacing: -0.01em;
 }
-/* The v3 wallet block (address display) is gone — this page never shows a
-   wallet label or an address, so its grid rules were deleted with it. */
-.cb-rate { font-size: clamp(28px, 8vw, 34px); line-height: 1.1; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+/* The v3 wallet block (address display) and the old .cb-rate headline are gone
+   — this page never shows a wallet label or an address, and the live rate now
+   renders in .cb-rate-value (see the rate-strip block further down). */
 
 /* --- amount + action rows ------------------------------------------------ */
 .cb-form-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -752,40 +752,10 @@ html.in-nimiq-pay #main.page {
   .astat-grid { grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); }
 }
 
-/* --- cashback page v3: hero + steps + calculator --------------------------- */
-.cb-hero {
-  display: grid; gap: 18px; grid-template-columns: 1fr; align-items: center;
-  padding: 18px 20px; border: 1px solid var(--line-dash);
-  background: linear-gradient(135deg, var(--surface-1), var(--hero-wash));
-  box-shadow: 0 5px 18px rgba(78,61,40,.06);
-}
-@media (min-width: 720px) {
-  .cb-hero { grid-template-columns: minmax(0, 1.2fr) minmax(260px, .8fr) auto; }
-  .cb-hero .cb-hero-cta { grid-column: 3; justify-self: end; }
-}
-.cb-hero-main { min-width: 0; }
-.cb-hero .cb-rate { display: flex; align-items: center; gap: 9px; margin-top: 3px; color: var(--green, #2f5540); font-size: clamp(2rem, 6vw, 3rem); line-height: 1; }
-.cb-hero .cb-rate .chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; line-height: 1.2; }
-.cb-hero-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 11px 0; border-top: 1px solid var(--line-dash); border-bottom: 1px solid var(--line-dash); }
-.cb-hero-stats > div { min-width: 0; }
-.cb-hero-stats .strong { display: flex; align-items: center; gap: 4px; font-size: clamp(14px, 3.5vw, 18px); white-space: nowrap; }
-.cb-hero-stats .nim-unit { display: inline-flex; align-items: center; gap: 3px; }
-.cb-hero-cta .btn { width: auto; white-space: nowrap; }
-@media (max-width: 719px) { .cb-hero-cta .btn { width: 100%; } }
-@media (max-width: 480px) { .cb-hero { padding: 16px; gap: 14px; } .cb-hero-stats { gap: 6px; } .cb-hero-stats .strong { font-size: 14px; } }
-
-.cb-steps { display: grid; gap: 10px; grid-template-columns: 1fr; }
-@media (min-width: 640px) { .cb-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-.cb-step {
-  display: flex; gap: 10px; align-items: flex-start;
-  background: var(--surface-1); border: 1.5px dashed var(--line-dash); border-radius: var(--r-l);
-  padding: 12px 14px; min-width: 0;
-}
-.cb-step-n {
-  flex: 0 0 26px; width: 26px; height: 26px; border-radius: 50%;
-  display: inline-flex; align-items: center; justify-content: center;
-  background: var(--stamp); color: var(--on-stamp); font-weight: 900; font-size: 13px;
-}
+/* --- cashback page: calculator + stake card --------------------------------
+   The v3 "hero + steps" blocks are GONE (owner, 2026-10-05: the page was too
+   long). The live rate now renders in the compact .cb-rate-strip between the
+   receipt card and the leaderboard, and the pitch lives in the calculator. */
 
 /* calculator */
 .cb-calc-inputs { display: grid; gap: 16px; grid-template-columns: 1fr; }
@@ -869,9 +839,8 @@ html.in-nimiq-pay #main.page {
 .pager .pager-gap { color: var(--ink-dim); padding: 0 2px; }
 
 /* responsiveness: nothing on this page may push the viewport wider */
-.cb-hero, .cb-calc, .cb-steps, .cb-row { max-width: 100%; }
-.cb-hero-main, .cb-hero-stats > div { min-width: 0; overflow-wrap: anywhere; }
-.cb-rate { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: clamp(30px, 8vw, 40px); line-height: 1.1; }
+.cb-calc, .cb-row { max-width: 100%; }
+.cb-rate-now, .cb-rate-stats > div { min-width: 0; overflow-wrap: anywhere; }
 .cb-calc-kv dt { min-width: 0; overflow-wrap: anywhere; }
 .cb-calc-kv dd { white-space: nowrap; }
 /* Desktop: keep the stake amount + action together instead of pinning the
@@ -881,7 +850,6 @@ html.in-nimiq-pay #main.page {
   #cb-stake-form .cb-form-row .btn.cb-primary { margin-left: 0; }
 }
 @media (max-width: 480px) {
-  .cb-hero-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
   .cb-form-row .cb-primary { width: 100%; }
   .pager { justify-content: flex-start; }
   .pager .btn.pager-prev, .pager .btn.pager-next { flex: 1 1 40%; justify-content: center; }
@@ -941,6 +909,46 @@ html.in-nimiq-pay #main.page {
 }
 
 /* ---- global totals ---- */
+/* Global programme totals, compact, INSIDE the leaderboard card (owner,
+   2026-10-05: the page was too long — the three programme-wide numbers used to
+   be their own full-width row at the very top, above the receipt card). */
+.pt-stats.pt-stats-inline{ gap:8px; grid-template-columns:repeat(3,minmax(0,1fr)); margin:0 0 12px }
+.pt-stats.pt-stats-inline .pt-stat{ flex-direction:row; align-items:center; gap:8px; text-align:left;
+  padding:8px 10px; border-style:solid }
+.pt-stats.pt-stats-inline .pt-stat-ico{ width:30px; height:30px; border-radius:9px }
+.pt-stats.pt-stats-inline .pt-stat-ico svg{ width:16px; height:16px }
+.pt-stats.pt-stats-inline .pt-stat-num{ font-size:var(--fs-md); font-family:inherit }
+.pt-stats.pt-stats-inline .pt-stat-label{ font-size:var(--fs-xs) }
+@media (max-width:430px){ .pt-stats.pt-stats-inline{ grid-template-columns:1fr } }
+
+/* --- "Your cashback right now" strip (owner, 2026-10-05) ---------------------
+   The receipt card leads the page, this strip carries the live rate and the
+   buyer's three numbers, the board follows. It replaces the old full-height
+   hero; the pitch it used to open with now lives in the calculator. */
+.cb-rate-strip{ display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between;
+  gap:10px 18px; padding:12px 14px }
+.cb-rate-now{ display:flex; flex-direction:column; gap:3px; min-width:0; flex:1 1 240px }
+.cb-rate-value{ display:inline-flex; align-items:center; gap:8px; flex-wrap:wrap;
+  font-size:clamp(1.4rem,1.1rem+1.2vw,1.8rem); font-weight:900; line-height:1.15; color:var(--stamp);
+  font-family:var(--font-serif) }
+.cb-rate-value .cb-rate-chip{ font-size:.72rem; color:var(--green); padding:3px 8px }
+.cb-rate-stats{ display:flex; flex-wrap:wrap; gap:8px 18px; align-items:flex-start }
+.cb-rate-stats > div{ min-width:0 }
+.cb-rate-cta{ display:flex; gap:8px; flex-wrap:wrap }
+@media (max-width:560px){ .cb-rate-strip{ padding:12px } .cb-rate-stats{ width:100%; justify-content:space-between } }
+
+/* --- Calculator: the single rate line and the rewards line ------------------ */
+.cb-rate-line{ display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; margin-top:10px;
+  padding:8px 12px; border:1.5px dashed var(--line-dash); border-radius:var(--r-m); background:var(--surface-1) }
+.cb-rate-line-num{ font-weight:900; font-size:var(--fs-md); color:var(--stamp) }
+.cb-calc-rewards{ padding:8px 10px; border-radius:var(--r-m); background:var(--green-soft);
+  border:1px solid var(--green) }
+.cb-calc-rewards-num{ font-weight:900; font-size:var(--fs-md); color:var(--green-600) }
+
+/* The stake card is its own card now (it used to be folded into the
+   calculator, which only exists when the programme loaded). */
+.cb-stake-card{ padding:clamp(12px,2.4vw,18px) }
+
 .pt-stats{ display:grid; gap:12px; grid-template-columns:repeat(2,minmax(0,1fr)) }
 @media (min-width:620px){ .pt-stats{ grid-template-columns:repeat(4,minmax(0,1fr)) } }
 .pt-stat{ background:var(--surface-1); border:1.5px dashed var(--line-dash); border-radius:var(--r-l);
@@ -3162,11 +3170,11 @@ body {
 .pt-card.pt-impact small { font-size: max(10px, 1em) !important; }
 .pt-card.pt-impact .pt-impact-kicker { letter-spacing: .1em; }
 
-/* Cashback hero: `1fr` let the longest line (German button label) set a
-   min-content width wider than a 320px phone — content ran off the card. */
-.cb-hero { grid-template-columns: minmax(0, 1fr); }
-.cb-hero > * { min-width: 0; }
-.cb-hero .btn { white-space: normal; max-width: 100%; text-align: center; }
+/* Cashback rate strip: `1fr` tracks let the longest line (German button label)
+   set a min-content width wider than a 320px phone — keep every cell shrinkable
+   and let the strip's own buttons wrap instead of running off the card. */
+.cb-rate-strip > * { min-width: 0; }
+.cb-rate-strip .btn { white-space: normal; max-width: 100%; text-align: center; }
 
 /* Activity stat tiles: the 2-column grid could not shrink below the label
    width in fr/tr at 320px. */

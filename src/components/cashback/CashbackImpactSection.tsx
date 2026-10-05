@@ -5,6 +5,7 @@
  * Leaderboard on the /cashback page.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Icon } from '../ui/Icon';
 import { Identicon } from '../ui/Identicon';
 import { canonicalIdenticonInput, resolveIdenticonUrl } from '../../lib/identicon';
@@ -79,9 +80,16 @@ export type MyCashbackTotalsProp = {
 export function CashbackImpactSection({
   authed,
   myTotals,
+  between,
 }: {
   authed: boolean;
   myTotals: MyCashbackTotalsProp;
+  /**
+   * Rendered BETWEEN the personal card and the leaderboard — the Cashback page
+   * passes its compact "your cashback right now" strip here, so the page order
+   * (card → current rate → board) lives in ONE place (owner, 2026-10-05).
+   */
+  between?: ReactNode;
 
 }) {
   const { t } = useT();
@@ -599,13 +607,6 @@ export function CashbackImpactSection({
 
   return (
     <div className="pt-page" style={{ padding: '14px 0 0' }}>
-      {/* global cashback totals */}
-      <div className="pt-stats">
-        <Stat icon="spark" value={`${formatNimCompact(globalEarned)} NIM`} label={t('cashbackCard.statEarned')} />
-        <Stat icon="wallet" value={`${formatNimCompact(globalWallet)} NIM`} label={t('cashbackCard.statWallet')} />
-        <Stat icon="gift" value={String(globalOrders)} label={t('cashbackCard.statOrders')} />
-      </div>
-
       {/* ------------------------------------------------ personal cashback card */}
       {authed ? (
         <section className="pt-card pt-impact" aria-label={t('cashbackCard.impactAria')}>
@@ -732,6 +733,8 @@ export function CashbackImpactSection({
         </section>
       )}
 
+      {between}
+
       {/* ------------------------------------------------ leaderboard */}
       <section className="pt-card">
         <div className="pt-card-head">
@@ -752,6 +755,15 @@ export function CashbackImpactSection({
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Global programme totals: a compact summary line for the board below.
+            They used to be their own full-width row at the very top of the
+            page, which pushed the owner's card/rate/board order down. */}
+        <div className="pt-stats pt-stats-inline">
+          <Stat icon="spark" value={`${formatNimCompact(globalEarned)} NIM`} label={t('cashbackCard.statEarned')} />
+          <Stat icon="wallet" value={`${formatNimCompact(globalWallet)} NIM`} label={t('cashbackCard.statWallet')} />
+          <Stat icon="gift" value={String(globalOrders)} label={t('cashbackCard.statOrders')} />
         </div>
 
         {authed && cleanUser && (

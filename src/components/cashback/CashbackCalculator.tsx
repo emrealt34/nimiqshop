@@ -9,9 +9,22 @@
  * The base rule lives in the pool and is mirrored here: staked with ANY
  * amount → the staker base (0.5%); not staked → no base at all (0%), unless
  * the operator runs a promotion. The ledger boost stacks on top.
+ *
+ * SIMPLIFIED (owner, 2026-10-05: "hesaplayıcıyı basitleştir baya, şu an baya
+ * karışık"). What used to be here and is gone:
+ *   · the second big result box (staking rewards) — the same number now sits
+ *     in ONE line inside the assumptions, where the APY that feeds it lives;
+ *   · the four-line breakdown table — the total rate is one line under the
+ *     result, and the per-part numbers (base / boost / loyalty) moved into
+ *     the assumptions panel;
+ *   · the four long prose bullets on the card face — they are the fine print
+ *     of this card and belong behind the same disclosure;
+ *   · the "Assumptions" toggle: a plain <details> now, so the card owns no
+ *     open/closed state.
+ * Face of the card, top to bottom: heading, on/off toggle, two sliders, the
+ * loyalty picker, ONE number, one rate line, the call to action.
  */
 import { useEffect, useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
 import { Icon } from '../ui/Icon';
 import { getNimRate, cachedNimRate, onRatesChange } from '../../lib/api';
 import { estimateCashback, sliderToValue, valueToSlider } from '../../lib/cashbackCalc';
@@ -82,7 +95,6 @@ export function CashbackCalculator({
   myStakeNIM,
   myLoyaltyDays,
   onUseAmount,
-  footer,
 }: {
   program: StakeCashbackProgram;
   /** Operator's universal base (non-stakers), bps. 0 by default. */
@@ -94,8 +106,6 @@ export function CashbackCalculator({
   myLoyaltyDays?: number;
   /** "Stake this amount" hands the slider value to the stake form. */
   onUseAmount?: (nim: number) => void;
-  /** REQ-63: compact stake block folded into this card by the page. */
-  footer?: ReactNode;
 }) {
   const stakeMin = Math.max(1, program.min_stake_nim || 100);
   const [stake, setStake] = useState<number>(() =>
@@ -106,7 +116,6 @@ export function CashbackCalculator({
   const [loyalty, setLoyalty] = useState<number>(() => Math.max(0, myLoyaltyDays || 0));
   const [apy, setApy] = useState<string>(String(DEFAULT_APY));
   const [price, setPrice] = useState<number>(() => Number(cachedNimRate()?.usd_per_nim) || 0);
-  const [advanced, setAdvanced] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -299,6 +308,9 @@ export function CashbackCalculator({
       </div>
 
       {/* --------------------------------------------------------- results */}
+      {/* ONE number: what the sliders add up to. The pool-rewards figure that
+          used to sit beside it is a line in the assumptions now (owner: "baya
+          karışık"), and the rate the maths applied is the line right below. */}
       <div className="cb-calc-out mt-2">
         <div className={'cb-calc-main' + (r.totalNIM > 0 ? '' : ' zero')}>
           <div className="xs faint">{t('cashback.calcCashbackOnOrders')}</div>
@@ -310,47 +322,18 @@ export function CashbackCalculator({
             {r.staked ? t('cashback.calcRateOfOrder', { pct: pctText(r.effectivePct) }) : t('cashback.calcNoStakeNoCb')}
           </div>
         </div>
-        <div className="cb-calc-main alt">
-          <div className="xs faint">{t('cashback.calcRewardsKeep')}</div>
-          <div className="cb-calc-big">
-            {nim(r.poolRewardsNIM)}
-            <small> <NimUnit size={11} /> {t('cashback.calcPerMonth')}</small>
-          </div>
-          <div className="small muted">{t('cashback.calcAfterPoolFee', { fee: String(POOL_FEE_PCT) })}</div>
-        </div>
       </div>
 
-      <dl className="kv cb-calc-kv mt-2">
-        <div>
-          <dt>
-            {t('cashback.calcBaseRate', { pct: pctLabel(r.baseBpsApplied) })}
-            {r.staked && r.baseBpsApplied >= stakerBaseBps && stakerBaseBps > 0
-              ? t('cashback.calcBecauseStake')
-              : !r.staked && stakerBaseBps > 0
-                ? t('cashback.calcStakeAnythingFor', { pct: pctLabel(stakerBaseBps) })
-                : ''}
-          </dt>
-          <dd>{nim(r.baseNIM)} NIM</dd>
-        </div>
-        <div>
-          <dt>
-            {t('cashback.calcStakerBoost')}{r.boostRatePct > 0 ? t('cashback.calcBoostApprox', { pct: pctText(r.boostRatePct) }) : ''}
-            {r.staked && r.belowMin ? t('cashback.calcFromMin', { nim: fmtStakeNIM(program.min_stake_nim) }) : ''}
-          </dt>
-          <dd style={{ color: r.boostNIM > 0 ? 'var(--green)' : undefined }}>+{nim(r.boostNIM)} NIM</dd>
-        </div>
-        <div>
-          <dt>{t('cashback.calcLoyaltyMultiplier')}</dt>
-          <dd>×{r.loyaltyMultiplier.toFixed(2)}</dd>
-        </div>
-        {/* The line the whole card builds towards: base + boost, after the
-            loyalty multiplier, as ONE effective rate of the order value —
-            so nobody has to add the pieces above by hand. */}
-        <div>
-          <dt style={{ color: 'var(--ink)', fontWeight: 800 }}>{t('cashback.calcTotalRate')}</dt>
-          <dd style={{ color: 'var(--stamp)', fontWeight: 900, fontSize: 'var(--fs-md)' }}>{pctText(r.effectivePct)}</dd>
-        </div>
-      </dl>
+      <div className="cb-rate-line">
+        <span className="xs faint">{t('cashback.calcYourRate')}</span>
+        <span className="cb-rate-line-num">{pctText(r.effectivePct)}</span>
+        <span className="xs faint">{t('cashback.calcValueNow')}</span>
+      </div>
+      <div className="xs faint">{t('cashback.calcBaseNoCap')}</div>
+
+      {!r.staked && stakerBaseBps > 0 && (
+        <div className="small muted mt-1">{t('cashback.calcNoStakeBody')}</div>
+      )}
 
       {canUse && (
         <button type="button" className="btn btn-sm btn-gold mt-2" onClick={() => onUseAmount!(addNIM)}>
@@ -358,14 +341,13 @@ export function CashbackCalculator({
         </button>
       )}
 
-      {/* Collapsible like the other notes on this page. */}
-      <details
-        className="cb-details mt-2"
-        open={advanced}
-        onToggle={(e) => setAdvanced((e.target as HTMLDetailsElement).open)}
-      >
+      {/* Assumptions & fine print — ONE disclosure, a plain <details> (no
+          state): the APY that drives the maths, the three numbers behind the
+          rate above, the pool rewards the same stake earns, and the programme
+          bullets. */}
+      <details className="cb-details mt-2">
         <summary className="small strong">
-          <Icon name="chevron" size={14} /> {t('cashback.calcAssumptions')}
+          <Icon name="chevron" size={14} /> {t('cashback.calcAssumptionsShort')}
         </summary>
         <div className="mt-2">
           <div className="cb-form-row">
@@ -385,6 +367,35 @@ export function CashbackCalculator({
               style={{ flex: '0 0 84px', width: '84px' }}
             />
           </div>
+
+          {/* The rate above, taken apart: base, boost, loyalty. */}
+          <dl className="kv cb-calc-kv mt-2">
+            <div>
+              <dt>{t('cashback.calcBaseRate', { pct: pctLabel(r.baseBpsApplied) })}</dt>
+              <dd>{nim(r.baseNIM)} NIM</dd>
+            </div>
+            <div>
+              <dt>
+                {t('cashback.calcStakerBoost')}{r.boostRatePct > 0 ? t('cashback.calcBoostApprox', { pct: pctText(r.boostRatePct) }) : ''}
+              </dt>
+              <dd style={{ color: r.boostNIM > 0 ? 'var(--green)' : undefined }}>+{nim(r.boostNIM)} NIM</dd>
+            </div>
+            <div>
+              <dt>{t('cashback.calcLoyaltyMultiplier')}</dt>
+              <dd>×{r.loyaltyMultiplier.toFixed(2)}</dd>
+            </div>
+          </dl>
+
+          {/* Staking rewards — the same stake, the other payout. One line, and
+              it lives next to the APY assumption it is computed from. */}
+          <div className="cb-calc-rewards mt-2">
+            <div className="xs faint">{t('cashback.calcRewardsKeep')}</div>
+            <div className="cb-calc-rewards-num">
+              {nim(r.poolRewardsNIM)} <NimUnit size={11} /> {t('cashback.calcPerMonth')}
+            </div>
+            <div className="xs faint">{t('cashback.calcAfterPoolFee', { fee: String(POOL_FEE_PCT) })}</div>
+          </div>
+
           <ul className="xs faint" style={{ margin: '8px 0 0', paddingLeft: 18 }}>
             <li>
               {t('cashback.calcBaseBullet', {
@@ -418,7 +429,6 @@ export function CashbackCalculator({
           </ul>
         </div>
       </details>
-      {footer}
       <div className="xs faint mt-1">{t('cashback.calcEstimateOnly')}</div>
     </div>
   );

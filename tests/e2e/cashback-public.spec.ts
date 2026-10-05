@@ -42,8 +42,10 @@ test.describe('cashback without an account', () => {
     await expect(handoff, 'calculator "Stake this amount" button is public').toBeVisible();
     await handoff.click();
 
-    // The form picked the calculator's slider value up.
-    await expect(page.locator('#cb-stake-form input[aria-label="Amount in NIM"]')).toHaveValue('10000');
+    // The form picked the calculator's slider value up. The slider starts at
+    // the calculator's own floor (100K NIM — STAKE_MIN_CALC in
+    // CashbackCalculator.tsx), which is what the button label above shows.
+    await expect(page.locator('#cb-stake-form input[aria-label="Amount in NIM"]')).toHaveValue('100000');
   });
 
   test('signed out: pressing stake opens the wallet hand-off, not a dead end', async ({ page }) => {
