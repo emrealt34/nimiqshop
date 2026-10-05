@@ -622,7 +622,7 @@ export function ProductPage() {
         </div>
         <div className="pd pd-skeleton fade-in mt-2" aria-busy="true" aria-label={t('productPage.loadingProduct')}>
           <div className="pd-top">
-            <div className="skeleton-box" style={{ width: 160, height: 120, borderRadius: 12, flexShrink: 0 }} />
+            <div className="skeleton-box" style={{ width: 'clamp(120px, 40vw, 160px)', aspectRatio: '4 / 3', borderRadius: 12, flexShrink: 0 }} />
             <div className="pd-info" style={{ flex: 1 }}>
               <div className="skeleton-box" style={{ width: '60%', maxWidth: 320, height: 28, borderRadius: 8 }} />
               <div className="skeleton-box mt-1" style={{ width: '40%', maxWidth: 240, height: 22, borderRadius: 8 }} />

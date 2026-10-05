@@ -45,7 +45,7 @@ function TrackingSearch() {
 
 function TrackThumbs({ titles, country }: { titles: string[]; country: string }) {
   return (
-    <div style={{ width: 140, flex: 'none' }}>
+    <div style={{ width: 'clamp(96px, 40vw, 140px)', flex: 'none' }}>
       <BrandThumbStack titles={titles} country={country} />
     </div>
   );
