@@ -414,7 +414,7 @@ function cashbackPaidLabel(cb: any) {
   return cb.status || 'unknown';
 }
 
-function CashbackRow({ cb, extraLeft }: { cb: any; extraLeft?: string }) {
+function CashbackRow({ cb, extraLeft, purchaseTx }: { cb: any; extraLeft?: string; purchaseTx?: string }) {
   const paid = cashbackPaidLabel(cb);
   const amt = cb && cb.amount_nim != null ? fmtNIM(cb.amount_nim) + ' NIM' : '—';
   const hash = cb && cb.tx_hash ? String(cb.tx_hash) : '';
@@ -425,6 +425,12 @@ function CashbackRow({ cb, extraLeft }: { cb: any; extraLeft?: string }) {
         <div className="small">{left}</div>
         {badge('Cashback ' + paid, paid === 'paid', amt)}
       </div>
+      {purchaseTx ? (
+        <div className="row between mt-1" style={{ gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <div className="mono xs" style={{ wordBreak: 'break-all' }}>purchase tx {purchaseTx}</div>
+          <CopyButton getText={purchaseTx} label="Copy tx" />
+        </div>
+      ) : null}
       {hash ? (
         <div className="row between mt-1" style={{ gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
           <div className="mono xs" style={{ wordBreak: 'break-all' }}>{hash}</div>
@@ -997,7 +1003,7 @@ function OrdersPanel() {
         <span>Orders — amount, tx, cashback status</span>
         <button
           type="button"
-          className="btn btn-ghost btn-sm"
+          className="btn btn-gold btn-sm"
           style={{ marginLeft: 8 }}
           disabled={purging}
           onClick={() => {
@@ -1025,7 +1031,7 @@ function OrdersPanel() {
       {shown.length ? (
         <div className="mt-1">
           {shown.map((q: any, i: number) => (
-            <CashbackRow key={from + i} cb={q.cashback} extraLeft={(q.test_mode ? '🧪 TEST · ' : '') + (q.product_id || 'item') + ' · ' + (q.status || '') + (q.id ? ' · ' + String(q.id).slice(0, 8) : '')} />
+            <CashbackRow key={from + i} cb={q.cashback} purchaseTx={q.lightning_payment_hash || ''} extraLeft={(q.test_mode ? '🧪 TEST · ' : '') + (q.product_id || 'item') + ' · ' + (q.status || '') + (q.id ? ' · ' + String(q.id).slice(0, 8) : '')} />
           ))}
         </div>
       ) : (
