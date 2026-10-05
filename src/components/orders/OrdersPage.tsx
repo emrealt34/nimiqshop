@@ -19,7 +19,7 @@ import { quoteStages, isTerminalStatus, isDeliveredStatus, isIssueStatus } from 
 import { deliverySummary, payRail } from '../../lib/deliveryCopy';
 import { useInterval } from '../../lib/useInterval';
 import { useToast, useSheet } from '../AppProviders';
-import { StatusBadge, MiniProgress, StarsDisplay, StarPicker, EmptyState, ErrorState, LockedSignInCard, SkeletonCards, NimAmount, OnChainProof } from '../ui/uiKit';
+import { StatusBadge, MiniProgress, StarsDisplay, StarPicker, EmptyState, ErrorState, LockedSignInCard, SkeletonCards, NimAmount, OnChainProof, LiveAgo } from '../ui/uiKit';
 import { WalletBalance } from '../wallet/WalletBalance';
 import { Pager } from '../ui/Pager';
 import { useT, t as i18nT } from '../../i18n';
@@ -489,51 +489,67 @@ function OrderRow({ r, onRate }: { r: any; onRate: (r: any, val: number) => void
           <UnifiedThumb src={''} alt={r.name || r.id} bg={'rgb(255,255,255)'} />
         )}
       </div>
+      {/* THE FEED'S OWN RHYTHM (owner, 2026-10-06: "orders sekmesini de
+          activity'deki tarz yaparsan seviniriz, güzel olmuş da"). Same three
+          rows as a public feed row — title + status + when, then the amount and
+          its chips, then progress · how long it took · the rating. The side
+          column is gone because it was the thing that made a phone squeeze the
+          name into a ribbon. */}
       <div className="o-main">
-        <div className="o-name">{r.name || r.id}</div>
-        <div className="o-sub">
-          <span>{fmtDate(r.created_at)}</span>
-          {r.batchItems > 1 ? <span>{t('ordersPage.itemsCount', { count: r.batchItems })}</span> : r.qty > 1 ? <span>× {r.qty}</span> : null}
-          {r.country ? (
-            <span className="row" style={{ gap: '4px', alignItems: 'center' }}>
-              <FlagMark country={r.country} size={16} /> <span>{countryName(r.country)}</span>
-            </span>
-          ) : null}
-          {/* Delivery channel, straight from the server manifest: a cart with
-              a top-up in it must not read as an email-only order. */}
-          {r.deliveryLabel ? (
-            <span className="row" style={{ gap: '4px', alignItems: 'center' }}>
-              <Icon name={r.deliveryIcon} size={13} /> <span>{r.deliveryLabel}</span>
-            </span>
-          ) : null}
-          {r.railLabel ? <span>{r.railLabel}</span> : null}
+        <div className="o-row-1">
+          <span className="o-title-wrap">
+            {r.country ? (
+              <span className="o-flag" title={countryName(r.country)}>
+                <FlagMark country={r.country} size={16} />
+              </span>
+            ) : null}
+            <span className="strong truncate o-name">{r.name || r.id}</span>
+          </span>
+          <span className="o-side">
+            <StatusBadge status={r.status} />
+            <span className="xs faint o-time">{r.created_at ? <LiveAgo ts={r.created_at} /> : null}</span>
+          </span>
         </div>
-        <div className="mt-1">
-          <MiniProgress order={r} />
+        <div className="o-row-2">
+          <span className="o-amounts">
+            <span className="o-amt-main">
+              {nimNode ? nimNode : r.paidUnit || (r.nimUsd > 0 ? '' : r.priceLabel) || ''}
+            </span>
+            {nimNode && (r.paidUnit || r.usdLabel) ? (
+              <span className="xs faint">{[r.paidUnit, r.usdLabel].filter(Boolean).join(' · ')}</span>
+            ) : null}
+            <span className="o-chips">
+              <span className="chip xs">{fmtDate(r.created_at)}</span>
+              {r.batchItems > 1 ? <span className="chip xs">{t('ordersPage.itemsCount', { count: r.batchItems })}</span> : r.qty > 1 ? <span className="chip xs">× {r.qty}</span> : null}
+              {r.country ? (
+                <span className="chip xs">
+                  <FlagMark country={r.country} size={13} /> {countryName(r.country)}
+                </span>
+              ) : null}
+              {/* Delivery channel, straight from the server manifest: a cart with
+                  a top-up in it must not read as an email-only order. */}
+              {r.deliveryLabel ? (
+                <span className="chip xs">
+                  <Icon name={r.deliveryIcon} size={12} /> {r.deliveryLabel}
+                </span>
+              ) : null}
+              {r.railLabel ? <span className="chip xs">{r.railLabel}</span> : null}
+              {String(r.status).toLowerCase() === 'awaiting_payment' ? (
+                awaitingPay(r) ? (
+                  <span className="chip xs" style={{ fontWeight: 800, color: 'var(--stamp-ink)' }}>{t('order.payNow')}</span>
+                ) : (
+                  <span className="chip xs" style={{ color: 'var(--ink-dim)' }}>{t('ordersPage.paymentWindowPassed')}</span>
+                )
+              ) : null}
+            </span>
+          </span>
         </div>
-        <div className="row mt-1" style={{ gap: '14px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="o-row-3">
+          <span className="o-progress">
+            <MiniProgress order={r} />
+          </span>
           {durationNode}
-          {ratingNode}
-        </div>
-      </div>
-      <div className="o-side">
-        <StatusBadge status={r.status} />
-        {String(r.status).toLowerCase() === 'awaiting_payment' ? (
-          awaitingPay(r) ? (
-            <span className="chip" style={{ marginTop: 6, fontWeight: 800, color: 'var(--stamp-ink)' }}>{t('order.payNow')}</span>
-          ) : (
-            <span className="chip" style={{ marginTop: 6, color: 'var(--ink-dim)' }}>{t('ordersPage.paymentWindowPassed')}</span>
-          )
-        ) : null}
-        <div className="o-price" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '1px' }}>
-          {nimNode ? (
-            <span>{nimNode}</span>
-          ) : (
-            <span>{r.paidUnit || (r.nimUsd > 0 ? '' : r.priceLabel) || ''}</span>
-          )}
-          {nimNode && (r.paidUnit || r.usdLabel) ? (
-            <span className="xs faint">{[r.paidUnit, r.usdLabel].filter(Boolean).join(' · ')}</span>
-          ) : null}
+          {ratingNode ? <span className="o-rate">{ratingNode}</span> : null}
         </div>
       </div>
     </a>

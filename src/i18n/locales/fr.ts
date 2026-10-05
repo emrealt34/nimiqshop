@@ -1770,6 +1770,7 @@ const fr = {
     signIn: 'Connectez votre wallet pour voir votre solde NIM',
     onNetwork: 'sur {{network}}',
     stale: 'actualisation…',
+    shortToast: 'Votre wallet semble insuffisant pour cet achat : environ {{need}} NIM requis, {{have}} NIM disponibles. Vous pouvez continuer quand même.',
     updatePay: 'Mettez à jour Nimiq Pay pour lire votre solde ici — le montant affiché vient de la boutique.',
   },
 
@@ -1910,6 +1911,7 @@ const fr = {
   /* ---- fmt ---- */
   fmt: {
     justNow: 'à l’instant',
+    secAgo: 'il y a {{n}} secondes',
     minAgo: 'il y a {{n}} min',
     hAgo: 'il y a {{n}} h',
     dAgo: 'il y a {{n}} j',

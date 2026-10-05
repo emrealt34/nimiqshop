@@ -73,7 +73,12 @@ export function timeAgo(iso: string | Date): string {
   const d = iso instanceof Date ? iso : new Date(iso);
   if (isNaN(d as unknown as number)) return '';
   const s = Math.max(0, (Date.now() - d.getTime()) / 1000);
-  if (s < 45) return tr('fmt.justNow');
+  // Owner (2026-10-06): "live trackingde saniyede gösterirsen sevinirim,
+  // dakika gösteriyorsun". Under a minute the age is now stated in SECONDS
+  // ("42 saniye önce") instead of a flat "az önce", so a count that is refreshed
+  // every second visibly moves. Above a minute nothing changed.
+  if (s < 5) return tr('fmt.justNow');
+  if (s < 60) return tr('fmt.secAgo', { n: Math.floor(s) });
   if (s < 3600) return tr('fmt.minAgo', { n: Math.round(s / 60) });
   if (s < 86400) return tr('fmt.hAgo', { n: Math.round(s / 3600) });
   if (s < 7 * 86400) return tr('fmt.dAgo', { n: Math.round(s / 86400) });

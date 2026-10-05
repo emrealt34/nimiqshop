@@ -39,7 +39,7 @@ import { quoteFaceValue } from '../../lib/format';
 import { StakerCashbackLine } from '../staker/StakerCashback';
 import { currentCashbackCode } from '../../lib/cashbackCode';
 import { nimAmountText, nimAmountFor } from '../../lib/nim';
-import { refreshWalletBalance, SPEND_MARGIN } from '../../lib/walletBalance';
+import { refreshWalletBalance, coversTarget, neededWholeNim, shortByWholeNim, SPEND_MARGIN } from '../../lib/walletBalance';
 import { WalletBalance, useWalletBalance } from '../wallet/WalletBalance';
 import { fmtUSD } from '../../lib/format';
 import { deliveryLine, youGetText } from '../../lib/deliveryCopy';
@@ -878,16 +878,52 @@ export function PayScreen({
   // amount + the 1% cushion (SPEND_MARGIN): what the buyer must actually hold.
   const needTotal = needNim > 0 ? needNim * (1 + SPEND_MARGIN) : 0;
   const shortBy = Math.max(0, needTotal - walletState.availableNim);
-  const lowBalance = walletState.status === 'ready' && needTotal > 0 && shortBy > 0 && !lowBalDismissed;
+  const walletReady = walletState.status === 'ready';
+  const lowBalance = walletReady && needTotal > 0 && shortBy > 0 && !lowBalDismissed;
+  // The prices in the warning are the same whole NIM the strip shows.
+  const needWhole = neededWholeNim(needNim);
+  const shortWhole = shortByWholeNim(needNim, walletState.availableNim);
 
-  // One toast per quote, not per render: the buyer gets the warning as soon as
-  // the pay screen is ready, and never gets it again while they think about it.
+  /**
+   * THE WARNING, at the moment of the attempt.
+   * Owner (2026-10-06): "bakiyemin yetmediği şeyleri almaya çalışırken karta ve
+   * normal toast çıkmadı düzelt lütfen; toastı yanlış yere mi koydun yoksa".
+   *
+   * Two things were wrong:
+   *  1. the toast fired ONLY once per quote, while the pay screen was still
+   *     assembling — if the buyer was looking at the button, they missed it;
+   *  2. the card was gated on `insidePay`, so the same shortfall said nothing at
+   *     all outside Nimiq Pay even though the balance was known.
+   * It now fires on the press as well (with a short cooldown, so a double tap
+   * does not stack toasts) and the card no longer depends on the host.
+   */
   const warnedFor = useRef('');
+  const lastWarnAt = useRef(0);
+  const warnNow = useCallback(
+    (force = false) => {
+      if (!walletReady || !(needNim > 0)) return;
+      if (coversTarget(needNim, walletState.availableNim)) return;
+      // The 4 s cooldown only guards the press path: the open path must always
+      // announce once per quote, the press path must not stack on a double tap.
+      if (force && Date.now() - lastWarnAt.current < 4000) return;
+      lastWarnAt.current = Date.now();
+      toast(
+        t('checkout.flowLowBalanceToast', {
+          need: needWhole,
+          have: Math.max(0, Math.floor(walletState.availableNim)),
+        }),
+        'warn'
+      );
+    },
+    [needNim, needWhole, walletReady, walletState.availableNim, t, toast]
+  );
+
   useEffect(() => {
     const key = quoteIdOf(current);
     if (!lowBalance || !key || warnedFor.current === key) return;
     warnedFor.current = key;
-    toast(t('checkout.flowLowBalanceToast', { need: fmtNum(needTotal), have: fmtNum(walletState.availableNim) }), 'warn');
+    lastWarnAt.current = Date.now();
+    toast(t('checkout.flowLowBalanceToast', { need: needWhole, have: Math.max(0, Math.floor(walletState.availableNim)) }), 'warn');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lowBalance, walletState.availableNim]);
   const settled = useRef(false);
@@ -1094,16 +1130,16 @@ export function PayScreen({
             shop does not know the exact fee the wallet will charge, so refusing
             would be a guess and a blocked purchase. The verdict carries the 1%
             cushion (SPEND_MARGIN); the figure on the strip does not. */}
-        {lowBalance && insidePay && invoice ? (
-          <div className="alert warn mt-2" style={{ marginBottom: 0, textAlign: 'left', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+        {lowBalance && invoice ? (
+          <div className="alert warn mt-2" data-testid="low-balance-card" style={{ marginBottom: 0, textAlign: 'left', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
             <Icon name="alert" size={16} />
             <div className="small" style={{ flex: 1 }}>
               <div className="strong">{t('checkout.flowLowBalance')}</div>
               <div className="mt-1">
                 {t('checkout.flowLowBalanceBody', {
-                  need: fmtNum(needTotal),
-                  have: fmtNum(walletState.availableNim),
-                  short: fmtNum(shortBy),
+                  need: needWhole,
+                  have: Math.max(0, Math.floor(walletState.availableNim)),
+                  short: shortWhole,
                 })}
               </div>
               <div className="row mt-2" style={{ gap: 8, flexWrap: 'wrap' }}>
@@ -1137,6 +1173,7 @@ export function PayScreen({
             <NimiqPayPayButton
               invoice={invoice}
               amountNim={Number(nimAmountFor(current, cachedNimRate())) || 0}
+              onBeforePay={() => warnNow(true)}
               className="btn btn-gold btn-block btn-lg"
             />
           </div>
@@ -1146,6 +1183,8 @@ export function PayScreen({
             className="btn btn-gold btn-block btn-lg"
             style={{ marginTop: 12 }}
             onClick={() => {
+              // The shortfall is announced on the press too, never blocking.
+              warnNow(true);
               rememberLightningPayment(invoice, { kind: 'quote', ref: quoteIdOf(current) });
               void authorizePaymentLaunch(quoteIdOf(current)).catch(() => {});
               // Outside Nimiq Pay the button must DO something: desktop gets
@@ -1315,14 +1354,6 @@ function isActiveCheckoutMessage(reason: string, msg: string): boolean {
  * (window.__lastPayDetail) when a payment fails; the prompt that follows reads
  * it once and clears it, so a later unrelated failure never inherits it.
  */
-/** NIM with enough precision to be recognisable in a warning sentence. */
-function fmtNum(n: number): string {
-  const v = Number(n) || 0;
-  const abs = Math.abs(v);
-  const digits = abs >= 1000 ? 2 : abs >= 10 ? 2 : abs >= 1 ? 3 : 5;
-  return v.toLocaleString('en-US', { maximumFractionDigits: digits });
-}
-
 function takeLastPayDetail(): string {
   const w = window as any;
   const detail = String(w.__lastPayDetail || '');

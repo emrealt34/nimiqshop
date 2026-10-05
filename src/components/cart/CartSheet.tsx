@@ -18,6 +18,8 @@ import { readAppliedCashbackCode, CASHBACK_CODE_EVENT } from '../../lib/cashback
 import { isAuthed } from '../../lib/session';
 import { openLoginSheet } from '../shell/SiteShell';
 import { CheckoutFlow } from '../checkout/CheckoutFlow';
+import { useWalletBalance } from '../wallet/WalletBalance';
+import { coversTarget, neededWholeNim, shortByWholeNim, warnIfShort } from '../../lib/walletBalance';
 import { WalletBalance } from '../wallet/WalletBalance';
 import { CashbackCodeField } from '../cashback/CashbackCodeField';
 import { useRouter } from '../../lib/router';
@@ -51,6 +53,10 @@ export function CartSheetContent({ close }: { close: () => void }) {
   // computed from rates the market has moved away from.
   const [rateTick, setRateTick] = useState(0);
   const [checkoutItems, setCheckoutItems] = useState<any[] | null>(null);
+  // The buyer's own reading of the wallet, so the cart can warn BEFORE the
+  // checkout sheet opens (shared reading — no extra request).
+  const { state: walletState } = useWalletBalance();
+  const [lowBalDismissed, setLowBalDismissed] = useState(false);
   const [totals, setTotals] = useState<{ nim: number; local: { amount: number; ccy: string } | null; usd: number; bps: number } | null>(null);
   const [cashbackCode, setCashbackCode] = useState(() => readAppliedCashbackCode());
 
@@ -212,6 +218,19 @@ export function CartSheetContent({ close }: { close: () => void }) {
       return;
     }
     if (!items.length) return;
+    // Owner (2026-10-06): "bakiyemin yetmediği şeyleri almaya çalışırken karta
+    // ve normal toast çıkmadı". The cart is where a purchase is attempted for
+    // the WHOLE basket, so the shortfall is announced here too — with the same
+    // numbers, and without stopping the checkout: the inline card right above
+    // this button stays available under "continue anyway".
+    const cartNim = totals && totals.nim > 0 ? totals.nim : 0;
+    warnIfShort({
+      targetNim: cartNim,
+      availableNim: walletState.availableNim,
+      ready: walletState.status === 'ready',
+      translate: t,
+      toast,
+    });
     setCheckoutItems([...items]);
     setMode('checkout');
   };
@@ -338,6 +357,34 @@ export function CartSheetContent({ close }: { close: () => void }) {
       {/* Owner (2026-10-05): "your cart" — the buyer's own NIM, and whether the
           cart actually fits in it, right where the checkout starts. */}
       <WalletBalance variant="line" targetNim={totals && totals.nim > 0 ? totals.nim : 0} targetTotal signInHint className="mt-2" />
+      {/* The cart's own shortfall card — same wording and same two numbers as
+          the pay screen's, and just as non-blocking: "continue anyway" only
+          hides the card, the button below keeps working. */}
+      {(() => {
+        const cartNim = totals && totals.nim > 0 ? totals.nim : 0;
+        if (lowBalDismissed || walletState.status !== 'ready' || !(cartNim > 0)) return null;
+        if (coversTarget(cartNim, walletState.availableNim)) return null;
+        return (
+          <div className="alert warn mt-2" data-testid="low-balance-card" style={{ marginBottom: 0, textAlign: 'left', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+            <Icon name="alert" size={16} />
+            <div className="small" style={{ flex: 1 }}>
+              <div className="strong">{t('checkout.flowLowBalance')}</div>
+              <div className="mt-1">
+                {t('checkout.flowLowBalanceBody', {
+                  need: neededWholeNim(cartNim),
+                  have: Math.max(0, Math.floor(walletState.availableNim)),
+                  short: shortByWholeNim(cartNim, walletState.availableNim),
+                })}
+              </div>
+              <div className="row mt-2" style={{ gap: 8, flexWrap: 'wrap' }}>
+                <button type="button" className="btn btn-sm btn-gold" onClick={() => setLowBalDismissed(true)}>
+                  {t('checkout.flowLowBalanceAnyway')}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       <details className="checkout-details-min"><summary>{t('cartSheet.detailsSummary')}</summary><div style={{ marginTop: 8 }}><CashbackFeeNotice example="nim" /></div></details>
       <button className="btn btn-gold btn-block btn-lg mt-2" onClick={startCheckout} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', justifyContent: 'center', minWidth: 0, paddingInline: '16px' }}>
         <Icon name="nimiq" size={20} />

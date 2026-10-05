@@ -74,6 +74,56 @@ export function coversTarget(targetNim: number, availableNim: number): boolean {
   return Number(availableNim || 0) >= target * (1 + SPEND_MARGIN);
 }
 
+/**
+ * The whole NIM figures the warning sentences use — the buyer sees the same
+ * integers on the strip, in the card and in the toast.
+ *   need   → UP   (never understate what the payment will ask for)
+ *   have   → DOWN (never claim more than the wallet really holds)
+ * Owner (2026-10-06): "bakiyemin yetmediği şeyleri almaya çalışırken karta ve
+ * normal toast çıkmadı" — this is the one place that decides whether the buyer
+ * is short, so the strip, the card and the toast can never disagree.
+ */
+export function neededWholeNim(targetNim: number): number {
+  const target = Number(targetNim || 0);
+  if (!(target > 0)) return 0;
+  return Math.ceil(target * (1 + SPEND_MARGIN));
+}
+
+export function shortByWholeNim(targetNim: number, availableNim: number): number {
+  const need = Number(targetNim || 0) * (1 + SPEND_MARGIN);
+  const have = Number(availableNim || 0);
+  if (!(need > 0) || have >= need) return 0;
+  return Math.max(1, Math.ceil(need - have));
+}
+
+/**
+ * THE pre-purchase warning. Called from every place a purchase can start
+ * (product page, cart, checkout pay screen) so "I'm trying to buy something my
+ * balance doesn't cover" always answers with the same card + toast, and never
+ * blocks the buyer — the shop does not know the wallet's exact fee, and a
+ * refusal based on a guess would be worse than the warning.
+ * Returns true when the warning fired.
+ */
+export function warnIfShort(opts: {
+  targetNim: number;
+  availableNim: number;
+  ready: boolean;
+  translate: (key: string, vars?: Record<string, string | number>) => string;
+  toast: (text: string, kind?: 'success' | 'error' | 'info' | 'warn') => void;
+}): boolean {
+  const { targetNim, availableNim, ready, translate, toast } = opts;
+  if (!ready || !(Number(targetNim) > 0)) return false;
+  if (coversTarget(targetNim, availableNim)) return false;
+  toast(
+    translate('wallet.shortToast', {
+      need: neededWholeNim(targetNim),
+      have: Math.max(0, Math.floor(Number(availableNim || 0))),
+    }),
+    'warn'
+  );
+  return true;
+}
+
 /** How many `unitNim`-priced units the balance can buy, margin included. */
 export function affordableUnits(availableNim: number, unitNim: number): number {
   const unit = Number(unitNim || 0);

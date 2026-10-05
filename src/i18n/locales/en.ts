@@ -1779,6 +1779,7 @@ const en = {
     signIn: 'Sign in with your wallet to see your NIM balance',
     onNetwork: 'on {{network}}',
     stale: 'refreshing…',
+    shortToast: 'Your wallet looks short for this: about {{need}} NIM needed, {{have}} NIM available. You can continue anyway.',
     updatePay: 'Update Nimiq Pay to read your balance here — the figure shown comes from the shop.',
   },
 
@@ -1919,6 +1920,7 @@ const en = {
   /* ---- fmt ---- */
   fmt: {
     justNow: 'just now',
+    secAgo: '{{n}} seconds ago',
     minAgo: '{{n}} min ago',
     hAgo: '{{n}} h ago',
     dAgo: '{{n}} d ago',

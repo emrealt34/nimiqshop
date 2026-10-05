@@ -1770,6 +1770,7 @@ const es = {
     signIn: 'Inicia sesión con tu wallet para ver tu saldo en NIM',
     onNetwork: 'en {{network}}',
     stale: 'actualizando…',
+    shortToast: 'Tu wallet parece insuficiente para esta compra: unos {{need}} NIM necesarios, {{have}} NIM disponibles. Puedes continuar igualmente.',
     updatePay: 'Actualiza Nimiq Pay para leer tu saldo aquí — el importe mostrado viene de la tienda.',
   },
 
@@ -1910,6 +1911,7 @@ const es = {
   /* ---- fmt ---- */
   fmt: {
     justNow: 'ahora mismo',
+    secAgo: 'hace {{n}} segundos',
     minAgo: 'hace {{n}} min',
     hAgo: 'hace {{n}} h',
     dAgo: 'hace {{n}} d',

@@ -29,10 +29,15 @@ import { useWalletBalance } from '../wallet/WalletBalance';
 import { SPEND_MARGIN } from '../../lib/walletBalance';
 
 /** NIM with enough precision to be recognisable (see WalletBalance.nimText). */
+/**
+ * NIM as a whole number. Owner (2026-10-06): "o nimde virgülden sonrasını
+ * gösterme … tam nim göster" — the same rule the balance strip follows, so the
+ * refusal sentence and the figure above the button can be compared at a glance.
+ */
 function nim(n: number): string {
-  const abs = Math.abs(n);
-  const decimals = abs >= 1000 ? 2 : abs >= 10 ? 2 : abs >= 1 ? 3 : 5;
-  return abs.toLocaleString('en-US', { maximumFractionDigits: decimals });
+  const v = Number(n);
+  if (!isFinite(v)) return '0';
+  return String(Math.round(v));
 }
 
 export type NimiqPayPayLabels = {
@@ -99,6 +104,7 @@ const TONE_COLOR: Record<Tone, string> = {
 export function NimiqPayPayButton({
   invoice,
   onSubmitted,
+  onBeforePay,
   labels,
   amountNim = 0,
   className = 'btn btn-gold btn-block',
@@ -106,6 +112,13 @@ export function NimiqPayPayButton({
   invoice: string;
   /** Called once the spend was submitted (submitted / duplicate / unknown). */
   onSubmitted?: (outcome: PayLightningOutcome) => void;
+  /**
+   * Called on the PRESS, before the wallet dialog opens. Owner (2026-10-06):
+   * "bakiyemin yetmediği şeyleri almaya çalışırken karta ve normal toast
+   * çıkmadı" — the warning belongs to the moment the buyer commits, not only to
+   * the moment the screen opened, and it must not block the attempt.
+   */
+  onBeforePay?: () => void;
   labels?: Partial<NimiqPayPayLabels>;
   /** The NIM this payment costs (amount + the host's fee is added on top). */
   amountNim?: number;
@@ -131,6 +144,7 @@ export function NimiqPayPayButton({
 
   const handleClick = useCallback(async () => {
     if (busy || locked || !invoice) return;
+    onBeforePay?.();
     setBusy(true);
     const res = await payLightningInvoice(invoice);
     setOutcome(res);
@@ -149,7 +163,7 @@ export function NimiqPayPayButton({
     // Any outcome may have moved money (or been refused for want of it), so the
     // balance shown above the button is re-read instead of waiting out its TTL.
     refreshWallet();
-  }, [busy, locked, invoice, onSubmitted, refreshWallet]);
+  }, [busy, locked, invoice, onSubmitted, onBeforePay, refreshWallet]);
 
   const message = outcome ? label(outcome.status as keyof NimiqPayPayLabels) : '';
   const tone = outcome ? toneFor(outcome) : 'info';
@@ -167,7 +181,8 @@ export function NimiqPayPayButton({
   const shortfall = (() => {
     if (outcome?.status !== 'insufficient' || !(needTotal > 0)) return 0;
     if (wallet.status !== 'ready') return 0;
-    return Math.max(0, needTotal - wallet.availableNim);
+    // Rounded UP: a shortage never reads as "0 NIM".
+    return Math.ceil(Math.max(0, needTotal - wallet.availableNim));
   })();
   const needHave = outcome?.status === 'insufficient' && needTotal > 0 && wallet.status === 'ready';
 

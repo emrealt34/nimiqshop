@@ -45,14 +45,29 @@ export function useWalletBalance(): { state: WalletBalanceState; refresh: () => 
 }
 
 /**
- * NIM with as much precision as the amount deserves: an integer-rounded
- * 1,240.62 NIM looked like a different number ("miktarım yanlış"), and a
- * 0.4 NIM wallet rounded to "0 NIM". Below 1 NIM nothing is rounded away.
+ * NIM as a WHOLE number, everywhere a NIM figure is shown.
+ * Owner (2026-10-06): "o nimde virgülden sonrasını gösterme lütfen anladın mı
+ * tam nim göster … 0,000 yok 0 var". A crypto balance with three or five
+ * decimals reads as a different number every time the rate ticks, and the
+ * buyer never asked for that precision — "12 NIM" is the honest, stable
+ * reading. The displayed figure is rounded; verdicts and shortages round
+ * differently on purpose (see nimShortText).
  */
 export function nimText(n: number): string {
-  const abs = Math.abs(n);
-  const decimals = abs >= 1000 ? 2 : abs >= 10 ? 2 : abs >= 1 ? 3 : 5;
-  return fmtNIM(n, decimals);
+  const v = Number(n);
+  if (!isFinite(v)) return '0';
+  return fmtNIM(Math.round(v), 0);
+}
+
+/**
+ * A SHORTAGE rounds UP, never down: telling a buyer they are 0 NIM short when
+ * the wallet will refuse the payment is worse than saying 1. It never prints
+ * "0" for a real gap either.
+ */
+export function nimShortText(n: number): string {
+  const v = Number(n);
+  if (!isFinite(v) || v <= 0) return '1';
+  return fmtNIM(Math.max(1, Math.ceil(v)), 0);
 }
 
 /** "NQ73 SE1X YRRF … 2HPD" → "NQ73SE1X…2HPD" */
@@ -123,11 +138,11 @@ export function WalletBalance({
     if (targetTotal) {
       return coversTarget(targetNim, state.availableNim)
         ? { ok: true, text: t('wallet.enough') }
-        : { ok: false, text: t('wallet.short', { nim: nimText(missing) }) };
+        : { ok: false, text: t('wallet.short', { nim: nimShortText(missing) }) };
     }
     return units >= 1
       ? { ok: true, text: t('wallet.afford', { count: units }) }
-      : { ok: false, text: t('wallet.short', { nim: nimText(missing) }) };
+      : { ok: false, text: t('wallet.short', { nim: nimShortText(missing) }) };
   })();
 
   const body = (
@@ -180,14 +195,21 @@ export function WalletBalance({
 
       {ready && variant === 'card' && (
         <span className="wal-meta xs faint">
-          {state.address && <span className="mono">{shortAddress(state.address)}</span>}
-          {state.address && clockOf(state.at) ? ' · ' : ''}
-          {clockOf(state.at) ? t('wallet.updated', { time: clockOf(state.at) }) : ''}
-          {/* WHICH CHAIN the figure was read from. A testnet balance shown as a
-              real one is a wrong reading in every sense — this line makes the
-              mix-up visible instead of mysterious. */}
-          {state.network ? ' · ' + t('wallet.onNetwork', { network: state.network }) : ''}
-          {state.stale ? ' · ' + t('wallet.stale') : ''}
+          {/* Owner (2026-10-06): the address · read time · network row is cut on
+              a phone — it was the longest line on the card and pushed the
+              refresh control off the edge. The whole line (and its transparency:
+              which address, which chain, when) stays on wider screens, and the
+              refresh button is always reachable. */}
+          <span className="wal-meta-text">
+            {state.address && <span className="mono">{shortAddress(state.address)}</span>}
+            {state.address && clockOf(state.at) ? ' · ' : ''}
+            {clockOf(state.at) ? t('wallet.updated', { time: clockOf(state.at) }) : ''}
+            {/* WHICH CHAIN the figure was read from. A testnet balance shown as a
+                real one is a wrong reading in every sense — this line makes the
+                mix-up visible instead of mysterious. */}
+            {state.network ? ' · ' + t('wallet.onNetwork', { network: state.network }) : ''}
+            {state.stale ? ' · ' + t('wallet.stale') : ''}
+          </span>
           <button type="button" className="wal-refresh" onClick={refresh} aria-label={t('wallet.refresh')}>
             <Icon name="refresh" size={13} />
           </button>

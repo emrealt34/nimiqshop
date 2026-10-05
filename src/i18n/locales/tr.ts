@@ -1771,6 +1771,7 @@ const tr = {
     signIn: 'NIM bakiyeni görmek için cüzdanınla giriş yap',
     onNetwork: '{{network}} ağında',
     stale: 'güncelleniyor…',
+    shortToast: 'Bu alışveriş için NIM yetersiz görünüyor: ~{{need}} NIM gerekiyor, {{have}} NIM var. Yine de devam edebilirsin.',
     updatePay: 'Bakiyeyi burada okumak için Nimiq Pay’i güncelle — gösterilen tutar dükkandan geliyor.',
   },
 
@@ -1911,6 +1912,7 @@ const tr = {
   /* ---- fmt ---- */
   fmt: {
     justNow: 'az önce',
+    secAgo: '{{n}} saniye önce',
     minAgo: '{{n}} dk önce',
     hAgo: '{{n}} sa önce',
     dAgo: '{{n}} gün önce',

@@ -3613,3 +3613,111 @@ input[type="range"]:focus-visible { outline: 2px solid var(--stamp); outline-off
   .order-card .o-side { flex-wrap: wrap; row-gap: 4px; }
   .order-card .o-price { font-size: 0.92rem; }
 }
+
+/* ================= ORDERS WEARS THE FEED'S CLOTHES =================
+ * Owner (2026-10-06): "orders sekmesini de activity'deki tarz yaparsan
+ * seviniriz, güzel olmuş da". The order row is now the same object as a feed
+ * row: thumbnail, a title line with the status chip and a live "when", an
+ * amount line with its chips, and a last line carrying progress + duration +
+ * the rating. The side column that used to hold the status and the price is
+ * gone — on a phone it was what squeezed the product name into a ribbon.
+ *
+ * Every rule below pairs with the feed's, so the two lists can never drift
+ * apart again; the feed classes are listed first in each pair on purpose.
+ */
+.order-card {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 14px;
+}
+.o-main { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.o-row-1 { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.o-title-wrap { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.order-card .o-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 1.02rem; font-weight: 800; }
+.o-side { display: flex; align-items: center; gap: 10px; flex: none; }
+.o-side .chip { margin: 0 !important; }
+.o-time { white-space: nowrap; }
+.o-row-2 { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.o-amounts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.o-amt-main { font-family: var(--font-serif); font-weight: 900; font-size: 1.12rem; color: var(--ink); }
+.o-chips { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.o-chips .chip { gap: 4px; }
+.o-row-3 { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.o-progress { display: inline-flex; flex: none; }
+.o-rate { margin-left: auto; }
+
+@media (max-width: 640px) {
+  /* Identical grid to .feed-item so the two lists line up row for row. */
+  .order-card {
+    grid-template-columns: clamp(76px, 22vw, 96px) minmax(0, 1fr);
+    grid-template-areas:
+      "thumb head"
+      "b2 b2"
+      "b3 b3";
+    column-gap: 12px;
+    row-gap: 10px;
+    padding: 12px;
+    align-items: start;
+  }
+  .o-thumb { grid-area: thumb; width: 100% !important; max-width: 96px; align-self: center; }
+  .o-main { display: contents; }
+  .o-row-1 {
+    grid-area: head;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 6px;
+  }
+  .o-title-wrap { width: 100%; }
+  .order-card .o-name { white-space: normal; overflow: visible; text-overflow: clip; }
+  .o-side { flex: 0 1 auto; flex-wrap: wrap; justify-content: flex-start; gap: 6px 8px; }
+  .o-row-2 { grid-area: b2; }
+  .o-row-3 { grid-area: b3; justify-content: space-between; }
+  .o-row-3 .o-rate { margin-left: auto; }
+}
+
+/* ================= THE FEED ON A PHONE, TAKE 2 =================
+ * Owner (2026-10-06), after the first pass: "activityde görsel tam
+ * ortalanmamış" and "sadece yıldız verme yanlış yerde gözüküyor".
+ *  - the 4px sticker shadow shifts the logo by -2/-2px so it LOOKS centred, but
+ *    on a 85px mobile tile that offset is visible, so a phone gets the true
+ *    centre;
+ *  - the rating stars used to fall onto a row of their own under the wallet
+ *    chip; the row is now one line, with the chip allowed to truncate instead
+ *    of pushing the stars down.
+ */
+@media (max-width: 640px) {
+  .thumb .product-img { transform: none !important; }
+  .feed-thumb { align-self: center; }
+  .feed-row-3 { flex-wrap: nowrap; gap: 8px; }
+  .feed-row-3 .feed-wallet { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .feed-row-3 .cell-rate { margin-left: auto; flex: none; }
+  .feed-row-3 .feed-wallet + .xs { flex: none; }
+  .tl-time .live { font-weight: 800; color: var(--stamp); }
+  .tl-time .live-pulse-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--stamp); margin-right: 5px; animation: pulse-dot 1.3s ease infinite; }
+}
+
+/* ================= TOAST KINDS =================
+ * The provider has always rendered `toast toast-<kind>`, but only the
+ * dotted `.toast.error` style existed, so every toast looked identical — a
+ * short-balance warning could not be told apart from a "copied" confirmation
+ * (owner, 2026-10-06: the warning "çıkmadı" as a warning). Each kind now
+ * carries the site's own accent as a left rule + icon colour.
+ */
+.toast.toast-success, .toast.success { border-left: 4px solid var(--green); }
+.toast.toast-error, .toast.error { border-left: 4px solid var(--red); }
+.toast.toast-info, .toast.info { border-left: 4px solid var(--blue); }
+.toast.toast-warn, .toast.warn { border-left: 4px solid var(--stamp); }
+.toast.toast-success svg { color: var(--green); }
+.toast.toast-warn svg { color: var(--stamp); }
+.toast.toast-error svg { color: var(--red); }
+.toast.toast-info svg { color: var(--blue); }
+
+/* The wallet card's meta line (address · read time · network) is the longest
+   line on the card and, on a phone, pushed the refresh control off the edge —
+   owner (2026-10-06): "fotoğrafını koyduğum yeri kesebilirsin" over a shot of
+   exactly that line. It is cut on phones; the refresh button stays. */
+@media (max-width: 640px) {
+  .wal-meta { justify-content: flex-end; }
+  .wal-meta-text { display: none; }
+}

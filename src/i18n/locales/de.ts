@@ -1770,6 +1770,7 @@ const de = {
     signIn: 'Melde dich mit deiner Wallet an, um dein NIM-Guthaben zu sehen',
     onNetwork: 'auf {{network}}',
     stale: 'wird aktualisiert…',
+    shortToast: 'Deine Wallet scheint dafür zu wenig zu haben: etwa {{need}} NIM nötig, {{have}} NIM vorhanden. Du kannst trotzdem fortfahren.',
     updatePay: 'Aktualisiere Nimiq Pay, um dein Guthaben hier zu lesen — der Wert stammt aus dem Shop.',
   },
 
@@ -1910,6 +1911,7 @@ const de = {
   /* ---- fmt ---- */
   fmt: {
     justNow: 'gerade eben',
+    secAgo: 'vor {{n}} Sekunden',
     minAgo: 'vor {{n}} Min.',
     hAgo: 'vor {{n}} Std.',
     dAgo: 'vor {{n}} Tg.',

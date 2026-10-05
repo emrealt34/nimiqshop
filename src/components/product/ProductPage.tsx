@@ -32,6 +32,8 @@ import {
 } from '../../lib/format';
 import { mapKind, extractLogo } from '../../lib/catalog';
 import { openSingleBuyFlow } from '../checkout/CheckoutFlow';
+import { useWalletBalance } from '../wallet/WalletBalance';
+import { warnIfShort } from '../../lib/walletBalance';
 import { safeRichHTML } from '../../lib/format';
 import { useRouter } from '../../lib/router';
 import { useT, t as i18nT } from '../../i18n';
@@ -360,6 +362,9 @@ export function ProductPage() {
   const { openSheet, closeSheet } = useSheet();
   const { toast } = useToast();
   const { navigate } = useRouter();
+  // The wallet reading the strip above the buttons already shows (shared
+  // state, no extra request) — the same numbers feed the pre-purchase warning.
+  const { state: walletState } = useWalletBalance();
 
   // init selection when product loads
   useEffect(() => {
@@ -701,8 +706,23 @@ export function ProductPage() {
 
   const dead = !hasPackages && !product.range;
 
+  /** The one place the product page decides "can this wallet afford it?" —
+      shared with the strip above the buttons, so the sentence and the figure
+      never disagree. Owner (2026-10-06): the warning must exist on the attempt,
+      not only on the pay screen. */
+  const affirmAffordable = () => {
+    warnIfShort({
+      targetNim: currentProductNIM(),
+      availableNim: walletState.availableNim,
+      ready: walletState.status === 'ready',
+      translate: t,
+      toast,
+    });
+  };
+
   const doAddToCart = () => {
     if (!cart) return;
+    affirmAffordable();
     const ok = cart.addToCart(
       {
         id: product.id,
@@ -744,6 +764,7 @@ export function ProductPage() {
   const chips = chipKeys(effectiveType);
 
   const doBuy = () => {
+    affirmAffordable();
     const selectedPkgForBuy = product.packages?.find((x) => x.package_id === pkg) as any;
     openSingleBuyFlow({
       product: {

@@ -8,7 +8,7 @@ import { Icon } from './Icon';
 import { explorerUrl, shortTx } from '../../lib/chain';
 import { CFG } from '../../lib/config';
 import { Identicon } from './Identicon';
-import { fmtDate, fmtNIM } from '../../lib/format';
+import { fmtDate, fmtNIM, timeAgo } from '../../lib/format';
 import { Clipboard } from '../../lib/clipboard';
 import { getNimRate, cachedNimRate, errorDetailLine } from '../../lib/api';
 import { nimAmountFor, nimFallbackText } from '../../lib/nim';
@@ -238,6 +238,32 @@ const DELIVERY_DONE_DESC: Record<string, string> = {
   both: 'stage.doneBoth',
 };
 
+/**
+ * LiveAgo — the age of a moment, refreshed EVERY SECOND while it is younger
+ * than a minute, then every second still (cheap: a text node).
+ *
+ * Owner (2026-10-06): "live trackingde saniyede gösterirsen sevinirim, dakika
+ * gösteriyorsun saniyede göstersen". The live-tracking card and the public feed
+ * answer "when?" — with a per-second tick the newest events read "3 saniye
+ * önce" and climb, instead of sitting on "az önce" until a minute has passed.
+ */
+export function LiveAgo({ ts, className = '' }: { ts?: string | number | Date; className?: string }) {
+  const [, force] = useState(0);
+  useEffect(() => {
+    if (!ts) return;
+    const timer = window.setInterval(() => force((n) => n + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [ts]);
+  if (!ts) return null;
+  const text = timeAgo(ts);
+  if (!text) return null;
+  return (
+    <span className={className} title={fmtDate(ts)}>
+      {text}
+    </span>
+  );
+}
+
 export function StageTimeline({ stages, channel, usdt }: { stages?: any[]; channel?: 'email' | 'phone' | 'both' | 'none'; usdt?: boolean }) {
   const { t } = useT();
   const arr = Array.isArray(stages) ? stages : [];
@@ -265,7 +291,20 @@ export function StageTimeline({ stages, channel, usdt }: { stages?: any[]; chann
             </div>
             <div className="tl-title">{title}</div>
             {desc ? <div className="tl-desc">{desc}</div> : null}
-            {st.timestamp ? <div className="tl-time">{fmtDate(st.timestamp)}</div> : null}
+            {/* Absolute clock + LIVE age. The in-progress step is the one the
+                buyer stares at, so its age ticks in seconds. */}
+            {st.timestamp ? (
+              <div className="tl-time">
+                {fmtDate(st.timestamp)}
+                {' · '}
+                <LiveAgo ts={st.timestamp} className={status === 'in_progress' ? 'live' : undefined} />
+              </div>
+            ) : status === 'in_progress' ? (
+              <div className="tl-time">
+                <span className="live-pulse-dot" aria-hidden="true" />
+                <LiveAgo ts={Date.now()} />
+              </div>
+            ) : null}
           </div>
         );
       })}
