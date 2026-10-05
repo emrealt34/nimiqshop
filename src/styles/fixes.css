@@ -1095,10 +1095,28 @@ html.in-nimiq-pay #main.page {
   line-height:1.35; overflow-wrap:anywhere }
 .wal-verdict.ok{ color:var(--green-600) }
 .wal-verdict.short{ color:var(--stamp) }
-.wal-card{ padding:14px 16px; border:1.5px dashed var(--line-dash); border-radius:var(--r-l); background:var(--surface-1) }
-.wal-line{ padding:10px 12px; border:1.5px dashed var(--line-dash); border-radius:var(--r-m); background:var(--gold-soft) }
+/* WALLET SURFACES = THE SITE'S OWN WHITE.
+   Owner (2026-10-06): "şu yaptığı renk şeması sitenin beyazına uymuyor iyice
+   düzelt … uyumsuz". The strip and the card were the only surfaces on the shop
+   painted with a bespoke tint (--gold-soft, a pale gold wash): everything else
+   is either the cream card (--surface-1) or the site's WHITE — the same white
+   the product tiles and the QR panel use (--white-card, see app.css). The
+   balance panel now uses that white with the shop's standard dashed card
+   border, so it is the same object language as every other card, and the dark
+   theme swaps it for the recessed surface instead of glare. */
+.wal-card{ padding:14px 16px; border:1.5px dashed var(--line-dash); border-radius:var(--r-l);
+  background:var(--white-card, #FFFFFF) }
+.wal-line{ padding:10px 12px; border:1.5px dashed var(--line-dash); border-radius:var(--r-m);
+  background:var(--white-card, #FFFFFF) }
+[data-theme="dark"] .wal-card, [data-theme="dark"] .wal-line{
+  background:var(--surface-2); border-color:var(--line-strong) }
 .wal-chip{ gap:5px }
 .wal-chip strong{ font-family:var(--font-serif) }
+/* The small print under the figure (address · read time · network · refresh)
+   sits on the same white panel, so it needs the site's dimmer ink to stay
+   readable rather than the faded tone meant for the cream background. */
+.wal-meta, .wal-note{ color:var(--ink-dim) }
+.wal-note{ display:flex; align-items:center; gap:5px; flex-wrap:wrap; line-height:1.4 }
 
 /* ---- pager ---- */
 .pt-pager{ display:flex; align-items:center; justify-content:space-between; gap:10px;
