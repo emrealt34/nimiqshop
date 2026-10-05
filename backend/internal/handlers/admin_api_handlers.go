@@ -1190,7 +1190,7 @@ func adminOrderView(order db.Order) map[string]any {
 }
 
 func adminQuoteView(quote db.Quote) map[string]any {
-	return map[string]any{
+	view := map[string]any{
 		"id": quote.ID, "user_id": quote.UserID,
 		"product_id": quote.ProductID, "product_country": quote.ProductCountry,
 		"denomination": quote.Denomination, "product_value": quote.ProductValue,
@@ -1206,14 +1206,14 @@ func adminQuoteView(quote db.Quote) map[string]any {
 		// Test-center orders are clearly marked so an operator never
 		// mistakes a simulated purchase for a real one.
 		"test_mode":         quote.TestMode,
-
-		// Owner (2026-10-05): the purchase tx belongs on the admin order row
-		// too — same hash the public recap and the feed show.
-		"lightning_payment_hash": quote.LightningPaymentHash,
-
 		"cashback_code":     quote.CashbackCode,
 		"cashback_code_bps": quote.CashbackCodeBps,
 	}
+	// Owner (2026-10-05): the purchase tx belongs on the admin order row
+	// too — same hash the public recap and the feed show. Set after the
+	// literal so gofmt alignment groups stay untouched.
+	view["lightning_payment_hash"] = quote.LightningPaymentHash
+	return view
 }
 
 func adminCashbackView(cb db.Cashback) map[string]any {
