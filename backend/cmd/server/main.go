@@ -840,6 +840,9 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 	// fake-pay it through the real state machine (see admin_test_center.go).
 	r.POST("/api/admin/test-purchase", adminOnly(h.AdminTestPurchase))
 	r.POST("/api/admin/purge-test-orders", adminOnly(h.AdminPurgeTestOrders))
+	// The simulated-pay ENGINE stays for the e2e suite; every customer-facing
+	// button that called it is gone (owner, 2026-10-05).
+	r.POST("/api/quotes/{id}/test-pay", authedTiered(aCheckout, h.UserTestPay))
 	r.GET("/api/admin/test-quote/{id}", adminOnly(h.AdminTestQuoteStatus))
 	r.GET("/api/admin/oracle", adminOnly(h.AdminOracleHealth))
 	r.POST("/api/admin/settings/margin", adminOnly(h.AdminUpdateMargin))
