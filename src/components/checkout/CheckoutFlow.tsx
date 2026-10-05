@@ -16,7 +16,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../ui/Icon';
 import { ErrorDetail } from '../ui/uiKit';
 import { useCart, itemKey, type CartItem } from '../../lib/cartStore';
-import { useToast } from '../AppProviders';
+import { useSheet, useToast } from '../AppProviders';
 import { createQuote, createQuoteBatch, forgetQuote, getQuote, friendlyApiMessage, authorizePaymentLaunch, cachedNimRate, errorDetailLine } from '../../lib/api';
 import { canRenewQuote, paymentInFlight } from '../../lib/pay';
 import { buildOrderRequest, getGiftExtras, type DeliveryInfo } from '../../lib/delivery';
@@ -865,6 +865,9 @@ export function PayScreen({
   onResult: (ok: boolean) => void;
 }) {
   const { t } = useT();
+  // The short-balance popup is a sheet, so the pay screen needs the opener
+  // (owner, 2026-10-06: "popup olarak çıkacaktı o yetersiz, seçenek sunacaktı").
+  const { openSheet } = useSheet();
   const [liveQuote, setLiveQuote] = useState(quote);
   const [expired, setExpired] = useState(false);
   useEffect(() => { setLiveQuote(quote); setExpired(false); }, [quote]);
