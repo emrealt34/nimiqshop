@@ -235,7 +235,6 @@ func main() {
 
 	h := handlers.New(store, cfg, cr)
 
-	}
 	h.Presence = presence.New()
 	// A shared (CDN) cache is keyed on the URL alone, so it may only store a
 	// response whose Access-Control-Allow-Origin is DETERMINISTIC. With zero
