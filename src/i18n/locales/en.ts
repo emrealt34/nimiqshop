@@ -1483,7 +1483,6 @@ const en = {
     liveTracking: 'Live tracking',
     youPay: 'You pay',
     paymentMethod: 'Payment',
-    payBtcLightning: 'Pay with BTC Lightning',
     giftMessagePresent: 'Yes',
     finalTotal: 'Final total',
     finalTotalUsdt: 'Exactly the {{coin}} amount shown — plus the small Polygon network fee (in POL) your wallet charges.',

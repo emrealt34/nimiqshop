@@ -1475,7 +1475,6 @@ const tr = {
     liveTracking: 'Canlı takip',
     youPay: 'Ödediğin',
     paymentMethod: 'Ödeme',
-    payBtcLightning: 'BTC Lightning ile öde',
     giftMessagePresent: 'Var',
     finalTotal: 'Nihai toplam',
     finalTotalUsdt: 'Tam olarak gösterilen {{coin}} tutarı — artı cüzdanının kestiği küçük Polygon ağ ücreti (POL).',

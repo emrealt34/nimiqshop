@@ -1474,7 +1474,6 @@ const fr = {
     liveTracking: 'Suivi en direct',
     youPay: 'Vous payez',
     paymentMethod: 'Paiement',
-    payBtcLightning: 'Payer avec BTC Lightning',
     giftMessagePresent: 'Présent',
     finalTotal: 'Total final',
     finalTotalUsdt: 'Exactement le montant en {{coin}} affiché — plus les petits frais réseau Polygon (en POL) de votre portefeuille.',

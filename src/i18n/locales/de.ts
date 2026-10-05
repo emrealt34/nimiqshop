@@ -1474,7 +1474,6 @@ const de = {
     liveTracking: 'Live-Tracking',
     youPay: 'Du zahlst',
     paymentMethod: 'Zahlung',
-    payBtcLightning: 'Mit BTC Lightning zahlen',
     giftMessagePresent: 'Vorhanden',
     finalTotal: 'Endsumme',
     finalTotalUsdt: 'Genau der angezeigte {{coin}}-Betrag — plus die kleine Polygon-Netzwerkgebühr (in POL) deiner Wallet.',
