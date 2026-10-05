@@ -250,6 +250,21 @@ func main() {
 			log.Printf("startup purge: marker not saved: %v", err)
 		}
 	}
+
+	// Owner (2026-10-05), pass 2: the wipe deleted the fake ORDERS but their
+	// cashback ledger rows stayed behind — orphans that kept inflating the
+	// public totals and the leaderboard with fake "pending" NIM. One-shot,
+	// its own marker, same boot-time discipline.
+	if raw, _ := store.LoadMeta("purge_orphan_cashbacks_v2"); raw == nil {
+		if n, err := store.PurgeOrphanCashbacks(); err != nil {
+			log.Printf("startup purge v2: %v", err)
+		} else {
+			log.Printf("startup purge v2: deleted %d orphan cashback rows", n)
+		}
+		if err := store.SaveMeta("purge_orphan_cashbacks_v2", []byte(time.Now().UTC().Format(time.RFC3339)), 0); err != nil {
+			log.Printf("startup purge v2: marker not saved: %v", err)
+		}
+	}
 	h.Presence = presence.New()
 	// A shared (CDN) cache is keyed on the URL alone, so it may only store a
 	// response whose Access-Control-Allow-Origin is DETERMINISTIC. With zero
