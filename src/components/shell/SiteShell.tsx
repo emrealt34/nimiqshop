@@ -129,11 +129,11 @@ function Brand() {
       ) : (
         <img
           src={asset("/img/brand-icon-50.webp")}
-          srcSet={`${asset("/img/brand-icon-50.webp?v=nim-brand-1")} 50w, ${asset("/img/brand-icon-80.webp?v=nim-brand-1")} 80w`}
-          sizes="(max-width: 960px) 35px, 40px"
+          srcSet={`${asset("/img/brand-icon-50.webp?v=nim-brand-1")} 50w, ${asset("/img/brand-icon-80.webp?v=nim-brand-1")} 80w, ${asset("/img/brand-icon.png?v=nim-brand-1")} 128w`}
+          sizes="50px"
           alt=""
-          width={40}
-          height={40}
+          width={50}
+          height={50}
           decoding="async"
           fetchPriority="low"
           aria-hidden="true"

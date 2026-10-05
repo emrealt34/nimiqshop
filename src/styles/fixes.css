@@ -2178,6 +2178,9 @@ label.oos-toggle > span {
 }
 @media (max-width: 560px) {
   .topbar .lang-toggle > svg { display: none; }
+  /* Every pixel of the narrow rail goes to the full-size brand: tighter
+     gutters instead of a smaller logo or name. */
+  .topbar-inner { gap: 3px; }
 }
 .topbar .mainnav {
   flex: 1 1 auto;
@@ -2250,9 +2253,6 @@ label.oos-toggle > span {
 
 @media (min-width: 1000px) and (max-width: 1180px) {
   .topbar-inner { gap: 8px; }
-  .topbar .brand { gap: 7px; font-size: 1.1rem; }
-  .topbar .brand svg,
-  .topbar .brand img { width: 40px; height: 40px; }
   .topbar .acct-btn { padding: 3px 7px 3px 3px; }
   /* Legacy from when the top nav appeared at 1000px: this band compacted the
      row for six links + four controls and let the wallet label yield first.
@@ -2268,11 +2268,7 @@ label.oos-toggle > span {
 /* One step closer to the 1181px layout: the wordmark keeps its full name,
    the logo is still the small one. French/Portuguese labels are the longest
    of the six languages, so the brand stays compact a little further up. */
-@media (min-width: 1181px) and (max-width: 1300px) {
-  .topbar .brand { gap: 8px; font-size: 1.16rem; }
-  .topbar .brand svg,
-  .topbar .brand img { width: 44px; height: 44px; }
-}
+
 
 /* Keep every bottom-nav item inside its equal grid cell too. */
 .tabbar,
@@ -2313,11 +2309,6 @@ label.oos-toggle > span {
      keeps the controls right-parked AND gives the wordmark every free pixel
      — a 1px shortfall still painted an ellipsis over the last character. */
   .topbar-spacer { flex-grow: 0; }
-  .topbar .brand img {
-    width: 40px;
-    height: 40px;
-    flex: 0 0 40px;
-  }
   .topbar #site-wordmark {
     display: block;
     min-width: 0;
@@ -3087,7 +3078,10 @@ body {
 /* Wordmark: below 380px the four header controls leave the brand <100px —
    not enough for a readable "shop. / nimiqbase.com" at ≥10px. The logo icon
    stays (the link keeps its aria-label); the text returns from 380px up. */
-@media (max-width: 379.98px) {
+/* The single-line wordmark needs ~235px of rail; below a 430px viewport even
+   the compacted controls cannot share the row, so the name steps aside
+   (icon-only brand) instead of shrinking or wrapping (owner: no shrinking). */
+@media (max-width: 429.98px) {
   .topbar #site-wordmark { display: none !important; }
 }
 
