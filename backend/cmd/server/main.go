@@ -202,6 +202,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("db init: %v", err)
 	}
+	// One-time spend-cap migration: stored rows still on the old published
+	// caps ($50/$500) move to the new ones ($500/$1000).
+	if err := store.MigrateOldSpendCaps(); err != nil {
+		log.Printf("cashback: spend-cap migration: %v", err)
+	}
 	// Wire cashback runtime enrichment: burn wallet address. Both payment
 	// rails (Nimiq Pay and USDT Polygon) pay the same cashback rate.
 	store.SetCashbackEnrichment(cfg.BurnNimAddress)

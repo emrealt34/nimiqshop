@@ -312,6 +312,31 @@ func (s *Store) patchAdminSettings(adminID string, now time.Time, mutate func(*a
 	return settings, err
 }
 
+// MigrateOldSpendCaps lifts a stored programme that still carries the OLD
+// published spend caps ($50/day, $500/month) to the new published caps
+// ($500/day, $1000/month; owner, 2026-10-05: "günlük harcama limiti 500
+// dolar, aylık ise 1000 dolar"). Any other stored values are deliberate
+// admin choices and stay untouched; once migrated the guard never fires
+// again, so the write happens at most once.
+func (s *Store) MigrateOldSpendCaps() error {
+	cur, err := s.GetAdminSettings(0)
+	if err != nil {
+		return err
+	}
+	if cur.StakeCashback == nil || cur.StakeCashback.DailyCapUSD != 50 || cur.StakeCashback.MonthlyCapUSD != 500 {
+		return nil
+	}
+	_, err = s.patchAdminSettings("system:migrate-spend-caps", time.Now().UTC(), func(st *adminmodel.Settings) error {
+		if st.StakeCashback == nil {
+			return nil
+		}
+		st.StakeCashback.DailyCapUSD = 500
+		st.StakeCashback.MonthlyCapUSD = 1000
+		return nil
+	})
+	return err
+}
+
 func (s *Store) SetGlobalMarginBps(marginBps int, adminID string, now time.Time) (adminmodel.Settings, error) {
 	if marginBps < 0 || marginBps > 5000 {
 		return adminmodel.Settings{}, fmt.Errorf("margin must be between 0 and 5000 basis points")
