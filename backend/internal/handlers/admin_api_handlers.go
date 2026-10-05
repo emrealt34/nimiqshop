@@ -1206,9 +1206,11 @@ func adminQuoteView(quote db.Quote) map[string]any {
 		// Test-center orders are clearly marked so an operator never
 		// mistakes a simulated purchase for a real one.
 		"test_mode":         quote.TestMode,
+
 		// Owner (2026-10-05): the purchase tx belongs on the admin order row
 		// too — same hash the public recap and the feed show.
 		"lightning_payment_hash": quote.LightningPaymentHash,
+
 		"cashback_code":     quote.CashbackCode,
 		"cashback_code_bps": quote.CashbackCodeBps,
 	}
