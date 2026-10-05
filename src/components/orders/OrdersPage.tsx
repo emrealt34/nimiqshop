@@ -19,7 +19,7 @@ import { quoteStages, isTerminalStatus, isDeliveredStatus, isIssueStatus } from 
 import { deliverySummary, payRail } from '../../lib/deliveryCopy';
 import { useInterval } from '../../lib/useInterval';
 import { useToast, useSheet } from '../AppProviders';
-import { StatusBadge, MiniProgress, StarsDisplay, StarPicker, EmptyState, ErrorState, LockedSignInCard, SkeletonCards, NimAmount } from '../ui/uiKit';
+import { StatusBadge, MiniProgress, StarsDisplay, StarPicker, EmptyState, ErrorState, LockedSignInCard, SkeletonCards, NimAmount, OnChainProof } from '../ui/uiKit';
 import { Pager } from '../ui/Pager';
 import { useT, t as i18nT } from '../../i18n';
 import { pagePath } from '../../lib/asset';
@@ -140,6 +140,7 @@ export function OrdersView() {
         stages: o.stages,
         current_stage: o.current_stage,
         rating: o.rating || 0,
+        ratingTx: o.rating_tx || '',
         hasTicket: !!o.has_ticket,
         ticketStatus: o.ticket_status,
         image: (o.payload && (o.payload.product_image || o.payload.logo_url || o.payload.image)) || meta.logo,
@@ -217,6 +218,7 @@ export function OrdersView() {
           stages,
           current_stage: stages.findIndex((s) => s.status === 'in_progress'),
           rating: q.rating || 0,
+          ratingTx: q.rating_tx || '',
           hasTicket: false,
           image: meta.logo,
           bgColor: meta.bg,
@@ -278,8 +280,10 @@ export function OrdersView() {
 
   const doRate = async (r: any, val: number) => {
     try {
-      await (r.rowKind === 'quote' ? rateQuote(r.id, val) : rateOrder(r.id, val));
-      toast(t('ordersPage.ratedThanks'), 'success');
+      const res: any = await (r.rowKind === 'quote' ? rateQuote(r.id, val) : rateOrder(r.id, val));
+      // Anchored on-chain: say so, and name the transaction (the explorer link
+      // sits on the row itself once the list refreshes).
+      toast(res && res.rating_tx ? t('ordersPage.ratedOnChain') : t('ordersPage.ratedThanks'), 'success');
       load();
     } catch (e) {
       toast(friendlyApiMessage(e, t('ordersPage.rateError')), 'error');
@@ -437,9 +441,12 @@ function OrderRow({ r, onRate }: { r: any; onRate: (r: any, val: number) => void
   if (isDeliveredStatus(r.status)) {
     if (rated && r.rating > 0) {
       ratingNode = (
-        <span className="row" style={{ gap: '6px', alignItems: 'center', flexWrap: 'nowrap', flexShrink: 0 }}>
+        <span className="row" style={{ gap: '6px', alignItems: 'center', flexWrap: 'wrap', flexShrink: 0 }}>
           <StarsDisplay rating={r.rating} size={14} />
           <span className="xs faint">{t('common.rated')}</span>
+          {/* The rating is anchored on-chain as a 1-Luna memo; the chip links
+              to the very transaction anyone can read on the explorer. */}
+          <OnChainProof tx={r.ratingTx} />
         </span>
       );
     } else if (!rated) {
@@ -463,7 +470,7 @@ function OrderRow({ r, onRate }: { r: any; onRate: (r: any, val: number) => void
 
   return (
     <a className="order-card" href={href}>
-      <div style={{ width: "clamp(64px, 30vw, 140px)", flex: 'none' }}>
+      <div className="o-thumb">
         {distinctTitles.length > 1 ? (
           <BrandThumbStack titles={distinctTitles} country={r.country} />
         ) : r.image ? (

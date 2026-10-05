@@ -14,7 +14,7 @@ export function QR({
   px,
   /** Foreground (module) colour — the stablecoin rail brands its QR. */
   fg = '#042133',
-  /** Centre mark (the shop's Nimiq hexagon) embedded in the quiet zone.
+  /** Centre mark (the shop's own brand tile) embedded in the quiet zone.
    *  With a centre mark the error correction rises M → Q so scanners still
    *  read the code through the overlay. */
   center,

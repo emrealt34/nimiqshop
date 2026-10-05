@@ -65,10 +65,14 @@ type Order struct {
 	// (CryptoRefills, merchant of record) returns the paid amount.
 	Refund json.RawMessage `json:"refund,omitempty"`
 	// Rating is the 1-5 star rating the buyer left after delivery (0 = unrated).
-	Rating    int        `json:"rating,omitempty"`
-	RatedAt   *time.Time `json:"rated_at,omitempty"`
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
+	Rating  int        `json:"rating,omitempty"`
+	RatedAt *time.Time `json:"rated_at,omitempty"`
+	// RatingTx is the Nimiq transaction hash that anchors the rating on-chain
+	// (1 Luna + a memo naming the stars and the order). It is the public proof
+	// anyone can check without our database; empty means not anchored (yet).
+	RatingTx  string    `json:"rating_tx,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // RatingAggregate is the running global star-rating summary. It is stored as a
@@ -267,9 +271,11 @@ type Quote struct {
 	Refund       json.RawMessage `json:"refund,omitempty"`
 	RefundReason string          `json:"refund_reason,omitempty"`
 	// Rating is the 1-5 star rating the buyer left after delivery (0 = unrated).
-	Rating    int        `json:"rating,omitempty"`
-	RatedAt   *time.Time `json:"rated_at,omitempty"`
-	UpdatedAt time.Time  `json:"updated_at"`
+	Rating  int        `json:"rating,omitempty"`
+	RatedAt *time.Time `json:"rated_at,omitempty"`
+	// RatingTx anchors the rating on-chain (see Order.RatingTx).
+	RatingTx  string    `json:"rating_tx,omitempty"`
+	UpdatedAt time.Time `json:"updated_at"`
 	// NimUsdRate / EstimatedNIM are snapshotted at quote time so cashback
 	// (1% of the product's NIM price) is computed from the rate the buyer
 	// actually saw, not a later oracle tick. Zero means "unknown — skip".

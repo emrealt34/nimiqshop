@@ -2677,17 +2677,24 @@ html { overflow-x: clip; }
  * their card. Catalog logo files are wide canvases with the mark vertically
  * centred; without this small visual lift the front card covers the entire
  * mark even though the second image has loaded successfully. The card sizes
- * and straight upward stack geometry stay unchanged. */
+ * and straight upward stack geometry stay unchanged.
+ *
+ * The lift is a PERCENTAGE of the card, not a fixed pixel count (owner,
+ * 2026-10-05: the stacks looked "yamuk yumuk" on phones). The exposed strip is
+ * itself proportional — 24% of a two-card stack, 12% of a three-card one — so a
+ * px value could only ever be right at one tile size: at 140px the marks stayed
+ * half-hidden, and on the 320px rail the middle layer of a 3-stack was lifted
+ * clean out of its card. As a share of the card height the same numbers hold at
+ * every size. */
 .multi-thumb-card[data-layer="2"] .product-img,
 .multi-thumb-card[data-layer="3"] .product-img {
   object-position: center top;
-  transform: translateY(-14px) scale(1.18);
+  transform: translateY(-16%) scale(1.18);
   transform-origin: center top;
 }
-/* In a three-card stack the middle layer has a smaller exposed strip, so lift
- * it a little further while preserving the same straight vertical geometry. */
-.multi-thumb[data-count="3"] .multi-thumb-card[data-layer="2"] .product-img {
-  transform: translateY(-24px) scale(1.18);
+/* Two-card stack: the rear card is exposed by a full quarter of the tile. */
+.multi-thumb[data-count="2"] .multi-thumb-card[data-layer="2"] .product-img {
+  transform: translateY(-32%) scale(1.18);
 }
 .multi-thumb[data-count="2"] .multi-thumb-card[data-layer="1"] {
   /* Front/first item stays in its normal lower position. */

@@ -13,7 +13,7 @@ import { FlagMark } from '../ui/FlagMark';
 import { AppRoot } from '../AppRoot';
 import { openLoginSheet } from '../shell/SiteShell';
 import { friendlyApiMessage, getOrder, refreshOrder, getQuote, refreshQuote, rateOrder, rateQuote, getProduct, allowNewPurchase, createQuote } from '../../lib/api';
-import { isAuthed, getAddress } from '../../lib/session';
+import { isAuthed } from '../../lib/session';
 import { useSession } from '../../lib/useSession';
 import { quoteStages, isTerminalStatus, shouldAskRating, ratingDismissedKey } from '../../lib/orderTrack';
 import { brandMetaForTitle } from '../../lib/catalogMeta';
@@ -757,7 +757,7 @@ function PayNowCard({ q }: { q: any }) {
             invoice={invoice}
             uri={payURI}
             onLaunch={() => rememberLightningPayment(invoice, { kind: 'quote', ref: q.id })}
-            avatarAddress={getAddress()}
+           
           />
         </>
       ) : null}

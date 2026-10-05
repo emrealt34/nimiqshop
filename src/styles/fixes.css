@@ -1034,9 +1034,49 @@ html.in-nimiq-pay #main.page {
   white-space:nowrap; font-weight:800; color:var(--green-600); font-size:var(--fs-sm) }
 .pt-leader-orders{ flex:0 0 auto; white-space:nowrap; color:var(--ink-faint); font-size:var(--fs-xs) }
 .pt-you-row{ background:var(--green-soft); border-radius:var(--r-m) }
+/* The amount / orders / YOU-badge trio is one group in the markup, so the phone
+   layout can move it as a unit and the desktop flex row is untouched. */
+.pt-leader-meta{ display:contents }
+
+/* Owner (2026-10-05): "buralar satırlı olmalı ve ekran küçüldüğünde bunlar yan
+   yana olmaktan vazgeçip yukarı aşağı oynuyorlar" — the row was one flat flex
+   line, so every wrap point produced a different picture (with a YOU badge the
+   six cells rearranged themselves, the amount sat beside the address, the order
+   count beside the amount…). On phones the row is now a FIXED two-line grid:
+   rank + identicon + address on line 1, the amount/orders/YOU group
+   right-aligned on line 2. The cells can never change place between rows, and
+   the address ellipsises instead of pushing the numbers around, so tall and
+   short rows stay aligned and nothing jumps when the viewport shrinks. A 4th
+   column is deliberately avoided: five fixed cells overflow a 320px card,
+   which is what the old flex row did. */
+@media (max-width: 560px) {
+  .pt-leader > li{
+    display:grid;
+    grid-template-columns:auto auto minmax(0,1fr);
+    grid-template-areas:
+      "badge ident code"
+      "badge ident meta";
+    align-items:center;
+    column-gap:8px; row-gap:4px;
+  }
+  .pt-leader > li > .pt-badge{ grid-area:badge }
+  .pt-leader > li > .pt-ident{ grid-area:ident }
+  .pt-leader > li > .pt-leader-code{ grid-area:code; min-width:0 }
+  .pt-leader > li > .pt-leader-meta{
+    grid-area:meta; display:flex; align-items:center; justify-content:flex-end;
+    gap:8px; flex-wrap:wrap; min-width:0; max-width:100%;
+  }
+}
 .pt-you-badge{ flex:0 0 auto; display:inline-flex; align-items:center; gap:4px;
   background:var(--green); color:#fff; font-size:10px; font-weight:800; text-transform:uppercase;
   letter-spacing:.04em; padding:3px 8px; border-radius:999px }
+
+/* The on-chain proof chip that hangs off a star rating (activity + orders):
+   quiet by default so stars stay the loudest thing in the row. */
+.onchain-chip{ gap:4px; text-decoration:none; color:var(--green-600); border-color:rgba(62,107,79,.45);
+  background:var(--green-soft); font-weight:800; font-size:var(--fs-xs); white-space:nowrap }
+.onchain-chip:hover{ border-color:var(--green); color:var(--green-600); text-decoration:none }
+.onchain-chip svg{ flex:0 0 auto }
 
 /* ---- pager ---- */
 .pt-pager{ display:flex; align-items:center; justify-content:space-between; gap:10px;
@@ -2530,13 +2570,30 @@ label.oos-toggle > span {
      the owner's ask: activity thumbs should look exactly like orders' ones. */
   width: clamp(64px, 30vw, 140px) !important;
   flex: none;
-  aspect-ratio: auto !important;
+  /* The wrapper is a size box, but it still needs a SHAPE and a positioning
+     context: a batch row's stack (.multi-thumb, height:100%) is absolutely
+     positioned inside it. With `aspect-ratio:auto` + `position:static` the
+     wrapper had no height of its own, so the stack had nothing to resolve
+     against — the tiles collapsed and the rear cards floated loose. The box is
+     the same 16/10 as the inner .thumb tile, so single-image and stacked rows
+     line up identically. */
+  aspect-ratio: 16 / 10 !important;
   border: 0 !important;
   box-shadow: none !important;
   background: transparent !important;
   display: block !important;
   overflow: visible !important;
-  position: static !important;
+  position: relative !important;
+}
+
+/* Orders list wrapper — same box as .feed-thumb so the two pages are
+   pixel-identical (this used to be an inline style with no aspect-ratio). */
+.o-thumb {
+  width: clamp(64px, 30vw, 140px);
+  flex: none;
+  aspect-ratio: 16 / 10;
+  position: relative;
+  min-width: 0;
 }
 
 
@@ -3239,13 +3296,9 @@ input[type="range"]:focus-visible { outline: 2px solid var(--stamp); outline-off
   .topbar-inner { width: min(1440px, 100% - 64px); }
 }
 
-/* Plant-trees leaderboard row on phones: rank + identicon + address + trees +
-   "N orders" + the YOU badge ran past a 320px screen ("VOUS" cut off). The
-   order count drops to a second line under the address. */
-@media (max-width: 480px) {
-  .pt-leader > li { flex-wrap: wrap; row-gap: 2px; }
-  .pt-leader-orders { order: 10; flex: 1 0 100%; padding-left: 72px; white-space: normal; }
-}
+/* (The old <=480px flex-wrap rule for this row is gone: it re-wrapped the flat
+   flex line and was exactly the "yukarı aşağı oynuyor" picture. The fixed
+   two-line grid at 560px supersedes it.) */
 
 /* fitText measures a label right after writing its font-size and freezes the
    label's own transition for that frame — but children (the wordmark's
@@ -3425,9 +3478,11 @@ input[type="range"]:focus-visible { outline: 2px solid var(--stamp); outline-off
   .pt-card-head .pt-seg .btn { flex: 1 1 auto; justify-content: center; }
 }
 @media (max-width: 480px) {
-  .pt-leader > li { row-gap: 4px; }
-  .pt-leader-orders { padding-left: 74px; }
-  .pt-you-badge { order: 11; flex: 0 0 auto; }
+  /* Superseded by the fixed 2-line grid at 560px (above): the flat flex row
+     plus `order:11` was exactly the "yukarı aşağı oynuyor" behaviour the owner
+     reported. Only the pieces the grid does not cover stay here. */
+  .pt-leader > li { padding: 10px 6px; }
+  .pt-you-badge { flex: 0 0 auto; }
   .pt-yourank { flex-wrap: wrap; }
   .pt-pager { flex-wrap: wrap; justify-content: center; row-gap: 6px; }
   .pt-pager .btn { flex: 1 1 auto; justify-content: center; }

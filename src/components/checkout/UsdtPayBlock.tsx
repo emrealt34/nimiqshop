@@ -18,7 +18,6 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../ui/Icon';
-import { Identicon } from '../ui/Identicon';
 import { QR } from './QR';
 import { Clipboard } from '../../lib/clipboard';
 import { coinAmountOf } from '../../lib/deliveryCopy';
@@ -55,8 +54,8 @@ function PolygonIcon({ size = 18 }: { size?: number }) {
  * connection or transfer only ever happens on an explicit user gesture,
  * exactly like the NIM block. Provider detection is hydration-safe: it runs
  * after mount so the server HTML and the first client render agree. */
-export function UsdtPayBlock({ quote, expired, onLaunchRequested, avatarAddress }: {
-  quote: any; expired: boolean; onLaunchRequested?: () => void; avatarAddress?: string;
+export function UsdtPayBlock({ quote, expired, onLaunchRequested }: {
+  quote: any; expired: boolean; onLaunchRequested?: () => void;
 }) {
   const { toast } = useToast();
   const { t } = useT();
@@ -198,10 +197,12 @@ export function UsdtPayBlock({ quote, expired, onLaunchRequested, avatarAddress 
       <button className="btn btn-outline btn-block mt-1" disabled={disabled} onClick={() => handoff('qr')}>{t('checkout.usdtpVerifyShowQr')}</button>
       {showQR && !!address && (
         <div className="pay-qr mt-3">
-          <div className="pay-qr-frame"><div style={{ position: 'relative', display: 'inline-block', lineHeight: 0 }}>
-            <QR text={address} size={29} center={asset("/img/nimiq-hexagon.png?v=40")} />
-            {avatarAddress && <span className="qr-ava" aria-hidden="true"><Identicon address={avatarAddress} /></span>}
-          </div></div>
+          {/* Centre mark = the shop's own brand tile. (Owner, 2026-10-05:
+              the QR used to carry the PAYER's identicon badge on top of it —
+              "şu adamın avatarı değil, nim.shop logosu olmalı".) */}
+          <div className="pay-qr-frame">
+            <QR text={address} size={29} center={asset("/img/brand-icon-96.png")} />
+          </div>
           <div className="xs faint mt-1">{t('checkout.usdtpScanOnce', { coin })}</div>
           <button className="btn btn-ghost mt-1" onClick={() => setShowQR(false)}>{t('checkout.usdtpHideQr')}</button>
         </div>

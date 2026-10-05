@@ -3,6 +3,7 @@ package db
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/dgraph-io/badger/v4"
@@ -344,6 +345,29 @@ func (s *Store) SetOrderRating(orderID, userID string, rating int) (Order, Ratin
 		return saveAggregate(txn, agg)
 	})
 	return o, agg, err
+}
+
+// SetOrderRatingTx stores the on-chain proof hash for a rating that was just
+// anchored (see handlers.RateOrder). Best-effort by design: the rating itself
+// is already saved, so a failure here costs only the proof link, never the
+// rating. A later successful anchor simply overwrites the hash.
+func (s *Store) SetOrderRatingTx(orderID, txHash string) error {
+	if strings.TrimSpace(txHash) == "" {
+		return nil
+	}
+	return s.Update(func(txn *badger.Txn) error {
+		var o Order
+		if e := getJSON(txn, orderKey(orderID), &o); e != nil {
+			return e
+		}
+		o.RatingTx = txHash
+		o.UpdatedAt = time.Now().UTC()
+		blob, e := marshal(o)
+		if e != nil {
+			return e
+		}
+		return txn.Set(orderKey(o.ID), blob)
+	})
 }
 
 // ListFeedOrders returns the most recently delivered orders (newest-first) for

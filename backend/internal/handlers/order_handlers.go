@@ -155,6 +155,10 @@ func (h *Handlers) ListOrders(ctx *fasthttp.RequestCtx) {
 		Stages            []StageInfo     `json:"stages"`
 		CurrentStage      int             `json:"current_stage"`
 		Payload           json.RawMessage `json:"payload,omitempty"`
+
+		Rating   int        `json:"rating,omitempty"`
+		RatedAt  *time.Time `json:"rated_at,omitempty"`
+		RatingTx string     `json:"rating_tx,omitempty"`
 	}
 
 	out := make([]orderRow, 0, len(orders))
@@ -188,6 +192,9 @@ func (h *Handlers) ListOrders(ctx *fasthttp.RequestCtx) {
 			Stages:            stages,
 			CurrentStage:      currStage,
 			Payload:           storedJSON(o.Payload),
+			Rating:            o.Rating,
+			RatedAt:           o.RatedAt,
+			RatingTx:          o.RatingTx,
 		})
 	}
 	writeJSON(ctx, fasthttp.StatusOK, out)

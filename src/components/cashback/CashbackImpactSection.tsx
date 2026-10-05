@@ -809,6 +809,7 @@ export function CashbackImpactSection({
                   <code className="pt-leader-code" title={row.user}>
                     {shortAddress(row.user)}
                   </code>
+                  <span className="pt-leader-meta">
                   <span className="pt-leader-trees pt-icon-inline">
                     {formatNimCompact(row.total_nim)} NIM <Icon name="spark" size={14} />
                   </span>
@@ -823,6 +824,7 @@ export function CashbackImpactSection({
                       <Icon name="user" size={12} /> {t('cashbackCard.you')}
                     </span>
                   )}
+                  </span>
                 </li>
               ))}
             </ol>

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"math"
 	"regexp"
 	"sort"
@@ -17,6 +18,7 @@ import (
 	"nimiqshop/internal/clientip"
 	"nimiqshop/internal/db"
 	"nimiqshop/internal/middleware"
+	"nimiqshop/internal/notification"
 )
 
 /* activity_handlers.go — public, fully-transparent payment feed + star ratings.
@@ -287,6 +289,11 @@ func (h *Handlers) ListActivity(ctx *fasthttp.RequestCtx) {
 		if o.RatedAt != nil {
 			e["rated_at"] = *o.RatedAt
 		}
+		// The on-chain proof of the rating, when the anchor landed: the feed is
+		// public, so anyone can follow the hash and read the memo themselves.
+		if o.RatingTx != "" {
+			e["rating_tx"] = o.RatingTx
+		}
 		all = append(all, timed{o.UpdatedAt, e})
 	}
 
@@ -354,6 +361,9 @@ func (h *Handlers) ListActivity(ctx *fasthttp.RequestCtx) {
 		e["rating"] = &r
 		if q.RatedAt != nil {
 			e["rated_at"] = *q.RatedAt
+		}
+		if q.RatingTx != "" {
+			e["rating_tx"] = q.RatingTx
 		}
 		all = append(all, timed{q.UpdatedAt, e})
 	}
@@ -488,6 +498,27 @@ func sanitizePresenceID(raw string) string {
 	return id
 }
 
+// anchorRating writes the rating ON-CHAIN: a 1-Luna transaction to the rater's
+// own address whose memo names the stars and the order ("… rating 5/5 order
+// ab12cd34"). The memo is the proof — public, immutable and readable by anyone
+// on an explorer, with no trust in our database. Returns the tx hash, or "" when
+// the anchor was skipped (wallet notifier off) or failed; a failed anchor never
+// fails the rating itself, which is already saved.
+func (h *Handlers) anchorRating(refID, orderID, userID string, stars int) string {
+	n := h.WalletNotifier
+	if n == nil || !n.Enabled() || strings.TrimSpace(userID) == "" {
+		return ""
+	}
+	ctxN, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	tx, err := n.NotifyTx(ctxN, refID, userID, notification.RatingMemo(orderID, stars))
+	if err != nil {
+		log.Printf("rating: on-chain anchor failed for %s: %v", orderID, err)
+		return ""
+	}
+	return tx
+}
+
 type rateOrderRequest struct {
 	Rating int `json:"rating"`
 }
@@ -519,11 +550,28 @@ func (h *Handlers) RateOrder(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
+	// The rating is saved; now make it provable. Idempotent per (order, stars):
+	// re-rating the same order with the same value never pays a second time, a
+	// CHANGED rating gets its own anchor (the newest memo is the truth).
+	// An ANONYMOUS order is never anchored: a shop→buyer memo transaction with
+	// the order id on it would tie that wallet to a row whose whole point is
+	// that it carries no address. The rating itself still counts.
+	txHash := ""
+	if !o.Anonymous {
+		txHash = h.anchorRating("rating:order:"+o.ID+":"+strconv.Itoa(o.Rating), o.ID, userID, o.Rating)
+	}
+	if txHash != "" {
+		if e := h.Store.SetOrderRatingTx(o.ID, txHash); e != nil {
+			log.Printf("rating: order %s anchored as %s but the proof hash could not be stored: %v", o.ID, txHash, e)
+		}
+	}
+
 	writeJSON(ctx, fasthttp.StatusOK, map[string]interface{}{
-		"order_id": o.ID,
-		"rating":   o.Rating,
-		"rated_at": o.RatedAt,
-		"summary":  ratingSummaryShape(agg),
+		"order_id":  o.ID,
+		"rating":    o.Rating,
+		"rated_at":  o.RatedAt,
+		"rating_tx": txHash,
+		"summary":   ratingSummaryShape(agg),
 	})
 }
 
@@ -557,11 +605,23 @@ func (h *Handlers) RateQuote(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
+	// Same on-chain anchor as RateOrder (see anchorRating).
+	txHash := ""
+	if !q.Anonymous {
+		txHash = h.anchorRating("rating:quote:"+q.ID+":"+strconv.Itoa(q.Rating), q.ID, userID, q.Rating)
+	}
+	if txHash != "" {
+		if e := h.Store.SetQuoteRatingTx(q.ID, txHash); e != nil {
+			log.Printf("rating: quote %s anchored as %s but the proof hash could not be stored: %v", q.ID, txHash, e)
+		}
+	}
+
 	writeJSON(ctx, fasthttp.StatusOK, map[string]interface{}{
-		"order_id": q.ID,
-		"rating":   q.Rating,
-		"rated_at": q.RatedAt,
-		"summary":  ratingSummaryShape(agg),
+		"order_id":  q.ID,
+		"rating":    q.Rating,
+		"rated_at":  q.RatedAt,
+		"rating_tx": txHash,
+		"summary":   ratingSummaryShape(agg),
 	})
 }
 

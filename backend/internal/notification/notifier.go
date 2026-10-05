@@ -128,40 +128,69 @@ func (n *Notifier) notifyReason(ctx context.Context, reason Reason, refID, userI
 // Prefer NotifyReason: this raw form bypasses the frequency policy and
 // exists for the fulfilled/cashback paths that are already one-per-object.
 func (n *Notifier) Notify(ctx context.Context, refID, recipientFriendly, memo string) error {
+	_, err := n.NotifyTx(ctx, refID, recipientFriendly, memo)
+	return err
+}
+
+// NotifyTx is Notify that also reports the broadcast transaction hash. Callers
+// that publish the memo as a public PROOF (star ratings do: the memo is the
+// proof) need the hash to link; everyone else keeps calling Notify. An empty
+// hash with a nil error means the idempotency ledger had already sent this ref,
+// so nothing was broadcast this time.
+func (n *Notifier) NotifyTx(ctx context.Context, refID, recipientFriendly, memo string) (string, error) {
 	if !n.Enabled() || recipientFriendly == "" {
-		return nil
+		return "", nil
 	}
 
 	sent, err := n.store.IsNotificationSent(refID)
 	if err != nil {
-		return fmt.Errorf("notif: check sent: %w", err)
+		return "", fmt.Errorf("notif: check sent: %w", err)
 	}
 	if sent {
-		return nil // already delivered — never double-send
+		return "", nil // already delivered — never double-send
 	}
 
 	memo = TrimMemo(memo)
 
 	height, err := n.rpc.GetBlockNumber(ctx)
 	if err != nil {
-		return fmt.Errorf("notif: block height: %w", err)
+		return "", fmt.Errorf("notif: block height: %w", err)
 	}
 
 	txHex, _, err := nimiq.BuildBasicTransaction(n.seedHex, recipientFriendly, NotificationLunas, n.feeLunas, uint32(height), n.networkID, []byte(memo))
 	if err != nil {
-		return fmt.Errorf("notif: build/sign: %w", err)
+		return "", fmt.Errorf("notif: build/sign: %w", err)
 	}
 
 	txHash, err := n.rpc.BroadcastRawTransaction(ctx, txHex)
 	if err != nil {
-		return fmt.Errorf("notif: broadcast: %w", err)
+		return "", fmt.Errorf("notif: broadcast: %w", err)
 	}
 
 	if err := n.store.MarkNotificationSent(refID); err != nil {
 		log.Printf("notif: sent tx %s to %s but failed to record idempotency for %s: %v", txHash, recipientFriendly, refID, err)
 	}
 	log.Printf("notif: sent 1 Luna + memo to %s (ref %s) tx=%s", recipientFriendly, refID, txHash)
-	return nil
+	return txHash, nil
+}
+
+// RatingMemo is the PUBLIC proof line for a star rating. The memo is what a
+// block explorer shows, so it names the shop, the stars and the order the
+// rating belongs to: anyone can read it off the chain, forever, without
+// trusting our database. Order ids are UUIDs — the first block is enough to
+// recognise one, and it keeps the line inside the 64-byte memo ceiling.
+func RatingMemo(orderID string, stars int) string {
+	if stars < 1 {
+		stars = 1
+	}
+	if stars > 5 {
+		stars = 5
+	}
+	id := strings.TrimSpace(orderID)
+	if len(id) > 8 {
+		id = id[:8]
+	}
+	return TrimMemo(fmt.Sprintf("%s rating %d/5 order %s", shopHost(), stars, id))
 }
 
 // notifySimulated is Notify with the chain steps replaced by a marker: the

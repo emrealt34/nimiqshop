@@ -15,7 +15,7 @@ import { cleanProductLabel, cleanBatchProductLabels, fmtNIM, timeAgo, countryNam
 import { Clipboard } from '../../lib/clipboard';
 import { useInterval } from '../../lib/useInterval';
 import { useToast } from '../AppProviders';
-import { StatusBadge, StarsDisplay, EmptyState, ErrorState, Skel, NimMark } from '../ui/uiKit';
+import { StatusBadge, StarsDisplay, EmptyState, ErrorState, Skel, NimMark, OnChainProof } from '../ui/uiKit';
 import { Pager } from '../ui/Pager';
 import { useT, t as i18nT } from '../../i18n';
 import { pagePath } from '../../lib/asset';
@@ -481,6 +481,8 @@ function FeedItem({ it }: { it: any }) {
           {it.rating > 0 ? (
             <span className="cell-rate">
               <StarsDisplay rating={it.rating} size={14} />
+              {/* Public proof: the rating's own on-chain memo transaction. */}
+              <OnChainProof tx={it.rating_tx} />
             </span>
           ) : null}
         </div>

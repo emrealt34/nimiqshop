@@ -14,7 +14,6 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../ui/Icon';
-import { Identicon } from '../ui/Identicon';
 import { QR } from './QR';
 import { Clipboard } from '../../lib/clipboard';
 import { useToast } from '../AppProviders';
@@ -67,8 +66,8 @@ export function useNimiqPayMissingToast() {
   }, [t, toast]);
 }
 
-export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddress, hidePayButton }: {
-  invoice: string; uri: string; quoteId: string; onLaunch?: () => void; avatarAddress?: string; compact?: boolean;
+export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, hidePayButton }: {
+  invoice: string; uri: string; quoteId: string; onLaunch?: () => void; compact?: boolean;
   /** The pay screen puts the Nimiq Pay button inside its hero card (owner,
    *  2026-10-04); then the block's own copy would be a duplicate. */
   hidePayButton?: boolean;
@@ -234,10 +233,11 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, avatarAddre
           is public data, and one less step between the buyer and the pay. */}
       {allowed && (
         <div className="pay-qr mt-3">
-          <div className="pay-qr-frame"><div style={{ position: 'relative', display: 'inline-block', lineHeight: 0 }}>
-            <QR text={invoice} size={29} center={asset("/img/nimiq-hexagon.png?v=40")} />
-            {avatarAddress && <span className="qr-ava" aria-hidden="true"><Identicon address={avatarAddress} /></span>}
-          </div></div>
+          {/* Centre mark = the shop's own brand tile — never the payer's
+              identicon (owner, 2026-10-05). */}
+          <div className="pay-qr-frame">
+            <QR text={invoice} size={29} center={asset("/img/brand-icon-96.png")} />
+          </div>
           <div className="xs faint mt-1">{t('checkout.lpScanOnce')}</div>
         </div>
       )}

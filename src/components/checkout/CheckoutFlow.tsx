@@ -48,7 +48,7 @@ import {
   limitSentence,
   type DailyLimit,
 } from '../../lib/dailyLimit';
-import { getAddress, isAuthed } from '../../lib/session';
+import { isAuthed } from '../../lib/session';
 import { loginWithHub, friendlyHubError } from '../../lib/hub';
 import { deliverySummary, payRail, payActionLine , coinAmountLabel, coinAmountLabelFor } from '../../lib/deliveryCopy';
 import { asset, pagePath } from '../../lib/asset';
@@ -858,7 +858,7 @@ export function PayScreen({
         <UsdtPayBlock
           quote={current}
           expired={expired}
-          avatarAddress={getAddress()}
+         
           onLaunchRequested={() => {
             // Stablecoin payments are self-wallet sends; keep polling.
           }}
@@ -1007,7 +1007,7 @@ export function PayScreen({
         ) : null)}      </div>
       <details className="checkout-details-min"><summary>{t('checkout.flowDetailsSummary')}</summary><div style={{ marginTop: 8 }}><div className="small" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}><span className="muted">{t('orderPage.finalTotal')}</span><span className="mono strong">{coinAmountLabelFor(current, 'BTC') || t('orderPage.amountNote')}</span></div><div className="small muted">{t('checkout.flowNimEstimateNote')}</div><CashbackFeeNotice example="nim" /><StakerCashbackLine quote={current} />{cbExclusive && (<div className="small muted mt-1" style={{ textAlign: 'center' }}><Icon name="lock" size={13} /> {cbExclusive}</div>)}<div className="alert info mt-1" style={{ marginBottom: 0, display: 'flex', gap: '8px', alignItems: 'center' }}><Icon name="bolt" size={18} /><div className="small">{payRail(current).note}</div></div><div className="small muted mt-1">{payActionLine(current)}</div></div></details>
       {note}
-      {uri ? <LightningPayBlock quoteId={quoteIdOf(current)} invoice={invoice} uri={uri} onLaunch={() => rememberLightningPayment(invoice, { kind: 'quote', ref: quoteIdOf(current) })} avatarAddress={getAddress()} hidePayButton /> : null}
+      {uri ? <LightningPayBlock quoteId={quoteIdOf(current)} invoice={invoice} uri={uri} onLaunch={() => rememberLightningPayment(invoice, { kind: 'quote', ref: quoteIdOf(current) })} hidePayButton /> : null}
     </div>
   );
 }

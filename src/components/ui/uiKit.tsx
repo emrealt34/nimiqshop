@@ -5,6 +5,8 @@
  */
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Icon } from './Icon';
+import { explorerUrl, shortTx } from '../../lib/chain';
+import { CFG } from '../../lib/config';
 import { Identicon } from './Identicon';
 import { fmtDate, fmtNIM } from '../../lib/format';
 import { Clipboard } from '../../lib/clipboard';
@@ -516,6 +518,30 @@ export function StarPicker({ onSelect, size = 34 }: { onSelect?: (r: number) => 
         </button>
       ))}
     </div>
+  );
+}
+
+/* ---------------- On-chain proof chip ---------------- */
+
+/** The little "on-chain" chip that hangs off a star rating: it links to the
+ *  Nimiq transaction whose memo carries the rating, so anyone can verify it
+ *  without trusting the shop. Renders nothing without a valid hash. */
+export function OnChainProof({ tx, className = '' }: { tx?: string | null; className?: string }) {
+  const { t } = useT();
+  // Same network the app runs on (config.js): mainnet in production.
+  const url = explorerUrl(tx, String(CFG.NETWORK || '').toLowerCase().startsWith('test') ? 'test' : 'main');
+  if (!url) return null;
+  return (
+    <a
+      className={`chip onchain-chip${className ? ' ' + className : ''}`}
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={t('ui.onChainProofTitle', { tx: shortTx(String(tx)) })}
+    >
+      <Icon name="spark" size={13} />
+      <span>{t('ui.onChainProof')}</span>
+    </a>
   );
 }
 

@@ -958,6 +958,24 @@ func (s *Store) SetQuoteRating(quoteID, userID string, rating int) (Quote, Ratin
 	return q, agg, err
 }
 
+// SetQuoteRatingTx stores the on-chain proof hash for a direct-NIM quote's
+// rating (mirror of SetOrderRatingTx). Best-effort: a failure costs only the
+// proof link.
+func (s *Store) SetQuoteRatingTx(quoteID, txHash string) error {
+	if strings.TrimSpace(txHash) == "" {
+		return nil
+	}
+	return s.Update(func(tx *badger.Txn) error {
+		var q Quote
+		if e := getJSON(tx, quoteKey(quoteID), &q); e != nil {
+			return e
+		}
+		q.RatingTx = txHash
+		q.UpdatedAt = time.Now().UTC()
+		return putQuoteTx(tx, &q)
+	})
+}
+
 // MarkGiftNotified records that a gift notification has been dispatched
 // (the gift email — the one channel). The marker is independent of the supplier state so it
 // survives any later state transition; the notifier uses it to skip already-
