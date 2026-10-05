@@ -560,6 +560,7 @@ function PayNowCard({ q }: { q: any }) {
   useEffect(() => { setExpired(false); setRenewErr(''); }, [q.id]);
   const rail = payRail(q);
   const del = deliverySummary(q);
+  const giftMsg = String(q.gift_message || (q._rows || []).find((r: any) => r && r.gift_message)?.gift_message || '');
   const invoice = quoteBolt11(q);
   // NOT payable any more — but never silently vanish. The order page used to
   // render nothing at all here, which left the buyer staring at a raw supplier
@@ -707,7 +708,7 @@ function PayNowCard({ q }: { q: any }) {
                 )}
               </dd>
             </div>
-            <div><dt>{t('orderPage.paymentMethod')}</dt><dd>{rail.label}</dd></div>
+            <div><dt>{t('orderPage.paymentMethod')}</dt><dd>{rail.isUsdt ? rail.label : t('orderPage.payBtcLightning')}</dd></div>
             <div>
               <dt>{t('orderPage.finalTotal')}</dt>
               <dd>{rail.isUsdt ? t('orderPage.finalTotalUsdt', { coin: rail.short }) : (coinAmountLabelFor(q, 'BTC') || t('orderPage.amountNote'))}</dd>
@@ -715,6 +716,9 @@ function PayNowCard({ q }: { q: any }) {
             <div><dt>{t('orderPage.rowTo')}</dt><dd>{t('orderPage.toSupplier')}</dd></div>
             <div><dt>{t('orderPage.youGet')}</dt><dd>{selectedAmountLabel(q) || cleanProductLabel(q.product_id) || t('orderPage.instantDelivery')}</dd></div>
             <div><dt>{t('orderPage.rowDelivery')}</dt><dd>{del.sentence}</dd></div>
+            {giftMsg && (
+              <div><dt>{t('orderPage.giftMessage')}</dt><dd>{t('orderPage.giftMessagePresent')}</dd></div>
+            )}
             <div><dt>{t('orderPage.nextStep')}</dt><dd>{payActionLine(q, del)}</dd></div>
           </dl>
           <div className="small muted mt-1">{t('checkout.flowNimEstimateNote')}</div>
@@ -1107,7 +1111,7 @@ function OrderContent({ o }: { o: any }) {
       : null,
     o.gift_channel || payload.gift_channel ? [t('orderPage.giftNotification'), giftChannelLabel(o.gift_channel || payload.gift_channel)] : null,
     o.gift_message || payload.gift_message
-      ? [t('orderPage.giftMessage'), <span key="gm" className="small">{String(o.gift_message || payload.gift_message).slice(0, 140)}</span>]
+      ? [t('orderPage.giftMessage'), t('orderPage.giftMessagePresent')]
       : null,
     [t('orderPage.rowQuantity'), String(o.quantity)],
     (() => {
@@ -1393,7 +1397,7 @@ function QuoteContent({ q, refund, fulfillment }: { q: any; refund?: any; fulfil
     qDel.hasTopUp && qDel.creditPhones.length
       ? [t('orderPage.topupNumber'), <span key="tp" className="mono small">{qDel.creditPhones.join(', ')}</span>]
       : null,
-    qGiftMessage ? [t('orderPage.giftMessage'), <span key="gm" className="small">{qGiftMessage.slice(0, 140)}</span>] : null,
+    qGiftMessage ? [t('orderPage.giftMessage'), t('orderPage.giftMessagePresent')] : null,
     [t('orderPage.rowTotal'), qRail.isUsdt && coinAmountLabel(q) ? coinAmountLabel(q) : <NimAmount key="t" q={q} fallback="—" />],
     [t('orderPage.orderId'), copyIdNode(q.id || '')],
     [t('orderPage.rowUpdated'), fmtDate(q.updated_at || q.created_at)],
