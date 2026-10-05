@@ -32,7 +32,9 @@ export function LeaderboardView() {
       .catch(() => { if (alive) setLedger(null); });
     return () => { alive = false; };
   }, [authed]);
-  const rows = ledger?.cashbacks || [];
+  // Owner (2026-10-05): a queued cashback is NOT a payout — the list shows
+  // rows whose tx really left the wallet, nothing else.
+  const rows = (ledger?.cashbacks || []).filter((r: any) => r.status === 'paid' && r.tx_hash && !String(r.tx_hash).startsWith('TEST'));
   return (
     <div className="container">
       <h1 className="cb-title" style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '4px 0 2px' }}>

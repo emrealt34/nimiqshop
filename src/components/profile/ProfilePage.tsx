@@ -22,7 +22,7 @@ import { RecentCashbackList } from '../cashback/RecentCashbackList';
 import { useT } from '../../i18n';
 import { pagePath } from '../../lib/asset';
 
-type RecentCashback = { id?: string; quote_id?: string; product_id?: string; status?: string; status_label?: string; amount_nim?: number; bps?: number; cashback_source?: string; tx_hash?: string };
+type RecentCashback = { id?: string; quote_id?: string; product_id?: string; status?: string; status_label?: string; amount_nim?: number; bps?: number; cashback_source?: string; tx_hash?: string; purchase_tx?: string };
 
 type Limits = {
   resets_at?: string | null;
@@ -91,7 +91,7 @@ export function ProfileView() {
     }
     try {
       const [L, cashback] = await Promise.all([getAccountLimits(), getMyCashback()]);
-      setRecentCashback(Array.isArray((cashback as any)?.cashbacks) ? (cashback as any).cashbacks.slice(0, 5) : []);
+      setRecentCashback(Array.isArray((cashback as any)?.cashbacks) ? (cashback as any).cashbacks.filter((r: any) => r.status === 'paid' && r.tx_hash && !String(r.tx_hash).startsWith('TEST')).slice(0, 5) : []);
       let resetsAt: number | null = null;
       if (L.resets_at) resetsAt = new Date(L.resets_at).getTime();
       if (resetsAt && L.server_now) {

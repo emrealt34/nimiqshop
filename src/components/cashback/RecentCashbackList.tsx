@@ -22,6 +22,8 @@ export type RecentCashbackRow = {
   status_label?: string;
   cashback_source?: string;
   tx_hash?: string;
+  /** The purchase's Lightning payment hash — the tx of what you bought. */
+  purchase_tx?: string;
 };
 
 export function rateSourceLabel(cb: RecentCashbackRow): string {
@@ -70,6 +72,11 @@ export function RecentCashbackRowView({ cb }: { cb: RecentCashbackRow }) {
           </span>
         </div>
         <div className="xs faint">{cb.status_label || cb.status || 'pending'}</div>
+        {cb.purchase_tx ? (
+          <div className="mono xs faint" title={cb.purchase_tx} style={{ wordBreak: 'break-all' }}>
+            tx {String(cb.purchase_tx).slice(0, 10)}…{String(cb.purchase_tx).slice(-6)}
+          </div>
+        ) : null}
       </div>
       <div className="cb-row-right">
         <div className="small strong cb-row-amount">+{fmtStakeNIM(Number(cb.amount_nim) || 0)} <NimUnitMark /></div>

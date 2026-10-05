@@ -705,13 +705,13 @@ function PayNowCard({ q }: { q: any }) {
               </dd>
             </div>
             <div><dt>{t('orderPage.paymentMethod')}</dt><dd>{rail.isUsdt ? rail.label : t('orderPage.payBtcLightning')}</dd></div>
-            {String(q.lightning_payment_hash || '') ? (
-              <div><dt>{t('orderPage.rowTx')}</dt><dd className="mono small" style={{ wordBreak: 'break-all' }}>{String(q.lightning_payment_hash)}</dd></div>
-            ) : null}
             <div>
               <dt>{t('orderPage.finalTotal')}</dt>
               <dd>{rail.isUsdt ? t('orderPage.finalTotalUsdt', { coin: rail.short }) : (coinAmountLabelFor(q, 'BTC') || t('orderPage.amountNote'))}</dd>
             </div>
+            {String(q.lightning_payment_hash || '') ? (
+              <div><dt>{t('orderPage.rowTx')}</dt><dd className="mono small" style={{ wordBreak: 'break-all' }}>{String(q.lightning_payment_hash)}</dd></div>
+            ) : null}
             <div><dt>{t('orderPage.rowTo')}</dt><dd>{t('orderPage.toSupplier')}</dd></div>
             <div><dt>{t('orderPage.youGet')}</dt><dd>{selectedAmountLabel(q) || cleanProductLabel(q.product_id) || t('orderPage.instantDelivery')}</dd></div>
             <div><dt>{t('orderPage.rowDelivery')}</dt><dd>{del.sentence}</dd></div>

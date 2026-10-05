@@ -3360,6 +3360,4 @@ input[type="range"]:focus-visible { outline: 2px solid var(--stamp); outline-off
   .pt-pager { flex-wrap: wrap; justify-content: center; row-gap: 6px; }
   .pt-pager .btn { flex: 1 1 auto; justify-content: center; }
   .cb-row-right { display: flex; flex-direction: row; align-items: baseline; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
-  .pt-card-head .lb-mode-seg { width: 100%; }
-  .pt-card-head .lb-mode-seg .btn { flex: 1 1 auto; justify-content: center; }
 }
