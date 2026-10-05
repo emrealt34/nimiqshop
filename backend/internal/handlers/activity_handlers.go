@@ -722,12 +722,12 @@ func (h *Handlers) TrackStatus(ctx *fasthttp.RequestCtx) {
 			"coin":             q.Coin,
 			"lines":            publicLines(q),
 		}
-			// Owner (2026-10-05): the purchase tx IS public summary content — the
-	// old "no payment-network details here" policy is superseded by him.
-	if !q.Anonymous && q.LightningPaymentHash != "" {
-		resp["tx"] = q.LightningPaymentHash
-	}
-writeJSON(ctx, fasthttp.StatusOK, resp)
+		// Owner (2026-10-05): the purchase tx IS public summary content â
+		// the old "no payment-network details here" policy is superseded.
+		if !q.Anonymous && q.LightningPaymentHash != "" {
+			resp["tx"] = q.LightningPaymentHash
+		}
+		writeJSON(ctx, fasthttp.StatusOK, resp)
 		return
 	}
 
