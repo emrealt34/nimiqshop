@@ -177,7 +177,7 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
     <meta name="theme-color" content="#E7DAC0" />
     <meta name="shop-build" content={buildId} />
     <link rel="preload" as="image" href={`${assetBase}/img/nimiq-hexagon.png?v=40`} />
-    <meta name="color-scheme" content="light dark" />
+    <meta name="color-scheme" content="light" />
     <!--
       Boot-time language bootstrap (synchronous, runs before paint).
       The site is fully static — there is no per-request server to decide the
@@ -363,9 +363,10 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
         try {
           var k = 'nimshop.theme';
           var t = localStorage.getItem(k);
-          if (t !== 'dark' && t !== 'light') {
-            t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-          }
+          // No saved choice → the WHITE site, whatever the device is set to
+          // (owner, 2026-10-05). Dark mode is opt-in via the toggle.
+          // Keep in sync with src/lib/theme.ts getTheme().
+          if (t !== 'dark' && t !== 'light') t = 'light';
           document.documentElement.setAttribute('data-theme', t);
           document.documentElement.style.colorScheme = t;
           var m = document.querySelector('meta[name="theme-color"]');

@@ -13,8 +13,9 @@ export function getTheme(): Theme {
     const s = localStorage.getItem(KEY);
     if (s === 'dark' || s === 'light') return s as Theme;
   } catch {}
-  // fallback: system preference
-  if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches) return 'dark';
+  /* No system-preference fallback (owner, 2026-10-05): a visitor who has not
+     chosen a theme gets the WHITE site, even on a device set to dark mode.
+     The dark theme is opt-in, and the choice still persists once made. */
   return 'light';
 }
 

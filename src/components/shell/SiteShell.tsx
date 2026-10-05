@@ -22,7 +22,7 @@ import { applyNimiqPayChrome, inNimiqPay, initNimiqMiniApp } from '../../lib/min
 import { NimiqPayInstallDialog } from '../ui/NimiqPayInstallDialog';
 import { loginWithHub, loginWithNimiqPay, prefetchHubLogin, initHubRedirectHandling, friendlyHubError } from '../../lib/hub';
 import { listQuotes, listOrders } from '../../lib/api';
-import { siteName } from '../../lib/config';
+import { BRAND_NAME } from '../../lib/config';
 import { useRouteKey, useRouter } from '../../lib/router';
 import { getTheme, setTheme, type Theme } from '../../lib/theme';
 import { useT, t as i18nT } from '../../i18n';
@@ -115,10 +115,14 @@ export function SiteShell({ activeKey }: { activeKey: ShellKey }) {
 /* ---------------- Brand ---------------- */
 
 function Brand() {
-  const name = siteName();
+  /* The navbar wordmark is the product brand ("nim.shop"), not the live
+     hostname (owner, 2026-10-05). The host still drives titles, share links
+     and copy via siteName(). */
+  const name = BRAND_NAME;
   const [logoFailed, setLogoFailed] = useState(false);
-  // Break after the FIRST dot ("shop." / "nimiqbase.com"): the two lines are
-  // then balanced, instead of a long "shop.nimiqbase." over a lone "com".
+  // Break after the FIRST dot ("nim." / "shop"): both halves stay balanced if
+  // the wordmark ever has to wrap. At 7 glyphs it now fits every rail — the
+  // 430px band that used to cut "nimiqbase.com" has room to spare.
   const i = name.indexOf('.');
   const before = i > 0 && i < name.length - 1 ? name.slice(0, i) : null;
   const after = before !== null ? name.slice(i + 1) : null;

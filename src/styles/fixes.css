@@ -3138,13 +3138,11 @@ body {
    finding it fixes; the scan fails the build if any of them regresses.
    ========================================================================== */
 
-/* Wordmark: below 380px the four header controls leave the brand <100px —
-   not enough for a readable "shop. / nimiqbase.com" at ≥10px. The logo icon
-   stays (the link keeps its aria-label); the text returns from 380px up. */
-/* The single-line wordmark needs ~235px of rail; below a 430px viewport even
-   the compacted controls cannot share the row, so the name steps aside
-   (icon-only brand) instead of shrinking or wrapping (owner: no shrinking). */
-@media (max-width: 429.98px) {
+/* Wordmark: the name is a 7-glyph product word ("nim.shop", owner 2026-10-05)
+   and needs ~60px of rail — not the ~235px "shop.nimiqbase.com" needed — so it
+   fits beside the four compacted header controls from 360px up. Only the 320px
+   rail still keeps the icon-only brand (the link keeps its aria-label). */
+@media (max-width: 359.98px) {
   .topbar #site-wordmark { display: none !important; }
 }
 

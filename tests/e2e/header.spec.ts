@@ -31,7 +31,7 @@ for (const width of [1200, 1280, 1366, 1440, 1600, 1920]) {
         });
         expect(info.shown, 'desktop nav shown ≥1200px').toBe(true);
         expect(info.tabbarShown, 'bottom tab bar hidden when the desktop nav is shown').toBe(false);
-        expect(info.wmClipped, 'wordmark "shop.nimiqbase.com" cut off').toBe(false);
+        expect(info.wmClipped, 'wordmark "nim.shop" cut off').toBe(false);
         for (const s of info.sizes) expect(s, 'nav font-size px').toBeGreaterThanOrEqual(10.5);
         expect(info.clipped, 'ellipsized nav labels').toEqual([]);
         for (const b of info.links) {
@@ -45,11 +45,13 @@ for (const width of [1200, 1280, 1366, 1440, 1600, 1920]) {
   }
 }
 
-test('wordmark shows the shop brand, never the API host @smoke', async ({ page }) => {
+test('wordmark shows the product brand, never the API host @smoke', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await open(page, path('/'));
   const wm = page.locator('#site-wordmark').first();
-  await expect(wm).toHaveText(/shop\.nimiqbase\.com/i);
+  // The navbar wordmark is the product name (owner, 2026-10-05) — the live
+  // hostname still lives in titles, share links and copy.
+  await expect(wm).toHaveText(/nim\.shop/i);
   await expect(wm).not.toHaveText(/shopapi/i);
 });
 
