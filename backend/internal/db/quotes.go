@@ -968,31 +968,7 @@ func (s *Store) PurgeQuotesAllExceptUnipin() (int, int, error) {
 	if keep == 0 {
 		return 0, 0, errors.New("no real UniPin order found — refusing to delete everything")
 	}
-	dead := make(map[string]bool, len(victims))
-	for _, v := range victims {
-		dead[v.id] = true
-	}
-	var ordersDeleted int
 	err = s.Update(func(txn *badger.Txn) error {
-		var orderKeys [][]byte
-		if err := scanJSONPrefix(txn, []byte(prefixOrder), func(item *badger.Item) error {
-			var o Order
-			if err := item.Value(func(value []byte) error { return unmarshal(value, &o) }); err != nil {
-				return err
-			}
-			if dead[o.QuoteID] {
-				orderKeys = append(orderKeys, item.KeyCopy(nil))
-			}
-			return nil
-		}); err != nil {
-			return err
-		}
-		for _, k := range orderKeys {
-			if err := txn.Delete(k); err != nil {
-				return err
-			}
-		}
-		ordersDeleted = len(orderKeys)
 		for _, v := range victims {
 			if err := txn.Delete(quoteKey(v.id)); err != nil {
 				return err
@@ -1008,7 +984,10 @@ func (s *Store) PurgeQuotesAllExceptUnipin() (int, int, error) {
 	if err != nil {
 		return 0, 0, err
 	}
-	return len(victims), ordersDeleted, nil
+	// The legacy o: order rows carry no quote link and no test stamp; the
+	// buyer-facing "orders" everywhere in the shop ARE the quotes, so the
+	// quote wipe is the wipe the owner sees.
+	return len(victims), 0, nil
 }
 
 /* ------------------------- activity feed + ratings ------------------------ */
