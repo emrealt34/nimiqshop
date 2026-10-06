@@ -125,10 +125,21 @@ func TestDeliveryInferenceAndFormatting(t *testing.T) {
 }
 
 func TestIdenticonRenderingAndAlpha(t *testing.T) {
-	for _, input := range []string{"", "https://tracker.invalid/pixel", "data:image/svg+xml;base64,abc", "data:image/png;base64,%%%", "data:image/png;base64," + base64.StdEncoding.EncodeToString([]byte("not a PNG")), pngURI(t, image.NewGray(image.Rect(0, 0, 2, 2)))} {
+	for _, input := range []string{"", "https://tracker.invalid/pixel", "data:image/svg+xml;base64,abc", "data:image/png;base64,%%%", "data:image/png;base64," + base64.StdEncoding.EncodeToString([]byte("not a PNG"))} {
 		if identiconTable(input) != "" {
 			t.Fatal("invalid PNG accepted")
 		}
+	}
+	// Any PNG the decoder understands renders — not just 8-bit RGBA. A gray or
+	// palette source used to fall through to the placeholder, which the
+	// recipient sees as a missing avatar; the mosaic is the one thing the whole
+	// donor block exists for, so it is converted instead of dropped.
+	gray := identiconTable(pngURI(t, image.NewGray(image.Rect(0, 0, 8, 8))))
+	if !strings.Contains(gray, `class="donor-img"`) {
+		t.Fatal("gray PNG should still render a mosaic")
+	}
+	if !strings.Contains(gray, "border:2px solid "+mailGold) {
+		t.Fatal("mosaic lost its brand ring")
 	}
 	img := image.NewNRGBA(image.Rect(0, 0, 32, 32))
 	for y := 0; y < 32; y++ {
@@ -142,23 +153,93 @@ func TestIdenticonRenderingAndAlpha(t *testing.T) {
 	}
 	uri := pngURI(t, img)
 	mosaic := identiconTable(uri)
-	if !strings.Contains(mosaic, `class="donor-img"`) || strings.Count(mosaic, "<tr ") != identN || strings.Count(mosaic, "<td ") != identN*identN {
-		t.Fatal("mosaic cell layout")
+	// One <tr> per cell row, and runs may compress horizontally but never
+	// below one cell per row.
+	if !strings.Contains(mosaic, `class="donor-img"`) || strings.Count(mosaic, "<tr ") != identN {
+		t.Fatalf("mosaic rows: %d", strings.Count(mosaic, "<tr "))
+	}
+	if got := strings.Count(mosaic, "<td "); got < identN || got > identN*identN {
+		t.Fatalf("mosaic cells out of range: %d", got)
 	}
 	solid := image.NewNRGBA(image.Rect(0, 0, 1, 1))
 	solid.SetNRGBA(0, 0, color.NRGBA{R: 100, A: 128})
-	if !strings.Contains(identiconTable(pngURI(t, solid)), `colspan="32"`) {
+	if !strings.Contains(identiconTable(pngURI(t, solid)), `colspan="72"`) {
 		t.Fatal("solid row not compressed")
 	}
-	if !strings.Contains(identityCard("NQ00", uri), "NQ00") || !strings.Contains(identityCard("", ""), "background:#efe4cd") || !strings.Contains(anonymousCard(), "anonymous") {
-		t.Fatal("identity cards")
+	card := identityCard("NQ00", uri)
+	if !strings.Contains(card, "NQ00") || !strings.Contains(card, "background:"+mailPanel) || !strings.Contains(card, mailGold) {
+		t.Fatal("identity card lost its address, panel or ring")
+	}
+	if !strings.Contains(identityCard("", ""), "background:"+mailPaper) {
+		t.Fatal("placeholder avatar lost its paper tone")
+	}
+	if !strings.Contains(anonymousCard(), "anonymous") || !strings.Contains(anonymousCard(), "background:"+mailPanel) {
+		t.Fatal("anonymous card")
 	}
 	for _, tc := range []struct {
 		c    color.NRGBA
 		want string
-	}{{color.NRGBA{R: 1, G: 2, B: 3, A: 255}, "#010203"}, {color.NRGBA{A: 0}, "#fffdf7"}, {color.NRGBA{R: 0, G: 0, B: 0, A: 128}, "#7f7e7b"}} {
+	}{{color.NRGBA{R: 1, G: 2, B: 3, A: 255}, "#010203"}, {color.NRGBA{A: 0}, mailPaper}, {color.NRGBA{R: 0, G: 0, B: 0, A: 128}, "#7a776d"}} {
 		if got := pngComposite(tc.c); got != tc.want {
 			t.Errorf("alpha: %s != %s", got, tc.want)
 		}
+	}
+}
+
+// TestGiftNoteCardSpeaksTheSitesDesignSystem pins the palette and the phone
+// behaviour of the card the owner asked to be transformed: the note has to look
+// like it came from the same shop as the page it links to, not like a generic
+// transactional mail. Drifting off the tokens is a design regression, so it
+// fails here rather than in someone's inbox.
+func TestGiftNoteCardSpeaksTheSitesDesignSystem(t *testing.T) {
+	note := GiftNote{
+		Recipient:          Address{Email: "buyer@example.com"},
+		ProductLabel:       "Steam · 50 USD",
+		GifterNimiqAddress: "NQ73SE1XYRRFQ8NCDQCPHLJMNR858P7V2HPD",
+		SiteName:           "shop.nimiqbase.com",
+		ShopURL:            "https://shop.nimiqbase.com",
+		SupportURL:         "https://shop.nimiqbase.com/support",
+		OrderID:            "ord_1234567890",
+		// The stake block is only rendered when a validator is named, and it
+		// carries the one green token on the card.
+		StakeValidatorAddress: "NQ73SE1XYRRFQ8NCDQCPHLJMNR858P7V2HPD",
+	}
+	msg, err := note.Build(Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := msg.HTML
+	for _, token := range []string{
+		mailKraft, mailPaper, mailPanel, mailInk, mailInkDim, mailStamp, mailOnStamp, mailGold, mailGreen,
+	} {
+		if !strings.Contains(h, token) {
+			t.Errorf("card dropped the site token %s", token)
+		}
+	}
+	for _, piece := range []string{
+		`class="email-container"`, `class="px-card`, `class="donor-img"`, `class="cta-link"`,
+		"Where is the gift card code?", "noreply@cryptorefills.com", "Reference",
+	} {
+		if !strings.Contains(h, piece) {
+			t.Errorf("card lost %q", piece)
+		}
+	}
+	// One inline style for the structural pieces and a stylesheet for the phone
+	// query: a client that strips <style> must still render the desktop layout.
+	if !strings.Contains(msg.HTML, "@media only screen and (max-width:620px)") {
+		t.Error("phone media query missing")
+	}
+	// A receipt must not call itself a gift.
+	self := note
+	self.Self = true
+	selfMsg, err := self.Build(Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(selfMsg.HTML, "gift note") {
+		t.Error("a self-purchase still labels itself a gift note")
+	}
+	if !strings.Contains(selfMsg.HTML, "Your order is on its way") {
+		t.Error("self-purchase headline missing")
 	}
 }

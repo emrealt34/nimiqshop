@@ -8,6 +8,7 @@ import (
 	"html"
 	"image"
 	"image/color"
+	"image/draw"
 	"image/png"
 	"net/url"
 	"strconv"
@@ -125,11 +126,41 @@ const (
 // the quote handler; this is the belt.
 const maxGiftNoteMessageChars = 2000
 
-// Shared building blocks of the responsive email. These MUST stay in sync with
-// mailer/mailbuilder.py (FONT/MONO/EMAIL_CSS there).
+// Shared building blocks of the responsive email.
 const (
 	emailFont = "-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
 	emailMono = "ui-monospace,Menlo,Consolas,'Courier New',monospace"
+)
+
+// mailPalette is the SHOP's own palette — the kraft/cream tokens of
+// src/styles/app.css — flattened to solid hex, because a mail client supports
+// neither CSS variables nor rgba. Each value names the token it mirrors, and
+// the alpha tokens are the token composited over the surface they sit on:
+//
+//	--bg #E7DAC0 kraft page · --surface-1 #F6EFDC card · --surface-2 #EFE4C6 panel
+//	--ink #4E3D28 · --ink-dim #7C6A4E · --ink-faint #786446
+//	--stamp #C7481D / --on-stamp #FFF6E8 (the primary action)
+//	--gold-400 #C98A1B / --gold-600 #8A5E0B (brand accents, links on paper)
+//
+// Keeping the note on these tokens is what makes an inbox message look like it
+// came from the same shop as the page it links to: same paper, same ink, same
+// stamp-red button, same gold.
+const (
+	mailKraft    = "#e7dac0" // page behind the card
+	mailPaper    = "#f6efdc" // the card itself
+	mailPanel    = "#efe4c6" // recessed panels (donor, "where is it")
+	mailInk      = "#4e3d28"
+	mailInkDim   = "#7c6a4e"
+	mailInkFaint = "#786446"
+	mailLine     = "#d8cdb6" // --line over the card
+	mailDash     = "#b09f8b" // --line-dash over the card
+	mailStamp    = "#c7481d"
+	mailOnStamp  = "#fff6e8"
+	mailGold     = "#c98a1b"
+	mailGoldDeep = "#8a5e0b"
+	mailGreen    = "#3e6b4f" // --green: the "built on NIM" note
+	mailGoldSoft = "#f2e3c2"
+	mailGoldLine = "#e3cf9e"
 )
 
 // emailCSS is the single <style> block of the email: client resets plus ONE
@@ -143,6 +174,9 @@ const emailCSS = `  :root{color-scheme:light;supported-color-schemes:light}
   a{padding:0}
   .ExternalClass{width:100%}
   .ExternalClass,.ExternalClass p,.ExternalClass span,.ExternalClass td,.ExternalClass div{line-height:inherit}
+  /* The donor mosaic is a table of 1x1px cells: without these resets some
+     clients give the cells a minimum height from the inherited line box. */
+  .donor-img td{font-size:0!important;line-height:0!important}
   @media only screen and (max-width:620px){
     .email-container{width:100%!important;max-width:100%!important}
     .px-outer{padding-left:10px!important;padding-right:10px!important}
@@ -157,6 +191,7 @@ const emailCSS = `  :root{color-scheme:light;supported-color-schemes:light}
     .cta-table{width:100%!important}
     .cta-link{display:block!important;text-align:center!important}
     .foot{font-size:11px!important}
+    .hero-pad{padding:20px 18px 0 18px!important}
   }`
 
 // tr returns the translator bound to this note's language (English fallback).
@@ -383,6 +418,19 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 		cta = strings.TrimRight(u, "/") + "/?utm_source=gift&utm_medium=email&utm_campaign=gift_note"
 	}
 
+	// ONE design, two voices: a gift someone sent, or the buyer's own receipt.
+	badge, heading, sub := "🎁", "You received a gift", "via "+site
+	if n.Anonymous && !n.Self {
+		sub = "from someone anonymous via " + site
+	}
+	if n.Self {
+		badge, heading = "✅", "Your order is on its way"
+	}
+
+	// The card is built from nested tables with every structural style inline
+	// (the stylesheet may be stripped) and the palette above — see mailPalette
+	// for why each colour is what it is.
+	font := emailFont
 	var b strings.Builder
 	b.WriteString("<!DOCTYPE html>\n")
 	b.WriteString(`<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">` + "\n")
@@ -400,188 +448,253 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 	b.WriteString(emailCSS + "\n")
 	b.WriteString("</style>\n")
 	b.WriteString("</head>\n")
-	b.WriteString(`<body style="margin:0;padding:0;background:#f6f1e7;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%">` + "\n")
+	b.WriteString(`<body style="margin:0;padding:0;background:` + mailKraft + `;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%">` + "\n")
 	b.WriteString(`<div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;m-hide:1">` + esc(pre) + pad + "</div>\n")
-	b.WriteString(`  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f6f1e7">` + "\n")
-	b.WriteString("    <tr>\n")
-	b.WriteString(`      <td align="center" valign="top" class="px-outer" style="padding:22px 14px">` + "\n")
-	b.WriteString(`        <!--[if mso]><table role="presentation" width="600" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->` + "\n")
-	b.WriteString(`        <table role="presentation" width="600" class="email-container" style="width:100%;max-width:600px" cellpadding="0" cellspacing="0" border="0">` + "\n")
-	b.WriteString("        <tr>\n")
-	b.WriteString(`          <td style="padding:0 2px 14px 2px;font-family:` + emailFont + `">` + "\n")
-	b.WriteString(`<span style="font-size:15px;font-weight:800;color:#2f2a24">nim<span style="color:#b98a2e">.shop</span></span>` + "\n")
-	b.WriteString(`<span style="font-size:12px;color:#8a7f72">&nbsp;·&nbsp;gift</span>` + "\n")
-	b.WriteString("          </td>\n")
-	b.WriteString("        </tr>\n")
-	b.WriteString("        <tr>\n")
-	b.WriteString(`          <td style="background:#fffdf7;border:1px solid #e3d9c6;border-radius:16px;overflow:hidden">` + "\n")
-	b.WriteString("            <!-- card -->\n")
-	b.WriteString(`            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">` + "\n")
-	b.WriteString("              <tr>\n")
-	b.WriteString(`                <td class="px-card" style="padding:26px 26px 0 26px;font-family:` + emailFont + `">` + "\n")
-	emo := "🎁"
-	heading := "You received a gift"
-	if n.Self {
-		emo = "✅"
-		heading = "Your order is on its way"
-	}
-	b.WriteString(`<div style="font-size:26px">` + emo + `</div>` + "\n")
-	b.WriteString(`<div class="h1" style="font-size:22px;font-weight:800;color:#2f2a24;margin:6px 0 2px">` + esc(heading) + `</div>` + "\n")
-	if n.Anonymous && !n.Self {
-		b.WriteString(`<div class="greet" style="font-size:14px;color:#6b6157">from someone anonymous via ` + esc(site) + "</div>\n")
-	} else {
-		b.WriteString(`<div class="greet" style="font-size:14px;color:#6b6157">via ` + esc(site) + "</div>\n")
-	}
-	b.WriteString("                </td>\n")
-	b.WriteString("              </tr>\n")
-	b.WriteString("\n")
-	b.WriteString("              <!-- donor identity: side-by-side on desktop, stacked+centred on phones -->\n")
+	b.WriteString(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:` + mailKraft + `">` + "\n")
+	b.WriteString("  <tr>\n")
+	b.WriteString(`    <td align="center" valign="top" class="px-outer" style="padding:24px 12px 28px 12px">` + "\n")
+	b.WriteString(`      <!--[if mso]><table role="presentation" width="600" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->` + "\n")
+	b.WriteString(`      <table role="presentation" width="600" class="email-container" style="width:100%;max-width:600px" cellpadding="0" cellspacing="0" border="0">` + "\n")
+
+	// ---- brand line: the shop's own wordmark, same gold dot as the navbar --
+	b.WriteString("      <tr>\n")
+	b.WriteString(`        <td style="padding:0 2px 12px 2px;font-family:` + font + `">` + "\n")
+	b.WriteString(`          <span style="font-size:16px;font-weight:800;color:` + mailInk + `;letter-spacing:-.01em">nim<span style="color:` + mailGold + `">.</span>shop</span>` + "\n")
+	b.WriteString(`          <span style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:` + mailInkFaint + `">&nbsp;&nbsp;` + giftWord(n.Self) + ` note</span>` + "\n")
+	b.WriteString("        </td>\n")
+	b.WriteString("      </tr>\n")
+
+	// ---- the card ----------------------------------------------------------
+	b.WriteString("      <tr>\n")
+	b.WriteString(`        <td style="background:` + mailPaper + `;border:1px solid ` + mailLine + `;border-radius:18px">` + "\n")
+	b.WriteString(`          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">` + "\n")
+
+	// hero: badge + headline
+	b.WriteString("            <tr>\n")
+	b.WriteString(`              <td class="px-card hero-pad" style="padding:26px 26px 0 26px;font-family:` + font + `">` + "\n")
+	b.WriteString(`                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>` + "\n")
+	b.WriteString(`                  <td width="54" valign="top" style="width:54px">` + "\n")
+	b.WriteString(`                    <table role="presentation" width="52" cellpadding="0" cellspacing="0" border="0" style="width:52px;background:` + mailGoldSoft + `;border:1px solid ` + mailGoldLine + `;border-radius:26px">` + "\n")
+	b.WriteString(`                      <tr><td height="52" align="center" valign="middle" style="height:52px;font-size:24px;line-height:52px">` + badge + `</td></tr>` + "\n")
+	b.WriteString("                    </table>\n")
+	b.WriteString("                  </td>\n")
+	b.WriteString(`                  <td style="padding-left:14px;vertical-align:middle">` + "\n")
+	b.WriteString(`                    <div class="h1" style="font-size:22px;font-weight:800;color:` + mailInk + `;margin:0 0 3px 0;letter-spacing:-.01em">` + esc(heading) + `</div>` + "\n")
+	b.WriteString(`                    <div class="greet" style="font-size:14px;color:` + mailInkDim + `">` + esc(sub) + `</div>` + "\n")
+	b.WriteString("                  </td>\n")
+	b.WriteString("                </tr></table>\n")
+	b.WriteString("              </td>\n")
+	b.WriteString("            </tr>\n")
+
+	// identity (gift only)
 	if !n.Self {
+		b.WriteString("            <tr>\n")
+		b.WriteString(`              <td class="px-card" style="padding:18px 26px 0 26px">` + "\n")
 		if n.Anonymous {
 			b.WriteString(anonymousCard())
 		} else if strings.TrimSpace(n.GifterNimiqAddress) != "" {
 			b.WriteString(identityCard(esc(groupAddress(n.GifterNimiqAddress)), n.GifterIdenticonDataURI))
+		} else {
+			b.WriteString(plainSenderCard())
 		}
+		b.WriteString("              </td>\n")
+		b.WriteString("            </tr>\n")
 	}
-	b.WriteString("\n\n" + `<tr><td class="px-card" style="padding:0 26px"><div style="border-top:1px dashed #e3d9c6;margin-top:18px"></div></td></tr>` + "\n")
-	b.WriteString("\n              <!-- body -->\n")
 
-	// ---- item ------------------------------------------------------------
+	// item row: what arrived, and when it was sent
+	b.WriteString("            <tr>\n")
+	b.WriteString(`              <td class="px-card" style="padding:20px 26px 18px 26px">` + "\n")
+	b.WriteString(`                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>` + "\n")
+	b.WriteString(`                  <td style="vertical-align:top">` + "\n")
+	b.WriteString(`                    ` + eyebrow(font, itemLabel(n.Self)) + "\n")
+	item := n.itemEmoji()
 	if product != "" {
-		b.WriteString("\n          <tr>\n")
-		b.WriteString(`            <td class="px-card" style="padding:18px 26px 16px 26px">` + "\n")
-		b.WriteString(`<div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#b0a287;padding-bottom:3px;font-family:` + emailFont + `">Item</div>` + "\n")
-		b.WriteString(`<div class="item-line" style="font-size:17px;font-weight:700;color:#2f2a24;font-family:` + emailFont + `">` + n.itemEmoji() + "&nbsp;" + esc(product) + "</div>\n")
-		b.WriteString("              ")
-		if !n.PurchasedAt.IsZero() {
-			b.WriteString(`<div style="font-size:12px;color:#b0a287;margin-top:2px;font-family:` + emailFont + `">Sent ` + esc(n.PurchasedAt.UTC().Format("2 Jan 2006")) + "</div>")
+		item += "&nbsp;" + esc(product)
+	} else {
+		item += "&nbsp;" + esc(n.itemWord())
+	}
+	b.WriteString(`                    <div class="item-line" style="font-size:17px;font-weight:700;color:` + mailInk + `;font-family:` + font + `">` + item + `</div>` + "\n")
+	b.WriteString("                  </td>\n")
+	b.WriteString(`                  <td align="right" style="vertical-align:top;white-space:nowrap;padding-left:12px">` + "\n")
+	b.WriteString(`                    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:` + mailInkFaint + `;padding-bottom:4px;font-family:` + font + `">Sent</div>` + "\n")
+	sentLine := "just now"
+	if !n.PurchasedAt.IsZero() {
+		sentLine = n.PurchasedAt.UTC().Format("2 Jan 2006")
+	}
+	b.WriteString(`                    <div style="font-size:13px;color:` + mailInkDim + `;font-family:` + font + `">` + esc(sentLine) + `</div>` + "\n")
+	b.WriteString("                  </td>\n")
+	b.WriteString("                </tr></table>\n")
+	b.WriteString("              </td>\n")
+	b.WriteString("            </tr>\n")
+
+	// the buyer's own words
+	if !n.Self {
+		b.WriteString("            <tr>\n")
+		b.WriteString(`              <td class="px-card" style="padding:0 26px 18px 26px">` + "\n")
+		if para != "" {
+			b.WriteString(`                ` + eyebrow(font, "Their message") + "\n")
+			b.WriteString(`                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:` + mailPanel + `;border-radius:12px"><tr>` + "\n")
+			b.WriteString(`                  <td width="4" style="width:4px;background:` + mailGold + `;border-radius:12px 0 0 12px">&nbsp;</td>` + "\n")
+			b.WriteString(`                  <td style="padding:12px 14px;font-size:15px;line-height:1.55;color:` + mailInk + `;font-style:italic;font-family:` + font + `">` + para + `</td>` + "\n")
+			b.WriteString("                </tr></table>\n")
+		} else {
+			b.WriteString(`                <div style="font-size:13px;color:` + mailInkFaint + `;font-family:` + font + `">No personal message was left with the gift.</div>` + "\n")
 		}
-		b.WriteString("\n")
-		b.WriteString("            </td>\n")
-		b.WriteString("          </tr>")
+		b.WriteString("              </td>\n")
+		b.WriteString("            </tr>\n")
 	}
-	b.WriteString("\n")
 
-	// ---- the buyer's message ----------------------------------------------
-	if !n.Self && para != "" {
-		b.WriteString("\n          <tr>\n")
-		b.WriteString(`            <td class="px-card" style="padding:0 26px 16px 26px">` + "\n")
-		b.WriteString(`<div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#b0a287;margin-bottom:4px;font-family:` + emailFont + `">Their message</div>` + "\n")
-		b.WriteString(`<div style="border-left:3px solid #d8c9a8;padding:2px 0 2px 12px;font-size:15px;line-height:1.55;color:#2f2a24;font-style:italic;font-family:` + emailFont + `">` + para + "</div>\n")
-		b.WriteString("            </td>\n")
-		b.WriteString("          </tr>")
-	} else if !n.Self {
-		b.WriteString(`<tr><td class="px-card" style="padding:0 26px 6px 26px;color:#8a7f72;font-size:14px;font-family:` + emailFont + `">No personal message was left with the gift.</td></tr>`)
-	}
-	b.WriteString("\n")
+	// where is it — the one paragraph that must survive intact
+	b.WriteString("            <tr>\n")
+	b.WriteString(`              <td class="px-card" style="padding:0 26px 18px 26px">` + "\n")
+	b.WriteString(`                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:` + mailPanel + `;border:1px dashed ` + mailDash + `;border-radius:12px">` + "\n")
+	b.WriteString(`                  <tr><td style="padding:13px 15px;font-size:13px;line-height:1.6;color:` + mailInkDim + `;font-family:` + font + `">` + "\n")
+	b.WriteString(`                    <strong style="color:` + mailInk + `">Where is ` + esc(n.itemWord()) + `?</strong><br>` + "\n")
+	b.WriteString(`                    ` + esc(n.deliveryLine()) + ` It arrives from <strong style="color:` + mailInk + `">noreply@cryptorefills.com</strong> — watch that inbox (and the spam folder).` + "\n")
+	b.WriteString("                  </td></tr>\n")
+	b.WriteString("                </table>\n")
+	b.WriteString("              </td>\n")
+	b.WriteString("            </tr>\n")
 
-	// ---- "where is it" box --------------------------------------------------
-	b.WriteString("\n          <tr>\n")
-	b.WriteString(`            <td class="px-card" style="padding:0 26px">` + "\n")
-	b.WriteString(`              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#fbf6ea;border:1px dashed #e3d9c6;border-radius:10px">` + "\n")
-	b.WriteString(`                <tr><td style="padding:12px 14px;font-size:13px;line-height:1.55;color:#5d544a;font-family:` + emailFont + `"><strong>Where is ` + esc(n.itemWord()) + `?</strong> ` + esc(n.deliveryLine()) + " It arrives from <strong>noreply@cryptorefills.com</strong> — watch that inbox (and the spam folder).</td></tr>\n")
-	b.WriteString("              </table>\n")
-	b.WriteString("            </td>\n")
-	b.WriteString("          </tr>")
-	b.WriteString("\n")
-	b.WriteString("\n              <!-- CTA (full-width block button on phones; VML roundrect in Outlook) -->\n")
-
-	// ---- CTA (give back) ----------------------------------------------------
+	// CTA (full-width block button on phones; VML roundrect in Outlook)
 	if cta != "" {
-		b.WriteString("\n          <tr>\n")
-		b.WriteString(`            <td class="px-card" style="padding:20px 26px 0 26px">` + "\n")
-		b.WriteString(`              <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="` + esc(cta) + `" style="height:46px;v-text-anchor:middle;width:254px;" arcsize="22%" strokecolor="#2f2a24" fillcolor="#2f2a24"><w:anchorlock/><center style="color:#fffdf7;font-family:Arial,sans-serif;font-size:15px;font-weight:bold">Give a gift back at ` + esc(site) + ` →</center></v:roundrect><![endif]-->` + "\n")
-		b.WriteString("              <!--[if !mso]><!-->\n")
-		b.WriteString(`              <table role="presentation" cellpadding="0" cellspacing="0" border="0" class="cta-table" style="width:auto">` + "\n")
-		b.WriteString("                <tr>\n")
-		b.WriteString(`                  <td bgcolor="#2f2a24" style="border-radius:10px;background:#2f2a24">` + "\n")
-		b.WriteString(`                    <a href="` + esc(cta) + `" class="cta-link" style="display:inline-block;padding:13px 22px;font-size:15px;font-weight:700;color:#fffdf7;text-decoration:none;border-radius:10px;font-family:` + emailFont + `">Give a gift back at ` + esc(site) + ` →</a>` + "\n")
-		b.WriteString("                  </td>\n")
-		b.WriteString("                </tr>\n")
-		b.WriteString("              </table>\n")
-		b.WriteString("              <!--<![endif]-->\n")
-		b.WriteString(`<div style="font-size:12px;color:#8a7f72;margin-top:8px;font-family:` + emailFont + `">Gift cards, eSIMs and phone top-ups — pay with NIM or USDT.</div>` + "\n")
-		b.WriteString("            </td>\n")
-		b.WriteString("          </tr>")
+		b.WriteString("            <tr>\n")
+		b.WriteString(`              <td class="px-card" style="padding:0 26px 20px 26px">` + "\n")
+		b.WriteString(`                <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="` + esc(cta) + `" style="height:46px;v-text-anchor:middle;width:254px;" arcsize="22%" strokecolor="` + mailStamp + `" fillcolor="` + mailStamp + `"><w:anchorlock/><center style="color:` + mailOnStamp + `;font-family:Arial,sans-serif;font-size:15px;font-weight:bold">Give a gift back at ` + esc(site) + ` →</center></v:roundrect><![endif]-->` + "\n")
+		b.WriteString("                <!--[if !mso]><!-->\n")
+		b.WriteString(`                <table role="presentation" cellpadding="0" cellspacing="0" border="0" class="cta-table" style="width:auto">` + "\n")
+		b.WriteString(`                  <tr><td bgcolor="` + mailStamp + `" style="border-radius:10px;background:` + mailStamp + `">` + "\n")
+		b.WriteString(`                    <a href="` + esc(cta) + `" class="cta-link" style="display:inline-block;padding:14px 22px;font-size:15px;font-weight:700;color:` + mailOnStamp + `;text-decoration:none;border-radius:10px;font-family:` + font + `">Give a gift back at ` + esc(site) + ` →</a>` + "\n")
+		b.WriteString("                  </td></tr>\n")
+		b.WriteString("                </table>\n")
+		b.WriteString("                <!--<![endif]-->\n")
+		b.WriteString(`                <div style="font-size:12px;color:` + mailInkFaint + `;padding-top:10px;font-family:` + font + `">Gift cards, eSIMs and phone top-ups — pay with NIM or USDT.</div>` + "\n")
+		b.WriteString("              </td>\n")
+		b.WriteString("            </tr>\n")
 	}
-	b.WriteString("\n")
-	b.WriteString("\n")
 
-	// ---- built on NIM (stake) ----------------------------------------------
+	// built on NIM (stake)
 	if sa := strings.TrimSpace(n.StakeValidatorAddress); sa != "" {
-		b.WriteString("\n          <tr>\n")
-		b.WriteString(`            <td class="px-card" style="padding:18px 26px 0 26px">` + "\n")
-		b.WriteString(`              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px dashed #e3d9c6">` + "\n")
-		b.WriteString("                <tr>\n")
-		b.WriteString(`                  <td class="foot" style="padding:16px 4px 0 4px;font-size:12px;line-height:1.5;color:#8a7f72;font-family:` + emailFont + `">` + "\n")
-		b.WriteString(`<strong>Built on NIM.</strong> ` + esc(site) + ` is a Nimiq-native shop. To help` + "\n")
-		b.WriteString(`                    secure the network, stake your NIM to our validator inside Nimiq Pay:<br>` + "\n")
-		b.WriteString(`<span style="font-family:` + emailMono + `;color:#6b6157">` + esc(groupAddress(sa)) + "</span>\n")
-		b.WriteString("                  </td>\n")
-		b.WriteString("                </tr>\n")
-		b.WriteString("              </table>\n")
-		b.WriteString("            </td>\n")
-		b.WriteString("          </tr>")
+		b.WriteString("            <tr>\n")
+		b.WriteString(`              <td class="px-card" style="padding:0 26px 22px 26px">` + "\n")
+		b.WriteString(`                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px dashed ` + mailDash + `">` + "\n")
+		b.WriteString(`                  <tr><td class="foot" style="padding:16px 2px 0 2px;font-size:12px;line-height:1.6;color:` + mailInkFaint + `;font-family:` + font + `">` + "\n")
+		b.WriteString(`                    <strong style="color:` + mailGreen + `">Built on NIM.</strong> ` + esc(site) + ` is a Nimiq-native shop — pay in NIM and stake to help secure the network.<br>` + "\n")
+		b.WriteString(`                    <span style="font-family:` + emailMono + `;font-size:11.5px;color:` + mailInkDim + `">` + esc(groupAddress(sa)) + `</span>` + "\n")
+		b.WriteString("                  </td></tr>\n")
+		b.WriteString("                </table>\n")
+		b.WriteString("              </td>\n")
+		b.WriteString("            </tr>\n")
 	}
-	b.WriteString("\n")
-	b.WriteString("\n              <!-- footer -->\n")
-	b.WriteString("              <tr>\n")
-	b.WriteString(`                <td class="px-card foot" style="padding:18px 26px 24px 26px;color:#8a7f72;font-size:12px;line-height:1.6;border-top:1px solid #eee2c8;font-family:` + emailFont + `">` + "\n")
-	b.WriteString("                  ")
+
+	// footer
+	b.WriteString("            <tr>\n")
+	b.WriteString(`              <td class="px-card foot" style="padding:16px 26px 22px 26px;border-top:1px solid ` + mailLine + `;font-size:12px;line-height:1.6;color:` + mailInkFaint + `;font-family:` + font + `">` + "\n")
 	if u := safeURL(n.SupportURL); u != "" {
-		b.WriteString(`<a href="` + u + `" style="color:#8a6d1f;text-decoration:none;font-family:` + emailFont + `">Something did not arrive? Contact support</a>`)
+		b.WriteString(`                <a href="` + u + `" style="color:` + mailGoldDeep + `;font-weight:700;text-decoration:none">Something did not arrive? Contact support</a>` + "\n")
 	}
-	b.WriteString("\n")
-	b.WriteString("                  ")
 	if ref := strings.TrimSpace(n.OrderID); ref != "" {
-		b.WriteString(`<div style="margin-top:8px;color:#b0a287;font-size:11px;font-family:` + emailFont + `">Reference: ` + esc(ref) + "</div>")
+		b.WriteString(`                <div style="padding-top:8px;color:` + mailInkFaint + `;font-size:11px;font-family:` + emailMono + `">Reference ` + esc(ref) + `</div>` + "\n")
 	}
-	b.WriteString("\n")
-	b.WriteString(`<div style="color:#b0a287;margin-top:8px">This email tells you about a gift someone sent. The ` + esc(n.itemWord()) + ` is delivered separately by ` + esc(site) + `&rsquo;s partner CryptoRefills and is never included in this email.</div>` + "\n")
-	b.WriteString("                </td>\n")
-	b.WriteString("              </tr>\n")
-	b.WriteString("            </table>\n")
-	b.WriteString("          </td>\n")
-	b.WriteString("        </tr>\n")
-	b.WriteString("        <tr>\n")
-	b.WriteString(`          <td class="foot" style="padding:14px 6px 0 6px;color:#b0a287;font-size:11px;line-height:1.5;text-align:center;font-family:` + emailFont + `">` + "\n")
-	b.WriteString(`            ` + esc(site) + ` · Nimiq-native shop for gift cards, eSIMs &amp; top-ups` + "\n")
-	b.WriteString("          </td>\n")
-	b.WriteString("        </tr>\n")
-	b.WriteString("        </table>\n")
-	b.WriteString(`        <!--[if mso]></td></tr></table><![endif]-->` + "\n")
-	b.WriteString("      </td>\n")
-	b.WriteString("    </tr>\n")
-	b.WriteString("  </table>\n")
+	b.WriteString(`                <div style="padding-top:8px;font-size:11px;color:` + mailInkFaint + `">This email tells you about a ` + esc(giftWord(n.Self)) + `. The ` + esc(n.itemWord()) + ` is delivered separately by ` + esc(site) + `&rsquo;s partner CryptoRefills and is never included in this email.</div>` + "\n")
+	b.WriteString("              </td>\n")
+	b.WriteString("            </tr>\n")
+	b.WriteString("          </table>\n")
+	b.WriteString("        </td>\n")
+	b.WriteString("      </tr>\n")
+
+	// below the card: the same footer line the site carries
+	b.WriteString("      <tr>\n")
+	b.WriteString(`        <td class="foot" style="padding:12px 4px 0 4px;color:` + mailInkFaint + `;font-size:11px;line-height:1.6;text-align:center;font-family:` + font + `">` + "\n")
+	b.WriteString(`          ` + esc(site) + ` · Nimiq-native shop for gift cards, eSIMs &amp; top-ups` + "\n")
+	b.WriteString("        </td>\n")
+	b.WriteString("      </tr>\n")
+	b.WriteString("      </table>\n")
+	b.WriteString(`      <!--[if mso]></td></tr></table><![endif]-->` + "\n")
+	b.WriteString("    </td>\n")
+	b.WriteString("  </tr>\n")
+	b.WriteString("</table>\n")
 	b.WriteString("</body>\n")
 	b.WriteString("</html>\n")
 	return b.String()
 }
 
-// Mosaic geometry of the donor avatar: a 32x32-cell grid, 2px cells, rendered
-// inside the 88px-wide donor table (browsers stretch the 64px of cells to the
-// table width; Outlook keeps 64px — still a solid avatar). 32x32 is the
-// measured sweet spot for the REAL @nimiq/identicons face rasterized at its
-// native 160px: ~300-500 run-compressed cells ≈ 20-30KB of HTML for the whole
-// note — safely under Gmail's 102KB clipping cutoff (88x88 cells measured
-// 95-107KB: clipped). The cell-size reset (font-size/line-height 0) is
-// emitted once per <tr> — not per <td> — so the resets inherit to the cells
-// and Outlook stays solid.
+// giftWord names the note itself, so a receipt never calls itself a gift.
+func giftWord(self bool) string {
+	if self {
+		return "order"
+	}
+	return "gift"
+}
+
+// itemLabel is the eyebrow above the item line.
+func itemLabel(self bool) string {
+	if self {
+		return "Your item"
+	}
+	return "Their gift"
+}
+
+// eyebrow is the small all-caps label used above every block of the card.
+func eyebrow(font, text string) string {
+	return `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:` + mailInkFaint + `;padding-bottom:5px;font-family:` + font + `">` + text + `</div>`
+}
+
+// panel wraps a block in the recessed paper tone the site uses for notes.
+func panel(font, inner string) string {
+	return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:` + mailPanel + `;border:1px dashed ` + mailDash + `;border-radius:14px">` +
+		`<tr><td style="padding:15px 16px;font-family:` + font + `">` + inner + `</td></tr></table>`
+}
+
+// plainSenderCard is the gift-without-a-wallet case: the note still says a gift
+// arrived, it just has no on-chain identity to show.
+func plainSenderCard() string {
+	font := emailFont
+	inner := `<div style="font-size:13px;line-height:1.6;color:` + mailInkDim + `">A gift card was bought for you at the shop. The buyer did not attach a wallet address, so this note carries no sender identity.</div>`
+	return panel(font, inner)
+}
+
+// Mosaic geometry of the donor avatar: 72x72 cells, one CSS pixel each, which
+// is a pixel-exact redraw of the identicon at the size it is displayed — the
+// 160px source is sampled on a 72-grid and every cell is one real pixel, so
+// the avatar in the inbox is as sharp as the one on the page.
+//
+// Sizing is a hard constraint, not a taste call: Gmail clips a message over
+// ~102KB, and the mosaic is by far the biggest thing in the note. Measured on
+// the real @nimiq/identicons face (flat areas compress into long runs, which is
+// what keeps this affordable):
+//
+//	32x32 cells, 2px (the previous version)  ~18KB  — visibly blocky, the
+//	                                                 character's face and hat
+//	                                                 were unreadable
+//	72x72 cells, 1px (this version)          ~49KB  — pixel-exact; the whole
+//	                                                 note stays ~60KB, a third
+//	                                                 below the clip
+//	88x88 cells, 1px                         ~69KB  — would leave ~25KB of
+//	                                                 headroom for everything
+//	                                                 else, too close to the cut
+//
+// The owner's verdict on the old one was blunt and right ("avatar bile bozuk
+// gözüküyor") — at 32 cells the identicon loses exactly what makes it an
+// identity: the face.
 const (
-	identN    = 32
-	identCell = 2
+	identN    = 72
+	identCell = 1
 )
 
 // identiconTable re-draws the donor's identicon PNG as a bgcolor-cell mosaic.
 //
 // Why not an <img>: Gmail strips data: URIs from image sources and CID inline
 // attachments render unreliably in webmail, so an embedded avatar arrives as
-// an empty box for a chunk of recipients. An 88x88 table of bgcolor cells is
-// the one graphics primitive every mail client renders, so that is what ships.
-// The URI must still pass safeDataImage, and only an 8-bit RGBA PNG decodes
-// (the Python harness decodes exactly the same subset); anything else keeps
-// the placeholder avatar. Identicon gradients become stepped cell colors —
-// the deterministic pattern, which is the identity, survives exactly.
+// an empty box for a chunk of recipients. A table of bgcolor cells is the one
+// graphics primitive every mail client renders, so that is what ships.
+//
+// The URI must still pass safeDataImage. Any PNG the decoder understands is
+// accepted and converted to NRGBA (RGBA, palette, gray and 16-bit sources all
+// arrive as *image.RGBA / *image.Paletted / *image.Gray otherwise, and a
+// silently missing avatar is exactly the bug this replaces); anything else
+// keeps the placeholder avatar. Identicon gradients become stepped cell
+// colours — the deterministic pattern, which is the identity, survives exactly.
 func identiconTable(dataURI string) string {
 	u := safeDataImage(dataURI)
 	if u == "" {
@@ -595,14 +708,20 @@ func identiconTable(dataURI string) string {
 	if err != nil {
 		return ""
 	}
-	img, err := png.Decode(bytes.NewReader(raw))
+	src, err := png.Decode(bytes.NewReader(raw))
 	if err != nil {
 		return ""
 	}
-	nrgba, ok := img.(*image.NRGBA)
-	if !ok {
-		return "" // palette/gray PNGs keep the placeholder (Python parity)
+	// One conversion for every source type: draw the decoded image onto an
+	// NRGBA canvas, which is also where a palette or gray PNG picks up full
+	// alpha. Non-premultiplied on purpose — pngComposite expects straight
+	// colours, exactly like the checkout's canvas output.
+	bounds := src.Bounds()
+	if bounds.Dx() < 1 || bounds.Dy() < 1 {
+		return ""
 	}
+	nrgba := image.NewNRGBA(image.Rect(0, 0, bounds.Dx(), bounds.Dy()))
+	draw.Draw(nrgba, nrgba.Bounds(), src, bounds.Min, draw.Src)
 	b := nrgba.Bounds()
 	clampX := func(v int) int {
 		if v > b.Max.X-1 {
@@ -617,11 +736,11 @@ func identiconTable(dataURI string) string {
 		return v
 	}
 	var sb strings.Builder
-	sb.WriteString(`<table class="donor-img" role="presentation" width="88" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;border-collapse:separate;border-spacing:0;border-radius:16px;overflow:hidden;border:2px solid #d8c9a8;font-size:0;line-height:0">`)
+	sb.WriteString(`<table class="donor-img" role="presentation" width="` + strconv.Itoa(identN) + `" cellpadding="0" cellspacing="0" border="0" style="width:` + strconv.Itoa(identN) + `px;margin:0 auto;border-collapse:separate;border-spacing:0;border-radius:14px;overflow:hidden;border:2px solid ` + mailGold + `;font-size:0;line-height:0">`)
 	for iy := 0; iy < identN; iy++ {
 		sy := clampY(int((float64(iy)+0.5)*float64(b.Dy())/identN) + b.Min.Y)
 		// The font-size/line-height reset lives on the <tr> (inherited by the
-		// cells), not each <td> — keeps the 88x88 mosaic under Gmail's 102KB cap.
+		// cells), not each <td> — keeps the mosaic percentage down.
 		sb.WriteString(`<tr style="font-size:0;line-height:0">`)
 		for ix := 0; ix < identN; {
 			sx := clampX(int((float64(ix)+0.5)*float64(b.Dx())/identN) + b.Min.X)
@@ -647,78 +766,66 @@ func identiconTable(dataURI string) string {
 	return sb.String()
 }
 
-// pngComposite is one mosaic cell's color: the source pixel, alpha-composited
-// over the email card background (#fffdf7) with the same thresholds and the
-// same truncating blend as the Python _mosaic_hex — byte parity by construction.
+// pngComposite is one mosaic cell's colour: the source pixel, alpha-composited
+// over the card background (mailPaper, the same tone the avatar table sits on)
+// so the identicon's transparent corners disappear into the card instead of
+// showing a box.
 func pngComposite(c color.Color) string {
 	nc := color.NRGBAModel.Convert(c).(color.NRGBA)
 	if nc.A >= 250 {
 		return fmt.Sprintf("#%02x%02x%02x", nc.R, nc.G, nc.B)
 	}
 	if nc.A <= 5 {
-		return "#fffdf7"
+		return mailPaper
 	}
 	ar := float64(nc.A) / 255.0
-	r := int(float64(nc.R)*ar + 255*(1-ar))
-	g := int(float64(nc.G)*ar + 253*(1-ar))
-	b := int(float64(nc.B)*ar + 247*(1-ar))
-	return fmt.Sprintf("#%02x%02x%02x", r, g, b)
+	r := int(float64(nc.R)*ar + 246*(1-ar))
+	g := int(float64(nc.G)*ar + 239*(1-ar))
+	bl := int(float64(nc.B)*ar + 220*(1-ar))
+	return fmt.Sprintf("#%02x%02x%02x", r, g, bl)
 }
 
 // anonymousCard replaces identityCard for anonymous gifts: no identicon, no
 // name, no address — just a calm "the sender chose to stay anonymous" so the
 // recipient understands the omission is deliberate, not a rendering bug.
 func anonymousCard() string {
-	return `
-            <!-- anonymous sender: identity withheld by request -->
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-              <tr>
-                <td class="px-card" style="padding:18px 26px 0 26px;font-family:` + emailFont + `">
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f3eee2;border:1px dashed #d8cbb0;border-radius:14px">
-                  <tr>
-                    <td style="padding:16px 18px;text-align:center">
-                      <div style="font-size:26px;line-height:1">&#128374;</div>
-                      <div style="font-size:15px;font-weight:700;color:#2f2a24;margin-top:4px">An anonymous sender</div>
-                      <div style="font-size:12.5px;color:#6b6157;margin-top:3px">The sender chose to stay anonymous — no name or wallet is shown.</div>
-                    </td>
-                  </tr>
-                </table>
-                </td>
-              </tr>
-            </table>`
+	font := emailFont
+	inner := `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>` +
+		`<td width="42" valign="middle" style="width:42px">` +
+		`<table role="presentation" width="40" cellpadding="0" cellspacing="0" border="0" style="width:40px;background:` + mailPaper + `;border:1px solid ` + mailDash + `;border-radius:20px">` +
+		`<tr><td height="40" align="center" valign="middle" style="height:40px;font-size:18px;line-height:40px">🤍</td></tr></table>` +
+		`</td>` +
+		`<td style="padding-left:14px;vertical-align:middle">` +
+		eyebrow(font, "From") +
+		`<div style="font-size:13px;line-height:1.55;color:` + mailInk + `"><strong>The sender chose to stay anonymous.</strong></div>` +
+		`<div style="font-size:11.5px;color:` + mailInkFaint + `;padding-top:2px">No name, no wallet — that is intentional, not a rendering mistake.</div>` +
+		`</td></tr></table>`
+	return panel(font, inner)
 }
 
-// identityCard is the "who sent this" block: the buyer's real Nimiq
-// identicon and their Nimiq wallet address — never a name. On phones the two
-// cells become display:block (see emailCSS) and stack, centred; Outlook never
-// sees the media query and keeps the side-by-side row.
+// identityCard is the donor block: their REAL Nimiq identicon (as a mosaic,
+// see identiconTable) and their wallet address — never a name. On phones the
+// two stack, centred, inside the same panel.
 func identityCard(addr, identURI string) string {
+	font := emailFont
 	img := identiconTable(identURI)
-	if img == "" {
-		img = `<div class="donor-img" style="width:88px;height:88px;border-radius:16px;background:#efe4cd"></div>`
+	avatar := `<div class="donor-img" style="width:` + strconv.Itoa(identN) + `px;height:` + strconv.Itoa(identN) + `px;border-radius:14px;background:` + mailPaper + `;border:2px solid ` + mailGold + `"></div>`
+	if img != "" {
+		avatar = img
 	}
-	addrCell := ""
-	if addr != "" {
-		addrCell = `<div class="addr" style="font-family:` + emailMono + `;font-size:11.5px;color:#6b6157;word-break:break-all">` + addr + `</div>` +
-			`<div style="font-size:11px;color:#b0a287;margin-top:3px;font-family:` + emailFont + `">the sender&rsquo;s Nimiq wallet</div>`
-	}
-	return `
-              <tr>
-                <td class="px-card" style="padding:20px 26px 0 26px">
-                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-                    <tr>
-                      <td class="donor-cell" width="88" valign="middle" style="text-align:center">` + img + `</td>
-                      <td class="donor-info" style="padding-left:14px;vertical-align:middle">
-                        ` + addrCell + `
-                      </td>
-                    </tr>
-                  </table>
-                </td>
-              </tr>`
+	// The wallet IS the identity: it is a public blockchain address, and it is
+	// what the recipient would use to send something back.
+	addrCell := `<div class="addr" style="font-family:` + emailMono + `;font-size:12px;line-height:1.5;color:` + mailInk + `;word-break:break-all">` + addr + `</div>`
+	inner := `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>` +
+		`<td class="donor-cell" width="` + strconv.Itoa(identN) + `" valign="middle" style="width:` + strconv.Itoa(identN) + `px;text-align:center">` + avatar + `</td>` +
+		`<td class="donor-info" style="padding-left:16px;vertical-align:middle">` +
+		eyebrow(font, "From") +
+		addrCell +
+		`<div style="font-size:11.5px;line-height:1.5;color:` + mailInkFaint + `;padding-top:4px">Their wallet is the signature — the note carries no name.</div>` +
+		`</td></tr></table>`
+	return panel(font, inner)
 }
 
-// wrap breaks a sentence at word boundaries so the plain-text part reads like a
-// paragraph and not one long line in a monospace client.
 func wrap(s string, width int) string {
 	words := strings.Fields(s)
 	if len(words) == 0 {
