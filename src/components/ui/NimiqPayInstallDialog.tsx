@@ -39,15 +39,18 @@ function PlayIcon() {
  * ("Nimiq Pay not found — pay with the QR below"), used by the payment flow;
  * the plain install case keeps the hint line alone. `only` narrows the buttons
  * to the buyer's actual store, which is what the old toast did on a phone.
+ *
+ * No "OK" button at the foot (owner, 2026-10-06: "tamama gerek yok, zaten X var
+ * ya üstte" — taken from his screenshot of this popup): the sheet header already
+ * carries the close control, and a second way out under two store buttons only
+ * made the popup taller.
  */
 export function NimiqPayInstallBody({
   messageKey,
   only = null,
-  onClose,
 }: {
   messageKey?: string;
   only?: 'ios' | 'android' | null;
-  onClose?: () => void;
 }) {
   const { t } = useT();
   const stores = only === 'ios'
@@ -88,11 +91,6 @@ export function NimiqPayInstallBody({
           </a>
         ))}
       </div>
-      {onClose ? (
-        <button type="button" className="btn btn-ghost btn-block mt-2" onClick={onClose}>
-          {t('actions.ok')}
-        </button>
-      ) : null}
     </>
   );
 }
@@ -107,12 +105,8 @@ export function useNimiqPayInstallSheet(): (opts?: { messageKey?: string }) => v
     (opts?: { messageKey?: string }) => {
       openSheet({
         title: (tr: Translator) => tr('login.payInstallTitle'),
-        render: (close) => (
-          <NimiqPayInstallBody
-            messageKey={opts?.messageKey}
-            only={detectMobilePlatform()}
-            onClose={close}
-          />
+        render: () => (
+          <NimiqPayInstallBody messageKey={opts?.messageKey} only={detectMobilePlatform()} />
         ),
       });
     },
