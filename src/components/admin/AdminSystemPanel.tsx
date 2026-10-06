@@ -322,8 +322,26 @@ export function SystemPanel() {
     );
   }
 
+  // A payload from a build that predates these cards says nothing about the
+  // host or the countries. Saying so beats rendering an empty page: the most
+  // likely reason is a deployment behind the API that has not picked up the
+  // new backend build, and that is a thing an operator can go and fix.
+  const stale = data && !data.host && !data.countries;
+
   return (
     <>
+      {stale ? (
+        <div className="card mt-2">
+          <div className="card-title">
+            <Icon name="pulse" size={18} />
+            <span>Server</span>
+          </div>
+          <AlertBox type="info">
+            This API build does not report server metrics or the country ranking yet — the backend running at the
+            public API host needs to pick up the latest build. Everything else on this page is unaffected.
+          </AlertBox>
+        </div>
+      ) : null}
       <HostCard host={data?.host || null} sampledAt={loadedAt} />
       <CountryRankCard countries={data?.countries || null} />
     </>
