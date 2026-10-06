@@ -706,6 +706,35 @@ html.in-nimiq-pay #main.page {
 .astat-value { font-size:1.55rem; font-weight:900; line-height:1.15; margin-top:2px; font-variant-numeric:tabular-nums; }
 .astat-hint { font-size:.66rem; font-weight:700; color:var(--ink-dim); margin-top:2px; }
 
+/* Server + countries cards (AdminSystemPanel.tsx). The meter is the one
+   addition to the .astat mini card: a percentage nobody can feel without a
+   bar. Tones follow the same ink/stamp/red scale the rest of the console
+   uses, so "89%" and "91%" do not read the same. */
+.ameter { height:7px; border-radius:4px; background:var(--surface-3); margin-top:7px; overflow:hidden; }
+.ameter-fill { display:block; height:100%; border-radius:4px; transition:width .3s var(--ease); }
+.ameter-good .ameter-fill { background:var(--green); }
+.ameter-warn .ameter-fill { background:var(--stamp); }
+.ameter-bad .ameter-fill { background:var(--red); }
+
+.acr-list { list-style:none; margin:10px 0 0; padding:0; display:flex; flex-direction:column; gap:6px;
+  counter-reset:none; }
+.acr-row { display:grid; grid-template-columns:26px 26px 1fr auto; gap:9px; align-items:center;
+  border:2px solid var(--line-strong); background:var(--surface-1); border-radius:var(--r-l);
+  padding:7px 10px; box-shadow:2px 2px 0 rgba(78,61,40,.12); min-width:0; }
+.acr-rank { font-size:.78rem; font-weight:900; color:var(--ink-faint); text-align:center;
+  font-variant-numeric:tabular-nums; }
+.acr-flag { font-size:1.05rem; line-height:1; text-align:center; }
+.acr-main { display:flex; flex-direction:column; min-width:0; gap:4px; }
+.acr-name { font-size:.85rem; font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.acr-code { font-size:.6rem; font-weight:800; letter-spacing:.06em; color:var(--ink-faint); margin-left:7px; }
+.acr-bar { display:block; height:6px; border-radius:4px; background:var(--surface-3); overflow:hidden; }
+.acr-fill { display:block; height:100%; background:var(--gold-400); border-radius:4px; }
+.acr-metrics { display:grid; grid-template-columns:repeat(3, minmax(46px, auto)); gap:8px; }
+.acr-metric { display:flex; flex-direction:column; align-items:flex-end; line-height:1.1; }
+.acr-metric b { font-size:.8rem; font-weight:900; font-variant-numeric:tabular-nums; }
+.acr-metric i { font-style:normal; font-size:.56rem; font-weight:800; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--ink-faint); }
+
 .ausr-list { display:flex; flex-direction:column; gap:8px; }
 .ausr-row { display:flex; align-items:center; gap:10px; width:100%; text-align:left; font:inherit; color:inherit;
   border:2px solid var(--line-strong); background:var(--surface-1); border-radius:var(--r-l); padding:9px 11px;
@@ -741,6 +770,9 @@ html.in-nimiq-pay #main.page {
 
 @media (max-width:560px) {
   .astat-grid { grid-template-columns:repeat(2, minmax(0,1fr)); }
+  .acr-row { grid-template-columns:22px 22px 1fr; row-gap:6px; }
+  .acr-metrics { grid-column:3 / -1; grid-template-columns:repeat(3, minmax(0,1fr)); }
+  .acr-metric { align-items:flex-start; }
   .ausr-row { flex-wrap:wrap; }
   .ausr-metrics { grid-template-columns:repeat(4, minmax(0,1fr)); width:100%; gap:4px; }
   .ausr-metric { align-items:flex-start; }

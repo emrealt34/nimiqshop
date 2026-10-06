@@ -322,6 +322,73 @@ func (s *Store) PlayerStats(now time.Time) (PlayerStats, error) {
 	return stats, nil
 }
 
+// CountryStat is one row of the console's country ranking: how many customers
+// the shop has seen from a country, and how many of them were here recently.
+//
+// The country comes from the presence note (see TouchUserPresence) — the edge's
+// geolocation of the visit, recorded per customer — so this is "where our
+// customers are", not an analytics estimate.
+type CountryStat struct {
+	Code        string `json:"code"`
+	Users       int    `json:"users"`
+	ActiveToday int    `json:"active_today"`
+	ActiveWeek  int    `json:"active_this_week"`
+	WithOrders  int    `json:"with_orders"`
+}
+
+// CountryStats groups customers by their last observed country, most customers
+// first, and reports the same activity windows the Players card uses. Customers
+// with no observed country (a visit the edge could not place) are counted
+// separately by the caller so the ranking never silently loses people.
+func (s *Store) CountryStats(now time.Time) ([]CountryStat, error) {
+	now = now.UTC()
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	weekStart := now.AddDate(0, 0, -7)
+
+	rows, err := s.ListUsersWithStats("registered", false, 0)
+	if err != nil {
+		return nil, err
+	}
+	byCode := map[string]*CountryStat{}
+	for _, r := range rows {
+		code := strings.ToUpper(strings.TrimSpace(r.LastCountry))
+		if len(code) != 2 || code == "XX" {
+			continue
+		}
+		st, ok := byCode[code]
+		if !ok {
+			st = &CountryStat{Code: code}
+			byCode[code] = st
+		}
+		st.Users++
+		if r.Agg.OrderCount > 0 {
+			st.WithOrders++
+		}
+		if last := r.effectiveLastSeen(); !last.IsZero() {
+			if !last.Before(todayStart) {
+				st.ActiveToday++
+			}
+			if !last.Before(weekStart) {
+				st.ActiveWeek++
+			}
+		}
+	}
+	out := make([]CountryStat, 0, len(byCode))
+	for _, st := range byCode {
+		out = append(out, *st)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Users != out[j].Users {
+			return out[i].Users > out[j].Users
+		}
+		if out[i].ActiveWeek != out[j].ActiveWeek {
+			return out[i].ActiveWeek > out[j].ActiveWeek
+		}
+		return out[i].Code < out[j].Code
+	})
+	return out, nil
+}
+
 // CashbackQueueStat is one status bucket of the payout queue.
 type CashbackQueueStat struct {
 	Status     string     `json:"status"`

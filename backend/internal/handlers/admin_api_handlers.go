@@ -89,6 +89,24 @@ func (h *Handlers) AdminDashboard(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
+	// Country ranking: where the shop's customers actually are, from the
+	// country recorded on their visits. Customers the edge could not place are
+	// reported as their own count so the ranking never silently loses people.
+	countries, cerr := h.Store.CountryStats(time.Now().UTC())
+	if cerr != nil {
+		adminStoreError(ctx)
+		return
+	}
+	placed := 0
+	for _, c := range countries {
+		placed += c.Users
+	}
+
+	// Host metrics: CPU, memory, disk and network on the machine running this
+	// API — one operator question ("is it us or the supplier?") that used to
+	// need a hosting dashboard. Best-effort: a host without /proc reports why.
+	host := h.hostMetrics()
+
 	response := map[string]any{
 		"users": users,
 		"queue": map[string]int{
@@ -100,11 +118,38 @@ func (h *Handlers) AdminDashboard(ctx *fasthttp.RequestCtx) {
 			"cr_queue_actors":         crQueue.Actors,
 		},
 		"players":        adminPlayerView(players),
+		"countries":      adminCountryView(countries, users-placed),
+		"host":           host,
 		"cashback_queue": adminCashbackQueueView(queue),
 		"settings":       map[string]any{"updated_at": settings.UpdatedAt, "updated_by": settings.UpdatedBy, "note": "pricing margin is set by the supplier; no local margin"},
 		"payment":        map[string]any{"rail": "cryptorefills", "custody": false, "note": "customer pays the supplier's one-time wallet address with stablecoins; Cryptorefills is merchant of record"},
 	}
 	writeJSON(ctx, fasthttp.StatusOK, response)
+}
+
+// adminCountryView shapes the country ranking: the rows, plus the roll-ups the
+// card's header line reads (how many customers the edge could place, and how
+// many it could not).
+func adminCountryView(rows []db.CountryStat, unknown int) map[string]any {
+	out := make([]map[string]any, 0, len(rows))
+	leaders := 0
+	for _, r := range rows {
+		leaders += r.Users
+		out = append(out, map[string]any{
+			"code":             r.Code,
+			"users":            r.Users,
+			"active_today":     r.ActiveToday,
+			"active_this_week": r.ActiveWeek,
+			"with_orders":      r.WithOrders,
+		})
+	}
+	return map[string]any{
+		"rows":      out,
+		"placed":    leaders,
+		"unknown":   max(unknown, 0),
+		"total":     leaders + max(unknown, 0),
+		"countries": len(out),
+	}
 }
 
 // adminPlayerView is the "Players" card set: how many customers exist, how

@@ -6,14 +6,59 @@ The production split is:
 | --- | --- | --- |
 | Frontend (static Astro build) | Cloudflare Pages project `nimshop` | <https://shop.nimiqbase.com> |
 | Backend (Go API + BadgerDB) | Railway service `zetas`, project `adventurous-motivation`, environment `production` | <https://zetas-production.up.railway.app> (port **8084**) |
-| Public API edge | Cloudflare Tunnel `83001ce9-d661-4eda-bd2f-f2de34ba295b` | <https://shopapi.nimiqbase.com> |
-| Staking pool (unchanged) | Orange Pi behind the same tunnel | <https://api.nimiqbase.com> |
+| Public API hostname | Cloudflare (proxied DNS) → Railway | <https://shopapi.nimiqbase.com> |
+| Staking pool (unchanged) | Orange Pi | <https://api.nimiqbase.com> |
 
-The browser only ever talks to `shop.nimiqbase.com`; Pages proxies `/api/*` to
-`shopapi.nimiqbase.com`, which the tunnel forwards to Railway. The Railway
-domain itself is **not** a public entry point: the backend runs in
+**Railway hosts ONLY the backend.** The static frontend is Cloudflare Pages and
+the database lives on the Railway volume; nothing else runs on Railway. That
+split is what the hosting dashboard shows, and it is what the response headers
+prove:
+
+```text
+$ curl -sI https://shop.nimiqbase.com/api/geo
+server: cloudflare
+x-railway-edge: ber1            ← the API answers from Railway
+cf-ray: a4637aa188ac7561-SEA
+
+$ curl -s https://shopapi.nimiqbase.com/api/geo
+{"cloudflare":false,"country":"","ip":"89.222.123.194"}
+```
+
+### How a request actually reaches the API (measured, 2026-10-06)
+
+The public hostname `shopapi.nimiqbase.com` is a **proxied Cloudflare DNS
+record** pointing straight at the Railway service. There is no separate
+`cloudflared` hop on this path: the `x-railway-*` headers are stamped by
+Railway's own edge, and `cf-ray` by Cloudflare in front of it.
+
+```text
+browser → Cloudflare edge → Railway edge → container
+```
+
+Two consequences worth knowing, because both shaped the code:
+
+1. **Cloudflare's `CF-*` headers do not survive the hop.** `x-forwarded-for`
+   carries the visitor address (Cloudflare's own header set, `CF-Connecting-IP`
+   / `CF-Ray` / `CF-IPCountry`, is not forwarded to the container). Verified:
+   `/api/geo` answered `cloudflare:false` — the ray trace never arrives — while
+   the IP was correct. So the country cannot come from `CF-IPCountry` on this
+   deployment. It travels instead on the deployment's own carrier,
+   `X-Nimshop-Client-Country` (what `functions/api/[[path]].js` and
+   `scripts/proxy.mjs` restate from the edge), and, as the last resort for
+   display only, on the browser's `X-Nimshop-Country-Hint`, read from the
+   same-origin `/cdn-cgi/trace`. See `backend/internal/clientip` and
+   `src/lib/edgeGeo.ts`.
+2. **The API sees the visitor's address, not the tunnel's.** `/api/geo` reported
+   the visitor IP correctly (`89.222.123.194` for the owner's line), which is
+   also what the operator console's People panel shows. If a future change puts
+   an origin-pinned tunnel (`cloudflared` on the Orange Pi) back in front, the
+   peeled chain ends at the tunnel's egress instead — one address for every
+   visitor — and that is the case `X-Nimshop-Client-IP` (set by the Pages
+   function / Node proxy from the edge's own attribution) exists to cover.
+
+The Railway domain itself is **not** a public entry point: the backend runs in
 `PROXY_HEADER_MODE=forwarded` and answers `403 UNVERIFIED_PROXY` to anything
-that did not come through the tunnel.
+that did not come through the proxy hop.
 
 ## 1. What the Railway service is configured with
 
@@ -32,7 +77,13 @@ Build/deploy settings (service → Settings):
 
 Deploys are triggered by pushes to `main` (GitHub trigger
 `dd1591d7-513f-483c-9887-fdb8f09b69db`) or manually with
-`serviceInstanceDeploy`.
+`serviceInstanceDeploy`. Watch Paths is `backend/**`, so a docs- or
+frontend-only push must not be expected to roll the API.
+
+When checking whether a backend change is live, do not guess from timing: hit an
+endpoint that names what you changed. (`/api/geo` gained `country_hint` and
+`ip_hint` fields, which is how the edge-attribution work was confirmed on the
+running service.)
 
 ## 2. Environment variables that differ from `backend/.env.example`
 
@@ -54,26 +105,19 @@ SESSION_COOKIE_SECURE     true
 ADMIN_COOKIE_SECURE       true
 ```
 
-`PROXY_HEADER_MODE=forwarded`, not `cloudflare`: the request reaches the
-backend as
+`PROXY_HEADER_MODE=forwarded`, not `cloudflare`: the immediate TCP peer is
+Railway's edge, which is not Cloudflare, so the trust decision has to be made
+against the forwarded chain rather than against `CF-Connecting-IP` (which does
+not arrive — see above). `cloudflare` mode fails closed here and answers 403 to
+every request (`UNVERIFIED_PROXY`). In `forwarded` mode the allowlist above
+covers Railway's private ranges and the request is served.
 
-```text
-browser → Cloudflare edge → cloudflared (Orange Pi) → Railway edge → container
-```
-
-so the immediate TCP peer is Railway's proxy, not the tunnel, and the
-Cloudflare identity headers belong to the *inner* hop. `cloudflare` mode
-fails closed here and answers 403 to every request (`UNVERIFIED_PROXY`),
-including ones arriving through the tunnel. In `forwarded` mode the
-allowlist above covers Railway's private ranges and the request is served.
-
-> Trade-off worth knowing: because cloudflared re-originates the request from
-> the Orange Pi, the IP the backend resolves is the tunnel's egress address,
-> not the visitor's. Per-IP rate limiting and `/api/geo` therefore see one
-> shared address. Fixing that needs the backend to be reached from a proxy
-> that can inject a verified real-IP header (the same-origin Node hop the
-> launcher documents, or `PROXY_HEADER_MODE=cloudflare` with the connector
-> talking to the API directly).
+Because Railway's edge passes the normalized `X-Forwarded-For` through, the
+resolved address IS the visitor's (confirmed live: `/api/geo` returned the
+owner's own address, and the operator console shows it per person). The
+`X-Nimshop-Client-IP` carrier keeps that true even on a deployment whose inner
+hop re-originates the request (an origin tunnel), where peeling the chain would
+otherwise yield the tunnel's egress for every visitor.
 
 ### Cashback payout wallet (`CASHBACK_WALLET_SEED`)
 

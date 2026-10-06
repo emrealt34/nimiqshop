@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Icon, type IconName } from '../ui/Icon';
 import { PlayersPanel, UsersPanel } from './AdminPeoplePanel';
+import { SystemPanel } from './AdminSystemPanel';
 import { AppRoot } from '../AppRoot';
 import { useSheet, useToast } from '../AppProviders';
 import {
@@ -1345,7 +1346,16 @@ export function AdminContent() {
         return <><StatusCard status={status} /><Composer status={status} /><TestEmailCard /></>;
       case 'overview':
       default:
-        return <><PlayersPanel /><StatusCard status={status} /></>;
+        // Players first (who and how many), then the machine and where the
+        // customers are — the owner asked for CPU/RAM/disk/network and the
+        // country ranking on this page rather than in a hosting dashboard.
+        return (
+          <>
+            <PlayersPanel />
+            <SystemPanel />
+            <StatusCard status={status} />
+          </>
+        );
     }
   })();
 
