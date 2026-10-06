@@ -236,7 +236,7 @@ function ThemeToggle() {
 
 /* ---------------- Account dropdown ---------------- */
 
-function AccountArea() {
+function AccountArea({ operatorConsole = false }: { operatorConsole?: boolean }) {
   const { t } = useT();
   const { navigate } = useRouter();
   const [authed, setAuthed] = useState<boolean | null>(null);
@@ -267,6 +267,14 @@ function AccountArea() {
   }, [open]);
 
   const addr = getAddress();
+
+  // The operator console shows exactly ONE way in: the operator login. Its
+  // customer wallet button read as a second, "admin" login for the same
+  // console (owner, 2026-10-06: "admin ve operatörü birleştir … sadece
+  // operatör girişini görmeliyim"), so the signed-out button is not rendered
+  // there. A signed-in customer still gets their chip, because that is where
+  // they sign the wallet session out again.
+  if (operatorConsole && authed !== true) return null;
 
   if (authed === null) {
     // Pre-hydration placeholder. It mirrors the real button's structure
@@ -394,7 +402,8 @@ function TopBar({ activeKey, awaiting }: { activeKey: ShellKey; awaiting?: numbe
         <ThemeToggle />
         <LanguageSwitcher />
         <CartButton />
-        <AccountArea />
+        {/* 'none' is the operator console's route key (see lib/router.tsx). */}
+        <AccountArea operatorConsole={activeKey === 'none'} />
       </div>
     </header>
   );

@@ -124,7 +124,18 @@ function AdminSectionNav({ active, onChange }: { active: AdminSection; onChange:
   );
 }
 
-function AdminLoginSheet({ onSuccess }: { onSuccess: () => void }) {
+/**
+ * The ONE sign-in for this console.
+ *
+ * Owner (2026-10-06): "admin ve operatörü birleştir, o /admin sayfasında sadece
+ * operatör girişini görmeliyim." The page used to show two signed-out surfaces
+ * for the same cookie session — an "Admin session" card with a "Sign in to admin
+ * console" button, and an "Operator console" card with an "Operator sign-in"
+ * button — and the sheet they shared was titled "Admin login" while its body
+ * said "Operator console". Four names, one session. Now: one card, one button,
+ * one sheet, one name — the operator.
+ */
+function OperatorSignInSheet({ onSuccess }: { onSuccess: () => void }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [totp, setTotp] = useState('');
@@ -153,20 +164,19 @@ function AdminLoginSheet({ onSuccess }: { onSuccess: () => void }) {
 
   return (
     <div>
-      <div className="mt-2 mb-1">
-        <div className="strong">Operator console</div>
-        <div className="small muted mt-1">Separate cookie session — your Nimiq wallet login is unrelated.</div>
+      <div className="small muted mb-2">
+        One session for the whole console. Separate cookie session — your Nimiq wallet login is unrelated.
       </div>
       <div className="field">
         <label>Username</label>
-        <input className="input" type="text" placeholder="admin" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} />
+        <input className="input" type="text" placeholder="operator" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} />
       </div>
       <div className="field">
         <label>Password</label>
         <input className="input" type="password" placeholder="Password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
       </div>
       <div className="field">
-        <label>TOTP code (optional for env test logins)</label>
+        <label>TOTP code (only if your operator account uses one)</label>
         <input className="input" type="text" inputMode="numeric" placeholder="6-digit code — leave empty if unused" maxLength={6} autoComplete="one-time-code" value={totp} onChange={(e) => setTotp(e.target.value)} />
       </div>
       {err ? (
@@ -1237,48 +1247,37 @@ function CatalogRulesPanel() {
   );
 }
 
-function SessionCard({ me, onLoggedOut, onSignIn }: any) {
+/** Shown ONLY when signed in — the page keeps exactly one way in (the
+ *  operator card below), so this card never grows a second sign-in button. */
+function SessionCard({ me, onLoggedOut }: any) {
   const { toast } = useToast();
-  const isLive = !!me;
   return (
     <div className="card" style={{ marginTop: '0' }}>
       <div className="row between" style={{ flexWrap: 'wrap', gap: '10px' }}>
         <div>
           <div className="card-title">
             <Icon name="shield" size={14} />
-            <span>Admin session</span>
+            <span>Operator session</span>
           </div>
-          {isLive ? (
-            <div>
-              <div className="strong">{me.admin?.username || 'admin'}</div>
-              <div className="xs faint">Session expires: {me.expires_at ? new Date(me.expires_at).toLocaleString() : '—'}</div>
-            </div>
-          ) : (
-            <div className="small muted">Not signed in. Sign in below to send notifications.</div>
-          )}
+          <div>
+            <div className="strong">{me?.admin?.username || 'operator'}</div>
+            <div className="xs faint">Session expires: {me?.expires_at ? new Date(me.expires_at).toLocaleString() : '—'}</div>
+          </div>
         </div>
-        {isLive ? (
-          <button
-            className="btn btn-ghost btn-sm"
-            onClick={async () => {
-              try {
-                await adminLogout();
-              } catch {}
-              toast('Admin session ended', 'info');
-              onLoggedOut();
-            }}
-          >
-            <Icon name="logout" size={14} />
-            <span className="btn-label">Sign out</span>
-          </button>
-        ) : null}
-      </div>
-      {!isLive ? (
-        <button className="btn btn-gold mt-2" onClick={onSignIn}>
-          <Icon name="shield" size={18} />
-          <span className="btn-label">Sign in to admin console</span>
+        <button
+          className="btn btn-ghost btn-sm"
+          onClick={async () => {
+            try {
+              await adminLogout();
+            } catch {}
+            toast('Operator session ended', 'info');
+            onLoggedOut();
+          }}
+        >
+          <Icon name="logout" size={14} />
+          <span className="btn-label">Sign out</span>
         </button>
-      ) : null}
+      </div>
     </div>
   );
 }
@@ -1319,7 +1318,7 @@ export function AdminContent() {
   }
 
   const openLogin = () => {
-    openSheet({ title: 'Admin login', wide: false, render: () => <AdminLoginSheet onSuccess={() => { refresh(); }} /> });
+    openSheet({ title: 'Operator sign-in', wide: false, render: () => <OperatorSignInSheet onSuccess={() => { refresh(); }} /> });
   };
 
   const goToSection = (next: AdminSection) => {
@@ -1353,9 +1352,9 @@ export function AdminContent() {
   return (
     <div className="container admin-console">
       <AdminHeader />
-      <SessionCard me={me} onLoggedOut={() => { setMe(null); setSection('overview'); }} onSignIn={openLogin} />
       {me ? (
         <>
+          <SessionCard me={me} onLoggedOut={() => { setMe(null); setSection('overview'); }} />
           <AdminSectionNav active={section} onChange={goToSection} />
           <div className="admin-section-heading">
             <div>
@@ -1368,18 +1367,19 @@ export function AdminContent() {
         </>
       ) : (
         <>
-          {/* Signed-out: say what this page IS and how to get in, instead of
-              showing panels that would just 403 and read as "broken admin". */}
+          {/* Signed-out: ONE card, ONE way in. This used to be two cards for the
+              same cookie session (see OperatorSignInSheet), which read as "there
+              is an admin login AND an operator login". There is one. */}
           <div className="card mt-2">
-            <div className="strong">Operator console</div>
+            <div className="strong">Operator sign-in</div>
             <div className="small muted mt-1">
-              Sign in to manage orders & quotes, direct email notifications, cashback & the stake
-              ledger, catalog rules and people. The support inbox is retired —
-              buyers are routed to the FAQ and the supplier. Access uses a separate
-              operator login — the customer wallet session is not enough.
+              One login for the whole console: orders &amp; quotes, email notifications, cashback
+              &amp; the stake ledger, catalog rules and people. The support inbox is retired —
+              buyers are routed to the FAQ and the supplier. Separate from the customer wallet
+              login.
             </div>
             <button className="btn btn-gold mt-2" onClick={openLogin}>
-              <Icon name="lock" size={15} /> Operator sign-in
+              <Icon name="lock" size={15} /> Sign in
             </button>
           </div>
         </>
@@ -1395,7 +1395,7 @@ function AdminHeader() {
         <h1 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Icon name="shield" size={24} /> Operator console
         </h1>
-        <div className="xs faint mt-1">Catalog, test orders, cashback, people and Mailtrap tools — separate from the customer wallet login.</div>
+        <div className="xs faint mt-1">One operator login for catalog, test orders, cashback, people and Mailtrap tools — separate from the customer wallet login.</div>
       </div>
       <a className="btn btn-ghost btn-sm" href={pagePath("/")}>
         <Icon name="back" size={14} />
