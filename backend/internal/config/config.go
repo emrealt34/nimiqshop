@@ -624,7 +624,7 @@ func Load() Config {
 		SiteHost:   host,
 		ListenAddr: env("LISTEN_ADDR", ":8084"), StaticDir: strings.TrimSpace(os.Getenv("STATIC_DIR")), BadgerDir: env("BADGER_DIR", "./data/badger"),
 		JWTSecret: env("JWT_SECRET", ""), JWTExpiryMins: envInt("JWT_EXPIRY_MINS", 60*24*30),
-		AllowedOrigins: allowedOriginsFromEnv(), FrontendURL: strings.TrimRight(strings.TrimSpace(os.Getenv("FRONTEND_URL")), "/"), MaxRequestBodyBytes: envInt("MAX_REQUEST_BODY_BYTES", 1<<20), MaxOrderQuantity: envInt("MAX_ORDER_QUANTITY", 10),
+		AllowedOrigins: allowedOriginsFromEnv(), FrontendURL: strings.TrimRight(strings.TrimSpace(os.Getenv("FRONTEND_URL")), "/"), MaxRequestBodyBytes: envInt("MAX_REQUEST_BODY_BYTES", 1<<20), MaxOrderQuantity: envInt("MAX_ORDER_QUANTITY", 100),
 		PriceFeedURL: env("PRICE_FEED_URL", "https://api.coingecko.com/api/v3/simple/price?ids=nimiq-2&vs_currencies=usd"),
 		// Default 2: at least TWO independent price feeds are used for the
 		// informational NIM estimate shown in the UI (never the payment
@@ -634,7 +634,7 @@ func Load() Config {
 		// $1000/month — the same numbers the staking spend caps carry, so a
 		// buyer never reads two different ceilings on two screens. The daily
 		// ORDER ceiling stays a separate knob (DAILY_ORDER_LIMIT).
-		DailyOrderLimit: envOrderLimit("DAILY_ORDER_LIMIT", 9), DailySpendLimitUSD: envBudgetUSD("DAILY_SPEND_LIMIT_USD", 500),
+		DailyOrderLimit: envOrderLimit("DAILY_ORDER_LIMIT", 100), DailySpendLimitUSD: envBudgetUSD("DAILY_SPEND_LIMIT_USD", 500),
 		MonthlySpendLimitUSD: envBudgetUSD("MONTHLY_SPEND_LIMIT_USD", 1000),
 		CRBaseURL:            env("CRYPTOREFILLS_BASE_URL", "https://api.cryptorefills.com"), CRPartnerID: os.Getenv("CRYPTOREFILLS_PARTNER_ID"), CRAppVersion: env("CRYPTOREFILLS_APP_VERSION", "nimshop/1.0"), CRUserAgent: env("CRYPTOREFILLS_USER_AGENT", "nimshop/1.0 +https://"+host), CRWebhookKey: os.Getenv("CRYPTOREFILLS_WEBHOOK_KEY"), PublicWebhookBaseURL: strings.TrimRight(os.Getenv("PUBLIC_WEBHOOK_BASE_URL"), "/"),
 		CRPollSecs: envInt("WORKER_ORDER_POLL_SECS", 5), CRStaleSecs: envInt("WORKER_ORDER_STALE_SECS", 300), TestMode: envBool("TEST_MODE", false),

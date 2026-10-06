@@ -8,6 +8,7 @@ secrets/
 
 # Node / Go
 node_modules/
+node_modules
 .astro/
 backend/bin/
 backend/dist/

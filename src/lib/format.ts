@@ -210,7 +210,7 @@ export function safeRichHTML(html: unknown): string {
 /* ---------- shared catalog / order helpers ---------- */
 
 // Backend MaxOrderQuantity — the same ceiling everywhere.
-export const MAX_QTY = 10;
+export const MAX_QTY = 100;
 
 // Fallback currency for local face-value labels, keyed by country.
 export const COUNTRY_CCY: Record<string, string> = {
