@@ -961,7 +961,7 @@ const tr = {
   home: {
     heroTitle1: 'Nimiq Pay ile hediye kartı, kontör ve eSIM al.',
     heroTitle2: 'Nimiq Pay ile öde, cashback kazan.',
-    heroLede: 'Doğrudan Nimiq Pay uygulamanla öde.',
+    heroLede: 'Nimiq Pay cüzdanınla ödemeler yap ve kazançlı çık.',
     browseShelf: 'Rafa göz at',
     earnCashback: 'Cashback kazan',
     payNotInstalled: 'Nimiq Pay kurulu değil. Uygulama mağazası açılıyor…',
