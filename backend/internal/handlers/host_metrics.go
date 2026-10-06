@@ -47,21 +47,21 @@ import (
 // hostSampleGap is how long a sample is reused. The console polls the dashboard
 // every 15s; anything faster would compute deltas over a few milliseconds and
 // report noise as load.
-const hostSampleGap = 2 * time.Second
+var hostSampleMinGap = 2 * time.Second
 
 type hostSampler struct {
 	mu   sync.Mutex
 	last *hostSample
-	at   time.Time
 }
 
+// hostSample is the previous reading the next one is differenced against:
+// CPU jiffies and network byte counters are monotonic, so only their change
+// over an interval means anything.
 type hostSample struct {
 	at       time.Time
 	cpuBusy  float64 // jiffies
 	cpuTotal float64 // jiffies
 	rx, tx   uint64  // bytes, all interfaces except loopback
-	diskUsed map[string]uint64
-	diskAll  map[string]uint64
 }
 
 var hostStats hostSampler
@@ -127,8 +127,9 @@ type HostProcess struct {
 }
 
 // hostMetrics collects a sample, reusing the previous one to turn the kernel's
-// monotonic counters into rates.
-func (h *Handlers) hostMetrics() HostMetrics {
+// monotonic counters into rates. A package function, not a method: it reads the
+// host, never the shop, and that is what makes it testable on its own.
+func hostMetrics() HostMetrics {
 	out := HostMetrics{SampledAt: time.Now().UTC()}
 	if runtime.GOOS != "linux" {
 		out.Reason = "host metrics need Linux /proc; this build runs on " + runtime.GOOS
@@ -141,13 +142,13 @@ func (h *Handlers) hostMetrics() HostMetrics {
 		return out
 	}
 	rx, tx, netOK := readNetDev()
-	disks, diskUsed, diskAll := readDisks()
+	disks := readDisks()
 
-	sample := &hostSample{at: now, cpuBusy: busy, cpuTotal: total, rx: rx, tx: tx, diskUsed: diskUsed, diskAll: diskAll}
+	sample := &hostSample{at: now, cpuBusy: busy, cpuTotal: total, rx: rx, tx: tx}
 
 	hostStats.mu.Lock()
 	prev := hostStats.last
-	reuse := prev != nil && now.Sub(prev.at) < hostSampleGap
+	reuse := prev != nil && now.Sub(prev.at) < hostSampleMinGap
 	if !reuse {
 		hostStats.last = sample
 	}
@@ -348,9 +349,7 @@ func readMemInfo() (*HostMemory, bool) {
 // database lives on (BADGER_DIR when set, /data otherwise — the doc pins it
 // there) and the root filesystem. Missing ones are skipped rather than shown as
 // zero-sized.
-func readDisks() ([]HostDisk, map[string]uint64, map[string]uint64) {
-	used := map[string]uint64{}
-	all := map[string]uint64{}
+func readDisks() []HostDisk {
 	var out []HostDisk
 	candidates := []struct{ path, label string }{
 		{strings.TrimSpace(os.Getenv("BADGER_DIR")), "Data volume"},
@@ -383,10 +382,8 @@ func readDisks() ([]HostDisk, map[string]uint64, map[string]uint64) {
 			AvailBytes: min(free, total),
 			Percent:    round1(float64(usd) / float64(total) * 100),
 		})
-		used[path] = usd
-		all[path] = total
 	}
-	return out, used, all
+	return out
 }
 
 // readNetDev sums byte counters over every interface except loopback. Loopback

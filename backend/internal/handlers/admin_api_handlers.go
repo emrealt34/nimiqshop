@@ -105,7 +105,7 @@ func (h *Handlers) AdminDashboard(ctx *fasthttp.RequestCtx) {
 	// Host metrics: CPU, memory, disk and network on the machine running this
 	// API — one operator question ("is it us or the supplier?") that used to
 	// need a hosting dashboard. Best-effort: a host without /proc reports why.
-	host := h.hostMetrics()
+	host := hostMetrics()
 
 	response := map[string]any{
 		"users": users,
