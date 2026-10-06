@@ -79,7 +79,7 @@ export function LightningRailPills() {
   return (
     <RailPills
       pills={[
-        { bg: '#0582CA', img: asset('/img/nimiq-pay.webp'), label: t('checkout.lpPayWithNimOrUsdt') },
+        { bg: '#0582CA', img: asset('/img/nimiq-hexagon.png?v=40'), label: t('checkout.lpPayWithNimOrUsdt') },
         
       ]}
     />
