@@ -549,9 +549,9 @@ func main() {
 		// config-driven (HTTP_REDUCE_MEMORY_USAGE, default on) — a second copy
 		// here would be a constant that silently wins over the setting an
 		// operator just changed.
-		ReadTimeout:        5 * time.Second,
-		WriteTimeout:       5 * time.Second,
-		IdleTimeout:        10 * time.Second,
+		ReadTimeout:                  5 * time.Second,
+		WriteTimeout:                 5 * time.Second,
+		IdleTimeout:                  10 * time.Second,
 		DisablePreParseMultipartForm: true,
 		MaxRequestBodySize:           cfg.MaxRequestBodyBytes,
 		DisableKeepalive:             false,
