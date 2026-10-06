@@ -30,6 +30,16 @@ export const ALLOWED = new Map([
         'Re-check when 4.2.1+ ships and bump via overrides.',
     },
   ],
+  [
+    'https://github.com/advisories/GHSA-68fv-2mgg-jv7q',
+    {
+      package: 'source-map-js',
+      reviewBy: '2027-01-31',
+      reason:
+        'Reachable only through development/build tools (source map generation). The shipped artifact ' +
+        'is static and never processes untrusted source maps at runtime. Cannot be exploited in production.',
+    },
+  ],
 ]);
 
 /** Extract high/critical advisories from `npm audit --json` output. */
