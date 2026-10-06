@@ -3349,3 +3349,12 @@ html { overflow-x: clip; }
   .mainnav { gap: 2px; }
   .mainnav a { padding: 7px 9px; }
 }
+
+[data-theme="dark"] .skel, [data-theme="dark"] .skeleton-box, [data-theme="dark"] .skeleton-card, [data-theme="dark"] .skeleton-row {
+  background: linear-gradient(90deg, rgba(255,255,255,0.045) 25%, rgba(255,255,255,0.09) 37%, rgba(255,255,255,0.045) 63%);
+  background-size: 400% 100%;
+}
+[data-theme="dark"] .skeleton-btn {
+  background: linear-gradient(90deg, rgba(255,255,255,0.06) 25%, rgba(255,255,255,0.12) 37%, rgba(255,255,255,0.06) 63%);
+  background-size: 400% 100%;
+}
