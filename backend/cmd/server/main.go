@@ -147,14 +147,9 @@ func main() {
 		if strings.TrimSpace(value) == "" {
 			return value
 		}
-		seedHex, derived, err := nimiq.ResolveWalletSecret(value, account)
+		seedHex, _, err := nimiq.ResolveWalletSecret(value, account)
 		if err != nil {
 			log.Fatalf("%s: %v", name, err)
-		}
-		if derived {
-			if _, aerr := nimiq.AddressFromKeyHex(seedHex); aerr == nil {
-				// Suppressed wallet derived log to reduce noise
-			}
 		}
 		return seedHex
 	}
