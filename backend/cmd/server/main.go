@@ -232,7 +232,7 @@ func main() {
 	// the process stops rather than serving: a boot that wiped and then failed
 	// to record it would wipe again on the next boot, which is exactly how a
 	// live shop loses data it just collected.
-	wipeFlag := filepath.Join(cfg.BadgerDir, "wiped_v2.flag")
+	wipeFlag := filepath.Join(cfg.BadgerDir, "wiped_v3.flag")
 	if _, err := os.Stat(wipeFlag); os.IsNotExist(err) {
 		log.Printf("fresh volume (no %s): deleting customer data, keeping operator accounts and settings", wipeFlag)
 		deleted, err := store.ResetShopData()

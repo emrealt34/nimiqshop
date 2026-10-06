@@ -37,6 +37,7 @@ type wipeNamespace struct {
 var wipeNamespaces = []wipeNamespace{
 	{"Customer accounts", "u:"},
 	{"Customer address index", "ix:u:addr:"},
+	{"Ratings Aggregate", "meta:rating_aggregate"},
 	{"Orders", "o:"},
 	{"Order indexes", "ix:o:"},
 	{"Quotes (checkouts)", "q:"},
