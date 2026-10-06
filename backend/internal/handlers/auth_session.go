@@ -92,6 +92,12 @@ func (h *Handlers) AuthSession(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
+	// Session restore is the closest thing this shop has to "a page load worth
+	// remembering": every signed-in visit passes through here, so accounts that
+	// browse and never check out still get an IP + country in the operator
+	// console instead of an empty line.
+	h.noteUserPresence(ctx, user.ID)
+
 	// SLIDING RENEWAL. The cookie used to be issued once, at login, and simply
 	// ran out — so a shopper who used the shop every day was still thrown out
 	// on the fixed schedule, which is what "sürekli giriş yapıyorum çıkıyor"

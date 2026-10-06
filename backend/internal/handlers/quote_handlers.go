@@ -218,7 +218,7 @@ func (h *Handlers) createQuoteInner(ctx *fasthttp.RequestCtx, userID string, req
 	req.CashbackCode = cashbackView.Code
 	// Presence (best-effort, admin console only).
 	info := clientip.Resolve(ctx, h.Cfg.TrustProxy, h.Cfg.ClientIPPolicy())
-	_ = h.Store.TouchUserPresence(userID, info.IP, info.Country)
+	h.noteUserPresenceFrom(userID, info)
 	if req.Denomination == "" {
 		writeError(ctx, fasthttp.StatusBadRequest, "denomination is required (e.g. \"100 USD\" or \"range\")")
 		return

@@ -23,9 +23,39 @@ import { Identicon } from '../ui/Identicon';
 import { AlertBox } from '../ui/uiKit';
 import { useSheet } from '../AppProviders';
 import { adminDashboard, adminListUsers, adminUserDetail } from '../../lib/api';
-import { fmtNIM, fmtUSD, shortAddr, timeAgo, fmtDate, countryName, formatWalletAddress } from '../../lib/format';
+import { fmtNIM, fmtUSD, shortAddr, timeAgo, fmtDate, countryName, formatWalletAddress, flag } from '../../lib/format';
+import { Clipboard } from '../../lib/clipboard';
 
 /* ---------------- shared bits ---------------- */
+
+/**
+ * The customer's origin, shown where the operator asked for it: on the person
+ * row and again — in full, with the exact address and a copy button — when the
+ * person is opened ("kişi ip adresi ülke de yazsa, basınca o yerde daha güzel
+ * olur").
+ *
+ * The stored address is the last OBSERVED client IP (the same value the
+ * checkout hands the supplier, resolved through the proxy policy) together
+ * with Cloudflare's CF-IPCountry for the same request. It is recorded on sign
+ * in, on every session restore (so someone who only browses is not invisible),
+ * on the presence heartbeat and on both checkout paths — see
+ * backend/internal/handlers/presence_note.go.
+ *
+ * A /64 IPv6 address is 39 characters and would push the row's other facts off
+ * the line, so long addresses are clipped in the middle: the network prefix
+ * and the host part stay readable, which is what an operator matches against.
+ */
+function shortIP(ip: unknown): string {
+  const s = String(ip || '').trim();
+  return s.length <= 26 ? s : s.slice(0, 15) + '…' + s.slice(-8);
+}
+
+/** Country + flag as one readable phrase, falling back to the raw code. */
+function originCountry(cc: unknown): string {
+  const code = String(cc || '').trim();
+  if (!code) return '';
+  return countryName(code) || code;
+}
 
 function num(v: unknown): number {
   const n = Number(v);
@@ -269,7 +299,8 @@ export function UsersPanel() {
               <span className="ausr-main">
                 <span className="ausr-addr mono">{shortAddr(u.nimiq_address, 8, 6)}</span>
                 <span className="ausr-sub">
-                  {u.last_country ? countryName(u.last_country) + ' · ' : ''}
+                  {u.last_country ? flag(u.last_country) + ' ' + originCountry(u.last_country) + ' · ' : ''}
+                  {u.last_ip ? <span className="mono">{shortIP(u.last_ip)} · </span> : null}
                   joined {u.created_at ? fmtDate(u.created_at, false) : '—'}
                   {u.last_seen_at ? ' · seen ' + timeAgo(u.last_seen_at) : ''}
                 </span>
@@ -330,6 +361,7 @@ function UserDetail({ userId }: { userId: string }) {
   const [err, setErr] = useState('');
   // Activity timeline is paged — 5 events per page, newest first.
   const [evPage, setEvPage] = useState(0);
+  const [ipCopied, setIpCopied] = useState(false);
 
   useEffect(() => {
     setEvPage(0);
@@ -366,11 +398,52 @@ function UserDetail({ userId }: { userId: string }) {
         <Identicon address={u.nimiq_address} className="identicon" size={38} />
         <div>
           <div className="mono strong">{formatWalletAddress(u.nimiq_address)}</div>
-          <div className="xs faint">
-            Joined {u.created_at ? fmtDate(u.created_at) : '—'}
-            {u.last_country ? ' · ' + countryName(u.last_country) : ''}
-            {u.last_ip ? ' · ' + u.last_ip : ''}
-          </div>
+          <div className="xs faint">Joined {u.created_at ? fmtDate(u.created_at) : '—'}</div>
+        </div>
+      </div>
+
+      {/* Where this person is coming from — the clicked-open place for it. */}
+      <div className="anet mt-2">
+        <div className="anet-head">
+          <Icon name="pulse" size={13} />
+          <span>Network</span>
+          {u.last_seen_at ? <span className="xs faint">seen {timeAgo(u.last_seen_at)} · {fmtDate(u.last_seen_at)}</span> : null}
+        </div>
+        <div className="anet-row">
+          {u.last_country ? (
+            <span className="anet-cc">
+              <span className="anet-flag" aria-hidden="true">{flag(u.last_country)}</span>
+              {originCountry(u.last_country)}
+            </span>
+          ) : (
+            <span className="anet-cc xs faint">Country not observed yet</span>
+          )}
+          {u.last_ip ? (
+            <>
+              <span className="anet-ip mono">{shortIP(u.last_ip)}</span>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                title={String(u.last_ip)}
+                onClick={() => {
+                  if (Clipboard.copy(String(u.last_ip))) {
+                    setIpCopied(true);
+                    window.setTimeout(() => setIpCopied(false), 1500);
+                  }
+                }}
+              >
+                <Icon name="copy" size={13} />
+                <span className="btn-label">{ipCopied ? 'Copied' : 'Copy'}</span>
+              </button>
+            </>
+          ) : (
+            <span className="anet-cc xs faint">No address recorded yet</span>
+          )}
+        </div>
+        <div className="anet-hint xs faint">
+          {u.last_ip
+            ? 'Last observed client address and the country reported with it — noted on sign in, session restore, the heartbeat and every checkout.'
+            : 'The address is recorded the next time this account signs in or opens the shop.'}
         </div>
       </div>
 

@@ -105,6 +105,9 @@ func (h *Handlers) HubLogin(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	userID := user.ID
+	// Login is the first authenticated moment of a visit — note where it came
+	// from, before the response so the panel is right immediately after.
+	h.noteUserPresence(ctx, userID)
 
 	token, err := auth.IssueToken(h.Cfg.JWTSecret, userID, h.Cfg.JWTExpiryMins)
 	if err != nil {

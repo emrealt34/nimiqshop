@@ -466,6 +466,10 @@ func (h *Handlers) PresenceHeartbeat(ctx *fasthttp.RequestCtx) {
 			// Authenticated: the account id is the identity, and it is not
 			// client-chosen at all.
 			id = "u:" + userID
+			// Same identity the operator console lists: keep the origin fresh
+			// here too, so a customer who is only browsing still shows an
+			// address when their person is opened.
+			h.noteUserPresence(ctx, userID)
 		} else if id == "" {
 			// Anonymous and no usable id: anchor on the verified client IP so
 			// the visitor still counts exactly once.
