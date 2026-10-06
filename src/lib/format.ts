@@ -216,8 +216,26 @@ export const MAX_QTY = 100;
 export const COUNTRY_CCY: Record<string, string> = {
   TR: 'TRY', US: 'USD', GB: 'GBP', DE: 'EUR', FR: 'EUR', ES: 'EUR', IT: 'EUR',
   NL: 'EUR', CA: 'CAD', BR: 'BRL', IN: 'INR', AU: 'AUD', JP: 'JPY', PL: 'PLN',
-  MX: 'MXN',
+  MX: 'MXN', CH: 'CHF', CN: 'CNY', KR: 'KRW', NZ: 'NZD', SE: 'SEK', NO: 'NOK',
+  DK: 'DKK', AE: 'AED', SA: 'SAR', ZA: 'ZAR', SG: 'SGD', AR: 'ARS',
 };
+
+/** Currency for wallet equivalents: prefer the visitor's browser region, then
+ * fall back to the site's selected language when the browser has no region. */
+export function localCurrencyCode(): string {
+  const byLanguage: Record<string, string> = {
+    tr: 'TRY', de: 'EUR', fr: 'EUR', es: 'EUR', pt: 'BRL', en: 'USD',
+  };
+  const language = getLang();
+  // A selected non-English site locale is the clearest currency preference.
+  if (language !== 'en' && byLanguage[language]) return byLanguage[language];
+
+  // English is used across several markets, so prefer the browser's region.
+  const browserLocale = typeof navigator !== 'undefined' ? String(navigator.language || '') : '';
+  const region = browserLocale.match(/-([A-Za-z]{2})(?:-|$)/)?.[1]?.toUpperCase() || '';
+  if (region && COUNTRY_CCY[region]) return COUNTRY_CCY[region];
+  return byLanguage[language] || 'USD';
+}
 
 /* ---------- denomination / money parsing (country-proof) ---------- */
 export function parseMoneyAmount(input: unknown): number {

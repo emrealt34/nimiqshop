@@ -20,7 +20,6 @@ type LeaderRow = {
   rank: number;
   user: string;
   total_nim: number;
-  burned_nim?: number;
   wallet_nim?: number;
   orders: number;
 };
@@ -161,7 +160,6 @@ export function CashbackImpactSection({
 
   const myEarnedStr = fmtNimUser(myEarned);
   const myWalletStr = fmtNimUser(myWallet);
-  const myBurnedStr = fmtNimUser(myBurned);
 
   const shareText = useMemo(() => {
     return t('cashbackCard.shareCaption', {
@@ -470,9 +468,7 @@ export function CashbackImpactSection({
     const tagTop = footBottom - 58 - tagLH * (tag.lines.length - 1);
     const footRule = tagTop - 124;
     const tileH = 128;
-    const tileCount = myBurned > 0 ? 2 : 1;
-    const tileGap = tileCount === 2 ? 16 : 0;
-    const tileW = (CW - tileGap * (tileCount - 1)) / tileCount;
+    const tileW = CW;
     const projected = heroTop + heroH + 80 + tileH + 30 + 36;
     const extra = Math.max(0, Math.min(34, (footRule - projected) / 3));
     fillRound(heroX, heroTop, heroW, heroH, 14, green);
@@ -506,9 +502,6 @@ export function CashbackImpactSection({
       text(val, valueX, tileTop + 94, fitSize(val, txW - 32, 34, 900, serif, 18), ink, 900, 'left', serif);
     };
     drawTile(L, 'wallet', t('cashbackCard.toWalletLabel'), myWalletStr);
-    if (myBurned > 0) {
-      drawTile(L + tileW + tileGap, 'nimiq', t('cashbackCard.previouslyBurned'), myBurnedStr);
-    }
     y = tileTop + tileH + 30 + extra;
 
     const host = siteName();
@@ -626,7 +619,7 @@ export function CashbackImpactSection({
             </div>
 
             <div className="pt-impact-metrics-label">{t('cashbackCard.breakdown')}</div>
-            <div className={`pt-impact-metrics${myBurned > 0 ? ' has-burned' : ''}`}>
+            <div className="pt-impact-metrics">
               <div className="pt-impact-metric">
                 <span className="pt-impact-metric-icon">
                   <Icon name="wallet" size={20} />
@@ -636,17 +629,6 @@ export function CashbackImpactSection({
                   <strong>{myWalletStr} <Icon name="nimiq" size={16} /></strong>
                 </span>
               </div>
-              {myBurned > 0 && (
-                <div className="pt-impact-metric">
-                  <span className="pt-impact-metric-icon is-nimiq">
-                    <Icon name="nimiq" size={21} />
-                  </span>
-                  <span>
-                    <small>{t('cashbackCard.previouslyBurned')}</small>
-                    <strong>{myBurnedStr} <Icon name="nimiq" size={16} /></strong>
-                  </span>
-                </div>
-              )}
             </div>
 
             <div className="pt-impact-share-head">
@@ -789,9 +771,6 @@ export function CashbackImpactSection({
                   </span>
                   <span className="pt-leader-orders">
                     {t('cashbackCard.orders', { count: row.orders })}
-                    {Number(row.burned_nim || 0) > 0 && (
-                      <>{t('cashbackCard.burnedSuffix', { nim: formatNimCompact(Number(row.burned_nim || 0)) })}</>
-                    )}
                   </span>
                   {row.rank === myLeaderRank && (
                     <span className="pt-you-badge">

@@ -124,7 +124,9 @@ export interface WalletBalanceState {
   stakedNim: number;
   /** Stake that is no longer active. Not spendable by itself. */
   inactiveNim: number;
-  /** What a wallet shows as the buyer's NIM: available + staked + inactive. */
+  /** Retired stake tracked by the wallet, not directly spendable. */
+  retiredNim: number;
+  /** What a wallet shows: available + active, inactive, and retired stake. */
   totalNim: number;
   /** Alias for `availableNim`, kept so affordability maths reads naturally. */
   nim: number;
@@ -170,6 +172,7 @@ const EMPTY: WalletBalanceState = {
   availableNim: 0,
   stakedNim: 0,
   inactiveNim: 0,
+  retiredNim: 0,
   totalNim: 0,
   nim: 0,
   luna: 0,
@@ -202,6 +205,7 @@ interface ShopReading {
   address: string;
   stakedNim: number;
   inactiveNim: number;
+  retiredNim: number;
   totalNim: number;
   network: string;
 }
@@ -243,12 +247,17 @@ async function shopReading(fresh = false): Promise<ShopReading> {
     (err as any).type = 'UNKNOWN_ERROR';
     throw err;
   }
+  const stakedNim = num(res.staked_nim);
+  const inactiveNim = num(res.inactive_nim);
+  const retiredNim = num(res.retired_nim);
+  const availableNim = luna / LUNA_PER_NIM;
   return {
     luna,
     address: String(res.address || ''),
-    stakedNim: num(res.staked_nim),
-    inactiveNim: num(res.inactive_nim),
-    totalNim: num(res.total_nim) || luna / LUNA_PER_NIM,
+    stakedNim,
+    inactiveNim,
+    retiredNim,
+    totalNim: availableNim + stakedNim + inactiveNim + retiredNim,
     network: String(res.network || ''),
   };
 }
@@ -408,20 +417,22 @@ async function readBalance(force = false): Promise<WalletBalanceState> {
            the comparison instead of a claim. */
     const spendLuna = Math.min(shop.luna, hostLuna);
     const higherLuna = Math.max(shop.luna, hostLuna);
-    const shopStakeNim = shop.stakedNim + shop.inactiveNim;
-    const inferredStakeNim = Math.max(0, (higherLuna - spendLuna) / LUNA_PER_NIM);
-    const stakedNim = Math.max(shopStakeNim, inferredStakeNim);
+    const reportedStakeNim = shop.stakedNim + shop.inactiveNim + shop.retiredNim;
+    const inferredTotalStakeNim = Math.max(0, (higherLuna - spendLuna) / LUNA_PER_NIM);
+    const totalStakeNim = Math.max(reportedStakeNim, inferredTotalStakeNim);
+    // Keep active, inactive, and retired amounts separate; the UI adds them once.
+    const stakedNim = Math.max(0, totalStakeNim - shop.inactiveNim - shop.retiredNim);
     const differs = higherLuna - spendLuna > Math.max(1, spendLuna * 0.01);
     const availableNim = spendLuna / LUNA_PER_NIM;
-    /* The total is whatever makes the line below equal the wallet's own view:
-       the higher reading itself when the difference is the stake. */
-    const totalNim = Math.max(shop.totalNim, availableNim + stakedNim);
+    /* The total includes spendable plus active and inactive stake, each once. */
+    const totalNim = availableNim + totalStakeNim;
     const state: WalletBalanceState = {
       status: 'ready',
       luna: spendLuna,
       availableNim,
       stakedNim,
       inactiveNim: shop.inactiveNim,
+      retiredNim: shop.retiredNim,
       totalNim,
       nim: availableNim,
       usd: 0,
@@ -430,7 +441,7 @@ async function readBalance(force = false): Promise<WalletBalanceState> {
       mismatch: differs,
       hostNim: hostLuna / LUNA_PER_NIM,
       shopNim: shop.luna / LUNA_PER_NIM,
-      stakeInferred: inferredStakeNim > shopStakeNim + 0.0000001,
+      stakeInferred: inferredTotalStakeNim > reportedStakeNim + 0.0000001,
       at: Date.now(),
       ...base,
     };
@@ -447,6 +458,7 @@ async function readBalance(force = false): Promise<WalletBalanceState> {
       availableNim: host / LUNA_PER_NIM,
       stakedNim: 0,
       inactiveNim: 0,
+      retiredNim: 0,
       totalNim: host / LUNA_PER_NIM,
       nim: host / LUNA_PER_NIM,
       usd: 0,
@@ -466,6 +478,7 @@ async function readBalance(force = false): Promise<WalletBalanceState> {
       availableNim: shop.luna / LUNA_PER_NIM,
       stakedNim: shop.stakedNim,
       inactiveNim: shop.inactiveNim,
+      retiredNim: shop.retiredNim,
       totalNim: shop.totalNim,
       nim: shop.luna / LUNA_PER_NIM,
       usd: 0,

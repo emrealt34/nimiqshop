@@ -1572,7 +1572,6 @@ html.in-nimiq-pay #main.page {
   color: var(--green-600);
   background: var(--green-soft);
 }
-.pt-impact-metric-icon.is-nimiq { background: var(--green-600); }
 .pt-impact-metric > span:last-child {
   display: flex;
   flex-direction: column;
@@ -3132,11 +3131,8 @@ body {
 .pt-card.pt-impact .pt-impact-count-label { white-space: normal; min-width: 0; }
 .pt-card.pt-impact .pt-impact-orders > * { min-width: 0; overflow-wrap: anywhere; }
 
-/* Metrics: two tiles as soon as the card can hold them (values are short). */
+/* The cashback receipt now shows only the destination wallet metric. */
 .pt-card.pt-impact .pt-impact-metrics { display: grid; grid-template-columns: 1fr; gap: 10px; }
-@container impact-card (min-width: 480px) {
-  .pt-card.pt-impact .pt-impact-metrics.has-burned { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
 .pt-card.pt-impact .pt-impact-metric { min-width: 0; }
 .pt-card.pt-impact .pt-impact-metric > * { min-width: 0; }
 .pt-card.pt-impact .pt-impact-metric small { overflow-wrap: anywhere; }

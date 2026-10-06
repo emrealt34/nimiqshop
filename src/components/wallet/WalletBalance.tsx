@@ -9,9 +9,9 @@
  * the buyer needs and never lets them be confused:
  *   - "Spendable": the address balance — what a payment can actually use, and
  *     therefore the only number the affordability verdict may be based on.
- *   - "Total … of it is staked": what the wallet shows. A buyer who stakes (our
- *     own cashback programme asks them to) otherwise sees a fraction of their
- *     NIM and calls the strip wrong — which it was.
+ *   - "Total … in stake": the wallet's full figure, including active, inactive,
+ *     and retired stake balances. A buyer who stakes otherwise sees only a
+ *     fraction of their NIM and calls the strip wrong — which it was.
  * The figure and manual refresh stay together on the home card; verbose source,
  * address, timestamp, and network metadata are omitted there for a cleaner view.
  *
@@ -20,7 +20,8 @@
  */
 import { useEffect, useState } from 'react';
 import { useT } from '../../i18n';
-import { fmtNIM } from '../../lib/format';
+import { fmtMoney, fmtNIM, localCurrencyCode } from '../../lib/format';
+import { cachedFX, getFXRates, onRatesChange } from '../../lib/api';
 import { NIM_LOGO } from '../../lib/nim';
 import {
   getWalletBalanceState,
@@ -97,7 +98,25 @@ export function WalletBalance({
   const { t } = useT();
   const { toast } = useToast();
   const { state, refresh } = useWalletBalance();
+  const [fxRates, setFxRates] = useState<Record<string, number> | null>(() => cachedFX());
   const ready = state.status === 'ready';
+
+  useEffect(() => {
+    if (variant === 'chip') return;
+    let active = true;
+    const applyRates = (payload: Record<string, any> | null) => {
+      if (!active || !payload) return;
+      const table = payload.usd_per_unit || payload;
+      if (table && typeof table === 'object') setFxRates(table);
+    };
+    const unsubscribe = onRatesChange(applyRates);
+    applyRates(cachedFX());
+    void getFXRates().then(applyRates).catch(() => {});
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [variant]);
 
   useEffect(() => {
     if (state.hostBalance !== 'update-required' || updatePayToastShown) return;
@@ -122,7 +141,7 @@ export function WalletBalance({
 
   if (state.status === 'unavailable' && !signInHint) return null;
 
-  const stakedNim = state.stakedNim + state.inactiveNim;
+  const stakedNim = state.stakedNim + state.inactiveNim + state.retiredNim;
   const hasStake = stakedNim > 0.0000001;
 
   const verdict = (() => {
@@ -144,15 +163,17 @@ export function WalletBalance({
       : { ok: false, text: t('wallet.short', { nim: nimShortText(missing) }) };
   })();
 
+  const localCurrency = localCurrencyCode();
+  const usdPerUnit = localCurrency === 'USD' ? 1 : Number(fxRates?.[localCurrency] || 0);
+  const localEquivalent = ready && state.usd > 0 && usdPerUnit > 0
+    ? fmtMoney(state.usd / usdPerUnit, localCurrency)
+    : '';
+
   const figure = ready ? (
     <span className="wal-bal-fig">
       <img src={NIM_LOGO} alt="NIM" draggable={false} width={15} height={15} style={{ pointerEvents: "none", borderRadius: 3 }} />
       <strong className="wal-nim">{nimText(state.availableNim)} NIM</strong>
-      {state.usd > 0 && (
-        <span className="wal-usd small faint">
-          ≈ ${state.usd.toLocaleString('en-US', { maximumFractionDigits: 2 })}
-        </span>
-      )}
+      {localEquivalent && <span className="wal-usd small faint">≈ {localEquivalent}</span>}
     </span>
   ) : state.status === 'loading' ? (
     <span className="small muted">{t('wallet.loading')}</span>
