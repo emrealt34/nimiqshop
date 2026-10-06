@@ -8,7 +8,7 @@ import { productMoney } from '../../lib/productMoney';
 import { useEffect, useState } from 'react';
 import { brandMetaForTitle } from '../../lib/catalogMeta';
 import { Icon } from '../ui/Icon';
-import { useCart, readCart, saveCart, itemKey, cartPriceLabel, cartSubtitle, rowUSD } from '../../lib/cartStore';
+import { useCart, readCart, saveCart, itemKey, cartPriceLabel, cartSubtitle, cartCurrency, cartMoney, rowUSD } from '../../lib/cartStore';
 import { UnifiedThumb } from '../ui/UnifiedThumb';
 import { useSheet, useToast } from '../AppProviders';
 import { COUNTRY_CCY, MAX_QTY, fmtMoney, fmtNIM } from '../../lib/format';
@@ -62,6 +62,8 @@ export function CartSheetContent({ close }: { close: () => void }) {
   const [cashbackCode, setCashbackCode] = useState(() => readAppliedCashbackCode());
 
   const { items } = cart;
+  // The cart's own money (TR cart → ₺): every row and the total use it.
+  const cartCcy = cartCurrency(items);
   // Daily order allowance (max_orders − used_orders). 0 = unknown/unlimited.
   const orderLimit = baseCart.orderLimit;
   const liveQty = () => readCart().reduce((s, it) => s + (it.qty || 0), 0);
@@ -120,7 +122,9 @@ export function CartSheetContent({ close }: { close: () => void }) {
           }
         }
         if (nim <= 0 && nimUsd > 0 && known) nim = usd / nimUsd;
-        const local = localTotal(its, rates);
+        // One currency for the whole cart: its own country's money (see
+        // cartCurrency) — a USD-priced line no longer pushes the total to USD.
+        const local = cartMoney(its, rates);
         if (alive) setTotals({ nim, local, usd, bps });
       } catch {
         /* total stays hidden */
@@ -288,7 +292,7 @@ export function CartSheetContent({ close }: { close: () => void }) {
                     <div className="strong">{it.name}</div>
                     <div className="xs faint">{cartSubtitle(it)}</div>
                   </div>
-                  <div className="cart-price strong">{cartPriceLabel(it)}</div>
+                  <div className="cart-price strong" data-ccy={cartCcy}>{cartPriceLabel(it, cartCcy)}</div>
                 </div>
               </div>
               <div className="cart-controls">
@@ -335,11 +339,14 @@ export function CartSheetContent({ close }: { close: () => void }) {
           <div style={{ minWidth: 0, textAlign: 'right' }}>
             <div className="strong">{t('cartSheet.totalApprox', { nim: fmtNIM(Math.round(totals.nim), 0) })}</div>
             {totals.local ? (
-              <div className="small muted" style={{ textAlign: 'right', marginTop: '4px' }}>
+              <div className="small muted" data-money-ccy={totals.local.ccy} style={{ textAlign: 'right', marginTop: '4px' }}>
                 ≈ {fmtMoney(totals.local.amount, totals.local.ccy)}
               </div>
             ) : totals.usd > 0 ? (
-              <div className="small muted" style={{ textAlign: 'right', marginTop: '4px' }}>
+              /* Only when a row could not be expressed in the cart's money at
+                 all (no FX rate yet): USD is the shop's common denominator, not
+                 a display choice. */
+              <div className="small muted" data-money-ccy="USD" style={{ textAlign: 'right', marginTop: '4px' }}>
                 ≈ ${totals.usd.toLocaleString('en-US', { maximumFractionDigits: 2 })}
               </div>
             ) : null}
@@ -416,29 +423,3 @@ function parsePackageMoney(p: any, _fallbackCurrency = ''): { value: number; cur
   return money.value > 0 && money.currency ? money : null;
 }
 
-function rowLocalMoney(it: any, rates: Record<string, number> | null): { amount: number; ccy: string } | null {
-  const ccy = String(it.currency || '').toUpperCase();
-  if (it.value > 0 && ccy && isRealCurrencyCode(ccy)) {
-    return { amount: it.value * it.qty, ccy };
-  }
-  const countryCcy = COUNTRY_CCY[String(it.country || '').toUpperCase()] || '';
-  const rate = rates && countryCcy ? Number(rates[countryCcy]) : 0;
-  const usd = rowUSD(it);
-  if (usd > 0 && countryCcy && rate > 0) {
-    return { amount: usd / rate, ccy: countryCcy };
-  }
-  return null;
-}
-
-function localTotal(items: any[], rates: Record<string, number> | null): { amount: number; ccy: string } | null {
-  let ccy = '';
-  let amount = 0;
-  for (const it of items) {
-    const local = rowLocalMoney(it, rates);
-    if (!local) return null;
-    if (!ccy) ccy = local.ccy;
-    if (local.ccy !== ccy) return null;
-    amount += local.amount;
-  }
-  return amount > 0 && ccy ? { amount, ccy } : null;
-}

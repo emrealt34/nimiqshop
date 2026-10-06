@@ -118,7 +118,97 @@ function approximateCountryMoney(it: CartItem): { amount: number; ccy: string } 
   return { amount: usd / rate, ccy };
 }
 
-export function cartPriceLabel(it: CartItem): string {
+/** USD-per-unit for a currency: the live table when the caller has it, the
+ *  cached session table otherwise (same /api/fx shape either way). */
+function fxRate(ccy: string, rates?: Record<string, number> | null): number {
+  const table = rates || sessionFX();
+  const r = table && ccy ? Number(table[ccy.toUpperCase()]) : 0;
+  return Number.isFinite(r) && r > 0 ? r : 0;
+}
+
+/**
+ * The one currency a cart is shown in: the money of the cart's own country.
+ *
+ * Owner (2026-10-06), on a Türkiye cart holding a USD-priced line: "biri usd
+ * ada eure olunca onlara çevirmesi saçma, sepetim nereliyse oranın para
+ * biriminde gözükmeli". The cart used to refuse to add up across currencies and
+ * fell back to "≈ $2.58" — two lira prices converted into dollars because a
+ * third line was priced in dollars. A cart has a country (the store refuses to
+ * mix countries), so it has a currency, and that is what it is shown in:
+ * foreign-priced lines come INTO it, they never pull the cart out of it.
+ *
+ * The country tally (rather than items[0]) only matters for a cart someone
+ * hand-edited in localStorage; a normal cart is a single country by
+ * construction.
+ */
+export function cartCurrency(items: CartItem[]): string {
+  if (!items.length) return '';
+  const tally = new Map<string, number>();
+  for (const it of items) {
+    const c = String(it.country || '').toUpperCase();
+    if (c) tally.set(c, (tally.get(c) || 0) + 1);
+  }
+  const topCountry = [...tally.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+  const byCountry = COUNTRY_CCY[topCountry] || '';
+  if (byCountry) return byCountry;
+  // Country outside our table: fall back to the rows' own money, but only when
+  // they agree — a cart with no single currency stays unlabelled (no invented
+  // total) rather than borrowing one row's currency for all of them.
+  const faces = new Set(items.map((it) => String(it.currency || '').toUpperCase()).filter(isRealCurrencyCode));
+  return faces.size === 1 ? [...faces][0] : '';
+}
+
+/**
+ * One row's money expressed in the CART's currency (see cartCurrency).
+ *
+ * `converted` is true when the number came from an FX conversion rather than
+ * the row's own price, which is what earns it the "≈" in front. Returns null
+ * when the row cannot be expressed in that currency (no rate yet), so the
+ * caller can hide the money instead of showing a wrong one.
+ */
+export function rowCartMoney(
+  it: CartItem,
+  ccy: string,
+  rates?: Record<string, number> | null
+): { amount: number; ccy: string; converted: boolean } | null {
+  if (!ccy) return null;
+  const face = String(it.currency || '').toUpperCase();
+  // Already priced in the cart's money — nothing to convert.
+  if (face === ccy && it.value > 0) return { amount: it.value * it.qty, ccy, converted: false };
+  // A foreign-priced row (a Turkish line sold in USD, say) converts through the
+  // same USD table the rest of the shop uses.
+  const rate = fxRate(ccy, rates);
+  const usd = rowUSD(it);
+  if (usd > 0 && rate > 0) return { amount: usd / rate, ccy, converted: true };
+  return null;
+}
+
+/** The whole cart in one currency — null when any row cannot be converted. */
+export function cartMoney(
+  items: CartItem[],
+  rates?: Record<string, number> | null
+): { amount: number; ccy: string; converted: boolean } | null {
+  const ccy = cartCurrency(items);
+  if (!ccy) return null;
+  let amount = 0;
+  let converted = false;
+  for (const it of items) {
+    const m = rowCartMoney(it, ccy, rates);
+    if (!m) return null;
+    amount += m.amount;
+    converted = converted || m.converted;
+  }
+  return amount > 0 ? { amount, ccy, converted } : null;
+}
+
+export function cartPriceLabel(it: CartItem, cartCcy = ''): string {
+  // Inside a cart every row is shown in the CART's money, so the prices add up
+  // to the total printed under them. A line priced in another currency keeps
+  // its own face value in its subtitle ("Türkiye 1 USD"), so nothing is lost.
+  if (cartCcy) {
+    const m = rowCartMoney(it, cartCcy);
+    if (m) return (m.converted ? '≈ ' : '') + fmtMoney(m.amount, m.ccy);
+  }
   if (it.value > 0 && it.currency && isRealCurrencyCode(it.currency)) return fmtMoney(it.value * it.qty, it.currency);
   const approx = approximateCountryMoney(it);
   if (approx) return '≈ ' + fmtMoney(approx.amount, approx.ccy);
