@@ -311,7 +311,7 @@ const tr = {
     flowRenewing: 'Yeni faturanız oluşturuluyor…',
     flowOpenOrder: 'Bu siparişi aç',
     flowFeeSuffix: '{{amount}} + ücret',
-    flowAmountInNimiqPay: 'Nimiq Pay'de gösterilen tutar',
+    flowAmountInNimiqPay: 'Nimiq Pay\'de gösterilen tutar',
     flowYouGet: 'Aldığın',
     flowUsdtDirect: 'Doğrudan CryptoRefills\'e öde · Polygon\'da USDT',
     flowDirect: 'Doğrudan CryptoRefills\'e öde',
@@ -1419,8 +1419,8 @@ const tr = {
     esimByEmail: 'E-posta ile eSIM',
     byEmail: 'E-posta ile',
     amountShownBelow: 'tutar aşağıda',
-    amountInNimiqPay: 'Nimiq Pay'de gösterilen tutar',
-    amountNote: 'Onaydan önce Nimiq Pay'de, ücretler dahil gösterilir.',
+    amountInNimiqPay: 'Nimiq Pay\'de gösterilen tutar',
+    amountNote: 'Onaydan önce Nimiq Pay\'de, ücretler dahil gösterilir.',
     instantDelivery: 'Anında teslimat',
     rateTitle: 'Teslimatını puanla',
     ratedThanks: 'Değerlendirmen için teşekkürler!',
@@ -1783,7 +1783,7 @@ const tr = {
 
   nim: {
     inInvoice: 'aşağıdaki faturada',
-    shownInPay: 'Nimiq Pay'de gösterilir',
+    shownInPay: 'Nimiq Pay\'de gösterilir',
   },
 
   /* ---- intent ---- */

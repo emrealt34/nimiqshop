@@ -101,7 +101,7 @@ export function Icon({
         fetchPriority="low"
         className={className}
         draggable={false}
-        draggable={false} style={{ pointerEvents: "none", 
+        style={{
           display: 'inline-block',
           verticalAlign: 'middle',
           flexShrink: 0,
