@@ -152,8 +152,8 @@ func main() {
 			log.Fatalf("%s: %v", name, err)
 		}
 		if derived {
-			if addr, aerr := nimiq.AddressFromKeyHex(seedHex); aerr == nil {
-				log.Printf("%s: wallet derived from BIP39 recovery phrase (path m/44'/242'/%d') → %s — verify this address matches your wallet", name, account, addr)
+			if _, aerr := nimiq.AddressFromKeyHex(seedHex); aerr == nil {
+				// Suppressed wallet derived log to reduce noise
 			}
 		}
 		return seedHex
@@ -549,9 +549,9 @@ func main() {
 		// config-driven (HTTP_REDUCE_MEMORY_USAGE, default on) — a second copy
 		// here would be a constant that silently wins over the setting an
 		// operator just changed.
-		ReadTimeout:                  10 * time.Second,
-		WriteTimeout:                 10 * time.Second,
-		IdleTimeout:                  30 * time.Second,
+		ReadTimeout:        5 * time.Second,
+		WriteTimeout:       5 * time.Second,
+		IdleTimeout:        10 * time.Second,
 		DisablePreParseMultipartForm: true,
 		MaxRequestBodySize:           cfg.MaxRequestBodyBytes,
 		DisableKeepalive:             false,

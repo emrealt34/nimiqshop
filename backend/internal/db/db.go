@@ -250,7 +250,7 @@ func New(dir string, cfgs ...Options) (*Store, error) {
 	// Caches are deliberately small: a shop's working set is orders and users,
 	// and the disk here is local, so a large read cache buys throughput this
 	// deployment does not need while costing memory on every boot.
-	cacheMB := int64(16)
+	cacheMB := int64(8) // ULTRA LOW RAM
 	if budgetMB := memoryBudgetMB(); budgetMB > 0 {
 		// About a forty-eighth of the budget per cache, floored at 8 MB (below
 		// that, index lookups start hitting disk for no real saving) and capped
