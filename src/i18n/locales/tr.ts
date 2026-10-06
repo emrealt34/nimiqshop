@@ -1360,7 +1360,7 @@ const tr = {
   /* ---- orderPage ---- */
   orderPage: {
     nimiqPay: {
-      idle: 'Nimiq Payla öde',
+      idle: 'Nimiq Pay ile öde',
       paying: 'Nimiq Pay açılıyor…',
       submitted: 'Ödeme gönderildi — mutabakat bekleniyor.',
       duplicate: 'Bu fatura zaten gönderildi. Tekrar denemeden önce ödeme durumunu kontrol et.',
@@ -1783,7 +1783,7 @@ const tr = {
 
   nim: {
     inInvoice: 'aşağıdaki faturada',
-    shownInPay: 'Nimiq Payında gösterilir',
+    shownInPay: 'Nimiq Pay'de gösterilir',
   },
 
   /* ---- intent ---- */
