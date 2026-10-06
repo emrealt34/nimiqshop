@@ -284,7 +284,7 @@ func New(dir string, cfgs ...Options) (*Store, error) {
 				log.Printf("db: checkout-safety index build aborted (%v) — reads stay on the full-scan path", r)
 			}
 		}()
-		if err := s.EnsureBlockingIndex(2 * time.Millisecond); err != nil {
+		if err := s.EnsureBlockingIndex(50 * time.Millisecond); err != nil {
 			log.Printf("db: checkout-safety index build stopped (%v) — reads stay on the full-scan path", err)
 		}
 	}()
@@ -355,7 +355,7 @@ func (s *Store) View(fn func(txn *badger.Txn) error) error {
 // on its own; without it the on-disk footprint grows monotonically as
 // records are updated. Postgres's autovacuum was the equivalent chore.
 func (s *Store) runValueLogGC() {
-	ticker := time.NewTicker(10 * time.Minute)
+	ticker := time.NewTicker(30 * time.Minute)
 	defer ticker.Stop()
 	for range ticker.C {
 		if s.closed.Load() {

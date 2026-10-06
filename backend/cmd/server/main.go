@@ -516,9 +516,11 @@ func main() {
 				ctx.SetConnectionClose()
 			}
 		},
-		ReadTimeout:        15 * time.Second,
-		WriteTimeout:       15 * time.Second, // a stuck writer can no longer pin a goroutine forever
-		IdleTimeout:        idleTimeout(cfg),
+		ReadTimeout:        10 * time.Second,
+		WriteTimeout:       10 * time.Second,
+		IdleTimeout:        30 * time.Second,
+		ReduceMemoryUsage:  true,
+		DisablePreParseMultipartForm: true,
 		MaxRequestBodySize: cfg.MaxRequestBodyBytes,
 		DisableKeepalive:   false,
 		// Ceiling on simultaneously HELD CONNECTIONS, not on in-flight work —
