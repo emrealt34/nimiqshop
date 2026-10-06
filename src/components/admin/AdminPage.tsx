@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Icon, type IconName } from '../ui/Icon';
 import { PlayersPanel, UsersPanel } from './AdminPeoplePanel';
 import { SystemPanel } from './AdminSystemPanel';
+import { MaintenancePanel } from './AdminMaintenancePanel';
 import { AppRoot } from '../AppRoot';
 import { useSheet, useToast } from '../AppProviders';
 import {
@@ -45,7 +46,7 @@ function badge(label: string, on: boolean, detail?: string) {
   );
 }
 
-type AdminSection = 'overview' | 'catalog' | 'orders' | 'cashback' | 'people' | 'email';
+type AdminSection = 'overview' | 'catalog' | 'orders' | 'cashback' | 'people' | 'email' | 'maintenance';
 
 type RuleOption = { value: string; label: string };
 
@@ -95,6 +96,9 @@ const ADMIN_SECTIONS: Array<{ id: AdminSection; label: string; hint: string; ico
   { id: 'cashback', label: 'Cashback', hint: 'rates & ledgers', icon: 'wallet' },
   { id: 'people', label: 'People', hint: 'users & players', icon: 'user' },
   { id: 'email', label: 'Email', hint: 'Mailtrap tools', icon: 'send' },
+  // The only destructive surface in the console gets its own tab, so it can
+  // never be clicked by accident while working on the page that is open daily.
+  { id: 'maintenance', label: 'Maintenance', hint: 'memory & start over', icon: 'shield' },
 ];
 
 function initialAdminSection(): AdminSection {
@@ -1344,6 +1348,8 @@ export function AdminContent() {
         return <UsersPanel />;
       case 'email':
         return <><StatusCard status={status} /><Composer status={status} /><TestEmailCard /></>;
+      case 'maintenance':
+        return <MaintenancePanel />;
       case 'overview':
       default:
         // Players first (who and how many), then the machine and where the

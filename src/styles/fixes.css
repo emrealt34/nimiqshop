@@ -3823,3 +3823,28 @@ input[type="range"]:focus-visible { outline: 2px solid var(--stamp); outline-off
   .anet-ip{ font-size:var(--fs-xs) }
   .anet-row .btn{ margin-left:0 }
 }
+
+/* ------------------------------------------------------------------ *
+ * Maintenance — "start the shop over" and the memory envelope.
+ *
+ * WHY IT LOOKS LIKE THIS. This is the one screen in the console that can
+ * delete everything, so the styling's job is to make that unmissable without
+ * shouting: a red-ruled card, the counts as a plain table (a table is what an
+ * operator reads before deciding), and one full-width button that only lights
+ * up once the typed phrase matches. The memory card above it is deliberately
+ * plain — it is information, not a decision.
+ * ------------------------------------------------------------------ */
+.amt-danger{ border:2px solid var(--red); background:var(--surface-1) }
+.amt-danger .card-title{ color:var(--red) }
+.amt-danger .card-title svg{ flex:0 0 auto }
+.amt-table{ width:100%; border-collapse:collapse; margin-top:6px; font-size:var(--fs-xs) }
+.amt-table td{ padding:4px 0; border-bottom:1px dashed var(--line-dash); vertical-align:baseline }
+.amt-table tr:last-child td{ border-bottom:0 }
+.amt-table td:first-child{ color:var(--ink-dim); font-weight:600 }
+.amt-count{ text-align:right; font-weight:900; font-variant-numeric:tabular-nums; white-space:nowrap; padding-left:12px }
+.amt-btn{ background:var(--red); border-color:var(--red); color:#fff; gap:8px; justify-content:center }
+.amt-btn:hover:not(:disabled){ filter:brightness(.93) }
+.amt-btn:disabled{ opacity:.45; cursor:not-allowed }
+@media (max-width:420px){
+  .amt-table{ font-size:var(--fs-2xs, .68rem) }
+}

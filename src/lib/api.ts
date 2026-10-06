@@ -937,6 +937,10 @@ export const adminCatalogRules = (opts: { path?: string; method?: string; body?:
 export const adminGetCashback = () => api('/admin/settings/cashback');
 /** Headline counters: Players + the cashback payment queue. */
 export const adminDashboard = () => api('/admin/dashboard');
+/** What a maintenance reset would delete right now (read-only). */
+export const adminResetPreview = () => api('/admin/reset/preview');
+/** Deletes every customer record. Requires the exact phrase the preview returns. */
+export const adminReset = (confirm: string) => api('/admin/reset', { method: 'POST', body: { confirm } });
 /** Customer list. sort: registered | orders | spend | cashback | last_seen | address */
 export const adminListUsers = (sort = 'registered', dir: 'asc' | 'desc' = 'desc', limit = 50) =>
   api(

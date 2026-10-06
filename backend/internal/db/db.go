@@ -26,6 +26,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"nimiqshop/internal/memlimit"
 	"os"
 	"strconv"
 	"strings"
@@ -232,35 +233,83 @@ func New(dir string, cfgs ...Options) (*Store, error) {
 	// would be a large speed win and a correctness disaster.
 	opts = opts.WithDetectConflicts(true)
 
-	// Memory envelope (env-tunable, BADGER_*): the defaults fit a 2-4 GB
-	// VPS. A bigger box serving six-figure concurrent users can raise
-	// BADGER_MEMTABLE_MB / BADGER_BLOCK_CACHE_MB for more write + read
-	// headroom without touching code.
+	// Memory envelope. Badger's own defaults are sized for a developer's
+	// laptop — a 64 MB memtable, five of them, and a block cache that can hold
+	// hundreds of megabytes — and on a small container that is the difference
+	// between a service that runs and one that gets OOM-killed while idle.
+	//
+	// Precedence, highest first:
+	//
+	//	1. BADGER_* — the deployment says exactly what it wants.
+	//	2. the detected memory budget — a container is not allowed to open with
+	//	   caches sized for a machine ten times its size, and the per-cache
+	//	   figure is derived from what the box actually has.
+	//	3. 16 MB per cache — the RAM-first default for when no limit can be
+	//	   read at all (no cgroup, no /proc/meminfo).
+	//
+	// Caches are deliberately small: a shop's working set is orders and users,
+	// and the disk here is local, so a large read cache buys throughput this
+	// deployment does not need while costing memory on every boot.
+	cacheMB := int64(16)
+	if budgetMB := memoryBudgetMB(); budgetMB > 0 {
+		// About a forty-eighth of the budget per cache, floored at 8 MB (below
+		// that, index lookups start hitting disk for no real saving) and capped
+		// at 32 MB (above that, the extra cache is memory the box wants for
+		// something else).
+		cacheMB = budgetMB / 48
+		if cacheMB < 8 {
+			cacheMB = 8
+		}
+		if cacheMB > 32 {
+			cacheMB = 32
+		}
+	}
+	memtableMB := cacheMB
+	blockCacheMB := cacheMB
+	indexCacheMB := cacheMB / 2
+	numMemtables := 1
+	if cacheMB > 16 {
+		// A second memtable only pays for itself once each one is big enough
+		// to absorb a burst; below that it is two buffers where one will do.
+		numMemtables = 2
+	}
+	numCompactors := 2 // Badger requires AT LEAST 2 compactors
+
+	// The environment wins over every derived figure above. Each branch keeps
+	// the local variable in step so the report below describes what actually
+	// opened, not what was intended.
 	if v := envPositiveInt("BADGER_MEMTABLE_MB"); v > 0 {
-		opts = opts.WithMemTableSize(v * 1024 * 1024)
-	} else {
-		opts = opts.WithMemTableSize(16 * 1024 * 1024)
+		memtableMB = v
 	}
 	if v := envPositiveInt("BADGER_NUM_MEMTABLES"); v > 0 && v <= 16 {
-		opts = opts.WithNumMemtables(int(v))
-	} else {
-		opts = opts.WithNumMemtables(1)
+		numMemtables = int(v)
 	}
 	if v := envPositiveInt("BADGER_BLOCK_CACHE_MB"); v > 0 {
-		opts = opts.WithBlockCacheSize(v * 1024 * 1024)
-	} else {
-		opts = opts.WithBlockCacheSize(16 * 1024 * 1024)
+		blockCacheMB = v
 	}
 	if v := envPositiveInt("BADGER_INDEX_CACHE_MB"); v > 0 {
-		opts = opts.WithIndexCacheSize(v * 1024 * 1024)
-	} else {
-		opts = opts.WithIndexCacheSize(16 * 1024 * 1024)
+		indexCacheMB = v
 	}
 	if v := envPositiveInt("BADGER_NUM_COMPACTORS"); v > 1 && v <= 16 {
-		opts = opts.WithNumCompactors(int(v))
-	} else {
-		opts = opts.WithNumCompactors(2) // Badger requires AT LEAST 2 compactors
+		numCompactors = int(v)
 	}
+
+	opts = opts.
+		WithMemTableSize(memtableMB * 1024 * 1024).
+		WithNumMemtables(numMemtables).
+		WithBlockCacheSize(blockCacheMB * 1024 * 1024).
+		WithIndexCacheSize(indexCacheMB * 1024 * 1024).
+		WithNumCompactors(numCompactors)
+
+	// Recorded, not just applied: MemoryReport and the console's Maintenance
+	// tab quote the sizes the database is really running with, so a deployment
+	// that sets BADGER_* can never be described by numbers it did not use.
+	appliedMemoryBudgetMB = memoryBudgetMB()
+	appliedMemtableMB = memtableMB
+	appliedBlockCacheMB = blockCacheMB
+	appliedIndexCacheMB = indexCacheMB
+	appliedNumMemtables = numMemtables
+	appliedNumCompactors = numCompactors
 
 	bdb, err := badger.Open(opts)
 	if err != nil {
@@ -289,6 +338,60 @@ func New(dir string, cfgs ...Options) (*Store, error) {
 		}
 	}()
 	return s, nil
+}
+
+// What the database actually opened with. Written once by New (single Open at
+// startup, before any request is served) and read afterwards, so a plain set of
+// package variables is honest here — no lock is needed to publish numbers that
+// never change again while the process lives.
+var (
+	appliedMemoryBudgetMB int64
+	appliedMemtableMB     int64
+	appliedBlockCacheMB   int64
+	appliedIndexCacheMB   int64
+	appliedNumMemtables   int
+	appliedNumCompactors  int
+)
+
+// MemoryReport describes the database's memory footprint: the caches it opened
+// with, whether those were scaled from the detected budget, and where that
+// budget came from. It exists so the operator console can answer "why is this
+// box using that much?" with the numbers the process is really running, rather
+// than with a screenshot of the deployment settings.
+func MemoryReport() map[string]any {
+	budget := memoryBudgetMB()
+	_, source := memlimit.LimitBytes()
+	if source == "" {
+		source = "unknown"
+	}
+	report := map[string]any{
+		"budget_mb":      budget,
+		"budget_source":  source,
+		"scaled":         appliedMemoryBudgetMB > 0,
+		"num_memtables":  int64(appliedNumMemtables),
+		"num_compactors": int64(appliedNumCompactors),
+	}
+	if appliedMemoryBudgetMB > 0 {
+		report["memtable_mb"] = appliedMemtableMB
+		report["block_cache_mb"] = appliedBlockCacheMB
+		report["index_cache_mb"] = appliedIndexCacheMB
+		report["total_cache_mb"] = appliedBlockCacheMB + appliedIndexCacheMB + appliedMemtableMB*int64(appliedNumMemtables)
+	}
+	return report
+}
+
+// memoryBudgetMB is the memory this process may use, in MB: the explicit
+// GO_MEMORY_LIMIT_MB when set, otherwise the container/host limit scaled the
+// same way cmd/server scales it into the Go heap ceiling. Zero means "unknown",
+// and then Badger keeps its own defaults rather than guessing.
+func memoryBudgetMB() int64 {
+	if v := envPositiveInt("GO_MEMORY_LIMIT_MB"); v > 0 {
+		return v
+	}
+	if bytes, _ := memlimit.LimitBytes(); bytes > 0 {
+		return bytes >> 20 * 3 / 4
+	}
+	return 0
 }
 
 // envPositiveInt reads a positive integer from the environment; absent or
@@ -412,24 +515,3 @@ func (badgerLogger) Errorf(f string, v ...interface{})   { logf("badger ERROR: "
 func (badgerLogger) Warningf(f string, v ...interface{}) { logf("badger WARN: "+f, v...) }
 func (badgerLogger) Infof(string, ...interface{})        {}
 func (badgerLogger) Debugf(string, ...interface{})       {}
-
-
-// WipeUsersCompletely permanently deletes all user data.
-func (s *Store) WipeUsersCompletely() error {
-	prefixes := [][]byte{
-		[]byte("u:"), []byte("ix:u:"), []byte("lock:q:user:"),
-		[]byte("o:"), []byte("ix:o:"),
-		[]byte("q:"), []byte("ix:q:"),
-		[]byte("st:"), []byte("ix:st:"),
-		[]byte("stm:"), []byte("ix:stm:"),
-		[]byte("ix:feed:"),
-		[]byte("cb:"), []byte("ix:cb:"),
-		[]byte("sw:"), []byte("sl:"), []byte("sr:"),
-	}
-	for _, p := range prefixes {
-		if err := s.db.DropPrefix(p); err != nil {
-			return fmt.Errorf("wipe %s: %w", string(p), err)
-		}
-	}
-	return nil
-}

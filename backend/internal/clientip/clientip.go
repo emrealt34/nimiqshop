@@ -17,16 +17,19 @@ import (
 const ProxySecretHeader = "X-Nimshop-Proxy-Secret"
 
 // ClientCountryHeader is how a deployment's OWN edge re-states the visitor's
-// country when Cloudflare's CF-* headers do not survive the hop. Both hops that
+// country when the Cloudflare headers are not available to it. Both hops that
 // ship in this repo set it — functions/api/[[path]].js from request.cf.country,
 // scripts/proxy.mjs from the edge's header — and both DELETE any client-supplied
 // copy before forwarding.
 //
-// The live deployment uses neither: it is Cloudflare as a proxy in front of the
-// application on an edge that rebuilds the request, so no Cloudflare header
-// reaches a handler at all (verified live: /api/geo answered country:"" while
-// the forwarded chain carried the right visitor IP). There the country travels
-// on CountryHintHeader instead, read by the presence note — see below.
+// It is a defence-in-depth carrier, NOT the live deployment's only source. An
+// earlier revision of this comment claimed Cloudflare's headers never reach a
+// handler on the live shop ("no Cloudflare header reaches a handler at all");
+// that was measured wrong on 2026-10-06. A plain GET of the live /api/geo
+// answers country:"US" with no hint header sent at all, i.e. CF-IPCountry does
+// arrive through the Pages hop and the Railway edge. This header stays because
+// it is the carrier for the shape where a hop REBUILDS the request (a
+// standalone proxy, a Worker) and the CF-* set is dropped.
 //
 // Read only from an already-trusted hop, and only as a COUNTRY: the visitor IP
 // is settled from the peeled chain and no header can move it. A forged value
@@ -36,12 +39,16 @@ const ClientCountryHeader = "X-Nimshop-Client-Country"
 
 // CountryHintHeader carries the country the visitor's own BROWSER read from the
 // edge: the shop's frontend fetches Cloudflare's same-origin /cdn-cgi/trace and
-// forwards its `loc=` value here (see src/lib/edgeGeo.ts), because in the live
-// deployment Cloudflare's CF-* headers do not survive the hop to the
-// application. Name aside it is still a hint, not evidence — a script can set
-// any header — which is exactly why it is NOT read inside Resolve: the visitor
-// IP and everything that hangs off it stay independent of it, and only the
-// operator console's origin note spends it.
+// forwards its `loc=` value here (see src/lib/edgeGeo.ts). It exists because the
+// frontend reaches the API through a hop that re-originates the request, so the
+// browser's own reading of the edge is the one witness that survives every
+// shape of that hop — including the ones where CF-IPCountry is dropped. Where
+// both arrive they are cross-checked in the operator console's origin note.
+//
+// Name aside it is still a hint, not evidence — a script can set any header —
+// which is exactly why it is NOT read inside Resolve: the visitor IP and
+// everything that hangs off it stay independent of it, and only the operator
+// console's origin note spends it.
 const CountryHintHeader = "X-Nimshop-Country-Hint"
 
 // CountryHint returns the validated country the browser reported, or "".
@@ -55,12 +62,18 @@ func CountryHint(ctx *fasthttp.RequestCtx) string {
 // carries) after deleting any client-supplied copy; scripts/proxy.mjs mirrors
 // that.
 //
-// It exists because this deployment's inner hops RE-ORIGINATE the request:
-// cloudflared on the owner's own host opens a fresh connection to the
-// application, so the chain the backend can peel ends at the tunnel's egress
-// and every visitor would be noted with the same address (deploy/railway.md
-// records the same trade-off). The edge is the one hop that sees the browser
-// itself, so it is the only place that value can come from.
+// It exists because some deployment shapes RE-ORIGINATE the request on an inner
+// hop (a standalone proxy, a tunnel, a Worker), so the chain the backend can
+// peel ends at that hop's egress and every visitor would be noted with the same
+// address (deploy/railway.md records the trade-off). The deployment's edge is
+// the one hop that sees the browser itself, so it is the only place that value
+// can come from.
+//
+// It is likewise not the live shop's only source. Measured 2026-10-06: a plain
+// GET of /api/geo keeps the visitor's own address in the peeled chain (the
+// response reported the caller's real egress IP), so the header is spent only
+// when a trusted hop set it AND the resolved value would otherwise be one of
+// ours.
 const ClientIPHeader = "X-Nimshop-Client-IP"
 
 // ClientIPHint returns the visit address the edge reported, or "". Private,

@@ -37,24 +37,33 @@ browser → Cloudflare edge → Railway edge → container
 
 Two consequences worth knowing, because both shaped the code:
 
-1. **Cloudflare's `CF-*` headers do not survive the hop.** `x-forwarded-for`
-   carries the visitor address (Cloudflare's own header set, `CF-Connecting-IP`
-   / `CF-Ray` / `CF-IPCountry`, is not forwarded to the container). Verified:
-   `/api/geo` answered `cloudflare:false` — the ray trace never arrives — while
-   the IP was correct. So the country cannot come from `CF-IPCountry` on this
-   deployment. It travels instead on the deployment's own carrier,
-   `X-Nimshop-Client-Country` (what `functions/api/[[path]].js` and
-   `scripts/proxy.mjs` restate from the edge), and, as the last resort for
-   display only, on the browser's `X-Nimshop-Country-Hint`, read from the
-   same-origin `/cdn-cgi/trace`. See `backend/internal/clientip` and
-   `src/lib/edgeGeo.ts`.
-2. **The API sees the visitor's address, not the tunnel's.** `/api/geo` reported
-   the visitor IP correctly (`89.222.123.194` for the owner's line), which is
-   also what the operator console's People panel shows. If a future change puts
-   an origin-pinned tunnel (`cloudflared` on the Orange Pi) back in front, the
-   peeled chain ends at the tunnel's egress instead — one address for every
-   visitor — and that is the case `X-Nimshop-Client-IP` (set by the Pages
-   function / Node proxy from the edge's own attribution) exists to cover.
+1. **Cloudflare's `CF-*` headers DO survive the hop — corrected 2026-10-06.**
+   An earlier revision of this section said the opposite ("`CF-Connecting-IP` /
+   `CF-Ray` / `CF-IPCountry` is not forwarded to the container", on the strength
+   of a `/api/geo` answer of `cloudflare:false`). That measurement no longer
+   holds and is retracted: with the current Railway deploy a plain GET of the
+   live `/api/geo` answers `cloudflare:true`, `country:"US"` and the caller's
+   real address, with no hint header sent by the client at all. Railway's edge
+   stamps `x-railway-edge` and Cloudflare's `cf-ray` rides along, and the
+   container sees the `CF-*` set.
+
+   The consequence for the code is the opposite of what was written here: the
+   country CAN come from `CF-IPCountry` on this deployment, and it does. The
+   deployment's own carriers are kept as defence in depth for the shapes where a
+   hop rebuilds the request and drops that set — `X-Nimshop-Client-Country`
+   (what `functions/api/[[path]].js` and `scripts/proxy.mjs` restate from the
+   edge) and, for display only, the browser's `X-Nimshop-Country-Hint` read from
+   the same-origin `/cdn-cgi/trace`. See `backend/internal/clientip` and
+   `src/lib/edgeGeo.ts`. Where both arrive, the console's origin note
+   cross-checks them rather than trusting either alone.
+2. **The API sees the visitor's address, not the tunnel's.** `/api/geo` reports
+   the caller's own address (measured 2026-10-06: the request's real egress IP,
+   not a Railway or Cloudflare one), which is also what the operator console's
+   People panel shows. If a future change puts an origin-pinned tunnel
+   (`cloudflared` on the Orange Pi) back in front, the peeled chain ends at the
+   tunnel's egress instead — one address for every visitor — and that is the
+   case `X-Nimshop-Client-IP` (set by the Pages function / Node proxy from the
+   edge's own attribution) exists to cover.
 
 The Railway domain itself is **not** a public entry point: the backend runs in
 `PROXY_HEADER_MODE=forwarded` and answers `403 UNVERIFIED_PROXY` to anything
@@ -107,8 +116,10 @@ ADMIN_COOKIE_SECURE       true
 
 `PROXY_HEADER_MODE=forwarded`, not `cloudflare`: the immediate TCP peer is
 Railway's edge, which is not Cloudflare, so the trust decision has to be made
-against the forwarded chain rather than against `CF-Connecting-IP` (which does
-not arrive — see above). `cloudflare` mode fails closed here and answers 403 to
+against the forwarded chain rather than against `CF-Connecting-IP` alone. (The
+`CF-*` set does arrive — see the correction above — but the peer cannot be
+trusted as Cloudflare from inside the container, and `cloudflare` mode fails
+closed on that and answers 403 to every request.) `cloudflare` mode fails closed here and answers 403 to
 every request (`UNVERIFIED_PROXY`). In `forwarded` mode the allowlist above
 covers Railway's private ranges and the request is served.
 

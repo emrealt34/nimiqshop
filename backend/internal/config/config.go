@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"net/url"
+	"nimiqshop/internal/memlimit"
 	"os"
 	"strconv"
 	"strings"
@@ -382,8 +383,28 @@ type Config struct {
 	// thing stealing latency. 0 = leave the runtime default (100).
 	GCPercent int
 	// MemoryLimitMB sets a soft Go heap ceiling (debug.SetMemoryLimit) so a
-	// flood degrades into GC pressure instead of an OOM kill. 0 = unset.
+	// flood degrades into GC pressure instead of an OOM kill. 0 = unset before
+	// applyMemoryEnvelope runs, which then derives it from the memory this
+	// process is actually allowed (a container's cgroup limit, or the host's
+	// RAM). GO_MEMORY_LIMIT_MB always wins.
 	MemoryLimitMB int
+	// MemoryLimitAuto marks the ceiling as DERIVED rather than configured, so
+	// the runtime log can say where the number came from.
+	MemoryLimitAuto bool
+	// MemoryBudgetMB is the memory this process may use in MB, whatever the
+	// source. The database cache sizes and the console's "how much room does
+	// this box have" line are computed from it, so one number explains the
+	// whole envelope.
+	MemoryBudgetMB int
+	// MemoryLimitSource says where the budget came from: "cgroup" (a container
+	// cap), "host" (a machine's RAM), "env" (set explicitly) or "" (unknown).
+	MemoryLimitSource string
+	// MaxConnsAuto marks the connection ceiling as DERIVED from the budget
+	// rather than configured, so the console can say so plainly.
+	MaxConnsAuto bool
+	// GCPercentAuto marks GOGC as DERIVED (the RAM-first default) rather than
+	// configured, so the runtime log says where 50 came from.
+	GCPercentAuto bool
 
 	// MaxKeepaliveDurationSecs bounds how long one TCP connection may keep
 	// being reused (enforced by the server handler via "Connection: close",
@@ -618,6 +639,89 @@ func normalizeSiteHost(raw string) string {
 	return s
 }
 
+// applyMemoryEnvelope derives the process's memory budget when the deployment
+// did not set one explicitly.
+//
+// The number decides the Go heap's soft ceiling (so a flood turns into GC
+// pressure instead of an OOM kill), the Badger cache sizes, and the console's
+// line about how much room the box has. Deriving it from the CGROUP limit —
+// not from the host's RAM — is what stops a container from being killed while
+// reporting a perfectly healthy heap.
+func (c *Config) applyMemoryEnvelope() {
+	if c.MemoryLimitMB > 0 {
+		c.MemoryLimitSource = "env"
+		c.MemoryBudgetMB = c.MemoryLimitMB
+		return
+	}
+	// GOGC 50 unless the deployment asked for something else: the owner's
+	// request is less memory, and halving the heap's growth step is the single
+	// cheapest way to get it. On this shop's traffic the extra collections cost
+	// nothing measurable, and GO_GC_PERCENT still overrides it.
+	if c.GCPercent == 0 {
+		c.GCPercent = 50
+		c.GCPercentAuto = true
+	}
+	bytes, source := memlimit.LimitBytes()
+	if bytes <= 0 {
+		// Nothing readable (no cgroup, no /proc/meminfo). The parallel
+		// deployment change to this code used a flat 150 MB here; it is kept
+		// as the last resort because a soft limit that is merely conservative
+		// costs GC work, while no limit at all costs an OOM kill. It is a
+		// FLOOR, never a cap on a bigger box: a readable budget always wins.
+		c.MemoryLimitMB = 150
+		c.MemoryBudgetMB = 150
+		c.MemoryLimitAuto = true
+		c.MemoryLimitSource = "default"
+		return
+	}
+	// Three quarters of the allowance: the runtime needs headroom above the
+	// heap for stacks, scheduler structures and the kernel's own accounting of
+	// this process, and a soft limit at 100% would sit where the hard one
+	// already is.
+	budget := int(bytes >> 20 * 3 / 4)
+	if budget < 32 {
+		budget = 32
+	}
+	c.MemoryLimitMB = budget
+	c.MemoryBudgetMB = budget
+	c.MemoryLimitAuto = true
+	c.MemoryLimitSource = source
+}
+
+// applyConnectionCeiling sizes fasthttp's held-connection cap from the memory
+// envelope when the deployment did not say otherwise.
+//
+// This is the setting the config comment calls out by name ("MaxConcurrentConns
+// x per-connection bytes must fit the memory budget"): the default of 262144 is
+// 2.6 GB of socket buffers at the measured ~10 KB per idle keep-alive
+// connection, which on a small container is more memory than the container has
+// — the box would be killed long before the cap ever became a real limit.
+// Deriving it means the ceiling can only ever be as large as the box, which is
+// what the number is for.
+//
+// Connections are allowed a third of the budget: the rest has to hold the Go
+// heap, the database caches and the kernel's accounting of this process.
+// MAX_CONCURRENT_CONNS still wins when set; the floor stays at 1024 so a
+// mis-sized budget can never lock everyone out.
+func (c *Config) applyConnectionCeiling() {
+	if strings.TrimSpace(os.Getenv("MAX_CONCURRENT_CONNS")) != "" || c.MemoryBudgetMB <= 0 {
+		return
+	}
+	const perConnBytes = 10 * 1024 // measured; see the Server.Concurrency note
+	conns := (c.MemoryBudgetMB / 3) * 1024 * 1024 / perConnBytes
+	if conns < 1024 {
+		conns = 1024
+	}
+	if conns > 262144 {
+		conns = 262144
+	}
+	if conns == c.MaxConcurrentConns {
+		return
+	}
+	c.MaxConcurrentConns = conns
+	c.MaxConnsAuto = true
+}
+
 func Load() Config {
 	host := normalizeSiteHost(env("SITE_HOST", "shop.nimiqbase.com"))
 	cfg := Config{
@@ -740,6 +844,11 @@ func Load() Config {
 	if cfg.AdminSessionSecret == "" && cfg.AdminDevMode() {
 		cfg.AdminSessionSecret = processSessionSecret()
 	}
+	// One place decides how much memory this process may use, and everything
+	// that is sized in memory reads it from here.
+	cfg.applyMemoryEnvelope()
+	cfg.applyConnectionCeiling()
+
 	return cfg
 }
 

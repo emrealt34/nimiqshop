@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -183,20 +184,32 @@ func main() {
 	// a JSON buffer, and the default GOGC=100 means the heap is collected
 	// every time it doubles. Both knobs are opt-in through env so a small VPS
 	// keeps the runtime defaults.
-	// OPTIMIZED RAM/CPU SETTINGS
+	// The runtime envelope, decided in one place (config.applyMemoryEnvelope)
+	// so that the numbers here, the database's caches and the console's
+	// Maintenance tab can never disagree about how much room this box has.
 	gcPct := cfg.GCPercent
-	if gcPct == 0 {
-		gcPct = 50 // lower GC percent to reclaim memory more aggressively
+	if gcPct != 0 {
+		origin := "configured"
+		if cfg.GCPercentAuto {
+			origin = "RAM-first default"
+		}
+		prev := debug.SetGCPercent(gcPct)
+		log.Printf("runtime: GOGC %d -> %d (%s)", prev, gcPct, origin)
 	}
-	prev := debug.SetGCPercent(gcPct)
-	log.Printf("runtime: GOGC %d -> %d", prev, gcPct)
 
-	memLimit := cfg.MemoryLimitMB
-	if memLimit == 0 {
-		memLimit = 150 // strict 150MB soft limit
+	if cfg.MemoryLimitMB > 0 {
+		debug.SetMemoryLimit(int64(cfg.MemoryLimitMB) << 20)
+		origin := "configured"
+		if cfg.MemoryLimitAuto {
+			origin = "derived from the " + cfg.MemoryLimitSource + " memory limit"
+		}
+		log.Printf("runtime: soft memory limit %d MB (%s — a flood degrades into GC pressure, not an OOM kill)",
+			cfg.MemoryLimitMB, origin)
 	}
-	debug.SetMemoryLimit(int64(memLimit) << 20)
-	log.Printf("runtime: soft memory limit %d MB", memLimit)
+	if cfg.MaxConnsAuto {
+		log.Printf("runtime: held-connection ceiling %d (derived from the memory budget; MAX_CONCURRENT_CONNS overrides)",
+			cfg.MaxConcurrentConns)
+	}
 
 	// BadgerDB is embedded: this opens a directory on disk rather than
 	// dialing a server, and there is no migration step because the store
@@ -208,19 +221,32 @@ func main() {
 	if err != nil {
 		log.Fatalf("db init: %v", err)
 	}
-	
-	// WIPE USERS Trigger (One-time wipe on fresh install)
+
+	// Fresh-install wipe, once per volume. The owner asked for a clean shop
+	// ("yeni kurulum") and a deployment cannot be trusted to remember a manual
+	// step, so the first boot on a new volume deletes the customer data by
+	// itself — through the SAME code path as the console's Maintenance button,
+	// which is the one place that decides what "customer data" means.
+	//
+	// The flag file is what makes it once-only. If the flag cannot be written
+	// the process stops rather than serving: a boot that wiped and then failed
+	// to record it would wipe again on the next boot, which is exactly how a
+	// live shop loses data it just collected.
 	wipeFlag := filepath.Join(cfg.BadgerDir, "wiped_v2.flag")
 	if _, err := os.Stat(wipeFlag); os.IsNotExist(err) {
-		log.Printf("First boot detected (wiped_v2.flag not found). Wiping all user data for fresh install...")
-		if err := store.WipeUsersCompletely(); err != nil {
-			log.Fatalf("failed to wipe users: %v", err)
+		log.Printf("fresh volume (no %s): deleting customer data, keeping operator accounts and settings", wipeFlag)
+		deleted, err := store.ResetShopData()
+		if err != nil {
+			log.Fatalf("fresh-install wipe failed, refusing to serve: %v", err)
 		}
-		// Create the flag so it doesn't wipe again on next boot
-		if err := os.WriteFile(wipeFlag, []byte("wiped"), 0644); err != nil {
-			log.Fatalf("failed to write wipe flag: %v", err)
+		if err := os.WriteFile(wipeFlag, []byte("wiped"), 0o644); err != nil {
+			log.Fatalf("fresh-install wipe ran but its flag could not be written (%v); refusing to serve so the next boot cannot wipe again", err)
 		}
-		log.Printf("User data wiped successfully. Flag created at %s.", wipeFlag)
+		total := 0
+		for _, n := range deleted {
+			total += n
+		}
+		log.Printf("fresh-install wipe: %d customer records deleted, flag written to %s", total, wipeFlag)
 	}
 	// One-time spend-cap migration: stored rows still on the old published
 	// caps ($50/$500) move to the new ones ($500/$1000). The boot line after
@@ -516,12 +542,19 @@ func main() {
 				ctx.SetConnectionClose()
 			}
 		},
-		ReadTimeout:        10 * time.Second,
-		WriteTimeout:       10 * time.Second,
-		IdleTimeout:        30 * time.Second,
+		// Shorter reads/writes bound how long one client can pin a worker and a
+		// 30 s idle timeout retires sockets sooner. This API never takes
+		// multipart bodies, so refusing to pre-parse them saves the allocation
+		// outright. ReduceMemoryUsage itself lives at the end of this literal,
+		// config-driven (HTTP_REDUCE_MEMORY_USAGE, default on) — a second copy
+		// here would be a constant that silently wins over the setting an
+		// operator just changed.
+		ReadTimeout:                  10 * time.Second,
+		WriteTimeout:                 10 * time.Second,
+		IdleTimeout:                  30 * time.Second,
 		DisablePreParseMultipartForm: true,
-		MaxRequestBodySize: cfg.MaxRequestBodyBytes,
-		DisableKeepalive:   false,
+		MaxRequestBodySize:           cfg.MaxRequestBodyBytes,
+		DisableKeepalive:             false,
 		// Ceiling on simultaneously HELD CONNECTIONS, not on in-flight work —
 		// see concurrencyCeiling. Sized from RAM; the shedder above is what
 		// reacts to a flood.
@@ -585,6 +618,42 @@ func writeHealthJSON(ctx *fasthttp.RequestCtx, v any) {
 		return
 	}
 	ctx.SetBody(b)
+}
+
+// runtimeEnvelope reports how much memory this process may use and how the
+// runtime is configured around it — the numbers an operator needs when a
+// container starts dying, and the ones the console's Server card shows. Kept
+// separate from the sampler so it can be read without touching /proc.
+func runtimeEnvelope(cfg config.Config) map[string]any {
+	var ms runtime.MemStats
+	runtime.ReadMemStats(&ms)
+	out := map[string]any{
+		"heap_bytes":      ms.HeapAlloc,
+		"sys_bytes":       ms.Sys,
+		"goroutines":      runtime.NumGoroutine(),
+		"go_version":      runtime.Version(),
+		"http_reduce_mem": cfg.HTTPReduceMemoryUsage,
+		"max_conns":       cfg.MaxConcurrentConns,
+		"max_conns_auto":  cfg.MaxConnsAuto,
+	}
+	if cfg.MemoryBudgetMB > 0 {
+		out["budget_mb"] = cfg.MemoryBudgetMB
+		out["budget_source"] = cfg.MemoryLimitSource
+		out["budget_auto"] = cfg.MemoryLimitAuto
+	}
+	if cfg.MemoryLimitMB > 0 {
+		out["soft_limit_mb"] = cfg.MemoryLimitMB
+	}
+	if cfg.GCPercent != 0 {
+		out["gc_percent"] = cfg.GCPercent
+	}
+	if dir := cfg.BadgerDir; dir != "" {
+		// Only the path is reported, and only its name: the console needs to
+		// know WHICH volume the database is on, not where the deployment keeps
+		// it.
+		out["badger_dir"] = dir
+	}
+	return out
 }
 
 // concurrencyCeiling is fasthttp's HARD in-flight cap. It sits a third above
@@ -888,6 +957,8 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 	r.GET("/api/admin/test-quote/{id}", adminOnly(h.AdminTestQuoteStatus))
 	r.GET("/api/admin/oracle", adminOnly(h.AdminOracleHealth))
 	r.POST("/api/admin/settings/margin", adminOnly(h.AdminUpdateMargin))
+	r.GET("/api/admin/reset/preview", adminOnly(h.AdminResetPreview))
+	r.POST("/api/admin/reset", adminOnly(h.AdminReset))
 	// Operator-triggered FX refresh (the background refresher runs every 6h;
 	// this is the "update the rates now" button). See internal/handlers/fx_refresh.go.
 	r.POST("/api/admin/settings/fx-refresh", adminOnly(h.AdminRefreshFX))
@@ -1064,6 +1135,12 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 				"cdn_cache_public": h.CDNCacheSafe && cfg.CDNCachePublic,
 			},
 			"store": h.Store.HealthSnapshot(),
+			// The memory envelope, on the unauthenticated health endpoint on
+			// purpose: it is what an operator (or the console's Server card)
+			// needs first when a container starts being killed, and it names
+			// where the budget came from. Values are numbers and built-in
+			// strings — no configuration secret is exposed.
+			"runtime": runtimeEnvelope(cfg),
 		})
 	})
 
