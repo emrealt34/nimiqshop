@@ -489,7 +489,7 @@ function LoginSheetContent({ close }: { close: () => void }) {
   return (
     <div>
       <div className="login-hero">
-        <div className="identicon-lg placeholder" style={{ display: 'grid', placeItems: 'center', width: 56, height: 56 }}>
+        <div className="identicon-lg placeholder" style={{ display: 'grid', placeItems: 'center', width: 56, height: 56, pointerEvents: 'none' }}>
           <Icon name="nimiq" size={38} />
         </div>
         <h3 className="center" style={{ marginBottom: '8px' }}>{t('login.heroTitle')}</h3>

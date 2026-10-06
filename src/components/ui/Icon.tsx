@@ -100,6 +100,7 @@ export function Icon({
         decoding="async"
         fetchPriority="low"
         className={className}
+        draggable={false}
         style={{
           display: 'inline-block',
           verticalAlign: 'middle',
@@ -108,6 +109,7 @@ export function Icon({
           height: h,
           objectFit: 'contain',
           borderRadius: Math.max(2, Math.round(size * 0.18)),
+          pointerEvents: 'none',
           ...style,
         }}
       />
