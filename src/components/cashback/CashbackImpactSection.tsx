@@ -162,6 +162,7 @@ export function CashbackImpactSection({
 
   const myEarnedStr = fmtNimUser(myEarned);
   const myWalletStr = fmtNimUser(myWallet);
+  const myBurnedStr = fmtNimUser(myBurned);
 
   const shareText = useMemo(() => {
     return t('cashbackCard.shareCaption', {
@@ -260,9 +261,10 @@ export function CashbackImpactSection({
         image.src = src;
       });
 
-    const [logo, avatar] = await Promise.all([
+    const [logo, avatar, nimiqMark] = await Promise.all([
       loadImg(asset('/img/brand-icon-96.png')),
       address ? resolveIdenticonUrl(address).then(loadImg).catch(() => null) : Promise.resolve(null),
+      loadImg(asset('/img/nimiq-hexagon.png?v=40')),
     ]);
 
     const fillRound = (x: number, y: number, w: number, h: number, r: number, color: string) => {
@@ -361,15 +363,11 @@ export function CashbackImpactSection({
       return y + (ls.length - 1) * lh;
     };
     const iconPaths: Record<string, string[]> = {
-      spark: [
-        'M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3L12 3z',
-      ],
+      nimiq: ['M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z'],
       wallet: [
         'M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1',
         'M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4',
       ],
-      bolt: ['M13 2 3 14h9l-1 8 10-12h-9l1-8z'],
-      clock: ['M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z', 'M12 6v6l4 2'],
     };
     const drawIcon = (name: string, x: number, y: number, size: number, color: string, lineWidth = 2.2) => {
       ctx.save();
@@ -381,6 +379,10 @@ export function CashbackImpactSection({
       ctx.lineCap = 'round';
       for (const d of iconPaths[name] || []) ctx.stroke(new Path2D(d));
       ctx.restore();
+    };
+    const drawNimiqMark = (x: number, y: number, size: number, color: string) => {
+      if (nimiqMark) ctx.drawImage(nimiqMark, x, y, size, Math.round(size * 0.9));
+      else drawIcon('nimiq', x, y, size, color, 1.8);
     };
     const L = 92,
       R = 988,
@@ -470,69 +472,54 @@ export function CashbackImpactSection({
     const numTop = heroTop + 76;
     const numBase = numTop + Math.round(numSize * 0.74);
     const labelTop = sideBySide ? numBase - Math.round(numSize * 0.37) - Math.round(labelBlockH / 2) : numBase + 34;
-    const destination = t('cashbackCard.canvasWalletSwitch');
-    const destBlock = fitBlock(destination, innerW - 36, 18, 700, 2, font, 14);
-    const destLH = Math.round(destBlock.size * 1.3);
-    const ruleY = (sideBySide ? numBase : labelTop + labelBlockH) + 38;
-    const heroH = ruleY - heroTop + 22 + destLH * destBlock.lines.length + 18;
-
-    const status = myEarned > 0 ? t('cashbackCard.statusEarned') : t('cashbackCard.canvasStatusChoose');
-    const stBlock = fitBlock(status, CW - 72 - 28, 19, 800, 2, font, 14);
-    const stLH = Math.round(stBlock.size * 1.35);
-    const stH = Math.max(72, 34 + stLH * stBlock.lines.length);
+    const contentBottom = Math.max(numBase, labelTop + labelBlockH + 4);
+    const heroH = contentBottom - heroTop + 52;
     const footBottom = 1214;
     const tag = fitBlock(t('cashbackCard.canvasTagline'), CW, 18, 700, 2, font, 14);
     const tagLH = Math.round(tag.size * 1.35);
     const tagTop = footBottom - 58 - tagLH * (tag.lines.length - 1);
     const footRule = tagTop - 124;
     const tileH = 128;
-    const projected = heroTop + heroH + 80 + tileH + 30 + stH + 36;
+    const tileCount = myBurned > 0 ? 2 : 1;
+    const tileGap = tileCount === 2 ? 16 : 0;
+    const tileW = (CW - tileGap * (tileCount - 1)) / tileCount;
+    const projected = heroTop + heroH + 80 + tileH + 30 + 36;
     const extra = Math.max(0, Math.min(34, (footRule - projected) / 3));
     fillRound(heroX, heroTop, heroW, heroH, 14, green);
     const cx = heroX + padX;
     text(contribution, cx, heroTop + 50, fitSize(contribution, innerW, 15, 900, font, 11), 'rgba(255,246,232,.72)', 900);
     text(myEarnedStr, cx - 4, numBase, numSize, white, 900, 'left', serif);
     const labelX = sideBySide ? cx + measure(myEarnedStr, numSize, 900, serif) + colGap : cx;
-    drawIcon('spark', labelX, labelTop + Math.round((fundedLH - labelIcon) / 2), labelIcon, white, 1.8);
+    drawNimiqMark(labelX, labelTop + Math.round((fundedLH - labelIcon) / 2), labelIcon, white);
     const fx = labelX + labelIcon + labelGap;
     const fundedLast = lines(fundedBlock.lines, fx, labelTop + fundedBlock.size, fundedBlock.size, fundedLH, white, 900);
     text(ordersLine, fx, fundedLast + 12 + ordersSize + 4, ordersSize, 'rgba(255,246,232,.78)', 700);
-    ctx.strokeStyle = 'rgba(255,246,232,.26)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(cx, ruleY);
-    ctx.lineTo(heroX + heroW - padX, ruleY);
-    ctx.stroke();
-    drawIcon('wallet', cx, ruleY + 20, 22, 'rgba(255,246,232,.8)', 1.7);
-    lines(destBlock.lines, cx + 36, ruleY + 22 + destBlock.size, destBlock.size, destLH, 'rgba(255,246,232,.8)', 700);
     y = heroTop + heroH;
 
     const fpLabel = upper(t('cashbackCard.breakdown'));
     text(fpLabel, L, y + extra + 56, fitSize(fpLabel, CW, 16, 900, font, 12), inkFaint, 900);
     y += extra;
-    const tileTop = y + 80,
-      tileW = CW;
+    const tileTop = y + 80;
     const drawTile = (tx: number, icon: string, label: string, val: string) => {
       fillRound(tx, tileTop, tileW, tileH, 12, recess);
       strokeRound(tx, tileTop, tileW, tileH, 12, 'rgba(78,61,40,.22)', 2);
-      fillRound(tx + 22, tileTop + 28, 52, 52, 10, 'rgba(47,85,64,.12)');
-      drawIcon(icon, tx + 35, tileTop + 41, 26, green, 2);
+      fillRound(tx + 22, tileTop + 28, 52, 52, 10, icon === 'nimiq' ? green : 'rgba(47,85,64,.12)');
+      if (icon === 'nimiq') drawNimiqMark(tx + 35, tileTop + 41, 26, green);
+      else drawIcon(icon, tx + 35, tileTop + 41, 26, green, 2);
       const txL = tx + 92,
-        txW = tileW - 92 - 20;
+        txW = tileW - 112;
       const cap = upper(label);
       text(cap, txL, tileTop + 48, fitSize(cap, txW, 13, 900, font, 10), inkFaint, 900);
-      text(val, txL, tileTop + 92, fitSize(val, txW, 34, 900, serif, 20), ink, 900, 'left', serif);
+      fillRound(txL - 4, tileTop + 68, 28, 28, 6, green);
+      drawNimiqMark(txL - 1, tileTop + 72, 22, ink);
+      const valueX = txL + 32;
+      text(val, valueX, tileTop + 94, fitSize(val, txW - 32, 34, 900, serif, 18), ink, 900, 'left', serif);
     };
-    drawTile(L, 'wallet', t('cashbackCard.toWalletLabel'), `${myWalletStr} NIM`);
-    y = tileTop + tileH;
-
-    y += 30 + extra;
-    fillRound(L, y, CW, stH, 10, 'rgba(199,72,29,.09)');
-    ctx.fillStyle = stamp;
-    ctx.fillRect(L, y, 6, stH);
-    drawIcon('clock', L + 26, y + Math.round((stH - 24) / 2), 24, stamp, 2);
-    lines(stBlock.lines, L + 66, y + 24 + stBlock.size, stBlock.size, stLH, inkDim, 800);
-    y += stH;
+    drawTile(L, 'wallet', t('cashbackCard.toWalletLabel'), myWalletStr);
+    if (myBurned > 0) {
+      drawTile(L + tileW + tileGap, 'nimiq', t('cashbackCard.previouslyBurned'), myBurnedStr);
+    }
+    y = tileTop + tileH + 30 + extra;
 
     const host = siteName();
     text(host, L, footBottom, fitSize(host, CW - 220, 26, 900, serif, 18), stamp, 900, 'left', serif);
@@ -614,7 +601,7 @@ export function CashbackImpactSection({
             <div className="pt-impact-bar">
               <div className="pt-impact-bar-brand">
                 <span className="pt-impact-logo">
-                  <Icon name="spark" size={21} />
+                  <Icon name="nimiq" size={23} />
                 </span>
                 <div className="pt-impact-bar-copy">
                   <div className="pt-impact-kicker">{t('cashbackCard.kicker', { site: siteName() })}</div>
@@ -622,7 +609,8 @@ export function CashbackImpactSection({
                 </div>
               </div>
               <span className={`pt-impact-stamp${myEarned > 0 ? '' : ' is-empty'}`}>
-                <Icon name="spark" size={14} /> {myEarned > 0 ? t('cashbackCard.stampEarned') : t('cashbackCard.stampReady')}
+                {myEarned > 0 && <Icon name="check" size={14} />}
+                {myEarned > 0 ? t('cashbackCard.stampEarned') : t('cashbackCard.stampReady')}
               </span>
             </div>
 
@@ -632,7 +620,7 @@ export function CashbackImpactSection({
                 <div className="pt-impact-count-row">
                   <span className="pt-impact-count">{myEarnedStr}</span>
                   <span className="pt-impact-count-label">
-                    <Icon name="spark" size={28} />
+                    <Icon name="nimiq" size={28} />
                     <span>{t('cashbackCard.nimEarned')}</span>
                   </span>
                 </div>
@@ -649,29 +637,28 @@ export function CashbackImpactSection({
             </div>
 
             <div className="pt-impact-metrics-label">{t('cashbackCard.breakdown')}</div>
-            <div className="pt-impact-metrics">
+            <div className={`pt-impact-metrics${myBurned > 0 ? ' has-burned' : ''}`}>
               <div className="pt-impact-metric">
                 <span className="pt-impact-metric-icon">
                   <Icon name="wallet" size={20} />
                 </span>
                 <span>
                   <small>{t('cashbackCard.toWalletLabel')}</small>
-                  <strong>{myWalletStr} NIM</strong>
+                  <strong>{myWalletStr} <Icon name="nimiq" size={16} /></strong>
                 </span>
               </div>
+              {myBurned > 0 && (
+                <div className="pt-impact-metric">
+                  <span className="pt-impact-metric-icon is-nimiq">
+                    <Icon name="nimiq" size={21} />
+                  </span>
+                  <span>
+                    <small>{t('cashbackCard.previouslyBurned')}</small>
+                    <strong>{myBurnedStr} <Icon name="nimiq" size={16} /></strong>
+                  </span>
+                </div>
+              )}
             </div>
-
-            {myEarned > 0 ? (
-              <div className="pt-impact-status">
-                <Icon name="wallet" size={17} />
-                <span>{t('cashbackCard.statusEarned')}</span>
-              </div>
-            ) : (
-              <div className="pt-impact-status">
-                <Icon name="spark" size={17} />
-                <span>{t('cashbackCard.statusChoose')}</span>
-              </div>
-            )}
 
             <div className="pt-impact-share-head">
               <div>
@@ -700,20 +687,21 @@ export function CashbackImpactSection({
             <div className="pt-impact-bar">
               <div className="pt-impact-bar-brand">
                 <span className="pt-impact-logo">
-                  <Icon name="spark" size={21} />
+                  <Icon name="nimiq" size={23} />
                 </span>
                 <div className="pt-impact-bar-copy">
                   <div className="pt-impact-kicker">{t('cashbackCard.kicker', { site: siteName() })}</div>
                   <h2 className="pt-impact-title">{t('cashbackCard.impactTitle')}</h2>
                 </div>
               </div>
-              <span className="pt-impact-stamp is-empty">
-                <Icon name="spark" size={14} /> {t('cashbackCard.stampReady')}
-              </span>
+              <span className="pt-impact-stamp is-empty">{t('cashbackCard.stampReady')}</span>
             </div>
             <div className="pt-impact-empty">
-              <div className="pt-icon-inline" style={{ justifyContent: 'center', color: 'var(--green-600)', marginTop: 8 }}>
-                <Icon name="spark" size={32} />
+              <div
+                className="pt-icon-inline"
+                style={{ justifyContent: 'center', color: 'var(--green-600)', marginTop: 8, width: 56, height: 56, borderRadius: 14, background: 'var(--green)', marginInline: 'auto' }}
+              >
+                <Icon name="nimiq" size={32} />
               </div>
               <div style={{ textAlign: 'center' }}>
                 <div className="strong" style={{ fontSize: '1.1rem' }}>
@@ -725,7 +713,7 @@ export function CashbackImpactSection({
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginTop: 4 }}>
                 <span className="chip">
-                  <Icon name="spark" size={13} /> {t('cashbackCard.emptyChipEarned')}
+                  <Icon name="nimiq" size={13} /> {t('cashbackCard.emptyChipEarned')}
                 </span>
               </div>
             </div>
@@ -761,7 +749,7 @@ export function CashbackImpactSection({
             They used to be their own full-width row at the very top of the
             page, which pushed the owner's card/rate/board order down. */}
         <div className="pt-stats pt-stats-inline">
-          <Stat icon="spark" value={`${formatNimCompact(globalEarned)} NIM`} label={t('cashbackCard.statEarned')} />
+          <Stat icon="nimiq" value={`${formatNimCompact(globalEarned)} NIM`} label={t('cashbackCard.statEarned')} />
           <Stat icon="wallet" value={`${formatNimCompact(globalWallet)} NIM`} label={t('cashbackCard.statWallet')} />
           <Stat icon="gift" value={String(globalOrders)} label={t('cashbackCard.statOrders')} />
         </div>
@@ -811,7 +799,7 @@ export function CashbackImpactSection({
                   </code>
                   <span className="pt-leader-meta">
                   <span className="pt-leader-trees pt-icon-inline">
-                    {formatNimCompact(row.total_nim)} NIM <Icon name="spark" size={14} />
+                    {formatNimCompact(row.total_nim)} NIM <Icon name="nimiq" size={14} />
                   </span>
                   <span className="pt-leader-orders">
                     {t('cashbackCard.orders', { count: row.orders })}

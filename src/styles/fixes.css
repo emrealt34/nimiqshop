@@ -994,6 +994,7 @@ html.in-nimiq-pay #main.page {
 .pt-stat-ico{ width:44px; height:44px; border-radius:12px; display:grid; place-items:center;
   background:var(--green-soft); color:var(--green-600); flex:0 0 auto }
 .pt-stat-ico svg{ width:22px; height:22px }
+.pt-stat-ico img{ box-sizing:content-box; padding:4px; border-radius:8px; background:var(--green-600) }
 @media (max-width:420px){ .pt-stat-ico{ width:38px;height:38px } .pt-stat-ico svg{ width:19px;height:19px } }
 .pt-stat-num{ font-family:var(--font-serif); font-weight:900; font-size:clamp(1.25rem,1.05rem+1.2vw,1.7rem);
   color:var(--ink); line-height:1.1; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
@@ -1456,7 +1457,7 @@ html.in-nimiq-pay #main.page {
   width: 42px;
   height: 42px;
   border-radius: var(--r-s);
-  background: var(--stamp);
+  background: var(--green-600);
   color: var(--on-stamp);
   box-shadow: 2px 2px 0 rgba(78,61,40,.24);
 }
@@ -1573,6 +1574,7 @@ html.in-nimiq-pay #main.page {
   color: var(--green-600);
   background: var(--green-soft);
 }
+.pt-impact-metric-icon.is-nimiq { background: var(--green-600); }
 .pt-impact-metric > span:last-child {
   display: flex;
   flex-direction: column;
@@ -1587,10 +1589,20 @@ html.in-nimiq-pay #main.page {
   line-height: 1.25;
 }
 .pt-impact-metric strong {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
   color: var(--ink);
   font-size: clamp(1rem, .9rem + .3vw, 1.2rem);
   line-height: 1.2;
   overflow-wrap: anywhere;
+}
+.pt-impact-metric strong img {
+  box-sizing: content-box;
+  padding: 2px;
+  border-radius: 4px;
+  background: var(--green-600);
 }
 .pt-impact-status {
   display: flex;
@@ -1709,7 +1721,7 @@ html.in-nimiq-pay #main.page {
   .pt-impact-bar { padding: 17px 18px 16px; }
   .pt-impact-bar-brand { gap: 10px; }
   .pt-impact-logo { flex-basis: 38px; width: 38px; height: 38px; }
-  .pt-impact-logo svg { width: 19px; height: 19px; }
+  .pt-impact-logo svg, .pt-impact-logo img { width: 19px; height: 19px; object-fit: contain; }
   .pt-impact-title { font-size: clamp(1.28rem, 6vw, 1.7rem); }
   .pt-impact-stamp { margin-top: 2px; }
   .pt-impact-metrics-label { margin-top: 20px; }
@@ -1835,8 +1847,7 @@ html.in-nimiq-pay #main.page {
   }
 }
 
-/* The tree mark belongs to the "trees funded" lockup. It is intentionally not
-   a decorative icon floating in the top-right corner of the contribution panel. */
+/* Keep the real Nimiq mark aligned with the cashback currency label. */
 .pt-impact-count-label {
   display: inline-flex;
   align-items: center;
@@ -1844,10 +1855,10 @@ html.in-nimiq-pay #main.page {
   white-space: nowrap;
   line-height: 1.1;
 }
-.pt-impact-count-label > svg { flex: 0 0 auto; color: currentColor; }
+.pt-impact-count-label > svg, .pt-impact-count-label > img { flex: 0 0 auto; color: currentColor; object-fit: contain; }
 @container impact-card (max-width: 359px) {
   .pt-impact-count-label { gap: 7px; }
-  .pt-impact-count-label > svg { width: 24px; height: 24px; }
+  .pt-impact-count-label > svg, .pt-impact-count-label > img { width: 24px; height: 24px; }
 }
 
 /* Impact card v5 — keep the liked receipt look, remove the redundant side
@@ -3126,7 +3137,7 @@ body {
 /* Metrics: two tiles as soon as the card can hold them (values are short). */
 .pt-card.pt-impact .pt-impact-metrics { display: grid; grid-template-columns: 1fr; gap: 10px; }
 @container impact-card (min-width: 480px) {
-  .pt-card.pt-impact .pt-impact-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pt-card.pt-impact .pt-impact-metrics.has-burned { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 .pt-card.pt-impact .pt-impact-metric { min-width: 0; }
 .pt-card.pt-impact .pt-impact-metric > * { min-width: 0; }
