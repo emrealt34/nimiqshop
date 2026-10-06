@@ -1,8 +1,7 @@
 /**
  * CashbackImpactSection.tsx — public Cashback stats,
- * personal shareable Cashback receipt card (1080×1350 PNG export + Web Share /
- * X / Facebook / Copy link), and weekly/monthly/all-time Cashback
- * Leaderboard on the /cashback page.
+ * personal shareable Cashback receipt card (1080×1350 PNG export + native
+ * sharing), and weekly/monthly/all-time Cashback Leaderboard on /cashback.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -181,10 +180,10 @@ export function CashbackImpactSection({
           text: shareText,
           url: shareUrl,
         });
-        return;
       } catch {
-        /* cancelled */
+        /* The buyer dismissed sharing; do not trigger a different action. */
       }
+      return;
     }
     copyShare();
   };
@@ -196,15 +195,6 @@ export function CashbackImpactSection({
       setTimeout(() => setCopied(false), 2200);
     }
   };
-
-  const openTwitter = () =>
-    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`, '_blank', 'noopener,noreferrer');
-  const openFacebook = () =>
-    window.open(
-      `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(shareText)}`,
-      '_blank',
-      'noopener,noreferrer',
-    );
 
   const makeShareImage = async (): Promise<Blob> => {
     const W = 1080,
@@ -544,7 +534,6 @@ export function CashbackImpactSection({
     } catch (e) {
       console.error(e);
       setShareImg(null);
-      copyShare();
     }
   };
 
@@ -670,9 +659,6 @@ export function CashbackImpactSection({
             <div className="pt-actions">
               <ShareBtn onClick={openShareImage} icon="download" label={t('cashbackCard.downloadPng')} primary />
               <ShareBtn onClick={nativeShare} icon="share" label={t('cashbackCard.share')} />
-              <ShareBtn onClick={openTwitter} brand="x" label={t('cashbackCard.postOnX')} />
-              <ShareBtn onClick={openFacebook} brand="fb" label={t('cashbackCard.facebook')} />
-              <ShareBtn onClick={copyShare} icon="link" label={copied ? t('actions.copied') : t('cashbackCard.copyLink')} />
             </div>
             {copied && (
               <div className="small pt-value pt-icon-inline pt-copied">
@@ -853,24 +839,6 @@ export function CashbackImpactSection({
             <div className="pt-overlay-preview">
               <img src={shareImg} width={1080} height={1350} alt={t('cashbackCard.shareImgAlt', { site: siteName() })} />
             </div>
-            <div className="pt-caption">
-              <div className="pt-caption-label">
-                <Icon name="copy" size={14} /> {t('cashbackCard.postCaption')}
-              </div>
-              <p className="pt-caption-text">{shareText}</p>
-              <button
-                className="btn btn-sm btn-ghost"
-                onClick={() => {
-                  if (Clipboard.copy(shareText)) {
-                    setCopied(true);
-                    // DS172411 (setTimeout): closure only, never a string — no untrusted data is evaluated.
-                    setTimeout(() => setCopied(false), 2200);
-                  }
-                }}
-              >
-                <Icon name="copy" size={14} /> {copied ? t('cashbackCard.copiedCheck') : t('cashbackCard.copyCaption')}
-              </button>
-            </div>
             <div className="pt-overlay-actions">
               <a className="btn btn-gold" href={shareImg} download="nimshop-cashback-card.png" onClick={downloadShareImage}>
                 <Icon name="download" size={16} /> {t('cashbackCard.downloadPng')}
@@ -881,23 +849,22 @@ export function CashbackImpactSection({
                   try {
                     const blob = shareBlobRef.current || (await makeShareImage());
                     const file = new File([blob], 'nimshop-cashback-card.png', { type: 'image/png' });
-                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    if (navigator.share && navigator.canShare?.({ files: [file] })) {
                       await navigator.share({
                         files: [file],
-                        title: t('cashbackCard.myImpact', { site: siteName() }) + ' ⚡',
+                        title: t('cashbackCard.shareTitle', { site: siteName() }),
                         text: shareText,
                       });
                       return;
                     }
-                    Clipboard.copy(shareText);
-                    window.open('https://twitter.com/intent/tweet?text=' + encodeURIComponent(shareText), '_blank', 'noopener,noreferrer');
-                  } catch {
-                    Clipboard.copy(shareText);
-                    window.open('https://twitter.com/intent/tweet?text=' + encodeURIComponent(shareText), '_blank', 'noopener,noreferrer');
+                    await nativeShare();
+                  } catch (error) {
+                    if (error instanceof DOMException && error.name === 'AbortError') return;
+                    await nativeShare();
                   }
                 }}
               >
-                <Icon name="share" size={16} /> {t('cashbackCard.postImageCaption')}
+                <Icon name="share" size={16} /> {t('cashbackCard.share')}
               </button>
             </div>
           </div>
@@ -910,17 +877,14 @@ export function CashbackImpactSection({
 function ShareBtn({
   onClick,
   icon,
-  brand,
   label,
   primary,
 }: {
   onClick: () => void;
-  icon?: string;
-  brand?: 'x' | 'fb';
+  icon: string;
   label: string;
   primary?: boolean;
 }) {
-  const glyph = brand === 'x' ? '𝕏' : brand === 'fb' ? 'f' : null;
   return (
     <button
       type="button"
@@ -928,7 +892,7 @@ function ShareBtn({
       className={'btn btn-sm' + (primary ? ' btn-gold' : ' btn-outline')}
       style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
     >
-      {icon ? <Icon name={icon as any} size={14} /> : <span style={{ fontWeight: 800, fontSize: '0.9rem' }}>{glyph}</span>}
+      <Icon name={icon as any} size={14} />
       {label}
     </button>
   );

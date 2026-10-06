@@ -72,7 +72,7 @@ export function ComeBackBanner({
   const textNode = text !== undefined ? text : t('ui.comeBackText');
   return (
     <a className={`come-back ${className}`.trim()} href={pagePath("/cashback")}>
-      <Icon name="spark" size={18} />
+      <Icon name="coins" size={18} />
       {/* data-fit="wrap": the banner is a one-line rail on purpose, so the
           type shrinks to keep that shape — and if a translation is still too
           long at the floor (French/German/Turkish are), the text wraps instead
@@ -609,7 +609,7 @@ export function OnChainProof({ tx, className = '' }: { tx?: string | null; class
       rel="noopener noreferrer"
       title={t('ui.onChainProofTitle', { tx: shortTx(String(tx)) })}
     >
-      <Icon name="spark" size={13} />
+      <Icon name="link" size={13} />
       <span>{t('ui.onChainProof')}</span>
     </a>
   );

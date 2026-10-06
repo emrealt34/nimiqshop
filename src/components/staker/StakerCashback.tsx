@@ -159,7 +159,7 @@ export function CheckoutCashbackSummary({
       </div>
       {earnsMoreWithStake && (
         <div className="small mt-2" style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', color: 'var(--green, #2f5540)' }}>
-          <Icon name="spark" size={16} />
+          <Icon name="coins" size={16} />
           <span>
             {rich(t('staker.withStake', {
               nim: fmtCashbackNIM(stakerAmount),
@@ -171,7 +171,7 @@ export function CheckoutCashbackSummary({
       )}
       {canCompare && !stakedHere && !earnsMoreWithStake && (
         <div className="small mt-2" style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', color: 'var(--green, #2f5540)' }}>
-          <Icon name="spark" size={16} />
+          <Icon name="coins" size={16} />
           <span>{t('staker.unlockRate', {
             pct: pct(stakerBps),
             more: maxBoost > 0 ? t('staker.unlockRateMoreSuffix', { max: String(maxBoost) }) : '',
@@ -238,7 +238,7 @@ export function StakerCashbackLine({ quote }: { quote?: any } = {}) {
   return (
     <div className="mt-1">
       <Line className="small muted">
-        <Icon name="spark" size={13} /> {t('staker.earnBase', {
+        <Icon name="coins" size={13} /> {t('staker.earnBase', {
           pct: pct(stakerBase),
           max: String(program.program?.max_boost_percent ?? 0),
         })}
@@ -338,7 +338,7 @@ export function StakerCashbackCard() {
   return (
     <div className="card mt-2">
       <div className="card-title">
-        <Icon name="spark" size={16} /> {t('staker.cardTitle')}
+        <Icon name="coins" size={16} /> {t('staker.cardTitle')}
       </div>
 
       <div className="small muted">

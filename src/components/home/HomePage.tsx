@@ -315,7 +315,7 @@ export function HomePage() {
               <span>{t('home.browseShelf')}</span>
             </a>
             <a className="btn btn-ghost btn-lg hero-cashback" href={pagePath("/cashback")} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-              <Icon name="spark" size={20} />
+              <Icon name="coins" size={20} />
               <span>{t('home.earnCashback')}</span>
             </a>
             {!inPay && (

@@ -1096,7 +1096,7 @@ function HowToRedeemCard({ product, info, termsText }: { product: ProductDetail;
   return (
     <div className="card mt-2 howto">
       <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-        <Icon name={product.type === 'phone_refill' ? 'bolt' : product.type === 'esim' ? 'spark' : 'gift'} size={16} />
+        <Icon name={product.type === 'phone_refill' ? 'bolt' : product.type === 'esim' ? 'phone' : 'gift'} size={16} />
         <span>{t(info.title)} — {t('productPage.deliveredBy')}</span>
       </div>
       {rich && rich.redeemGeo && (

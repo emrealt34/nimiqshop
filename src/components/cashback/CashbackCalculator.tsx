@@ -175,7 +175,7 @@ export function CashbackCalculator({
   return (
     <div className="card mt-2 cb-calc">
       <div className="card-title">
-        <Icon name="spark" size={16} /> {t('cashback.calcTitle')}
+        <Icon name="coins" size={16} /> {t('cashback.calcTitle')}
       </div>
       <div className="small muted" style={{ margin: '2px 0 12px' }}>
         {t('cashback.calcIntro')}

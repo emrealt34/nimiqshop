@@ -223,7 +223,7 @@ export function ProfileView() {
           <div className="row between" style={{ alignItems: 'center', gap: 10 }}>
             <div>
               <div className="card-title" style={{ margin: 0 }}>
-                <Icon name="spark" size={16} /> {t('account.cashbackStaking')}
+                <Icon name="coins" size={16} /> {t('account.cashbackStaking')}
               </div>
               <div className="xs faint mt-1">{t('accountPage.cashbackStakingText')}</div>
             </div>

@@ -160,7 +160,7 @@ export function PlayersPanel() {
         <div className="row mt-1" style={{ gap: 8, flexWrap: 'wrap' }}>
           <span className="chip xs">{num(p.with_orders)} bought at least once</span>
           <span className="chip xs">
-            <Icon name="spark" size={12} /> {num(p.stakers)} staking in your pool
+            <Icon name="wallet" size={12} /> {num(p.stakers)} staking in your pool
           </span>
         </div>
       </div>
@@ -200,7 +200,7 @@ export function PlayersPanel() {
             In flight {num(totals.in_flight_count)} · {fmtNIM(num(totals.in_flight_nim), 2)} NIM
           </span>
           <span className="chip xs">
-            <Icon name="spark" size={12} /> {num(totals.boosted_count)} paid at a pool-staker rate
+            <Icon name="coins" size={12} /> {num(totals.boosted_count)} paid at a pool-staker rate
           </span>
           {totals.oldest_pending_at ? (
             <span className="chip xs">
@@ -471,7 +471,7 @@ function UserDetail({ userId }: { userId: string }) {
 
       <div className="row mt-1 admin-chips" style={{ gap: 8, flexWrap: 'wrap' }}>
         <span className="chip xs">
-          <Icon name="spark" size={12} /> {rateSourceLabel(rate.live_source)} · next order without a promo
+          <Icon name="pulse" size={12} /> {rateSourceLabel(rate.live_source)} · next order without a promo
         </span>
         {ledger.has_ledger ? (
           <span className="chip xs">
@@ -479,7 +479,7 @@ function UserDetail({ userId }: { userId: string }) {
           </span>
         ) : null}
         <span className="chip xs">
-          <Icon name="spark" size={12} /> {num(s.cashback_boosted_count)} paid at the staker rate
+          <Icon name="coins" size={12} /> {num(s.cashback_boosted_count)} paid at the staker rate
         </span>
         <span className="chip xs">
           {st.staked

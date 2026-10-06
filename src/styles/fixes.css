@@ -1145,10 +1145,8 @@ html.in-nimiq-pay #main.page {
   background:var(--surface-2); border-color:var(--line-strong) }
 .wal-chip{ gap:5px }
 .wal-chip strong{ font-family:var(--font-serif) }
-/* The small print under the figure (address · read time · network · refresh)
-   sits on the same white panel, so it needs the site's dimmer ink to stay
-   readable rather than the faded tone meant for the cream background. */
-.wal-meta, .wal-note{ color:var(--ink-dim) }
+/* Balance-status notes use the dimmer ink on the same white panel. */
+.wal-note{ color:var(--ink-dim) }
 .wal-note{ display:flex; align-items:center; gap:5px; flex-wrap:wrap; line-height:1.4 }
 
 /* ---- pager ---- */
@@ -3756,28 +3754,11 @@ input[type="range"]:focus-visible { outline: 2px solid var(--stamp); outline-off
 .toast.toast-error svg { color: var(--red); }
 .toast.toast-info svg { color: var(--blue); }
 
-/* The wallet card's meta line (address · read time · network) is the longest
-   line on the card and, on a phone, pushed the refresh control off the edge —
-   owner (2026-10-06): "fotoğrafını koyduğum yeri kesebilirsin" over a shot of
-   exactly that line. It is cut on phones; the refresh button stays. */
-@media (max-width: 640px) {
-  .wal-meta { justify-content: flex-end; }
-  .wal-meta-text { display: none; }
-}
-
 /* ================= THE BALANCE CARD, AS ONE OBJECT =================
- * Owner (2026-10-06): "o spendable kartında baya şey sorunu var … ayrı ayrı
- * saçma gözüküyor her şey". It was five independently aligned lines (label,
- * figure, total, verdict, meta). It is now a headline row — figure left,
- * refresh right — and ONE sub-row carrying every fact about the reading. The
- * sub-row WRAPS as a whole on a phone instead of each item taking its own line.
+ * The home card keeps the balance and refresh control together. Verbose source,
+ * address, timestamp, and network metadata are intentionally omitted.
  */
 .wal-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; min-width:0 }
-.wal-subrow{ display:flex; align-items:center; gap:4px 10px; flex-wrap:wrap; min-width:0; line-height:1.5 }
-.wal-subrow .wal-bal-label{ font-size:inherit }
-.wal-subrow .mono{ letter-spacing:.02em }
-.wal-src{ font-weight:800; color:var(--ink-dim) }
-.wal-when{ font-variant-numeric:tabular-nums }
 /* The refresh control sits with the figure, not at the end of a long line:
    it can never be pushed off the card (owner, 2026-10-06). */
 .wal-refresh{ flex:0 0 auto; width:30px; height:30px; border-radius:var(--r-s);
@@ -3787,7 +3768,6 @@ input[type="range"]:focus-visible { outline: 2px solid var(--stamp); outline-off
 @media (max-width: 640px) {
   .wal-card{ padding:12px 13px; display:flex; flex-direction:column; gap:6px }
   .wal-nim{ font-size:1.22rem }
-  .wal-subrow{ gap:3px 8px; font-size:.72rem }
   .wal-verdict{ font-size:var(--fs-xs) }
 }
 

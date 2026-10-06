@@ -48,7 +48,7 @@ const NAV: { key: ShellKey; labelKey: 'shop' | 'activity' | 'orders' | 'cashback
   { key: 'shop',        labelKey: 'shop',       href: '/',             icon: 'bag' },
   { key: 'activity',    labelKey: 'activity',   href: '/activity',     icon: 'pulse' },
   { key: 'orders',      labelKey: 'orders',     href: '/orders',       icon: 'receipt' },
-  { key: 'cashback',    labelKey: 'cashback',   href: '/cashback',     icon: 'spark' },
+  { key: 'cashback',    labelKey: 'cashback',   href: '/cashback',     icon: 'coins' },
   // Owner (2026-10-05): the leaderboard lives INSIDE the cashback page — no
   // separate nav tab any more.
   { key: 'support',     labelKey: 'support',    href: '/support',      icon: 'headset' },
@@ -346,7 +346,7 @@ function AccountArea({ operatorConsole = false }: { operatorConsole?: boolean })
           </div>
           {menuItem('user',     t('account.accountLimits'),   () => navigate('/profile'))}
           {menuItem('receipt',  t('account.myOrders'),        () => navigate('/orders'))}
-          {menuItem('spark',    t('account.cashbackStaking'), () => navigate('/cashback'))}
+          {menuItem('coins',    t('account.cashbackStaking'), () => navigate('/cashback'))}
           {menuItem('pulse',    t('account.publicActivity'),  () => navigate('/activity'))}
           {menuItem('headset',  t('nav.support'),  () => navigate('/support'))}
           <button

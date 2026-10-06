@@ -662,7 +662,7 @@ function StakeCashbackEditor({ data, onChanged, basePct }: { data: any; onChange
   return (
     <div className="mt-2" style={{ borderTop: '1px solid var(--line, #e5e7eb)', paddingTop: 12 }}>
       <div className="strong">
-        <Icon name="spark" size={15} /> Pool-staker cashback — single ledger
+        <Icon name="coins" size={15} /> Pool-staker cashback — single ledger
       </div>
       <div className="small muted">
         One rule, no levels: the boost is a share of the pool fees the staker's stake actually earned, on top of the

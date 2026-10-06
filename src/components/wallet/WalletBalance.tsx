@@ -12,15 +12,15 @@
  *   - "Total … of it is staked": what the wallet shows. A buyer who stakes (our
  *     own cashback programme asks them to) otherwise sees a fraction of their
  *     NIM and calls the strip wrong — which it was.
- * The address, the reading time and a manual refresh are on the card, so the
- * number is verifiable instead of merely asserted.
+ * The figure and manual refresh stay together on the home card; verbose source,
+ * address, timestamp, and network metadata are omitted there for a cleaner view.
  *
  * Shapes: `card` (home), `line` (product / cart / checkout), `chip` (orders).
  * Every failure mode renders as a quiet state, never a broken screen.
  */
 import { useEffect, useState } from 'react';
 import { useT } from '../../i18n';
-import { fmtNIM, fmtClock } from '../../lib/format';
+import { fmtNIM } from '../../lib/format';
 import { NIM_LOGO } from '../../lib/nim';
 import {
   getWalletBalanceState,
@@ -75,24 +75,12 @@ export function nimShortText(n: number): string {
   return fmtNIM(Math.max(1, Math.ceil(v)), 0);
 }
 
-/** "NQ73 SE1X YRRF … 2HPD" → "NQ73SE1X…2HPD" */
-function shortAddress(addr: string): string {
-  const a = String(addr || '').replace(/\s+/g, '').toUpperCase();
-  if (a.length <= 12) return a;
-  return `${a.slice(0, 8)}…${a.slice(-4)}`;
-}
-
-function clockOf(at?: number): string {
-  /* EXACT, to the second: owner (2026-10-06) — "6 saat önce değil, 10 am tam
-     saniyesi yazsın". On the card this also proves the refresh landed. */
-  return fmtClock(at);
-}
-
 export function WalletBalance({
   variant = 'line',
   targetNim = 0,
   targetTotal = false,
   signInHint = false,
+  showVerdict = true,
   className = '',
 }: {
   variant?: 'card' | 'line' | 'chip';
@@ -102,6 +90,8 @@ export function WalletBalance({
   targetTotal?: boolean;
   /** Show the "sign in to see it" nudge when the wallet is unknown. */
   signInHint?: boolean;
+  /** Suppress the inline affordability verdict when another control handles it. */
+  showVerdict?: boolean;
   className?: string;
 }) {
   const { t } = useT();
@@ -154,15 +144,6 @@ export function WalletBalance({
       : { ok: false, text: t('wallet.short', { nim: nimShortText(missing) }) };
   })();
 
-  /* WHERE the figure came from, in three words. The buyer is holding a wallet
-     that shows its own number (owner, 2026-10-06: "spendable NIM yazıyor Nimiq
-     Pay'de ama…"), so the card must never leave the source implicit. */
-  const sourceLabel =
-    state.source === 'nimiq-pay' ? 'Nimiq Pay'
-    : state.source === 'shop' ? t('wallet.srcShop')
-    : state.source === 'both' ? t('wallet.srcBoth')
-    : '';
-
   const figure = ready ? (
     <span className="wal-bal-fig">
       <img src={NIM_LOGO} alt="NIM" draggable={false} width={15} height={15} style={{ pointerEvents: "none", borderRadius: 3 }} />
@@ -186,13 +167,8 @@ export function WalletBalance({
     </span>
   );
 
-  /* THE CARD IS ONE OBJECT (owner, 2026-10-06: "o spendable kartında baya şey
-     sorunu var … ayrı ayrı saçma gözüküyor her şey"). It used to be five
-     independent lines — label, figure, total, verdict, meta — each with its own
-     alignment, which is what read as scattered. Now: ONE headline row with the
-     figure and the refresh control, ONE sub-row carrying every fact about the
-     reading (what · from where · which address · when · which chain), and then
-     at most the verdict and the reconciliation. */
+  /* Keep the balance and refresh control together. The home card intentionally
+     omits the verbose read-source/address/time/network line. */
   const body = (
     <>
       <span className="wal-head">
@@ -203,22 +179,6 @@ export function WalletBalance({
           </button>
         )}
       </span>
-
-      {variant === 'card' && (
-        <span className="wal-subrow xs faint">
-          <span className="wal-bal-label">
-            <Icon name="wallet" size={14} /> {ready ? t('wallet.available') : t('wallet.label')}
-          </span>
-          {ready && sourceLabel ? <span className="wal-src">{sourceLabel}</span> : null}
-          {ready && state.address ? <span className="mono">{shortAddress(state.address)}</span> : null}
-          {ready && clockOf(state.at) ? <span className="wal-when">{clockOf(state.at)}</span> : null}
-          {/* WHICH CHAIN the figure was read from. A testnet balance shown as a
-              real one is a wrong reading in every sense — this line makes the
-              mix-up visible instead of mysterious. */}
-          {ready && state.network ? <span>{t('wallet.onNetwork', { network: state.network })}</span> : null}
-          {ready && state.stale ? <span>{t('wallet.stale')}</span> : null}
-        </span>
-      )}
 
       {variant !== 'card' && !ready && (
         <span className="wal-bal-label">
@@ -238,7 +198,7 @@ export function WalletBalance({
         </span>
       )}
 
-      {verdict && (
+      {showVerdict && verdict && (
         <span className={`wal-verdict ${verdict.ok ? 'ok' : 'short'}`}>
           <Icon name={verdict.ok ? 'check' : 'info'} size={13} /> {verdict.text}
         </span>
