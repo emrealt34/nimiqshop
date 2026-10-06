@@ -229,10 +229,6 @@ func (h *Handlers) PublicCashbackCode(ctx *fasthttp.RequestCtx) {
 }
 
 func (h *Handlers) attachQuoteCashbackEstimate(resp map[string]interface{}, q db.Quote, productNIM float64) {
-	// Nimiq Pay ONLY: if another method is used, zero out cashback
-	if q.PaymentMethod != "" && q.PaymentMethod != "nimiq_pay" {
-		return
-	}
 	view, err := h.resolveQuoteCashback(q.CashbackCode, q.UserID)
 	if err != nil {
 		bps, _ := h.buyerBaseBps(context.Background(), q.UserID)

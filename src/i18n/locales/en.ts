@@ -1552,7 +1552,7 @@ const en = {
   /* ---- cashbackFee ---- */
   cashbackFee: {
     title: 'No cashback on fees',
-    rule: 'Cashback is calculated only on the order price shown in this shop. Your wallet swaps to BTC to pay your order. Any extra swap, payment or network costs added by your wallet are excluded and earn no cashback.',
+    rule: 'Cashback is valid exclusively for payments made via Nimiq Pay (including USDT payments through Nimiq Pay). Cashback is calculated only on the order price shown in this shop. Your wallet swaps to BTC to pay your order. Any extra swap, payment or network costs added by your wallet are excluded and earn no cashback.',
     nimExample: 'Example: our shop shows 100 NIM + fee and your wallet adds 2 NIM in swap/payment costs → cashback is calculated on 100 NIM, not 102 NIM.',
     usdtExample: 'Example: 100 USDT + a POL network fee → only the 100 USDT order amount counts towards cashback. The POL fee does not count.',
     aria: 'Cashback calculation — fees excluded',

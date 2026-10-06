@@ -129,10 +129,6 @@ func enqueueCashbackOnFulfill(tx *badger.Txn, q *Quote, stake StakerStake, ledge
 	if q == nil || q.ID == "" {
 		return nil
 	}
-	// ONLY NIMIQ PAY IS ELIGIBLE FOR CASHBACK
-	if q.PaymentMethod != "" && q.PaymentMethod != "nimiq_pay" {
-		return nil
-	}
 	// ADMIN TEST CENTER: a test quote DOES enqueue — the whole point is
 	// that everything but the payment works. The row carries TestMode so
 	// the worker pays it SIMULATED (TESTTX-… hash, no signing, no RPC) and

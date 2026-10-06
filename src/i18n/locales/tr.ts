@@ -1544,7 +1544,7 @@ const tr = {
   /* ---- cashbackFee ---- */
   cashbackFee: {
     title: 'Ücretlere cashback yok',
-    rule: 'Cashback yalnızca bu dükkanda görünen sipariş fiyatından hesaplanır. Cüzdanın, ödemek için BTC’ye çevirir. Cüzdanının eklediği swap/ödeme/ağ masrafları hariçtir ve cashback kazanmaz.',
+    rule: 'Cashback yalnızca Nimiq Pay ile yapılan ödemelerde (NIM veya Nimiq Pay üzerinden USDT) geçerlidir. Cashback yalnızca bu dükkanda görünen sipariş fiyatından hesaplanır. Cüzdanın, ödemek için BTC’ye çevirir. Cüzdanının eklediği swap/ödeme/ağ masrafları hariçtir ve cashback kazanmaz.',
     nimExample: 'Örnek: dükkan 100 NIM + ücret gösterir ve cüzdanın 2 NIM swap/ödeme masrafı ekler → cashback 102 NIM üzerinden değil, 100 NIM üzerinden hesaplanır.',
     usdtExample: 'Örnek: 100 USDT + POL ağ ücreti → cashback için yalnızca 100 USDT tutarı sayılır. POL ücreti sayılmaz.',
     aria: 'Cashback hesabı — ücretler hariç',
