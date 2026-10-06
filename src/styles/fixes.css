@@ -472,7 +472,7 @@ html.in-nimiq-pay #main.page {
     padding: 8px 6px;
     gap: 4px;
   }
-  /* Even two-line wraps instead of "Pay with NIM ·" / "BTC Lightning". */
+  /* Even two-line wraps instead of "Pay with NIM ·" / "Nimiq Pay". */
   .how-step .strong { text-wrap: balance; overflow-wrap: break-word; }
   .how-step .small { display: none; }
   .how-n { width: 22px; height: 22px; font-size: 0.75rem; }

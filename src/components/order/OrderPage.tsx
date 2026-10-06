@@ -996,7 +996,7 @@ function payMethodLabel(q: any): string {
   if (rail.isUsdt) return rail.label; // "USDT · Polygon"
   const m = String(q?.payment_method || '').toLowerCase();
   const coin = String(q?.coin || '').toUpperCase();
-  // Owner (2026-10-04): the SUMMARY states the rail only — "BTC Lightning" —
+  // Owner (2026-10-04): the SUMMARY states the rail only — "Nimiq Pay" —
   // without the NIM prefix the pay chip carries.
   if (m === 'nimiq_pay') return i18nT('orderPage.payBtcLightning');
   return m ? m.replace(/_/g, ' ') : coin === 'NIM' ? i18nT('orderPage.payBtcLightning') : '—';

@@ -5,7 +5,7 @@ import { t as tr } from '../i18n';
  * answering differently:
  *
  *   1. "How does this order reach the buyer?"  (email / phone / email & phone)
- *   2. "Which rail is being paid?"             (Pay with NIM · BTC Lightning / USDT · Polygon)
+ *   2. "Which rail is being paid?"             (Pay with Nimiq Pay / USDT · Polygon)
  *
  * WHY THIS FILE EXISTS
  * --------------------
@@ -296,7 +296,7 @@ export function deliverySummary(source: any): DeliverySummary {
 export type PayRail = {
   /** 'usdt' | 'nim' */
   id: 'usdt' | 'nim';
-  /** "USDT · Polygon" / "Pay with NIM · BTC Lightning" */
+  /** "USDT · Polygon" / "Pay with Nimiq Pay" */
   label: string;
   /** Short chip text used next to amounts. */
   short: string;

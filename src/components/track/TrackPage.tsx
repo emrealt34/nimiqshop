@@ -163,7 +163,7 @@ export function TrackView() {
     ? titleParts.join(' + ')
     : cleanProductLabel(trk.title) || (quoteTracking ? t('trackPage.btcLightningPurchase') : t('common.purchase'));
   // Rail and channel come from the public payload; a USDT order must not be
-  // labelled a "BTC Lightning purchase", and a top-up must not promise a code.
+  // labelled a "Nimiq Pay purchase", and a top-up must not promise a code.
   const tRail = payRail(trk);
   const tDel = deliverySummary(trk);
   const rows: Array<[string, any]> = [

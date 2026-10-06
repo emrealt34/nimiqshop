@@ -211,7 +211,7 @@ async function finishLogin(challengeToken: string, signed: any): Promise<{ addre
   return { address: res.user.nimiq_address || address };
 }
 
-/* ---------------- Nimiq Pay: direct BTC Lightning ---------------- */
+/* ---------------- Nimiq Pay: direct Nimiq Pay ---------------- */
 export function lightningPaymentURI(invoice: string): string {
   const raw = String(invoice || '').trim();
   // Same gate as the copy button and the pay hand-off (lib/pay): shape +

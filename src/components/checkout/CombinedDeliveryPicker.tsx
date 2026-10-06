@@ -83,7 +83,7 @@ export function CombinedDeliveryPicker({
   // Apps"); USDT-on-Polygon is the shop's own rail with its own one-time
   // address. Both rails pay the SAME cashback rate, so both cards carry the
   // same cashback line.
-  // Single payment rail: BTC Lightning (Nimiq Pay or any Lightning wallet).
+  // Single payment rail: Nimiq Pay (Nimiq Pay or any Lightning wallet).
   // The USDT option was removed by owner decision; legacy USDT quotes keep
   // their pay screen in CheckoutFlow, but no new USDT quote can be created.
 
