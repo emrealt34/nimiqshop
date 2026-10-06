@@ -210,20 +210,11 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, hidePayButt
           <span className="btn-label">{busy ? t('checkout.verifying') : payLocked ? t('orderPage.nimiqPay.submitted') : insidePay ? t('orderPage.nimiqPay.idle') : t('checkout.flowPayWithNim')}</span>
         </button>
       )}
-      <button className="btn btn-outline btn-block mt-1" disabled={busy} onClick={() => handoff('copy')}><Icon name="copy" size={16} /> {t('checkout.lpCopyRequest')}</button>
+      {/* Copy button hidden */}
       {/* The QR is part of the card, not a reveal: owner removed the
           "Verify & show QR" button and the hide control — a Lightning invoice
           is public data, and one less step between the buyer and the pay. */}
-      {allowed && (
-        <div className="pay-qr mt-3">
-          {/* Centre mark = the shop's own brand tile — never the payer's
-              identicon (owner, 2026-10-05). */}
-          <div className="pay-qr-frame">
-            <QR text={invoice} size={29} center={asset("/img/brand-icon-96.png")} />
-          </div>
-          <div className="xs faint mt-1">{t('checkout.lpScanOnce')}</div>
-        </div>
-      )}
+      {/* QR Code hidden to strictly enforce Nimiq Pay usage. */}
     </div>
   );
 }
