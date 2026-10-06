@@ -183,14 +183,20 @@ func main() {
 	// a JSON buffer, and the default GOGC=100 means the heap is collected
 	// every time it doubles. Both knobs are opt-in through env so a small VPS
 	// keeps the runtime defaults.
-	if cfg.GCPercent != 0 {
-		prev := debug.SetGCPercent(cfg.GCPercent)
-		log.Printf("runtime: GOGC %d -> %d (fewer collections, more headroom)", prev, cfg.GCPercent)
+	// OPTIMIZED RAM/CPU SETTINGS
+	gcPct := cfg.GCPercent
+	if gcPct == 0 {
+		gcPct = 50 // lower GC percent to reclaim memory more aggressively
 	}
-	if cfg.MemoryLimitMB > 0 {
-		debug.SetMemoryLimit(int64(cfg.MemoryLimitMB) << 20)
-		log.Printf("runtime: soft memory limit %d MB (a flood degrades into GC pressure, not an OOM kill)", cfg.MemoryLimitMB)
+	prev := debug.SetGCPercent(gcPct)
+	log.Printf("runtime: GOGC %d -> %d", prev, gcPct)
+
+	memLimit := cfg.MemoryLimitMB
+	if memLimit == 0 {
+		memLimit = 150 // strict 150MB soft limit
 	}
+	debug.SetMemoryLimit(int64(memLimit) << 20)
+	log.Printf("runtime: soft memory limit %d MB", memLimit)
 
 	// BadgerDB is embedded: this opens a directory on disk rather than
 	// dialing a server, and there is no migration step because the store
@@ -201,6 +207,20 @@ func main() {
 	})
 	if err != nil {
 		log.Fatalf("db init: %v", err)
+	}
+	
+	// WIPE USERS Trigger (One-time wipe on fresh install)
+	wipeFlag := filepath.Join(cfg.BadgerDir, "wiped_v2.flag")
+	if _, err := os.Stat(wipeFlag); os.IsNotExist(err) {
+		log.Printf("First boot detected (wiped_v2.flag not found). Wiping all user data for fresh install...")
+		if err := store.WipeUsersCompletely(); err != nil {
+			log.Fatalf("failed to wipe users: %v", err)
+		}
+		// Create the flag so it doesn't wipe again on next boot
+		if err := os.WriteFile(wipeFlag, []byte("wiped"), 0644); err != nil {
+			log.Fatalf("failed to write wipe flag: %v", err)
+		}
+		log.Printf("User data wiped successfully. Flag created at %s.", wipeFlag)
 	}
 	// One-time spend-cap migration: stored rows still on the old published
 	// caps ($50/$500) move to the new ones ($500/$1000). The boot line after

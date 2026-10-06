@@ -238,18 +238,28 @@ func New(dir string, cfgs ...Options) (*Store, error) {
 	// headroom without touching code.
 	if v := envPositiveInt("BADGER_MEMTABLE_MB"); v > 0 {
 		opts = opts.WithMemTableSize(v * 1024 * 1024)
+	} else {
+		opts = opts.WithMemTableSize(16 * 1024 * 1024)
 	}
 	if v := envPositiveInt("BADGER_NUM_MEMTABLES"); v > 0 && v <= 16 {
 		opts = opts.WithNumMemtables(int(v))
+	} else {
+		opts = opts.WithNumMemtables(1)
 	}
 	if v := envPositiveInt("BADGER_BLOCK_CACHE_MB"); v > 0 {
 		opts = opts.WithBlockCacheSize(v * 1024 * 1024)
+	} else {
+		opts = opts.WithBlockCacheSize(16 * 1024 * 1024)
 	}
 	if v := envPositiveInt("BADGER_INDEX_CACHE_MB"); v > 0 {
 		opts = opts.WithIndexCacheSize(v * 1024 * 1024)
+	} else {
+		opts = opts.WithIndexCacheSize(16 * 1024 * 1024)
 	}
 	if v := envPositiveInt("BADGER_NUM_COMPACTORS"); v > 0 && v <= 16 {
 		opts = opts.WithNumCompactors(int(v))
+	} else {
+		opts = opts.WithNumCompactors(1)
 	}
 
 	bdb, err := badger.Open(opts)
@@ -402,3 +412,24 @@ func (badgerLogger) Errorf(f string, v ...interface{})   { logf("badger ERROR: "
 func (badgerLogger) Warningf(f string, v ...interface{}) { logf("badger WARN: "+f, v...) }
 func (badgerLogger) Infof(string, ...interface{})        {}
 func (badgerLogger) Debugf(string, ...interface{})       {}
+
+
+// WipeUsersCompletely permanently deletes all user data.
+func (s *Store) WipeUsersCompletely() error {
+	prefixes := [][]byte{
+		[]byte("u:"), []byte("ix:u:"), []byte("lock:q:user:"),
+		[]byte("o:"), []byte("ix:o:"),
+		[]byte("q:"), []byte("ix:q:"),
+		[]byte("st:"), []byte("ix:st:"),
+		[]byte("stm:"), []byte("ix:stm:"),
+		[]byte("ix:feed:"),
+		[]byte("cb:"), []byte("ix:cb:"),
+		[]byte("sw:"), []byte("sl:"), []byte("sr:"),
+	}
+	for _, p := range prefixes {
+		if err := s.db.DropPrefix(p); err != nil {
+			return fmt.Errorf("wipe %s: %w", string(p), err)
+		}
+	}
+	return nil
+}
