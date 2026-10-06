@@ -218,9 +218,9 @@ func (h *Handlers) createQuoteInner(ctx *fasthttp.RequestCtx, userID string, req
 	req.CashbackCode = cashbackView.Code
 	// Presence (best-effort, admin console only).
 	info := clientip.Resolve(ctx, h.Cfg.TrustProxy, h.Cfg.ClientIPPolicy())
-	// The supplier keeps the resolved value; the note may also take the
-	// browser's edge-country hint (withEdgeCountry).
-	h.noteUserPresenceFrom(userID, h.withEdgeCountry(ctx, info))
+	// The supplier keeps the resolved value; the note may take the edge's own
+	// restatement of the address and country instead (withEdgeOrigin).
+	h.noteUserPresenceFrom(userID, h.withEdgeOrigin(ctx, info))
 	if req.Denomination == "" {
 		writeError(ctx, fasthttp.StatusBadRequest, "denomination is required (e.g. \"100 USD\" or \"range\")")
 		return

@@ -15,11 +15,13 @@ import (
 // deployment's path does — CF-* never arrive), country is empty so the shop
 // falls back to a global catalog.
 //
-// country_hint is reported separately and is NOT part of that decision: it is
-// the country the visitor's browser read from the same-origin edge trace and
-// forwarded (see src/lib/edgeGeo.ts). /api/geo keeps the two apart on purpose —
-// the hint is display metadata for the operator console, and nothing that
-// depends on the visitor's address may read it.
+// country_hint and ip_hint are reported separately and are NOT part of that
+// decision: they are what the edge stated about this request (the visitor's own
+// address on X-Nimshop-Client-IP, the country on the hop's restatement or, as a
+// last resort, the value the browser read from the same-origin edge trace — see
+// src/lib/edgeGeo.ts). /api/geo keeps them apart on purpose: they are display
+// metadata for the operator console, and nothing that depends on the visitor's
+// address — rate limits, the supplier payload, audit lines — may read them.
 func (h *Handlers) GeoInfo(ctx *fasthttp.RequestCtx) {
 	info := clientip.Resolve(ctx, h.Cfg.TrustProxy, h.Cfg.ClientIPPolicy())
 	writeJSON(ctx, fasthttp.StatusOK, map[string]interface{}{
@@ -27,5 +29,6 @@ func (h *Handlers) GeoInfo(ctx *fasthttp.RequestCtx) {
 		"country":      info.Country,
 		"cloudflare":   info.Cloudflare,
 		"country_hint": clientip.CountryHint(ctx),
+		"ip_hint":      clientip.ClientIPHint(ctx),
 	})
 }

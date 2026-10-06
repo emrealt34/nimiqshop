@@ -28,9 +28,16 @@ import (
  * same value clientip.Resolve already gives the checkout for the supplier's
  * X-Forwarded-For. The country comes from the edge whenever the hop carries it
  * (CF-IPCountry, or the edge's own restatement), and otherwise from the hint the
- * browser fetched from the same-origin edge trace — see withEdgeCountry,
+ * browser fetched from the same-origin edge trace — see withEdgeOrigin,
  * clientip.CountryHint and src/lib/edgeGeo.ts. No third-party geo lookup is
  * called, for this or anything else.
+ *
+ * The ADDRESS has the same problem in this deployment: cloudflared re-originates
+ * the request from the owner's host, so the chain the backend can peel ends at
+ * the tunnel's egress and every customer would be noted with one shared
+ * address. The edge states the visitor's real one on X-Nimshop-Client-IP, and
+ * the note prefers it — again without touching what the rest of the server
+ * resolved for itself.
  */
 
 // presenceNoteGap bounds how often one account's origin may be rewritten.
@@ -49,20 +56,29 @@ var presenceNoteLast sync.Map
 // heartbeat, which is why the panel finally has an address for everyone.
 func (h *Handlers) noteUserPresence(ctx *fasthttp.RequestCtx, userID string) {
 	info := clientip.Resolve(ctx, h.Cfg.TrustProxy, h.Cfg.ClientIPPolicy())
-	h.noteUserPresenceFrom(userID, h.withEdgeCountry(ctx, info))
+	h.noteUserPresenceFrom(userID, h.withEdgeOrigin(ctx, info))
 }
 
-// withEdgeCountry adds the browser-reported country when the server could not
-// settle one itself: the live deployment's edge does not pass Cloudflare's
-// CF-IPCountry through, so without this every row in the People panel would
-// keep a blank flag however often the customer visited.
+// withEdgeOrigin prefers what the EDGE observed over what the hop chain can
+// still prove, for the two fields the People panel shows:
+//
+//   - the address: the deployment's inner hops re-originate the request, so the
+//     peeled chain ends at the tunnel's egress — the same address for everyone,
+//     which cannot answer "who is this person?". The edge states the visitor's
+//     own address on X-Nimshop-Client-IP.
+//   - the country: Cloudflare's CF-IPCountry does not survive those hops, so the
+//     edge restates it (and, failing that, the browser carries the same value
+//     from the same-origin edge trace).
 //
 // It is deliberately a separate step rather than something clientip.Resolve
-// does: callers that resolved the address for their OWN use (the checkout
-// hands it to the supplier) must keep exactly what the chain said, and only the
-// presence note — a display label in the operator console — may fall back to a
-// value a script could have set.
-func (h *Handlers) withEdgeCountry(ctx *fasthttp.RequestCtx, info clientip.Info) clientip.Info {
+// does: callers that resolved the address for their OWN use (the checkout hands
+// it to the supplier, the rate limiter counts with it) must keep exactly what
+// the chain said, and only the presence note — display metadata in the operator
+// console — may use the edge's word.
+func (h *Handlers) withEdgeOrigin(ctx *fasthttp.RequestCtx, info clientip.Info) clientip.Info {
+	if ip := clientip.ClientIPHint(ctx); ip != "" {
+		info.IP = ip
+	}
 	if info.Country == "" {
 		info.Country = clientip.CountryHint(ctx)
 	}

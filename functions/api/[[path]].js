@@ -156,6 +156,13 @@ export async function onRequest({ request }) {
   if (/^[0-9A-Fa-f:.]{2,45}$/.test(edgeIP)) {
     headers.set('CF-Connecting-IP', edgeIP);
     headers.set('X-Forwarded-For', edgeIP);
+    // Cloudflare's own attribution does not survive every hop of this stack
+    // (the tunnel re-originates the request from the owner's host, so the chain
+    // the backend can peel ends at the tunnel's egress — one address for every
+    // visitor). Restating it on our OWN header keeps the operator console able
+    // to answer "who is this?"; the Go side reads it from a trusted hop only,
+    // and only for that display. Client copies were deleted above.
+    headers.set('X-Nimshop-Client-IP', edgeIP);
   }
   if (edgeRay && edgeRay.length <= 128 && !/[\r\n,]/.test(edgeRay)) headers.set('CF-Ray', edgeRay);
   if (/^[A-Z]{2}$/.test(edgeCountry) && edgeCountry !== 'XX') {

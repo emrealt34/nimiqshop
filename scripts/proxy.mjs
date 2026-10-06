@@ -113,6 +113,12 @@ export function forwardedHeaders(req, options) {
     headers['cf-ray'] = visitor.ray;
     if (visitor.country) headers['cf-ipcountry'] = visitor.country;
   }
+  // Same contract as functions/api/[[path]].js: the address and country the
+  // EDGE verified travel on our own headers too, so a deployment whose inner
+  // hops re-originate the request still knows who visited (the Go side reads
+  // these from a trusted hop only, and only for the operator console).
+  headers['x-nimshop-client-ip'] = visitor.ip;
+  if (visitor.country) headers['x-nimshop-client-country'] = visitor.country;
   if (options.sharedSecret) headers['x-nimshop-proxy-secret'] = options.sharedSecret;
   return { headers, visitor };
 }

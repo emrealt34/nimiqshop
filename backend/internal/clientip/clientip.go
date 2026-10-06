@@ -49,6 +49,38 @@ func CountryHint(ctx *fasthttp.RequestCtx) string {
 	return country(string(ctx.Request.Header.Peek(CountryHintHeader)))
 }
 
+// ClientIPHeader is how the deployment's edge states the address it actually
+// saw the request arrive from — the Pages function sets it from the edge's own
+// attribution of the connection (the same value Cloudflare's CF-Connecting-IP
+// carries) after deleting any client-supplied copy; scripts/proxy.mjs mirrors
+// that.
+//
+// It exists because this deployment's inner hops RE-ORIGINATE the request:
+// cloudflared on the owner's own host opens a fresh connection to the
+// application, so the chain the backend can peel ends at the tunnel's egress
+// and every visitor would be noted with the same address (deploy/railway.md
+// records the same trade-off). The edge is the one hop that sees the browser
+// itself, so it is the only place that value can come from.
+const ClientIPHeader = "X-Nimshop-Client-IP"
+
+// ClientIPHint returns the visit address the edge reported, or "". Private,
+// loopback, link-local and synthetic (Cloudflare's Pseudo IPv4, 240/4) ranges
+// are refused, so a misconfigured hop cannot put a meaningless value in the
+// operator console.
+//
+// Like CountryHint it is deliberately NOT read inside Resolve: the resolved
+// address, and every decision that hangs off it (rate limits, the supplier
+// payload, audit lines), keeps using the peeled chain, and only the presence
+// note spends the edge's word — on a display label.
+func ClientIPHint(ctx *fasthttp.RequestCtx) string {
+	ip, err := ParseIP(string(ctx.Request.Header.Peek(ClientIPHeader)))
+	if err != nil || !ip.IsGlobalUnicast() || ip.IsPrivate() || ip.IsLoopback() ||
+		netip.MustParsePrefix("240.0.0.0/4").Contains(ip) {
+		return ""
+	}
+	return ip.String()
+}
+
 type Info struct {
 	IP         string
 	Cloudflare bool

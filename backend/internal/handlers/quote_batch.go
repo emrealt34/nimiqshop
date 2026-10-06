@@ -512,8 +512,8 @@ func (h *Handlers) createQuoteBatchInner(ctx *fasthttp.RequestCtx, userID string
 	// The cart path never noted the buyer's origin (only the single-product
 	// one did), so a cart-only customer was invisible in the operator's
 	// People panel. Same resolved info, no second header parse — plus the
-	// browser's edge-country hint, which the note may use.
-	h.noteUserPresenceFrom(userID, h.withEdgeCountry(ctx, info))
+	// edge's own restatement of the address and country, which the note may use.
+	h.noteUserPresenceFrom(userID, h.withEdgeOrigin(ctx, info))
 	// ---- write-ahead local quote (ONE row for the whole cart) -------------
 	now := time.Now().UTC()
 	if !faceTotalsComplete {

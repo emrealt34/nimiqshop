@@ -178,3 +178,37 @@ func TestCountryHint(t *testing.T) {
 		t.Errorf("hint lost: %q", got)
 	}
 }
+
+func TestClientIPHint(t *testing.T) {
+	for _, tc := range []struct{ name, raw, want string }{
+		{"public v4", "203.0.113.8", "203.0.113.8"},
+		{"public v6", "2001:db8::8", "2001:db8::8"},
+		{"mapped v4", " ::ffff:192.0.2.1 ", "192.0.2.1"},
+		{"private refused", "10.1.2.3", ""},
+		{"loopback refused", "127.0.0.1", ""},
+		{"link-local refused", "fe80::1", ""},
+		{"pseudo v4 refused", "240.0.0.1", ""},
+		{"unspecified refused", "0.0.0.0", ""},
+		{"free text refused", "shop.example.com", ""},
+		{"empty", "", ""},
+	} {
+		ctx := requestContext(net.ParseIP("127.0.0.1"), map[string][]string{ClientIPHeader: {tc.raw}})
+		if got := ClientIPHint(ctx); got != tc.want {
+			t.Errorf("%s: %q read as %q, want %q", tc.name, tc.raw, got, tc.want)
+		}
+	}
+
+	// The edge's word never moves the resolved address: the checkout, the rate
+	// limiter and the audit lines must keep seeing what the chain proved.
+	ctx := requestContext(net.ParseIP("127.0.0.1"), map[string][]string{
+		"X-Forwarded-For": {"198.51.100.7"},
+		ClientIPHeader:    {"203.0.113.9"},
+	})
+	info := Resolve(ctx, true, Policy{HeaderMode: "forwarded"})
+	if info.IP != "198.51.100.7" {
+		t.Errorf("Resolve took the edge address: %+v", info)
+	}
+	if got := ClientIPHint(ctx); got != "203.0.113.9" {
+		t.Errorf("edge address lost: %q", got)
+	}
+}
