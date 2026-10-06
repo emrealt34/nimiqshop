@@ -26,7 +26,7 @@ import { uuid } from '../../lib/format';
 import { CombinedDeliveryPicker } from './CombinedDeliveryPicker';
 import { needsPhone } from '../../lib/catalog';
 import { useT, t as tr } from '../../i18n';
-import { LightningPayBlock, useNimiqPayMissingToast } from './LightningPayBlock';
+import { LightningPayBlock, useNimiqPayMissingDialog } from './LightningPayBlock';
 import { LightningRailPills } from './payRailKit';
 import { NimiqPayPayButton } from './NimiqPayPayButton';
 import { inNimiqPay, detectMobilePlatform } from '../../lib/miniapp';
@@ -928,7 +928,7 @@ export function PayScreen({
   const usdtRail = payRail(current);
   const isUsdt = usdtRail.isUsdt;
   const insidePay = inNimiqPay();
-  const notifyHeroMissing = useNimiqPayMissingToast();
+  const notifyHeroMissing = useNimiqPayMissingDialog();
   // AutoRenewOnce fires once per MOUNT. A renewal that hands back the same
   // dead quote (or a quote born dead) left the old instance mounted, so the
   // "creating your new invoice…" line froze forever (live bug, 2026-10-04).

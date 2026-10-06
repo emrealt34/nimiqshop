@@ -17,8 +17,9 @@ import { Icon } from '../ui/Icon';
 import { QR } from './QR';
 import { Clipboard } from '../../lib/clipboard';
 import { useToast } from '../AppProviders';
+import { useNimiqPayInstallSheet } from '../ui/NimiqPayInstallDialog';
 import { useT } from '../../i18n';
-import { useInNimiqPay, detectMobilePlatform, NIMIQ_PAY_IOS_URL, NIMIQ_PAY_ANDROID_URL } from '../../lib/miniapp';
+import { useInNimiqPay, detectMobilePlatform } from '../../lib/miniapp';
 import { launchLightningUri, isQuotePayable, quoteBolt11 } from '../../lib/pay';
 import { payLightningInvoice, isTerminalOutcome } from '../../lib/nimiqPay';
 import { ApiError, authorizePaymentLaunch, getQuote, friendlyApiMessage, cachedNimRate } from '../../lib/api';
@@ -28,42 +29,24 @@ import { asset } from '../../lib/asset';
 
 
 
-/** Owner (2026-10-04): "Nimiq Pay not found" is a TOAST, not a dialog: one
- *  line — scan the QR below with your phone — plus store buttons that open
- *  the Nimiq Pay download. Replaces the old missing-app sheet everywhere. */
-export function useNimiqPayMissingToast() {
-  const { toast } = useToast();
-  const { t } = useT();
-  return useCallback(() => {
-    const plat = detectMobilePlatform();
-    const stores = plat === 'ios'
-      ? [{ href: NIMIQ_PAY_IOS_URL, label: t('checkout.lpAppStore') }]
-      : plat === 'android'
-        ? [{ href: NIMIQ_PAY_ANDROID_URL, label: t('checkout.lpGooglePlay') }]
-        : [
-            { href: NIMIQ_PAY_IOS_URL, label: t('checkout.lpAppStore') },
-            { href: NIMIQ_PAY_ANDROID_URL, label: t('checkout.lpGooglePlay') },
-          ];
-    toast(
-      t('checkout.nimiqPayNotFound'),
-      'info',
-      <span style={{ display: 'inline-flex', gap: 6, flex: '0 0 auto' }}>
-        {stores.map((st) => (
-          <a
-            key={st.href}
-            className="btn btn-outline btn-sm"
-            style={{ padding: '4px 10px', minHeight: 0 }}
-            href={st.href}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <span className="btn-label">{st.label}</span>
-          </a>
-        ))}
-      </span>,
-    );
-  }, [t, toast]);
+/**
+ * "Nimiq Pay not found" is a POPUP, not a toast.
+ *
+ * Owner (2026-10-06): "bi yerde toast olarak 'Nimiq Pay bulunamadı … Google
+ * Play Store' diyor … o toast değil popup olacaktı, anladın mı, var olan popup
+ * göreceksin zaten". The toast it replaced (owner, 2026-10-04) tried to squeeze
+ * two store buttons into a 3.5-second strip: it disappeared while the buyer was
+ * still reading which store to tap. The shop's existing Nimiq Pay popup — the
+ * same one the home page and "open in Nimiq Pay" open — now carries this case
+ * too, with the reason line above the store buttons, and it stays until the
+ * buyer closes it or taps a store.
+ */
+export function useNimiqPayMissingDialog() {
+  const openInstall = useNimiqPayInstallSheet();
+  return useCallback(
+    () => openInstall({ messageKey: 'checkout.nimiqPayNotFound' }),
+    [openInstall]
+  );
 }
 
 export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, hidePayButton }: {
@@ -75,7 +58,7 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, hidePayButt
   const { toast } = useToast();
   const { t } = useT();
   const insidePay = useInNimiqPay();
-  const notifyMissing = useNimiqPayMissingToast();
+  const notifyMissing = useNimiqPayMissingDialog();
   const [allowed, setAllowed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [payLocked, setPayLocked] = useState(false);
@@ -206,9 +189,9 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, hidePayButt
         return;
       }
       // Owner (2026-10-05): outside Nimiq Pay the button must DO something.
-      // Desktop has no wallet to launch — the toast (QR-below hint + Nimiq Pay
+      // Desktop has no wallet to launch — the POPUP (QR-below hint + Nimiq Pay
       // download links) is the hand-off there, shown at once; mobile tries the
-      // lightning: URI first and toasts when nothing opened.
+      // lightning: URI first and opens the popup when nothing opened.
       if (!detectMobilePlatform()) {
         notifyMissing();
         return;
