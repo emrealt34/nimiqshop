@@ -66,7 +66,8 @@ COPY --from=backend --chown=65532:65532 /out/tmp /tmp
 
 ENV LISTEN_ADDR=:8084 \
     STATIC_DIR=/app/frontend \
-    BADGER_DIR=/data/badger
+    BADGER_DIR=/data/badger \
+    NIMSHOP_SERVER_METRICS_SCOPE=instance
 
 VOLUME ["/data"]
 EXPOSE 8084

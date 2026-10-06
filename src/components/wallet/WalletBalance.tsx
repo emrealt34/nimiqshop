@@ -32,6 +32,11 @@ import {
   type WalletBalanceState,
 } from '../../lib/walletBalance';
 import { Icon } from '../ui/Icon';
+import { useToast } from '../AppProviders';
+
+// Several wallet strips can mount together; notify once per page instead of
+// stacking the same old-host warning from every subscriber.
+let updatePayToastShown = false;
 
 /** Subscribe to the shared reading (one lookup feeds every mounted strip). */
 export function useWalletBalance(): { state: WalletBalanceState; refresh: () => void } {
@@ -100,8 +105,15 @@ export function WalletBalance({
   className?: string;
 }) {
   const { t } = useT();
+  const { toast } = useToast();
   const { state, refresh } = useWalletBalance();
   const ready = state.status === 'ready';
+
+  useEffect(() => {
+    if (state.hostBalance !== 'update-required' || updatePayToastShown) return;
+    updatePayToastShown = true;
+    toast(t('wallet.updatePayToast'), 'warn');
+  }, [state.hostBalance, t, toast]);
 
   // Chip: a compact header marker earns its space only when it has a number.
   if (variant === 'chip') {

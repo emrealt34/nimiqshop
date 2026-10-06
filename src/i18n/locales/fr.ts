@@ -767,6 +767,8 @@ const fr = {
       a6: 'Le cashback est crédité **après que CryptoRefills a marqué votre commande comme honorée** — jamais avant la livraison de la carte. Il est versé en NIM au portefeuille utilisé au paiement (ou envoyé au portefeuille de brûlage Nimiq si vous avez choisi de le brûler). Les montants en direct sont sur la [page cashback]({{cashback}}).',
       q7: 'Est-ce un double débit ou deux commandes pour un même panier ?',
       a7: 'Un paiement qui échoue à la validation ne crée jamais de commande fournisseur, et la boutique refuse une seconde commande active pour le même panier — un double débit est donc très rare. Si votre portefeuille montre réellement deux paiements réglés, écrivez à CryptoRefills avec **les deux** identifiants de commande ; eux seuls peuvent régulariser et rembourser un doublon.',
+      q8: 'Pourquoi mon solde affiche-t-il 0 alors que mes NIM sont dans un HTLC ?',
+      a8: 'La requête lit uniquement l’adresse exacte demandée sur le réseau actuellement actif dans Nimiq Pay. Les NIM bloqués dans un contrat HTLC ou de vesting se trouvent à l’adresse du contrat, qui n’est pas forcément celle de votre portefeuille ; celle-ci peut donc afficher 0 correctement. Un résultat 0 signifie que la requête a réussi et que cette adresse n’a pas de solde ; en cas d’échec, une erreur est renvoyée. Sur un hôte compatible, une Mini App utilisant le SDK 0.2.1 ou ultérieur peut interroger toute adresse valide avec getBalance(address) (résultat en luna : 100 000 luna = 1 NIM). Même si l’adresse du contrat a un solde, il n’est pas forcément dépensable avant que ses conditions soient remplies. Pour un échange échoué, utilisez la procédure officielle de récupération du portefeuille ou du service d’origine ; cette boutique ne peut pas débloquer le contrat. N’envoyez jamais de fonds supplémentaires pour le « débloquer ».',
     },
     title: 'Support',
     newTicket: 'Nouveau ticket',
@@ -1778,6 +1780,7 @@ const fr = {
     compareLine: 'Nimiq Pay : {{pay}} NIM · boutique : {{shop}} NIM',
     stakeNote: '{{nim}} NIM semble staké ou dans un contrat — non dépensable.',
     updatePay: 'Mettez à jour Nimiq Pay pour lire votre solde ici — le montant affiché vient de la boutique.',
+    updatePayToast: 'Mettez Nimiq Pay à jour pour utiliser cette fonctionnalité.'
   },
 
   nim: {

@@ -1,29 +1,16 @@
 /**
- * AdminSystemPanel.tsx — the Overview cards that describe the MACHINE and
- * WHERE the customers are.
+ * AdminSystemPanel.tsx — the Overview cards for API/server health and customer
+ * locations. Server metrics carry an explicit host/instance scope; any legacy
+ * payload without scope is suppressed so shared-host readings are never shown
+ * as this API deployment's own resources.
  *
- * WHY THESE LIVE IN THE CONSOLE. The rest of the operator page answers "what is
- * the shop doing?" (players, orders, cashback). These two answer the questions
- * that come right before it when something feels wrong:
+ * Both cards come from the admin dashboard payload the Players card already
+ * fetches, so opening Overview costs no extra round trip. The server readings
+ * refresh with the dashboard cadence; country ranking remains comparatively
+ * stable.
  *
- *   • "Is it us or is it the supplier?" — CPU, memory, disk and network load on
- *     the host running the API, in the same little cards the Players row uses.
- *     Until now that meant opening a hosting dashboard that knows nothing about
- *     the shop.
- *   • "Where are my customers?" — the countries the shop has actually been
- *     visited from, ranked (Türkiye 3, Almanya 6 …), with how many of those
- *     people were here today and how many have bought something.
- *
- * Both come from the admin dashboard payload the Players card already fetches
- * (countries and host are fields of it), so opening the Overview costs no extra
- * round trip on first paint. The host numbers then refresh on their own cadence
- * — they are the only live part, and the endpoint samples /proc behind a short
- * cache, so polling them is cheap.
- *
- * WHAT THE CARDS REFUSE TO DO. No invented numbers: when the host cannot answer
- * (no /proc, a denied read), the card says why instead of drawing zeroes that
- * look like a healthy machine; when a country is not known, the row still shows
- * the code rather than an empty flag.
+ * No invented numbers: unavailable or unisolatable metrics are omitted or
+ * explained, and an unknown country remains its code rather than an empty flag.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '../ui/Icon';
@@ -123,6 +110,23 @@ function MetricTile({
 function HostCard({ host, sampledAt }: { host: any | null; sampledAt: string }) {
   if (!host) return null;
 
+  // Never render metrics from an older backend response that does not identify
+  // their scope. That response may contain the shared host's numbers.
+  if (host.scope !== 'host' && host.scope !== 'instance') {
+    return (
+      <div className="card mt-2">
+        <div className="card-title">
+          <Icon name="pulse" size={18} />
+          <span>Server</span>
+        </div>
+        <AlertBox type="info">
+          Server metric scope is unknown, so these readings are hidden. Update/restart the API backend to report
+          instance-scoped metrics instead of shared-host totals.
+        </AlertBox>
+      </div>
+    );
+  }
+
   if (!host.available) {
     return (
       <div className="card mt-2">
@@ -131,22 +135,34 @@ function HostCard({ host, sampledAt }: { host: any | null; sampledAt: string }) 
           <span>Server</span>
         </div>
         <AlertBox type="info">
-          Host metrics are not available on this deployment: {host.reason || 'the machine did not report them'}.
+          Server metrics are not available on this deployment: {host.reason || 'the API did not report them'}.
         </AlertBox>
       </div>
     );
   }
 
+  const isInstance = host.scope === 'instance';
   const cpu = host.cpu || {};
   const mem = host.memory || {};
   const net = host.network || {};
   const proc = host.process || {};
   const disks: any[] = Array.isArray(host.disks) ? host.disks : [];
   const cores = Number(cpu.cores) || 0;
+  const capacity = Number(cpu.capacity) || cores;
+  const capacityLabel = Number.isInteger(capacity) ? `${capacity}` : capacity.toFixed(1);
+  const capacitySource = String(cpu.capacity_source || 'runtime capacity');
+  const instanceCPUHint =
+    capacitySource === 'Go runtime capacity'
+      ? `${capacityLabel} Go runtime threads · CPU allocation not exposed`
+      : `${capacityLabel} vCPU capacity · ${capacitySource}`;
   const load = Number(cpu.load1);
-  // Load per core is the honest way to read load average: 4.0 on 8 cores is
-  // half a machine, on 2 cores it is double.
-  const loadPerCore = cores > 0 && isFinite(load) ? load / cores : NaN;
+  // Load average exists only in host scope. Load per core is meaningful only
+  // for the whole machine, never as a substitute for the API process's CPU.
+  const loadPerCore = !isInstance && cores > 0 && isFinite(load) ? load / cores : NaN;
+  const memoryTotal = Number(mem.total_bytes) || 0;
+  const processRSS = Number(proc.rss_bytes) || Number(mem.process_rss_bytes) || 0;
+  const memoryPercent = Number(mem.percent) || 0;
+  const cpuPercent = Number(cpu.percent) || 0;
 
   return (
     <div className="card mt-2">
@@ -154,35 +170,56 @@ function HostCard({ host, sampledAt }: { host: any | null; sampledAt: string }) 
         <Icon name="pulse" size={18} />
         <span>Server</span>
         <span className="chip xs" style={{ marginLeft: 'auto' }}>
-          {host.sample_interval_seconds ? `last ${host.sample_interval_seconds}s` : 'since boot'}
+          {host.sample_interval_seconds
+            ? `last ${Number(host.sample_interval_seconds).toFixed(1)}s`
+            : isInstance
+              ? 'since API start'
+              : 'since boot'}
         </span>
       </div>
       <div className="xs faint">
-        CPU, memory, disk and network on the machine running the API{sampledAt ? ` · sampled ${sampledAt}` : ''}
-        {host.uptime_seconds ? ` · up ${fmtUptime(host.uptime_seconds)}` : ''}
-        {cpu.model ? ` · ${cpu.model}` : ''}
+        {isInstance
+          ? 'API instance metrics · shared-host totals excluded'
+          : 'Host-scoped metrics for the API machine'}
+        {sampledAt ? ` · sampled ${sampledAt}` : ''}
+        {host.uptime_seconds ? ` · ${isInstance ? 'API' : 'host'} up ${fmtUptime(host.uptime_seconds)}` : ''}
+        {!isInstance && cpu.model ? ` · ${cpu.model}` : ''}
       </div>
       <div className="astat-grid">
-        <MetricTile
-          label="CPU"
-          value={`${(Number(cpu.percent) || 0).toFixed(1)}%`}
-          percent={cpu.percent}
-          tone={meterTone(Number(cpu.percent) || 0)}
-          hint={
-            `${cores} core${cores === 1 ? '' : 's'}` +
-            (isFinite(loadPerCore) ? ` · load ${load.toFixed(2)} (${loadPerCore.toFixed(2)}/core)` : '')
-          }
-        />
-        <MetricTile
-          label="Memory"
-          value={`${(Number(mem.percent) || 0).toFixed(1)}%`}
-          percent={mem.percent}
-          tone={meterTone(Number(mem.percent) || 0)}
-          hint={
-            `${fmtBytes(mem.used_bytes)} of ${fmtBytes(mem.total_bytes)}` +
-            (mem.swap_total_bytes ? ` · swap ${fmtBytes(mem.swap_used_bytes)}` : ' · no swap')
-          }
-        />
+        {host.cpu ? (
+          <MetricTile
+            label={isInstance ? 'API CPU' : 'CPU'}
+            value={`${cpuPercent.toFixed(1)}%`}
+            percent={cpuPercent}
+            tone={meterTone(cpuPercent)}
+            hint={
+              isInstance
+                ? instanceCPUHint
+                : `${cores} core${cores === 1 ? '' : 's'}` +
+                  (isFinite(loadPerCore) ? ` · load ${load.toFixed(2)} (${loadPerCore.toFixed(2)}/core)` : '')
+            }
+          />
+        ) : null}
+        {memoryTotal > 0 ? (
+          <MetricTile
+            label={isInstance ? 'Instance memory' : 'Memory'}
+            value={`${memoryPercent.toFixed(1)}%`}
+            percent={memoryPercent}
+            tone={meterTone(memoryPercent)}
+            hint={
+              `${fmtBytes(mem.used_bytes)} of ${fmtBytes(mem.total_bytes)}` +
+              (isInstance && mem.source === 'cgroup' ? ' · cgroup limit' : '') +
+              (processRSS > 0 ? ` · API RSS ${fmtBytes(processRSS)}` : '') +
+              (mem.swap_total_bytes ? ` · swap ${fmtBytes(mem.swap_used_bytes)}` : !isInstance ? ' · no swap' : '')
+            }
+          />
+        ) : processRSS > 0 ? (
+          <MetricTile
+            label="API process memory"
+            value={fmtBytes(processRSS)}
+            hint={isInstance ? 'resident set · instance memory limit not exposed' : 'resident set'}
+          />
+        ) : null}
         {disks.map((d) => (
           <MetricTile
             key={d.path}
@@ -193,20 +230,29 @@ function HostCard({ host, sampledAt }: { host: any | null; sampledAt: string }) 
             hint={`${fmtBytes(d.used_bytes)} of ${fmtBytes(d.total_bytes)} · ${d.path}`}
           />
         ))}
+        {isInstance && disks.length === 0 ? (
+          <div className="small muted" style={{ gridColumn: '1 / -1' }}>
+            No separate data volume is exposed. Shared host root-disk capacity is intentionally hidden.
+          </div>
+        ) : null}
+        {host.network ? (
+          <>
+            <MetricTile
+              label={isInstance ? 'Namespace network in' : 'Network in'}
+              value={fmtRate(net.rx_bytes_per_sec)}
+              hint={`${fmtBytes(net.rx_bytes_total)} received in total`}
+            />
+            <MetricTile
+              label={isInstance ? 'Namespace network out' : 'Network out'}
+              value={fmtRate(net.tx_bytes_per_sec)}
+              hint={`${fmtBytes(net.tx_bytes_total)} sent in total`}
+            />
+          </>
+        ) : null}
         <MetricTile
-          label="Network in"
-          value={fmtRate(net.rx_bytes_per_sec)}
-          hint={`${fmtBytes(net.rx_bytes_total)} received in total`}
-        />
-        <MetricTile
-          label="Network out"
-          value={fmtRate(net.tx_bytes_per_sec)}
-          hint={`${fmtBytes(net.tx_bytes_total)} sent in total`}
-        />
-        <MetricTile
-          label="Process"
+          label="API process"
           value={`${Number(proc.goroutines) || 0}`}
-          hint={`goroutines · heap ${fmtBytes(proc.heap_bytes)}`}
+          hint={`goroutines · heap ${fmtBytes(proc.heap_bytes)}${processRSS > 0 ? ` · RSS ${fmtBytes(processRSS)}` : ''}`}
         />
       </div>
     </div>

@@ -67,6 +67,7 @@ export type PayLightningOutcome =
   | { status: 'insufficient'; message: string; wallet?: PayWalletError }
   | { status: 'invalid'; message: string; wallet?: PayWalletError }        // INVALID_REQUEST / INVALID_TRANSACTION
   | { status: 'unavailable'; message: string }                            // not inside Nimiq Pay / no invoice
+  | { status: 'updateRequired'; message: string; wallet?: PayWalletError } // host does not support this Mini App method
   // The WALLET reported a network problem of its own (provider code -32000).
   // It says nothing about the shop being reachable, so it must not be shown
   // as such either — it gets its own copy.
@@ -103,8 +104,10 @@ function outcomeFromWalletError(error: unknown): PayLightningOutcome {
     case 'invalid':
       return { status: 'invalid', message, wallet };
     case 'unsupported':
-      // This host cannot do the request at all — the shop-only path applies.
-      return { status: 'unavailable', message };
+      // The app is running in Nimiq Pay, but this host does not support the
+      // Lightning invoice method. Keep it distinct from an app-not-installed
+      // case so the UI can tell the buyer to update Nimiq Pay.
+      return { status: 'updateRequired', message, wallet };
     default:
       return { status: 'error', message, wallet };
   }
@@ -145,6 +148,15 @@ export async function payLightningInvoice(invoice: string): Promise<PayLightning
   inFlight.add(inv);
   try {
     const nimiq = await getProvider();
+    // SDK typings may include a method that the injected host has not shipped
+    // yet. Check the runtime provider before calling it so an older Nimiq Pay
+    // version gets an actionable update message instead of a generic TypeError.
+    if (typeof nimiq.payLightningInvoice !== 'function') {
+      return {
+        status: 'updateRequired',
+        message: 'Update Nimiq Pay to use Lightning invoice payments.',
+      };
+    }
     const res: any = await nimiq.payLightningInvoice({ invoice: inv });
     // PR 215: SDK 0.2.x converts legacy `{ error: { type, message } }` answers
     // into NimiqProviderError, but an older host bundle still RESOLVES with

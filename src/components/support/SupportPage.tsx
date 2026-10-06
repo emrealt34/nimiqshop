@@ -29,7 +29,7 @@ import { useT } from '../../i18n';
 const CONTACT_EMAIL = 'support@nimiqbase.com';
 
 /** FAQ body keys, in the order they appear on the page. */
-const FAQ_KEYS = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7'] as const;
+const FAQ_KEYS = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7', 'q8'] as const;
 
 /** Render the tiny inline syntax above to React nodes. */
 function rich(text: string): React.ReactNode {

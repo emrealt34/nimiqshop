@@ -20,6 +20,7 @@
  */
 import { useCallback, useState } from 'react';
 import { useT } from '../../i18n';
+import { useToast } from '../AppProviders';
 import {
   payLightningInvoice,
   isTerminalOutcome,
@@ -87,7 +88,8 @@ function toneFor(o: PayLightningOutcome): Tone {
     case 'duplicate':
     case 'unknown': return 'warn';
     case 'network':
-    case 'noProvider': return 'warn';
+    case 'noProvider':
+    case 'updateRequired': return 'warn';
     case 'insufficient': return 'error';
     case 'declined':
     case 'unavailable': return 'info';
@@ -125,6 +127,7 @@ export function NimiqPayPayButton({
   className?: string;
 }) {
   const { t } = useT();
+  const { toast } = useToast();
   // The balance is already on screen; a refusal can therefore say HOW short the
   // wallet is instead of only that something failed. Shared reading: no extra
   // network call.
@@ -157,6 +160,7 @@ export function NimiqPayPayButton({
     const res = await payLightningInvoice(invoice);
     setOutcome(res);
     setBusy(false);
+    if (res.status === 'updateRequired') toast(t('wallet.updatePayToast'), 'warn');
     if (res.status === 'submitted' || res.status === 'duplicate' || res.status === 'unknown') {
       onSubmitted?.(res);
     } else {
@@ -171,9 +175,13 @@ export function NimiqPayPayButton({
     // Any outcome may have moved money (or been refused for want of it), so the
     // balance shown above the button is re-read instead of waiting out its TTL.
     refreshWallet();
-  }, [busy, locked, invoice, onSubmitted, onBeforePay, refreshWallet]);
+  }, [busy, locked, invoice, onSubmitted, onBeforePay, refreshWallet, t, toast]);
 
-  const message = outcome ? label(outcome.status as keyof NimiqPayPayLabels) : '';
+  const message = outcome
+    ? outcome.status === 'updateRequired'
+      ? t('wallet.updatePayToast')
+      : label(outcome.status as keyof NimiqPayPayLabels)
+    : '';
   const tone = outcome ? toneFor(outcome) : 'info';
   const hash = outcome && 'hash' in outcome ? outcome.hash : undefined;
   const swapId = outcome && 'swapId' in outcome ? outcome.swapId : undefined;

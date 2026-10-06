@@ -157,6 +157,10 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, hidePayButt
         // a Nimiq Pay -32000 NETWORK_ERROR became before): say what happened,
         // say that nothing was charged, and — when the wallet's own words are
         // short enough to be useful — quote them so support can see them.
+        if (res.status === 'updateRequired') {
+          toast(t('wallet.updatePayToast'), 'warn');
+          return;
+        }
         if (res.status === 'unavailable') {
           // payLightningInvoice only answers this when we are NOT inside Nimiq
           // Pay after all — the wallet's own words are useless to the buyer.

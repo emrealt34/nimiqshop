@@ -767,6 +767,8 @@ const pt = {
       a6: 'O cashback é creditado **depois de a CryptoRefills marcar a encomenda como cumprida** — nunca antes da entrega do cartão. É pago em NIM para a carteira usada no pagamento (ou enviado para a carteira de queima da Nimiq, se escolheu queimar). Os valores em direto estão na [página de cashback]({{cashback}}).',
       q7: 'Estou a ver uma cobrança duplicada / duas encomendas para um carrinho?',
       a7: 'Um pagamento que falha a validação nunca cria encomenda no fornecedor, e a loja recusa uma segunda encomenda ativa para o mesmo carrinho — uma cobrança duplicada é, por isso, muito rara. Se a sua carteira mostrar mesmo dois pagamentos liquidados, escreva à CryptoRefills com **ambos** os ids de encomenda; só eles podem reconciliar e reembolsar um duplicado.',
+      q8: 'Porque é que o meu saldo mostra 0 se os meus NIM estão num HTLC?',
+      a8: 'A consulta lê apenas o endereço exato indicado na rede que está ativa no Nimiq Pay. Os NIM bloqueados num contrato HTLC ou de vesting ficam no endereço do contrato, que pode ser diferente do endereço da sua carteira; por isso, a carteira pode mostrar 0 corretamente. Um resultado 0 significa que a consulta foi bem-sucedida e que esse endereço não tem saldo; uma consulta falhada devolve um erro. Num host compatível, uma Mini App com SDK 0.2.1 ou posterior pode consultar qualquer endereço válido através de getBalance(address) (o resultado é em luna: 100.000 luna = 1 NIM). Mesmo que o endereço do contrato tenha saldo, este pode não estar disponível para gastar até as condições serem cumpridas. Se uma troca falhou, use o processo oficial de recuperação da carteira ou do serviço original; esta loja não pode desbloquear o contrato. Nunca envie fundos adicionais para o «libertar».',
     },
     title: 'Suporte',
     newTicket: 'Novo ticket',
@@ -1778,6 +1780,7 @@ const pt = {
     compareLine: 'Nimiq Pay: {{pay}} NIM · loja: {{shop}} NIM',
     stakeNote: '{{nim}} NIM parece estar em stake ou num contrato — não gastável.',
     updatePay: 'Atualiza a Nimiq Pay para ler o teu saldo aqui — o valor mostrado vem da loja.',
+    updatePayToast: 'Atualiza a Nimiq Pay para usar esta funcionalidade.'
   },
 
   nim: {

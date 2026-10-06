@@ -767,6 +767,8 @@ const es = {
       a6: 'El cashback se abona **después de que CryptoRefills marque tu pedido como completado**, nunca antes de que se entregue la tarjeta. Se paga en NIM a la cartera usada al pagar (o se envía a la cartera de quema de Nimiq si elegiste quemarlo). Los importes en vivo están en la [página de cashback]({{cashback}}).',
       q7: '¿Veo un cargo duplicado o dos pedidos para un mismo carrito?',
       a7: 'Un pago que no supera la validación nunca crea un pedido al proveedor, y la tienda rechaza un segundo pedido activo para el mismo carrito, así que un cargo duplicado es muy raro. Si tu cartera muestra realmente dos pagos liquidados, escribe a CryptoRefills con **ambos** ids de pedido; solo ellos pueden conciliar y reembolsar un duplicado.',
+      q8: '¿Por qué mi saldo aparece como 0 si mis NIM están en un HTLC?',
+      a8: 'La consulta solo lee la dirección exacta indicada en la red que Nimiq Pay tiene activa en ese momento. Los NIM bloqueados en un contrato HTLC o de vesting están en la dirección del contrato, que no tiene por qué ser la de tu cartera; por eso la dirección de tu cartera puede mostrar 0 correctamente. Un resultado 0 significa que la consulta se completó y esa dirección no tiene saldo; si falla, devuelve un error. En un host compatible, una Mini App con SDK 0.2.1 o posterior puede consultar cualquier dirección válida con getBalance(address) (el resultado está en luna: 100.000 luna = 1 NIM). Aunque la dirección del contrato tenga saldo, quizá no puedas gastarlo hasta cumplir sus condiciones. Si falló un intercambio, utiliza el proceso oficial de recuperación de la cartera o servicio original; esta tienda no puede desbloquear el contrato. No envíes más fondos para «liberarlo».',
     },
     title: 'Soporte',
     newTicket: 'Nuevo ticket',
@@ -1778,6 +1780,7 @@ const es = {
     compareLine: 'Nimiq Pay: {{pay}} NIM · tienda: {{shop}} NIM',
     stakeNote: '{{nim}} NIM parece estar en stake o en un contrato — no gastable.',
     updatePay: 'Actualiza Nimiq Pay para leer tu saldo aquí — el importe mostrado viene de la tienda.',
+    updatePayToast: 'Actualiza Nimiq Pay para usar esta función.'
   },
 
   nim: {

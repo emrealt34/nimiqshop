@@ -1,41 +1,29 @@
 package handlers
 
-/* host_metrics.go — the live numbers behind the operator console's server
- * cards: CPU, memory, disk and network on the machine the API runs on.
+/* host_metrics.go — scope-aware CPU, memory, disk and network readings for
+ * the operator console's Server card.
  *
- * WHY IT LIVES HERE. Everything else in the console describes the SHOP (users,
- * orders, cashback). These describe the HOST, and an operator needs them in the
- * same place: "is it the supplier that is slow, or is this box out of RAM?" is
- * the first question when something feels wrong, and until now answering it
- * meant opening a hosting dashboard the console does not know about.
+ * The sampler distinguishes a dedicated API host from a container or
+ * cgroup-limited service. In instance scope it uses process CPU time, cgroup
+ * limits/counters where available, process RSS otherwise, and only separately
+ * mounted shop data volumes. It intentionally omits shared-host load, model,
+ * uptime, memory and root-disk readings instead of presenting them as the
+ * user's deployment. Host-wide /proc metrics are used only when no instance
+ * boundary is detected (or an operator explicitly sets
+ * NIMSHOP_SERVER_METRICS_SCOPE=host).
  *
- * WHERE THE NUMBERS COME FROM. /proc on Linux — the same source `top`, `free`,
- * `df` and `ifstat` read — plus two Go runtime counters. No third-party agent,
- * no metrics service, nothing installed: the backend already runs there, so it
- * can read what the kernel publishes about itself.
- *
- * HONEST LIMITS, which the console repeats in the card's hint line:
- *   - CPU percent is a DELTA between two samples (this call and the previous
- *     one), so it describes the interval, not "now"; the very first call after
- *     a restart can only report the since-boot average, which is why both are
- *     sent and labelled.
- *   - Memory "used" is total minus available (the kernel's own definition, the
- *     one `free` prints), not total minus free: page cache is not pressure.
- *   - Disk is reported per filesystem the shop actually uses — the volume the
- *     database lives on and the root filesystem — because a full database
- *     volume is an outage while a full root is usually just noise.
- *   - On a host without /proc (a developer's Mac, Windows) the sampler reports
- *     available=false with the reason, and the console says so instead of
- *     drawing zeroes that look like a healthy machine.
- *
- * Sampling is cheap but not free, and the console polls: results are cached for
- * a couple of seconds, which also makes the deltas meaningful instead of
- * racing the poll interval.
+ * CPU rates are deltas between samples; the first instance sample reports a
+ * process-lifetime average. Host memory uses MemAvailable; instance memory uses
+ * the cgroup's current/limit pair. Missing or unisolatable values stay absent.
+ * Sampling is cached briefly so a fast dashboard poll cannot turn noise into
+ * apparently meaningful rates.
  */
 
 import (
+	"fmt"
 	"math"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -58,18 +46,22 @@ type hostSampler struct {
 // CPU jiffies and network byte counters are monotonic, so only their change
 // over an interval means anything.
 type hostSample struct {
-	at       time.Time
-	cpuBusy  float64 // jiffies
-	cpuTotal float64 // jiffies
-	rx, tx   uint64  // bytes, all interfaces except loopback
+	at           time.Time
+	cpuBusy      float64 // host jiffies (host scope only)
+	cpuTotal     float64 // host jiffies (host scope only)
+	processCPU   float64 // seconds from getrusage (instance scope)
+	processCPUOK bool
+	rx, tx       uint64 // bytes, interfaces in the current network namespace
 }
 
 var hostStats hostSampler
+var processStartedAt = time.Now()
 
 // HostMetrics is the payload the Overview cards render. Every field is
 // explicitly optional: a host that cannot answer simply omits it.
 type HostMetrics struct {
 	Available      bool              `json:"available"`
+	Scope          string            `json:"scope,omitempty"` // "host" or this API service/container "instance"
 	Reason         string            `json:"reason,omitempty"`
 	SampledAt      time.Time         `json:"sampled_at"`
 	UptimeSeconds  float64           `json:"uptime_seconds,omitempty"`
@@ -83,9 +75,11 @@ type HostMetrics struct {
 }
 
 type HostCPU struct {
-	Percent          float64   `json:"percent"`            // over the sample interval
-	SinceBootPercent float64   `json:"since_boot_percent"` // cumulative average
+	Percent          float64   `json:"percent"`            // over the sample interval, normalized to scope
+	SinceBootPercent float64   `json:"since_boot_percent"` // cumulative average for this scope
 	Cores            int       `json:"cores"`
+	Capacity         float64   `json:"capacity,omitempty"` // vCPU capacity, may be fractional in instance scope
+	CapacitySource   string    `json:"capacity_source,omitempty"`
 	Load1            float64   `json:"load1,omitempty"`
 	Load5            float64   `json:"load5,omitempty"`
 	Load15           float64   `json:"load15,omitempty"`
@@ -94,12 +88,14 @@ type HostCPU struct {
 }
 
 type HostMemory struct {
-	TotalBytes     uint64  `json:"total_bytes"`
-	UsedBytes      uint64  `json:"used_bytes"`
-	AvailableBytes uint64  `json:"available_bytes"`
-	Percent        float64 `json:"percent"`
-	SwapTotalBytes uint64  `json:"swap_total_bytes,omitempty"`
-	SwapUsedBytes  uint64  `json:"swap_used_bytes,omitempty"`
+	TotalBytes      uint64  `json:"total_bytes"`
+	UsedBytes       uint64  `json:"used_bytes"`
+	AvailableBytes  uint64  `json:"available_bytes"`
+	Percent         float64 `json:"percent"`
+	ProcessRSSBytes uint64  `json:"process_rss_bytes,omitempty"`
+	Source          string  `json:"source,omitempty"` // host, cgroup, or process-only
+	SwapTotalBytes  uint64  `json:"swap_total_bytes,omitempty"`
+	SwapUsedBytes   uint64  `json:"swap_used_bytes,omitempty"`
 }
 
 type HostDisk struct {
@@ -121,16 +117,27 @@ type HostNetwork struct {
 type HostProcess struct {
 	Goroutines int     `json:"goroutines"`
 	HeapBytes  uint64  `json:"heap_bytes"`
+	RSSBytes   uint64  `json:"rss_bytes,omitempty"`
 	SysBytes   uint64  `json:"sys_bytes"`
 	GoVersion  string  `json:"go_version"`
 	GCPercent  float64 `json:"gc_percent,omitempty"`
 }
 
-// hostMetrics collects a sample, reusing the previous one to turn the kernel's
-// monotonic counters into rates. A package function, not a method: it reads the
-// host, never the shop, and that is what makes it testable on its own.
+// hostMetrics is scope-aware: it returns host-wide counters only on a dedicated
+// machine. Containers and cgroup-limited services get their own process/cgroup
+// readings instead, so a shared node's CPU, RAM, uptime and root disk never
+// masquerade as this shop's resources.
 func hostMetrics() HostMetrics {
-	out := HostMetrics{SampledAt: time.Now().UTC()}
+	if runtime.GOOS == "linux" && instanceScoped() {
+		return instanceMetrics()
+	}
+	return hostMetricsMachine()
+}
+
+// hostMetricsMachine collects machine-wide metrics only when the API is running
+// directly on a dedicated host (not in a container or resource-limited cgroup).
+func hostMetricsMachine() HostMetrics {
+	out := HostMetrics{SampledAt: time.Now().UTC(), Scope: "host"}
 	if runtime.GOOS != "linux" {
 		out.Reason = "host metrics need Linux /proc; this build runs on " + runtime.GOOS
 		return out
@@ -142,9 +149,14 @@ func hostMetrics() HostMetrics {
 		return out
 	}
 	rx, tx, netOK := readNetDev()
-	disks := readDisks()
+	disks := readDisks(false)
+	processCPU, processCPUOK := readProcessCPUSeconds()
 
-	sample := &hostSample{at: now, cpuBusy: busy, cpuTotal: total, rx: rx, tx: tx}
+	sample := &hostSample{
+		at: now, cpuBusy: busy, cpuTotal: total,
+		processCPU: processCPU, processCPUOK: processCPUOK,
+		rx: rx, tx: tx,
+	}
 
 	hostStats.mu.Lock()
 	prev := hostStats.last
@@ -161,7 +173,10 @@ func hostMetrics() HostMetrics {
 		out.UptimeSeconds = up
 	}
 
-	cpu := &HostCPU{Cores: runtime.NumCPU(), PerCore: perCore}
+	cpu := &HostCPU{
+		Cores: runtime.NumCPU(), Capacity: float64(runtime.NumCPU()),
+		CapacitySource: "host", PerCore: perCore,
+	}
 	if total > 0 {
 		cpu.SinceBootPercent = round1(busy / total * 100)
 		cpu.Percent = cpu.SinceBootPercent
@@ -179,7 +194,10 @@ func hostMetrics() HostMetrics {
 	cpu.Model = readCPUModel()
 	out.CPU = cpu
 
+	processRSS := readProcessRSSBytes()
 	if mem, ok := readMemInfo(); ok {
+		mem.ProcessRSSBytes = processRSS
+		mem.Source = "host"
 		out.Memory = mem
 	}
 	out.Disks = disks
@@ -204,10 +222,441 @@ func hostMetrics() HostMetrics {
 	out.Process = &HostProcess{
 		Goroutines: runtime.NumGoroutine(),
 		HeapBytes:  ms.HeapAlloc,
+		RSSBytes:   processRSS,
 		SysBytes:   ms.Sys,
 		GoVersion:  runtime.Version(),
 	}
 	return out
+}
+
+// instanceMetrics deliberately avoids host-wide /proc values. CPU is the API
+// process's own CPU time normalized by the instance's effective CPU capacity;
+// memory comes from this cgroup when a finite limit is exposed, otherwise only
+// the API process RSS is shown. Host load, model, uptime and root-disk capacity
+// are omitted because they may belong to a shared node.
+func instanceMetrics() HostMetrics {
+	now := time.Now()
+	out := HostMetrics{
+		SampledAt:     now.UTC(),
+		Scope:         "instance",
+		UptimeSeconds: now.Sub(processStartedAt).Seconds(),
+		Platform:      map[string]string{"os": runtime.GOOS, "arch": runtime.GOARCH},
+	}
+	if runtime.GOOS != "linux" {
+		out.Reason = "instance metrics need Linux process/cgroup counters; this build runs on " + runtime.GOOS
+		return out
+	}
+
+	cpuTime, cpuOK := readProcessCPUSeconds()
+	capacity, capacitySource := readCPUCapacity()
+	rx, tx, netOK := readNetDev() // current network namespace only
+	processRSS := readProcessRSSBytes()
+
+	var ms runtime.MemStats
+	runtime.ReadMemStats(&ms)
+	out.Process = &HostProcess{
+		Goroutines: runtime.NumGoroutine(),
+		HeapBytes:  ms.HeapAlloc,
+		RSSBytes:   processRSS,
+		SysBytes:   ms.Sys,
+		GoVersion:  runtime.Version(),
+	}
+	out.Available = true
+
+	sample := &hostSample{
+		at: now, processCPU: cpuTime, processCPUOK: cpuOK,
+		rx: rx, tx: tx,
+	}
+	hostStats.mu.Lock()
+	prev := hostStats.last
+	reuse := prev != nil && now.Sub(prev.at) < hostSampleMinGap
+	if !reuse {
+		hostStats.last = sample
+	}
+	hostStats.mu.Unlock()
+
+	if cpuOK && capacity > 0 {
+		cpu := &HostCPU{
+			Cores: int(math.Ceil(capacity)), Capacity: capacity,
+			CapacitySource: capacitySource,
+		}
+		if elapsed := now.Sub(processStartedAt).Seconds(); elapsed > 0 {
+			cpu.SinceBootPercent = percentOfCapacity(cpuTime, elapsed, capacity)
+			cpu.Percent = cpu.SinceBootPercent
+		}
+		if prev != nil && prev.processCPUOK {
+			elapsed := now.Sub(prev.at).Seconds()
+			used := cpuTime - prev.processCPU
+			if elapsed > 0 && used >= 0 {
+				cpu.Percent = percentOfCapacity(used, elapsed, capacity)
+				out.SampleInterval = round2(elapsed)
+			}
+		}
+		out.CPU = cpu
+	}
+
+	if memory, ok := readCgroupMemory(); ok {
+		memory.ProcessRSSBytes = processRSS
+		memory.Source = "cgroup"
+		out.Memory = memory
+	} else if processRSS > 0 {
+		// No finite instance limit is exposed. Do not substitute /proc/meminfo:
+		// inside many containers that is the shared node's RAM, not this app's.
+		out.Memory = &HostMemory{ProcessRSSBytes: processRSS, Source: "process-only"}
+	}
+
+	out.Disks = readDisks(true)
+	if netOK {
+		net := &HostNetwork{RxBytesTotal: rx, TxBytesTotal: tx}
+		if prev != nil {
+			if elapsed := now.Sub(prev.at).Seconds(); elapsed > 0.5 {
+				if rx >= prev.rx {
+					net.RxBytesPerSec = round2(float64(rx-prev.rx) / elapsed)
+				}
+				if tx >= prev.tx {
+					net.TxBytesPerSec = round2(float64(tx-prev.tx) / elapsed)
+				}
+			}
+		}
+		out.Network = net
+	}
+	return out
+}
+
+func percentOfCapacity(cpuSeconds, wallSeconds, capacity float64) float64 {
+	if cpuSeconds <= 0 || wallSeconds <= 0 || capacity <= 0 {
+		return 0
+	}
+	return round1(math.Max(0, math.Min(100, cpuSeconds/(wallSeconds*capacity)*100)))
+}
+
+// instanceScoped is intentionally conservative: a container, a PaaS runtime,
+// or a cgroup-limited service must never fall back to the physical node's
+// global counters. The explicit env override is useful on unusual hosts whose
+// container markers are hidden by the platform.
+func instanceScoped() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("NIMSHOP_SERVER_METRICS_SCOPE"))) {
+	case "instance", "container", "process":
+		return true
+	case "host", "machine":
+		return false
+	}
+
+	for _, marker := range []string{"/.dockerenv", "/run/.containerenv"} {
+		if _, err := os.Stat(marker); err == nil {
+			return true
+		}
+	}
+	for _, key := range []string{
+		"KUBERNETES_SERVICE_HOST", "RAILWAY_ENVIRONMENT", "FLY_APP_NAME",
+		"DYNO", "ECS_CONTAINER_METADATA_URI", "ECS_CONTAINER_METADATA_URI_V4",
+		"K_SERVICE", "WEBSITE_INSTANCE_ID", "RENDER_INSTANCE_ID",
+	} {
+		if strings.TrimSpace(os.Getenv(key)) != "" {
+			return true
+		}
+	}
+
+	if containerCgroupPath() || rootFilesystemIsOverlay() {
+		return true
+	}
+	if readCPUQuota() > 0 || readCgroupMemoryLimitBytes() > 0 {
+		return true
+	}
+	if cpus := readCPUSetCapacity(); cpus > 0 && cpus < runtime.NumCPU() {
+		return true
+	}
+	return false
+}
+
+func containerCgroupPath() bool {
+	raw, err := os.ReadFile("/proc/self/cgroup")
+	if err != nil {
+		return false
+	}
+	text := strings.ToLower(string(raw))
+	for _, marker := range []string{
+		"/docker/", "docker-", "/kubepods/", "kubepods.slice",
+		"/containerd/", "cri-containerd-", "/libpod/", "/lxc/", "/ecs/",
+	} {
+		if strings.Contains(text, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func rootFilesystemIsOverlay() bool {
+	raw, err := os.ReadFile("/proc/self/mountinfo")
+	if err != nil {
+		return false
+	}
+	for _, line := range strings.Split(string(raw), "\n") {
+		before, after, found := strings.Cut(line, " - ")
+		if !found {
+			continue
+		}
+		left, right := strings.Fields(before), strings.Fields(after)
+		if len(left) >= 5 && left[4] == "/" && len(right) > 0 && (right[0] == "overlay" || right[0] == "aufs") {
+			return true
+		}
+	}
+	return false
+}
+
+func cgroupDirectories(controller string) []string {
+	var unifiedPath string
+	var controllerPath string
+	var raw []byte
+	if contents, err := os.ReadFile("/proc/self/cgroup"); err == nil {
+		raw = contents
+	}
+	for _, line := range strings.Split(string(raw), "\n") {
+		parts := strings.SplitN(line, ":", 3)
+		if len(parts) != 3 {
+			continue
+		}
+		if parts[1] == "" {
+			unifiedPath = parts[2]
+			continue
+		}
+		for _, name := range strings.Split(parts[1], ",") {
+			if name == controller {
+				controllerPath = parts[2]
+				break
+			}
+		}
+	}
+
+	var dirs []string
+	if unifiedPath != "" {
+		appendCurrentCgroup(&dirs, "/sys/fs/cgroup", unifiedPath)
+	}
+	if controllerPath != "" {
+		roots := []string{filepath.Join("/sys/fs/cgroup", controller)}
+		if controller == "cpu" || controller == "cpuacct" {
+			roots = append(roots, "/sys/fs/cgroup/cpu,cpuacct")
+		}
+		for _, root := range roots {
+			appendCurrentCgroup(&dirs, root, controllerPath)
+		}
+	}
+	return dirs
+}
+
+// appendCurrentCgroup resolves only the process's own cgroup directory. Its
+// ancestors can be shared slices containing sibling workloads, so their
+// current-memory or quota values must not be passed off as this API instance's.
+func appendCurrentCgroup(dirs *[]string, root, cgroupPath string) {
+	root = filepath.Clean(root)
+	rel := strings.Trim(strings.TrimSpace(cgroupPath), "/")
+	if rel != "" && !filepath.IsLocal(rel) {
+		return
+	}
+	dir := root
+	if rel != "" {
+		dir = filepath.Join(root, rel)
+	}
+	*dirs = appendUniquePath(*dirs, dir)
+}
+
+func appendUniquePath(paths []string, candidate string) []string {
+	candidate = filepath.Clean(candidate)
+	for _, path := range paths {
+		if filepath.Clean(path) == candidate {
+			return paths
+		}
+	}
+	return append(paths, candidate)
+}
+
+func readCPUQuota() float64 {
+	best := 0.0
+	for _, dir := range cgroupDirectories("cpu") {
+		if raw, err := os.ReadFile(filepath.Join(dir, "cpu.max")); err == nil {
+			if quota := parseCPUQuota(string(raw)); quota > 0 && (best == 0 || quota < best) {
+				best = quota
+			}
+		}
+		quotaRaw, qErr := os.ReadFile(filepath.Join(dir, "cpu.cfs_quota_us"))
+		periodRaw, pErr := os.ReadFile(filepath.Join(dir, "cpu.cfs_period_us"))
+		if qErr == nil && pErr == nil {
+			q, qe := strconv.ParseFloat(strings.TrimSpace(string(quotaRaw)), 64)
+			p, pe := strconv.ParseFloat(strings.TrimSpace(string(periodRaw)), 64)
+			if qe == nil && pe == nil && q > 0 && p > 0 {
+				quota := q / p
+				if best == 0 || quota < best {
+					best = quota
+				}
+			}
+		}
+	}
+	return best
+}
+
+func parseCPUQuota(raw string) float64 {
+	fields := strings.Fields(raw)
+	if len(fields) < 2 || fields[0] == "max" {
+		return 0
+	}
+	quota, qErr := strconv.ParseFloat(fields[0], 64)
+	period, pErr := strconv.ParseFloat(fields[1], 64)
+	if qErr != nil || pErr != nil || quota <= 0 || period <= 0 {
+		return 0
+	}
+	return quota / period
+}
+
+func readCPUSetCapacity() int {
+	for _, dir := range cgroupDirectories("cpuset") {
+		for _, name := range []string{"cpuset.cpus.effective", "cpuset.cpus"} {
+			raw, err := os.ReadFile(filepath.Join(dir, name))
+			if err != nil {
+				continue
+			}
+			if count := countCPUs(string(raw)); count > 0 {
+				return count
+			}
+		}
+	}
+	return 0
+}
+
+func countCPUs(raw string) int {
+	seen := make(map[int]struct{})
+	for _, item := range strings.Split(strings.TrimSpace(raw), ",") {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		if lowRaw, highRaw, ranged := strings.Cut(item, "-"); ranged {
+			low, lowErr := strconv.Atoi(strings.TrimSpace(lowRaw))
+			high, highErr := strconv.Atoi(strings.TrimSpace(highRaw))
+			if lowErr != nil || highErr != nil || low < 0 || high < low || high-low > 4096 {
+				continue
+			}
+			for cpu := low; cpu <= high; cpu++ {
+				seen[cpu] = struct{}{}
+			}
+			continue
+		}
+		if cpu, err := strconv.Atoi(item); err == nil && cpu >= 0 {
+			seen[cpu] = struct{}{}
+		}
+	}
+	return len(seen)
+}
+
+func readCPUCapacity() (float64, string) {
+	quota := readCPUQuota()
+	cpuset := readCPUSetCapacity()
+	if quota > 0 && cpuset > 0 && float64(cpuset) < quota {
+		return float64(cpuset), "cpuset"
+	}
+	if quota > 0 {
+		return quota, "cgroup quota"
+	}
+	if cpuset > 0 {
+		return float64(cpuset), "cpuset"
+	}
+	procs := runtime.GOMAXPROCS(0)
+	if procs < 1 {
+		procs = runtime.NumCPU()
+	}
+	if procs < 1 {
+		procs = 1
+	}
+	return float64(procs), "Go runtime capacity"
+}
+
+func findCgroupMemoryLimit() (uint64, string, string) {
+	var best uint64
+	var bestDir, bestUsage string
+	for _, dir := range cgroupDirectories("memory") {
+		candidates := []struct{ limit, usage string }{
+			{"memory.max", "memory.current"},
+			{"memory.limit_in_bytes", "memory.usage_in_bytes"},
+		}
+		for _, candidate := range candidates {
+			raw, err := os.ReadFile(filepath.Join(dir, candidate.limit))
+			if err != nil {
+				continue
+			}
+			limit := parseCgroupMemoryLimit(string(raw))
+			if limit > 0 && (best == 0 || limit < best) {
+				best, bestDir, bestUsage = limit, dir, candidate.usage
+			}
+		}
+	}
+	return best, bestDir, bestUsage
+}
+
+func parseCgroupMemoryLimit(raw string) uint64 {
+	value := strings.TrimSpace(raw)
+	if value == "" || value == "max" {
+		return 0
+	}
+	limit, err := strconv.ParseUint(value, 10, 64)
+	if err != nil || limit == 0 || limit >= uint64(1)<<62 {
+		return 0
+	}
+	return limit
+}
+
+func readCgroupMemoryLimitBytes() uint64 {
+	limit, _, _ := findCgroupMemoryLimit()
+	return limit
+}
+
+func readCgroupMemory() (*HostMemory, bool) {
+	limit, dir, usageFile := findCgroupMemoryLimit()
+	if limit == 0 || dir == "" || usageFile == "" {
+		return nil, false
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, usageFile))
+	if err != nil {
+		return nil, false
+	}
+	used, err := strconv.ParseUint(strings.TrimSpace(string(raw)), 10, 64)
+	if err != nil {
+		return nil, false
+	}
+	used = min(used, limit)
+	available := limit - used
+	return &HostMemory{
+		TotalBytes: limit, UsedBytes: used, AvailableBytes: available,
+		Percent: round1(float64(used) / float64(limit) * 100),
+	}, true
+}
+
+func readProcessRSSBytes() uint64 {
+	raw, err := os.ReadFile("/proc/self/status")
+	if err != nil {
+		return 0
+	}
+	for _, line := range strings.Split(string(raw), "\n") {
+		if !strings.HasPrefix(line, "VmRSS:") {
+			continue
+		}
+		fields := strings.Fields(strings.TrimPrefix(line, "VmRSS:"))
+		if len(fields) == 0 {
+			return 0
+		}
+		if kb, err := strconv.ParseUint(fields[0], 10, 64); err == nil {
+			return kb * 1024
+		}
+	}
+	return 0
+}
+
+func readProcessCPUSeconds() (float64, bool) {
+	var usage syscall.Rusage
+	if err := syscall.Getrusage(syscall.RUSAGE_SELF, &usage); err != nil {
+		return 0, false
+	}
+	user := float64(usage.Utime.Sec) + float64(usage.Utime.Usec)/1_000_000
+	system := float64(usage.Stime.Sec) + float64(usage.Stime.Usec)/1_000_000
+	return user + system, true
 }
 
 func round1(v float64) float64 { return math.Round(v*10) / 10 }
@@ -345,45 +794,64 @@ func readMemInfo() (*HostMemory, bool) {
 	}, true
 }
 
-// readDisks reports the filesystems the shop cares about: the volume the
-// database lives on (BADGER_DIR when set, /data otherwise — the doc pins it
-// there) and the root filesystem. Missing ones are skipped rather than shown as
-// zero-sized.
-func readDisks() []HostDisk {
+// readDisks reports only filesystems relevant to the shop. In instance scope,
+// the node root is excluded, and mounts with the same filesystem identity are
+// listed once (e.g. BADGER_DIR=/data/badger and /data on the same volume).
+func readDisks(instanceScope bool) []HostDisk {
 	var out []HostDisk
 	candidates := []struct{ path, label string }{
 		{strings.TrimSpace(os.Getenv("BADGER_DIR")), "Data volume"},
 		{"/data", "Data volume"},
-		{"/", "Root filesystem"},
 	}
-	seen := map[string]bool{}
-	for _, c := range candidates {
-		path, label := c.path, c.label
-		if path == "" || seen[path] {
+	if !instanceScope {
+		candidates = append(candidates, struct{ path, label string }{"/", "Root filesystem"})
+	}
+
+	var rootIdentity string
+	if instanceScope {
+		var root syscall.Statfs_t
+		if syscall.Statfs("/", &root) == nil {
+			rootIdentity = filesystemIdentity(root)
+		}
+	}
+	seenPaths := make(map[string]bool)
+	seenFilesystems := make(map[string]bool)
+	for _, candidate := range candidates {
+		path := strings.TrimSpace(candidate.path)
+		if path == "" || seenPaths[filepath.Clean(path)] {
 			continue
 		}
 		var st syscall.Statfs_t
 		if err := syscall.Statfs(path, &st); err != nil {
 			continue
 		}
-		seen[path] = true
+		seenPaths[filepath.Clean(path)] = true
+		identity := filesystemIdentity(st)
+		if identity == rootIdentity || seenFilesystems[identity] {
+			continue
+		}
 		bsize := uint64(st.Bsize)
 		total := st.Blocks * bsize
 		free := st.Bavail * bsize
 		if total == 0 {
 			continue
 		}
-		usd := total - min(free, total)
+		used := total - min(free, total)
+		seenFilesystems[identity] = true
 		out = append(out, HostDisk{
 			Path:       path,
-			Label:      label,
+			Label:      candidate.label,
 			TotalBytes: total,
-			UsedBytes:  usd,
+			UsedBytes:  used,
 			AvailBytes: min(free, total),
-			Percent:    round1(float64(usd) / float64(total) * 100),
+			Percent:    round1(float64(used) / float64(total) * 100),
 		})
 	}
 	return out
+}
+
+func filesystemIdentity(st syscall.Statfs_t) string {
+	return fmt.Sprintf("%v:%v", st.Fsid, st.Type)
 }
 
 // readNetDev sums byte counters over every interface except loopback. Loopback

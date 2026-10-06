@@ -36,6 +36,7 @@ Live shop: <https://shop.nimiqbase.com> · Static preview: <https://emrealt34.gi
 - [Run from source](#run-from-source)
 - [Configuration](#configuration)
 - [Architecture](#architecture)
+- [Nimiq Pay balance reference](#nimiq-pay-balance-reference)
 - [Testing](#testing)
 - [Continuous integration](#continuous-integration)
 - [Security](#security)
@@ -113,6 +114,7 @@ origins outside loopback, missing partner id).
 | `LISTEN_ADDR` | Bind address (default `:8084`) |
 | `STATIC_DIR` | Built frontend folder to serve (empty = API only) |
 | `BADGER_DIR` | Embedded database directory (default `./data/badger`) |
+| `NIMSHOP_SERVER_METRICS_SCOPE` | Server card metrics: `auto` (source-run default), `instance` (container/process only; Docker default), or `host` (dedicated machine only) |
 | `JWT_SECRET` | Shopper session signing key (≥ 32 random bytes) |
 | `CRYPTOREFILLS_*` | Supplier partner id, keys, webhook secret |
 | `ADMIN_USERNAME`, `ADMIN_PASSWORD_HASH`, `ADMIN_TOTP_SECRET` | Admin console (Argon2id + TOTP SHA-256) |
@@ -147,6 +149,14 @@ browser ──► static Astro/React bundle (dist/)         ──► /api ─�
 - **Money**: quotes are the single source of truth; supplier state is
   applied through one state machine (no regressions, idempotent
   webhooks + tracker polls).
+
+## Nimiq Pay balance reference
+
+The Mini App reads the queried address on Nimiq Pay's active network. A zero
+wallet-address balance does not include NIM held at a separate HTLC or vesting
+contract address, and contract balances are not automatically spendable. See
+[`docs/nimiq-pay-get-balance.md`](docs/nimiq-pay-get-balance.md) for SDK
+availability, luna units, typed errors and the direct and generic provider calls.
 
 ## Testing
 

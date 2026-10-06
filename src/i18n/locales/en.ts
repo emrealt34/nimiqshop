@@ -776,6 +776,8 @@ const en = {
       a6: 'Cashback is credited **after CryptoRefills marks your order fulfilled** — never before the card is delivered. It is paid in NIM to the wallet used at checkout (or sent to the Nimiq burn wallet if you chose to burn it). Live amounts are on the [cashback page]({{cashback}}).',
       q7: 'Am I looking at a duplicate charge / two orders for one cart?',
       a7: 'A payment that fails validation never creates a supplier order, and the shop refuses a second live order for the same cart — so a duplicate charge is extremely rare. If your wallet really shows two settled payments, email CryptoRefills with **both** order ids; only they can reconcile and refund a duplicate.',
+      q8: 'Why does my balance show 0 when my NIM is in an HTLC?',
+      a8: 'The lookup reads only the exact address you query on the network currently active in Nimiq Pay. NIM locked in an HTLC or vesting contract sits at the contract address, not necessarily your wallet address, so your wallet address can correctly report 0. A successful 0 means that address has no balance; a failed lookup returns an error. On a supported host, a Mini App using SDK 0.2.1 or later can query any valid address with getBalance(address) (the result is in luna: 100,000 luna = 1 NIM). Even when a contract address has a balance, it may not be spendable until its conditions are met. For a failed swap, use the original wallet or service’s official recovery process; this shop cannot unlock the contract. Never send extra funds to “release” it.',
     },
     title: 'Support',
     newTicket: 'New ticket',
@@ -1787,6 +1789,7 @@ const en = {
     compareLine: 'Nimiq Pay: {{pay}} NIM · shop: {{shop}} NIM',
     stakeNote: '{{nim}} NIM appears to be staked or in a contract — not spendable.',
     updatePay: 'Update Nimiq Pay to read your balance here — the figure shown comes from the shop.',
+    updatePayToast: 'Update Nimiq Pay to use this feature.'
   },
 
   nim: {

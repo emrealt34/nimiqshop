@@ -768,6 +768,8 @@ const tr = {
       a6: 'Cashback, **CryptoRefills siparişinizi tamamlandı olarak işaretledikten sonra** yatırılır — kart teslim edilmeden asla. Ödeme sırasında kullandığınız cüzdana NIM olarak (yakmayı seçtiyseniz Nimiq yakma cüzdanına) gönderilir. Güncel tutarlar [cashback sayfasında]({{cashback}}).',
       q7: 'Aynı sepet için iki sipariş / mükerrer çekim mi görüyorum?',
       a7: 'Doğrulamadan geçmeyen bir ödeme tedarikçi siparişi oluşturmaz ve mağaza aynı sepet için ikinci bir canlı siparişi kabul etmez — bu yüzden mükerrer çekim çok nadirdir. Cüzdanınızda gerçekten iki kesinleşmiş ödeme görünüyorsa **iki** sipariş kimliğiyle CryptoRefills’e yazın; mükerrer kaydı yalnızca onlar çözebilir ve iade edebilir.',
+      q8: 'NIM’lerim HTLC’de dururken bakiyem neden 0 görünüyor?',
+      a8: 'Sorgu, yalnızca Nimiq Pay’de o anda etkin olan ağda belirttiğiniz tam adresi okur. HTLC veya vesting sözleşmesinde kilitli NIM’ler sözleşme adresinde durur; bu adres cüzdan adresinizden farklı olabilir. Bu nedenle cüzdan adresinizin 0 döndürmesi doğru olabilir. Başarılı bir 0 sonucu, sorgulanan adreste bakiye olmadığını gösterir; sorgu başarısız olursa 0 değil hata döner. Desteklenen bir hostta SDK 0.2.1 veya üzerini kullanan Mini App, getBalance(address) ile geçerli herhangi bir adresi sorgulayabilir (sonuç luna cinsindendir: 100.000 luna = 1 NIM). Sözleşme adresinde bakiye olsa bile, koşullar yerine gelene kadar bu tutar harcanamayabilir. Başarısız bir takasta, işlemi başlatan cüzdanın veya hizmetin resmi kurtarma adımlarını izleyin; bu mağaza sözleşmenin kilidini açamaz. Kilidi “açmak” için asla ek para göndermeyin.',
     },
     title: 'Destek',
     newTicket: 'Yeni talep',
@@ -1779,6 +1781,7 @@ const tr = {
     compareLine: 'Nimiq Pay: {{pay}} NIM · dükkan: {{shop}} NIM',
     stakeNote: '{{nim}} NIM stake’te ya da bir kontratta görünüyor — harcanabilir değil.',
     updatePay: 'Bakiyeyi burada okumak için Nimiq Pay’i güncelle — gösterilen tutar dükkandan geliyor.',
+    updatePayToast: 'Bu özelliği kullanmak için Nimiq Pay’i güncelleyin.'
   },
 
   nim: {

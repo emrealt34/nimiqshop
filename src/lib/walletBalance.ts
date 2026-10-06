@@ -375,6 +375,10 @@ async function readBalance(force = false): Promise<WalletBalanceState> {
       host = await bridgeLuna(address);
     } catch (e) {
       hostError = e;
+      // A host may expose generic request() without implementing getBalance.
+      // Treat its explicit unsupported-method response as an update requirement,
+      // not as an ordinary transient balance failure.
+      if (classifyWalletError(e) === 'unsupported') hostSupport = 'update-required';
     }
   }
 

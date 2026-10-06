@@ -1334,6 +1334,7 @@ function whyFor(reason: string, name: string, msg: string): string {
     // true and useless; this says what actually happened, and the wallet's own
     // sentence is appended below it.
     insufficient: tr('orderPage.nimiqPay.insufficient'),
+    updateRequired: tr('wallet.updatePayToast'),
   };
   const base = map[reason] || tr('checkout.flowWhyGeneric', { name });
   if (reason === 'quote' || !msg) return base;

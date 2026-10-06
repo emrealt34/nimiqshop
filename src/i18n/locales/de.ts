@@ -767,6 +767,8 @@ const de = {
       a6: 'Cashback wird **erst gutgeschrieben, nachdem CryptoRefills deine Bestellung als erfüllt markiert** — nie bevor die Karte geliefert ist. Es wird in NIM an die beim Bezahlen verwendete Wallet gezahlt (oder an die Nimiq-Burn-Wallet gesendet, wenn du das Verbrennen gewählt hast). Aktuelle Beträge stehen auf der [Cashback-Seite]({{cashback}}).',
       q7: 'Sehe ich eine doppelte Abbuchung bzw. zwei Bestellungen für einen Warenkorb?',
       a7: 'Eine Zahlung, die die Prüfung nicht besteht, erzeugt nie eine Lieferantenbestellung, und der Shop lehnt eine zweite aktive Bestellung für denselben Warenkorb ab — eine doppelte Abbuchung ist also sehr selten. Zeigt deine Wallet wirklich zwei abgeschlossene Zahlungen, schreibe CryptoRefills mit **beiden** Bestellnummern; nur sie können eine Doppelzahlung klären und erstatten.',
+      q8: 'Warum zeigt mein Guthaben 0, obwohl meine NIM in einem HTLC liegen?',
+      a8: 'Die Abfrage liest nur die genaue Adresse aus, die du im aktuell aktiven Nimiq-Pay-Netzwerk abfragst. In einem HTLC- oder Vesting-Vertrag gesperrte NIM liegen an der Vertragsadresse, nicht unbedingt an deiner Wallet-Adresse; deshalb kann diese korrekt 0 anzeigen. Ein erfolgreiches Ergebnis von 0 bedeutet, dass die abgefragte Adresse kein Guthaben hat; bei einem fehlgeschlagenen Aufruf kommt ein Fehler zurück. Eine Mini App kann auf einem unterstützten Host mit SDK 0.2.1 oder neuer jede gültige Adresse per getBalance(address) abfragen (Ergebnis in Luna: 100.000 Luna = 1 NIM). Auch Guthaben an einer Vertragsadresse ist nicht automatisch ausgebbar: Die Bedingungen des Vertrags müssen erfüllt sein. Bei einem fehlgeschlagenen Swap nutze den offiziellen Wiederherstellungsweg der ursprünglichen Wallet oder des Dienstes; dieser Shop kann den Vertrag nicht entsperren. Sende niemals zusätzliches Geld, um es „freizuschalten“.',
     },
     title: 'Support',
     newTicket: 'Neues Ticket',
@@ -1778,6 +1780,7 @@ const de = {
     compareLine: 'Nimiq Pay: {{pay}} NIM · Shop: {{shop}} NIM',
     stakeNote: '{{nim}} NIM scheint gestakt oder in einem Vertrag zu liegen — nicht ausgebbar.',
     updatePay: 'Aktualisiere Nimiq Pay, um dein Guthaben hier zu lesen — der Wert stammt aus dem Shop.',
+    updatePayToast: 'Aktualisiere Nimiq Pay, um diese Funktion zu nutzen.'
   },
 
   nim: {
