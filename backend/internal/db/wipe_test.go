@@ -1,6 +1,7 @@
 package db
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -117,11 +118,11 @@ func TestResetDeletesCustomersAndKeepsOperators(t *testing.T) {
 
 // TestWipeNamespacesNeverCoverOperatorKeyspace is the guard rail against a
 // future edit that adds a prefix to the wipe table by pattern instead of by
-// reading it: no prefix in the table may cover the operator's own records.
-// Kept separate from the behavioural test because it fails at review time —
-// the message names the offending prefix, which is the whole point.
+// reading it: no wipe prefix may overlap a protected operator namespace.
+// The customer-derived ratings aggregate is a deliberately deletable exact
+// metadata key; it must not make every `meta:` key deletable.
 func TestWipeNamespacesNeverCoverOperatorKeyspace(t *testing.T) {
-	forbidden := []string{"ix:au:", "meta:", "snap:cat:", "au:", "adm:", "sess:"}
+	protected := []string{"ix:au:", "meta:admin:", "meta:notif:", "meta:ix:q:", "meta:fx_snapshot", "meta:rates_snapshot", "snap:cat:", "au:", "adm:", "sess:"}
 	for _, ns := range wipeNamespaces {
 		if ns.Label == "" {
 			t.Fatalf("wipe namespace %q has no label; the console would show an unnamed row", ns.Prefix)
@@ -129,9 +130,9 @@ func TestWipeNamespacesNeverCoverOperatorKeyspace(t *testing.T) {
 		if ns.Prefix == "" {
 			t.Fatal("a wipe namespace has an empty prefix, which would delete EVERY key in the database")
 		}
-		for _, bad := range forbidden {
-			if len(ns.Prefix) >= len(bad) && ns.Prefix[:len(bad)] == bad {
-				t.Fatalf("wipe namespace %q (label %q) would delete the operator keyspace %q", ns.Prefix, ns.Label, bad)
+		for _, keyspace := range protected {
+			if strings.HasPrefix(ns.Prefix, keyspace) || strings.HasPrefix(keyspace, ns.Prefix) {
+				t.Fatalf("wipe namespace %q (label %q) overlaps protected operator keyspace %q", ns.Prefix, ns.Label, keyspace)
 			}
 		}
 	}
