@@ -229,8 +229,8 @@ export function useRouteKey(): ShellKey | null {
 function RouteFallback() {
   return (
     <div className="container" style={{ paddingTop: 24, paddingBottom: 40 }} aria-busy="true">
-      <div className="skeleton-card" style={{ height: 140, borderRadius: 14, background: 'var(--surface-2)' }} />
-      <div className="skeleton-card" style={{ height: 90, marginTop: 14, borderRadius: 14, background: 'var(--surface-2)' }} />
+      <div className="skeleton-card" style={{ height: 140, borderRadius: 14 }} />
+      <div className="skeleton-card" style={{ height: 90, marginTop: 14, borderRadius: 14 }} />
     </div>
   );
 }

@@ -769,7 +769,7 @@ function SkeletonGrid() {
   return (
     <div className="grid products">
       {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="skeleton-card" style={{ height: 190, borderRadius: 14, background: 'var(--surface-2)' }} />
+        <div key={i} className="skeleton-card" style={{ height: 190, borderRadius: 14 }} />
       ))}
     </div>
   );
