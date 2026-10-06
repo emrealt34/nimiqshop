@@ -519,7 +519,6 @@ func main() {
 		ReadTimeout:        10 * time.Second,
 		WriteTimeout:       10 * time.Second,
 		IdleTimeout:        30 * time.Second,
-		ReduceMemoryUsage:  true,
 		DisablePreParseMultipartForm: true,
 		MaxRequestBodySize: cfg.MaxRequestBodyBytes,
 		DisableKeepalive:   false,
