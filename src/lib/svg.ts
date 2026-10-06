@@ -1,5 +1,5 @@
 // Standalone SVG documents for data: URLs. A document rendered through an
-// <img src="data:image/svg+xml,…"> must declare the SVG namespace; that
+// <img style={{ pointerEvents: 'none' }} draggable={false} src="data:image/svg+xml,…"> must declare the SVG namespace; that
 // namespace is the W3C identifier string, a name rather than a network
 // location, which is why it is spelled with http.
 export function svgDocument(width: number, height: number, body: string): string {

@@ -48,7 +48,7 @@ export function RailPill({ bg, mark, img, children }: { bg: string; mark?: strin
         }}
       >
         {img ? (
-          <img src={img} alt="" width={16} height={16} style={{ width: 16, height: 16, objectFit: 'contain', display: 'inline-block' }} />
+          <img draggable={false} src={img} alt="" width={16} height={16} style={{ pointerEvents: 'none',  width: 16, height: 16, objectFit: 'contain', display: 'inline-block' }} />
         ) : (
           mark
         )}

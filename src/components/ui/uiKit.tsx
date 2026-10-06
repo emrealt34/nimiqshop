@@ -28,7 +28,7 @@ export function NimMark({ size = 16, className = '', style }: { size?: number; c
       decoding="async"
       fetchPriority="low"
       className={className}
-      style={{
+      draggable={false} style={{ pointerEvents: "none", 
         flexShrink: 0,
         display: 'inline-block',
         verticalAlign: '-0.18em',

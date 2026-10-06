@@ -971,7 +971,7 @@ export function PayScreen({
         <div className="pay-hero mt-2">
           <div className="pay-hero-label">{t('checkout.flowUsdtDirect')}</div>
           <div className="pay-hero-amt">
-            <img className="pay-nim-ico" src={asset("/img/usdt.png")} alt="USDT" width={22} height={22} style={{ borderRadius: 5 }} />
+            <img className="pay-nim-ico" src={asset("/img/usdt.png")} alt="USDT" draggable={false} width={22} height={22} style={{ pointerEvents: "none", borderRadius: 5 }} />
             <span className="big-nim">{coinAmountLabel(current) || t('checkout.flowAmountShownBelow')}</span>
           </div>
           <div className="pay-hero-youget">
@@ -1090,7 +1090,7 @@ export function PayScreen({
         <div className="pay-hero-amt">
           {nimText ? (
             <>
-              <img className="pay-nim-ico" src={asset("/img/nimiq-hexagon.png?v=40")} alt="NIM" width={22} height={22} style={{ borderRadius: 5 }} />
+              <img className="pay-nim-ico" src={asset("/img/nimiq-hexagon.png?v=40")} alt="NIM" draggable={false} width={22} height={22} style={{ pointerEvents: "none", borderRadius: 5 }} />
               <span className="big-nim">{nimText}</span>
             </>
           ) : (

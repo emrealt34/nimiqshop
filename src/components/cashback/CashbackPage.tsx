@@ -220,7 +220,7 @@ function WalletRedirectSheet({ guide }: { guide: WalletGuide }) {
       </div>
 
       <div className="cb-wallet-redirect-validator">
-        <img src={POOL_VALIDATOR_BADGE} alt="" width={30} height={30} />
+        <img src={POOL_VALIDATOR_BADGE} alt="" draggable={false} width={30} height={30} style={{ pointerEvents: "none" }} />
         <span className="small"><strong>{POOL_VALIDATOR_NAME}</strong>{t('cashback.wrChooseValidator')}</span>
       </div>
 

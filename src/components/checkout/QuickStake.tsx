@@ -235,7 +235,7 @@ export function QuickStake({
             background: 'var(--panel-2)',
           }}
         >
-          <img src={POOL_VALIDATOR_BADGE} alt={t('checkout.qsValidatorBadgeAlt')} width={34} height={34} style={{ borderRadius: 8, background: 'var(--white-card)', flex: '0 0 auto' }} />
+          <img draggable={false} src={POOL_VALIDATOR_BADGE} alt={t('checkout.qsValidatorBadgeAlt')} width={34} height={34} style={{ pointerEvents: 'none',  borderRadius: 8, background: 'var(--white-card)', flex: '0 0 auto' }} />
           <div className="small">
             <strong>{POOL_VALIDATOR_NAME}</strong> {t('checkout.qsValidatorPick')}
           </div>
@@ -266,7 +266,7 @@ export function QuickStake({
     }
     return (
       <div className="small muted" style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-        <img src={POOL_VALIDATOR_BADGE} alt="" width={22} height={22} style={{ borderRadius: 5, background: 'var(--white-card)', flex: 'none' }} />
+        <img src={POOL_VALIDATOR_BADGE} alt="" draggable={false} width={22} height={22} style={{ pointerEvents: "none", borderRadius: 5, background: 'var(--white-card)', flex: 'none' }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           {t('checkout.qsBrowserIntro')}
           {body}
@@ -336,7 +336,7 @@ export function QuickStake({
         </button>
       </div>
       <div className="xs faint" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <img src={POOL_VALIDATOR_BADGE} alt="" width={14} height={14} style={{ borderRadius: 3, background: 'var(--white-card)' }} />
+        <img src={POOL_VALIDATOR_BADGE} alt="" draggable={false} width={14} height={14} style={{ pointerEvents: "none", borderRadius: 3, background: 'var(--white-card)' }} />
         {stakedHere
                     ? t('cashback.formAddsExisting')
                     : t('checkout.qsDelegates', { validator: POOL_VALIDATOR_NAME, min: String(MIN_STAKE_NIM) })}

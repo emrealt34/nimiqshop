@@ -111,7 +111,7 @@ export function WalletBalance({
         className={`chip wal-chip${className ? ' ' + className : ''}`}
         title={t('wallet.available')}
       >
-        <img src={NIM_LOGO} alt="NIM" width={13} height={13} style={{ borderRadius: 3 }} />
+        <img src={NIM_LOGO} alt="NIM" draggable={false} width={13} height={13} style={{ pointerEvents: "none", borderRadius: 3 }} />
         <strong>{nimText(state.availableNim)}</strong>
         <span className="faint">NIM</span>
       </span>
@@ -153,7 +153,7 @@ export function WalletBalance({
 
   const figure = ready ? (
     <span className="wal-bal-fig">
-      <img src={NIM_LOGO} alt="NIM" width={15} height={15} style={{ borderRadius: 3 }} />
+      <img src={NIM_LOGO} alt="NIM" draggable={false} width={15} height={15} style={{ pointerEvents: "none", borderRadius: 3 }} />
       <strong className="wal-nim">{nimText(state.availableNim)} NIM</strong>
       {state.usd > 0 && (
         <span className="wal-usd small faint">
