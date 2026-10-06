@@ -60,6 +60,7 @@ func TestResolveTrustBoundaries(t *testing.T) {
 		p              Policy
 		headers        map[string][]string
 		wantIP, source string
+		wantCountry    string
 		fail, cf       bool
 	}{
 		{name: "socket ignores spoofing", peer: "203.0.113.1", headers: map[string][]string{"X-Forwarded-For": {"1.2.3.4"}}, wantIP: "203.0.113.1", source: "socket"},
@@ -75,9 +76,16 @@ func TestResolveTrustBoundaries(t *testing.T) {
 		{name: "wrong secret", peer: "127.0.0.1", trust: true, p: Policy{SharedSecret: secret}, headers: map[string][]string{ProxySecretHeader: {"wrong"}}, fail: true},
 		{name: "missing normalized IP", peer: "127.0.0.1", trust: true, p: Policy{SharedSecret: secret}, headers: map[string][]string{ProxySecretHeader: {secret}}, fail: true},
 		{name: "authenticated forwarded", peer: "127.0.0.1", trust: true, p: Policy{SharedSecret: secret}, headers: map[string][]string{ProxySecretHeader: {secret}, "X-Forwarded-For": {"203.0.113.8"}}, wantIP: "203.0.113.8", source: "trusted-proxy"},
-		{name: "verified CF metadata", peer: "127.0.0.1", trust: true, p: Policy{SharedSecret: secret}, headers: map[string][]string{ProxySecretHeader: {secret}, "X-Forwarded-For": {"203.0.113.8"}, "CF-Ray": {"fixture"}, "CF-Connecting-IP": {"203.0.113.8"}, "CF-IPCountry": {"TR"}}, wantIP: "203.0.113.8", source: "cloudflare", cf: true},
+		{name: "verified CF metadata", peer: "127.0.0.1", trust: true, p: Policy{SharedSecret: secret}, headers: map[string][]string{ProxySecretHeader: {secret}, "X-Forwarded-For": {"203.0.113.8"}, "CF-Ray": {"fixture"}, "CF-Connecting-IP": {"203.0.113.8"}, "CF-IPCountry": {"TR"}}, wantIP: "203.0.113.8", source: "cloudflare", wantCountry: "TR", cf: true},
 		{name: "inconsistent CF metadata", peer: "127.0.0.1", trust: true, p: Policy{SharedSecret: secret}, headers: map[string][]string{ProxySecretHeader: {secret}, "X-Forwarded-For": {"203.0.113.8"}, "CF-Ray": {"fixture"}, "CF-Connecting-IP": {"203.0.113.9"}}, fail: true},
-		{name: "direct CF", peer: "127.0.0.1", trust: true, p: Policy{HeaderMode: "cloudflare"}, headers: map[string][]string{"CF-Connecting-IP": {"203.0.113.8"}, "CF-IPCountry": {"TR"}}, wantIP: "203.0.113.8", source: "cloudflare", cf: true},
+		// Pages-in-front-of-the-tunnel shape: a trusted hop, no shared secret,
+		// edge-set CF-IPCountry. Country is taken; the IP still comes from the
+		// normalized chain, never from a CF header.
+		{name: "edge country without secret", peer: "127.0.0.1", trust: true, headers: map[string][]string{"X-Forwarded-For": {"203.0.113.8"}, "CF-Ray": {"fixture"}, "CF-IPCountry": {"TR"}}, wantIP: "203.0.113.8", source: "trusted-proxy", wantCountry: "TR", cf: true},
+		{name: "no ray no country", peer: "127.0.0.1", trust: true, headers: map[string][]string{"X-Forwarded-For": {"203.0.113.8"}, "CF-IPCountry": {"TR"}}, wantIP: "203.0.113.8", source: "trusted-proxy"},
+		{name: "garbage country ignored", peer: "127.0.0.1", trust: true, headers: map[string][]string{"X-Forwarded-For": {"203.0.113.8"}, "CF-Ray": {"fixture"}, "CF-IPCountry": {"Turkiye"}}, wantIP: "203.0.113.8", source: "trusted-proxy", cf: true},
+		{name: "untrusted edge headers ignored", peer: "203.0.113.1", trust: true, headers: map[string][]string{"CF-Ray": {"fixture"}, "CF-IPCountry": {"TR"}}, wantIP: "203.0.113.1", source: "socket"},
+		{name: "direct CF", peer: "127.0.0.1", trust: true, p: Policy{HeaderMode: "cloudflare"}, headers: map[string][]string{"CF-Connecting-IP": {"203.0.113.8"}, "CF-IPCountry": {"TR"}}, wantIP: "203.0.113.8", source: "cloudflare", wantCountry: "TR", cf: true},
 		{name: "CF missing", peer: "127.0.0.1", trust: true, p: Policy{HeaderMode: "cloudflare"}, fail: true},
 		{name: "CF invalid", peer: "127.0.0.1", trust: true, p: Policy{HeaderMode: "cloudflare"}, headers: map[string][]string{"CF-Connecting-IP": {"bad"}}, fail: true},
 		{name: "cross zone worker", peer: "127.0.0.1", trust: true, p: Policy{HeaderMode: "cloudflare"}, headers: map[string][]string{"CF-Connecting-IP": {"2a06:98c0:3600::103"}}, fail: true},
@@ -88,7 +96,8 @@ func TestResolveTrustBoundaries(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := requestContext(net.ParseIP(tc.peer), tc.headers)
 			got := Resolve(ctx, tc.trust, tc.p)
-			if (got.Err != nil) != tc.fail || got.IP != tc.wantIP || got.Source != tc.source || got.Cloudflare != tc.cf {
+			if (got.Err != nil) != tc.fail || got.IP != tc.wantIP || got.Source != tc.source ||
+				got.Country != tc.wantCountry || got.Cloudflare != tc.cf {
 				t.Fatalf("resolve: %+v", got)
 			}
 		})

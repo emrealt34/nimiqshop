@@ -9,7 +9,10 @@ import (
 // GeoInfo resolves the caller's IP for the frontend without any external call.
 //
 // Country comes free from Cloudflare's CF-IPCountry header when Cloudflare is
-// in front (TRUST_PROXY on). In direct mode (or non-Cloudflare proxy) country
+// in front (TRUST_PROXY on) — in BOTH proxy modes: the edge sets it (and the
+// edge trace that vouches for it), and the deployment's own hop deletes any
+// client-supplied copy before forwarding, so a visitor cannot pick a country.
+// In direct mode (or behind a generic proxy that carries no edge trace) country
 // is empty so the shop falls back to a global catalog. The frontend only ever
 // talks to this same-origin endpoint — there is no third-party geo API call.
 func (h *Handlers) GeoInfo(ctx *fasthttp.RequestCtx) {

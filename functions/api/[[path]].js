@@ -137,11 +137,28 @@ export async function onRequest({ request }) {
   const connectionTokens = (headers.get('Connection') || '').split(',');
   for (const name of [...HOP, ...connectionTokens.map(s => s.trim()).filter(Boolean),
     'host', 'forwarded', 'x-forwarded-for', 'x-real-ip', 'true-client-ip',
+    // Cloudflare's visitor attribution is re-stated below from Cloudflare's
+    // own values. A client-supplied copy must never survive this hop — it is
+    // the one thing that could make the backend attribute a visit to an
+    // address or country the visitor chose (the operator console shows both).
+    'cf-connecting-ip', 'cf-connecting-ipv6', 'cf-pseudo-ipv4', 'cf-ipcountry', 'cf-ray',
     'x-nimshop-proxy-secret', 'x-nimshop-client-ip', 'x-nimshop-client-country']) {
     headers.delete(name);
   }
-  // CF-managed visitor headers are left to Cloudflare; never manufacture
-  // trusted client identity or private-hop credentials from browser input.
+  // Never manufacture trusted identity from browser input: re-state what the
+  // EDGE knows (Cloudflare sets these on the incoming request; request.cf
+  // carries the geolocation) in the same shape scripts/proxy.mjs produces, so
+  // the Go side has ONE contract to reason about: one verified IP, the edge
+  // trace, the edge's country.
+  const edgeIP = String(request.headers.get('CF-Connecting-IP') || '').trim();
+  const edgeRay = String(request.headers.get('CF-Ray') || '').trim();
+  const edgeCountry = String((request.cf && request.cf.country) || '').toUpperCase();
+  if (/^[0-9A-Fa-f:.]{2,45}$/.test(edgeIP)) {
+    headers.set('CF-Connecting-IP', edgeIP);
+    headers.set('X-Forwarded-For', edgeIP);
+  }
+  if (edgeRay && edgeRay.length <= 128 && !/[\r\n,]/.test(edgeRay)) headers.set('CF-Ray', edgeRay);
+  if (/^[A-Z]{2}$/.test(edgeCountry) && edgeCountry !== 'XX') headers.set('CF-IPCountry', edgeCountry);
   let upstream;
   try {
     upstream = await fetch(target.href, {

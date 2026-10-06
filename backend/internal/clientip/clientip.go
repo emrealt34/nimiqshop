@@ -215,6 +215,22 @@ func Resolve(ctx *fasthttp.RequestCtx, trustProxy bool, policies ...Policy) Info
 		result.Cloudflare = true
 		result.Country = country(string(ctx.Request.Header.Peek("CF-IPCountry")))
 		result.Source = "cloudflare"
+	} else if len(ctx.Request.Header.Peek("CF-Ray")) > 0 {
+		// The edge's OWN attribution, for proxy hops that carry no shared
+		// secret: Cloudflare Pages in front of the tunnel, which is how this
+		// shop is deployed. CF-Ray and CF-IPCountry are set by Cloudflare on
+		// every proxied request and cannot be chosen by a browser, and the
+		// deployment's edge deletes any client-supplied copy before forwarding
+		// (functions/api/[[path]].js and scripts/proxy.mjs both do), then
+		// re-states the verified values. Demanding the secret here instead
+		// meant `forwarded` mode had NO country at all, so the operator
+		// console's "IP · country" showed an address with a blank flag.
+		//
+		// Country ONLY, and only from an already-trusted hop: the visitor IP
+		// was settled from the peeled chain above, and no CF header can move
+		// it. The cloudflare flag records that an edge vouched for the request.
+		result.Cloudflare = true
+		result.Country = country(string(ctx.Request.Header.Peek("CF-IPCountry")))
 	}
 	return result
 }
