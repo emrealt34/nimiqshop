@@ -24,7 +24,7 @@ $ curl -s https://shopapi.nimiqbase.com/api/geo
 {"cloudflare":false,"country":"","ip":"89.222.123.194"}
 ```
 
-### How a request actually reaches the API (measured, 2026-10-06)
+## How a request actually reaches the API (measured, 2026-10-06)
 
 The public hostname `shopapi.nimiqbase.com` is a **proxied Cloudflare DNS
 record** pointing straight at the Railway service. There is no separate
