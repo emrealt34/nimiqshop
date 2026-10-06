@@ -39,9 +39,9 @@ import { quoteFaceValue } from '../../lib/format';
 import { StakerCashbackLine } from '../staker/StakerCashback';
 import { currentCashbackCode } from '../../lib/cashbackCode';
 import { nimAmountText, nimAmountFor } from '../../lib/nim';
-import { refreshWalletBalance, neededWholeNim, shortByWholeNim, SPEND_MARGIN } from '../../lib/walletBalance';
+import { refreshWalletBalance } from '../../lib/walletBalance';
 import { guardLowBalance } from '../wallet/LowBalanceSheet';
-import { WalletBalance, useWalletBalance } from '../wallet/WalletBalance';
+import { useWalletBalance } from '../wallet/WalletBalance';
 import { fmtUSD } from '../../lib/format';
 import { deliveryLine, youGetText } from '../../lib/deliveryCopy';
 import {
@@ -875,17 +875,9 @@ export function PayScreen({
   const invoice = quoteBolt11(current);
 
   /* The buyer's own NIM, already read for the strip above — no extra request. */
-  const { state: walletState, refresh: refreshWallet } = useWalletBalance();
-  const [lowBalDismissed, setLowBalDismissed] = useState(false);
+  const { state: walletState } = useWalletBalance();
   const needNim = Number(nimAmountFor(current, cachedNimRate())) || 0;
-  // amount + the 1% cushion (SPEND_MARGIN): what the buyer must actually hold.
-  const needTotal = needNim > 0 ? needNim * (1 + SPEND_MARGIN) : 0;
-  const shortBy = Math.max(0, needTotal - walletState.availableNim);
   const walletReady = walletState.status === 'ready';
-  const lowBalance = walletReady && needTotal > 0 && shortBy > 0 && !lowBalDismissed;
-  // The prices in the warning are the same whole NIM the strip shows.
-  const needWhole = neededWholeNim(needNim);
-  const shortWhole = shortByWholeNim(needNim, walletState.availableNim);
 
   /**
    * THE WARNING, at the moment of the attempt.
@@ -1105,46 +1097,14 @@ export function PayScreen({
             <span className="big-nim">{t('checkout.flowAmountInNimiqPay')}</span>
           )}
         </div>
-        {/* Owner (2026-10-05): "sipariş verecekken ilk gözüm onu aradı" — the
-            buyer checks their own NIM against the amount due BEFORE paying. */}
-        <WalletBalance
-          variant="line"
-          targetNim={Number(nimAmountFor(current, cachedNimRate())) || 0}
-          targetTotal
-          signInHint
-          className="mt-2"
-        />
-
-        {/* THE SHORT-BALANCE WARNING (owner, 2026-10-06: "öderken uyarı verelim
-            işte toast güzel bir … you still seem … don't have … continue izin
-            ver"). The buyer is told BEFORE the wallet dialog opens, with the
-            numbers, and — this is the point — is still allowed to continue: the
-            shop does not know the exact fee the wallet will charge, so refusing
-            would be a guess and a blocked purchase. The verdict carries the 1%
-            cushion (SPEND_MARGIN); the figure on the strip does not. */}
-        {lowBalance && invoice ? (
-          <div className="alert warn mt-2" data-testid="low-balance-card" style={{ marginBottom: 0, textAlign: 'left', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-            <Icon name="alert" size={16} />
-            <div className="small" style={{ flex: 1 }}>
-              <div className="strong">{t('checkout.flowLowBalance')}</div>
-              <div className="mt-1">
-                {t('checkout.flowLowBalanceBody', {
-                  need: needWhole,
-                  have: Math.max(0, Math.floor(walletState.availableNim)),
-                  short: shortWhole,
-                })}
-              </div>
-              <div className="row mt-2" style={{ gap: 8, flexWrap: 'wrap' }}>
-                <button type="button" className="btn btn-sm btn-gold" onClick={() => setLowBalDismissed(true)}>
-                  {t('checkout.flowLowBalanceAnyway')}
-                </button>
-                <button type="button" className="btn btn-sm btn-outline" onClick={refreshWallet}>
-                  <Icon name="refresh" size={13} /> {t('wallet.refresh')}
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : null}
+        {/* NO BALANCE, NO WARNING, ON THIS CARD.
+            Owner (2026-10-06): "ödeme kartında yetersiz bakiye şeyini kaldır, o
+            da NIM miktarım falan yazmasın lütfen". The payment card is the amount
+            due and how to pay it — nothing else. The buyer's own NIM used to sit
+            here as a second strip and a short-balance box below it; both are
+            gone. The shortfall is still handled, one step later and as a POPUP
+            with options: pressing either pay button asks the same question
+            (continue / refresh / cancel) without crowding this card. */}
         <div className="pay-hero-youget">
           <span className="xs faint">{t('checkout.flowYouGet')}</span>
           <span className="strong pay-you-get">{youGet || t('checkout.instantDelivery')}</span>

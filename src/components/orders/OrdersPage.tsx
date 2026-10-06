@@ -20,7 +20,6 @@ import { deliverySummary, payRail } from '../../lib/deliveryCopy';
 import { useInterval } from '../../lib/useInterval';
 import { useToast, useSheet } from '../AppProviders';
 import { StatusBadge, MiniProgress, StarsDisplay, StarPicker, EmptyState, ErrorState, LockedSignInCard, SkeletonCards, NimAmount, OnChainProof, ClockTime } from '../ui/uiKit';
-import { WalletBalance } from '../wallet/WalletBalance';
 import { Pager } from '../ui/Pager';
 import { useT, t as i18nT } from '../../i18n';
 import { pagePath } from '../../lib/asset';
@@ -385,10 +384,9 @@ function SectionHead({ awaitingCount, lastRefresh, onRefresh }: { awaitingCount:
       <h2>
         <Icon name="receipt" size={26} /> {t('order.listTitle')}
         {awaitingCount > 0 ? <span className="await-pill">{t('ordersPage.awaitingPill', { count: awaitingCount })}</span> : null}
-        {/* Owner (2026-10-05): "sipariş sayfasında NIM kuru gözükse" — the
-            wallet's NIM beside the refresh state. Renders nothing without a
-            readable wallet. */}
-        <WalletBalance variant="chip" />
+        {/* Owner (2026-10-06): "siparişler sekmesinden de kaldır" — no wallet
+            figure in this header. The orders list answers "what did I buy and
+            where is it"; the balance belongs where a purchase is decided. */}
       </h2>
       <div className="row" style={{ gap: '8px', alignItems: 'center', marginLeft: 'auto', flexShrink: 0 }}>
         <span className="xs faint" id="lastRefresh">
