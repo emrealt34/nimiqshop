@@ -158,7 +158,15 @@ export async function onRequest({ request }) {
     headers.set('X-Forwarded-For', edgeIP);
   }
   if (edgeRay && edgeRay.length <= 128 && !/[\r\n,]/.test(edgeRay)) headers.set('CF-Ray', edgeRay);
-  if (/^[A-Z]{2}$/.test(edgeCountry) && edgeCountry !== 'XX') headers.set('CF-IPCountry', edgeCountry);
+  if (/^[A-Z]{2}$/.test(edgeCountry) && edgeCountry !== 'XX') {
+    headers.set('CF-IPCountry', edgeCountry);
+    // Cloudflare's own geo header does not survive every hop of this stack (a
+    // tunnel drops the CF-* set), so the country is ALSO restated on our own
+    // header, which the Go side reads from a trusted hop only. Browsers cannot
+    // reach the backend with it: this function deletes client-supplied copies
+    // first, exactly as scripts/proxy.mjs does.
+    headers.set('X-Nimshop-Client-Country', edgeCountry);
+  }
   let upstream;
   try {
     upstream = await fetch(target.href, {

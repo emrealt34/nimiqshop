@@ -16,6 +16,21 @@ import (
 
 const ProxySecretHeader = "X-Nimshop-Proxy-Secret"
 
+// ClientCountryHeader is how the deployment's OWN edge re-states the visitor's
+// country when Cloudflare's CF-* headers do not survive the hop. A Cloudflare
+// Tunnel drops them (verified live on this shop: the visitor IP arrives through
+// the normalized X-Forwarded-For, while CF-Ray and CF-IPCountry never do), so
+// the Pages function / Node proxy sets this instead, from request.cf.country —
+// and both of them DELETE any client-supplied copy before forwarding.
+//
+// It is read only from an already-trusted hop, only as a COUNTRY: the visitor
+// IP is settled from the peeled chain and no header can move it. What a forged
+// value could change is display-only — which catalog country a visitor is
+// DEFAULTED to (the shop has a country picker anyway) and the country label on
+// their own row in the operator console — while the address, which is what
+// actually identifies a person, cannot be chosen.
+const ClientCountryHeader = "X-Nimshop-Client-Country"
+
 type Info struct {
 	IP         string
 	Cloudflare bool
@@ -215,22 +230,27 @@ func Resolve(ctx *fasthttp.RequestCtx, trustProxy bool, policies ...Policy) Info
 		result.Cloudflare = true
 		result.Country = country(string(ctx.Request.Header.Peek("CF-IPCountry")))
 		result.Source = "cloudflare"
-	} else if len(ctx.Request.Header.Peek("CF-Ray")) > 0 {
+	} else {
 		// The edge's OWN attribution, for proxy hops that carry no shared
 		// secret: Cloudflare Pages in front of the tunnel, which is how this
-		// shop is deployed. CF-Ray and CF-IPCountry are set by Cloudflare on
-		// every proxied request and cannot be chosen by a browser, and the
-		// deployment's edge deletes any client-supplied copy before forwarding
-		// (functions/api/[[path]].js and scripts/proxy.mjs both do), then
-		// re-states the verified values. Demanding the secret here instead
-		// meant `forwarded` mode had NO country at all, so the operator
-		// console's "IP · country" showed an address with a blank flag.
-		//
-		// Country ONLY, and only from an already-trusted hop: the visitor IP
-		// was settled from the peeled chain above, and no CF header can move
-		// it. The cloudflare flag records that an edge vouched for the request.
-		result.Cloudflare = true
-		result.Country = country(string(ctx.Request.Header.Peek("CF-IPCountry")))
+		// shop is deployed. Demanding the secret here meant `forwarded` mode
+		// had NO country at all, so the operator console's "IP · country"
+		// showed an address with a blank flag no matter how often someone
+		// visited. Country ONLY, and only from an already-trusted hop: the
+		// visitor IP was settled from the peeled chain above.
+		if len(ctx.Request.Header.Peek("CF-Ray")) > 0 {
+			// Cloudflare answered this request itself.
+			result.Cloudflare = true
+		}
+		if result.Country == "" {
+			result.Country = country(string(ctx.Request.Header.Peek("CF-IPCountry")))
+		}
+		if result.Country == "" {
+			// ...and when Cloudflare's own geolocation header does not survive
+			// the hop (a tunnel drops it), our edge's restatement of it
+			// (request.cf.country) does — see ClientCountryHeader.
+			result.Country = country(string(ctx.Request.Header.Peek(ClientCountryHeader)))
+		}
 	}
 	return result
 }

@@ -85,6 +85,14 @@ func TestResolveTrustBoundaries(t *testing.T) {
 		{name: "no ray no country", peer: "127.0.0.1", trust: true, headers: map[string][]string{"X-Forwarded-For": {"203.0.113.8"}, "CF-IPCountry": {"TR"}}, wantIP: "203.0.113.8", source: "trusted-proxy"},
 		{name: "garbage country ignored", peer: "127.0.0.1", trust: true, headers: map[string][]string{"X-Forwarded-For": {"203.0.113.8"}, "CF-Ray": {"fixture"}, "CF-IPCountry": {"Turkiye"}}, wantIP: "203.0.113.8", source: "trusted-proxy", cf: true},
 		{name: "untrusted edge headers ignored", peer: "203.0.113.1", trust: true, headers: map[string][]string{"CF-Ray": {"fixture"}, "CF-IPCountry": {"TR"}}, wantIP: "203.0.113.1", source: "socket"},
+		// The tunnel that fronts this shop drops CF-Ray/CF-IPCountry, so the
+		// edge re-states the country on its OWN header. Same trust level: it is
+		// only read from an already-trusted hop, and it can never move the IP.
+		{name: "edge restated country", peer: "127.0.0.1", trust: true, headers: map[string][]string{"X-Forwarded-For": {"203.0.113.8"}, ClientCountryHeader: {"TR"}}, wantIP: "203.0.113.8", source: "trusted-proxy", wantCountry: "TR"},
+		{name: "restated country lowercased", peer: "127.0.0.1", trust: true, headers: map[string][]string{"X-Forwarded-For": {"203.0.113.8"}, ClientCountryHeader: {"tr"}}, wantIP: "203.0.113.8", source: "trusted-proxy", wantCountry: "TR"},
+		{name: "restated country garbage ignored", peer: "127.0.0.1", trust: true, headers: map[string][]string{"X-Forwarded-For": {"203.0.113.8"}, ClientCountryHeader: {"Turkey!"}}, wantIP: "203.0.113.8", source: "trusted-proxy"},
+		{name: "restated country from untrusted peer ignored", peer: "203.0.113.1", trust: true, headers: map[string][]string{ClientCountryHeader: {"TR"}}, wantIP: "203.0.113.1", source: "socket"},
+		{name: "cf header wins over restatement", peer: "127.0.0.1", trust: true, headers: map[string][]string{"X-Forwarded-For": {"203.0.113.8"}, ClientCountryHeader: {"DE"}, "CF-Ray": {"fixture"}, "CF-IPCountry": {"TR"}}, wantIP: "203.0.113.8", source: "trusted-proxy", wantCountry: "TR", cf: true},
 		{name: "direct CF", peer: "127.0.0.1", trust: true, p: Policy{HeaderMode: "cloudflare"}, headers: map[string][]string{"CF-Connecting-IP": {"203.0.113.8"}, "CF-IPCountry": {"TR"}}, wantIP: "203.0.113.8", source: "cloudflare", wantCountry: "TR", cf: true},
 		{name: "CF missing", peer: "127.0.0.1", trust: true, p: Policy{HeaderMode: "cloudflare"}, fail: true},
 		{name: "CF invalid", peer: "127.0.0.1", trust: true, p: Policy{HeaderMode: "cloudflare"}, headers: map[string][]string{"CF-Connecting-IP": {"bad"}}, fail: true},
