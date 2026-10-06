@@ -16,20 +16,38 @@ import (
 
 const ProxySecretHeader = "X-Nimshop-Proxy-Secret"
 
-// ClientCountryHeader is how the deployment's OWN edge re-states the visitor's
-// country when Cloudflare's CF-* headers do not survive the hop. A Cloudflare
-// Tunnel drops them (verified live on this shop: the visitor IP arrives through
-// the normalized X-Forwarded-For, while CF-Ray and CF-IPCountry never do), so
-// the Pages function / Node proxy sets this instead, from request.cf.country —
-// and both of them DELETE any client-supplied copy before forwarding.
+// ClientCountryHeader is how a deployment's OWN edge re-states the visitor's
+// country when Cloudflare's CF-* headers do not survive the hop. Both hops that
+// ship in this repo set it — functions/api/[[path]].js from request.cf.country,
+// scripts/proxy.mjs from the edge's header — and both DELETE any client-supplied
+// copy before forwarding.
 //
-// It is read only from an already-trusted hop, only as a COUNTRY: the visitor
-// IP is settled from the peeled chain and no header can move it. What a forged
-// value could change is display-only — which catalog country a visitor is
-// DEFAULTED to (the shop has a country picker anyway) and the country label on
-// their own row in the operator console — while the address, which is what
-// actually identifies a person, cannot be chosen.
+// The live deployment uses neither: it is Cloudflare as a proxy in front of the
+// application on an edge that rebuilds the request, so no Cloudflare header
+// reaches a handler at all (verified live: /api/geo answered country:"" while
+// the forwarded chain carried the right visitor IP). There the country travels
+// on CountryHintHeader instead, read by the presence note — see below.
+//
+// Read only from an already-trusted hop, and only as a COUNTRY: the visitor IP
+// is settled from the peeled chain and no header can move it. A forged value
+// could change display only — the country label on the visitor's own row in the
+// operator console — never the address that identifies them.
 const ClientCountryHeader = "X-Nimshop-Client-Country"
+
+// CountryHintHeader carries the country the visitor's own BROWSER read from the
+// edge: the shop's frontend fetches Cloudflare's same-origin /cdn-cgi/trace and
+// forwards its `loc=` value here (see src/lib/edgeGeo.ts), because in the live
+// deployment Cloudflare's CF-* headers do not survive the hop to the
+// application. Name aside it is still a hint, not evidence — a script can set
+// any header — which is exactly why it is NOT read inside Resolve: the visitor
+// IP and everything that hangs off it stay independent of it, and only the
+// operator console's origin note spends it.
+const CountryHintHeader = "X-Nimshop-Country-Hint"
+
+// CountryHint returns the validated country the browser reported, or "".
+func CountryHint(ctx *fasthttp.RequestCtx) string {
+	return country(string(ctx.Request.Header.Peek(CountryHintHeader)))
+}
 
 type Info struct {
 	IP         string
@@ -232,12 +250,12 @@ func Resolve(ctx *fasthttp.RequestCtx, trustProxy bool, policies ...Policy) Info
 		result.Source = "cloudflare"
 	} else {
 		// The edge's OWN attribution, for proxy hops that carry no shared
-		// secret: Cloudflare Pages in front of the tunnel, which is how this
-		// shop is deployed. Demanding the secret here meant `forwarded` mode
-		// had NO country at all, so the operator console's "IP · country"
-		// showed an address with a blank flag no matter how often someone
-		// visited. Country ONLY, and only from an already-trusted hop: the
-		// visitor IP was settled from the peeled chain above.
+		// secret — a Pages function or self-hosted proxy in front of the app.
+		// Demanding the secret here meant `forwarded` mode had NO country at
+		// all, so the operator console's "IP · country" showed an address with
+		// a blank flag no matter how often someone visited. Country ONLY, and
+		// only from an already-trusted hop: the visitor IP was settled from the
+		// peeled chain above.
 		if len(ctx.Request.Header.Peek("CF-Ray")) > 0 {
 			// Cloudflare answered this request itself, so its own attribution
 			// may be taken. Without the ray trace a bare CF-IPCountry is just a

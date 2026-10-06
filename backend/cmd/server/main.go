@@ -1111,7 +1111,7 @@ func applyCORS(ctx *fasthttp.RequestCtx, cfg config.Config) {
 			ctx.Response.Header.Set("Access-Control-Allow-Origin", allowed)
 			ctx.Response.Header.Set("Vary", "Origin")
 			ctx.Response.Header.Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-			ctx.Response.Header.Set("Access-Control-Allow-Headers", "Content-Type, Authorization, Idempotency-Key, X-Admin-Bootstrap-Token, X-Requested-With, X-CSRF-Token")
+			ctx.Response.Header.Set("Access-Control-Allow-Headers", "Content-Type, Authorization, Idempotency-Key, X-Admin-Bootstrap-Token, X-Requested-With, X-CSRF-Token, X-Nimshop-Country-Hint")
 			ctx.Response.Header.Set("Access-Control-Allow-Credentials", "true")
 			ctx.Response.Header.Set("Access-Control-Max-Age", "86400")
 			return
@@ -1127,7 +1127,7 @@ func applyCORS(ctx *fasthttp.RequestCtx, cfg config.Config) {
 					ctx.Response.Header.Set("Access-Control-Allow-Origin", origin)
 					ctx.Response.Header.Set("Vary", "Origin")
 					ctx.Response.Header.Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-					ctx.Response.Header.Set("Access-Control-Allow-Headers", "Content-Type, Authorization, Idempotency-Key, X-Admin-Bootstrap-Token, X-Requested-With, X-CSRF-Token")
+					ctx.Response.Header.Set("Access-Control-Allow-Headers", "Content-Type, Authorization, Idempotency-Key, X-Admin-Bootstrap-Token, X-Requested-With, X-CSRF-Token, X-Nimshop-Country-Hint")
 					ctx.Response.Header.Set("Access-Control-Allow-Credentials", "true")
 					ctx.Response.Header.Set("Access-Control-Max-Age", "86400")
 					return
@@ -1149,7 +1149,7 @@ func applyCORS(ctx *fasthttp.RequestCtx, cfg config.Config) {
 		ctx.Response.Header.Set("Access-Control-Allow-Origin", origin)
 		ctx.Response.Header.Set("Vary", "Origin")
 		ctx.Response.Header.Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		ctx.Response.Header.Set("Access-Control-Allow-Headers", "Content-Type, Authorization, Idempotency-Key, X-Admin-Bootstrap-Token, X-Requested-With, X-CSRF-Token")
+		ctx.Response.Header.Set("Access-Control-Allow-Headers", "Content-Type, Authorization, Idempotency-Key, X-Admin-Bootstrap-Token, X-Requested-With, X-CSRF-Token, X-Nimshop-Country-Hint")
 		ctx.Response.Header.Set("Access-Control-Allow-Credentials", "true")
 		ctx.Response.Header.Set("Access-Control-Max-Age", "86400")
 		return

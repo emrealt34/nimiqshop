@@ -11,6 +11,7 @@ import { getLang, t as tr } from '../i18n';
 import { uuid as uuid2 } from './format';
 import { canonicalIntent, purchaseIntentPayload, loadOrCreateIntent, saveIntentQuote, releaseIntentForQuote } from './checkoutIntent';
 import { dailyLimitMessage, isDailyLimitError } from './dailyLimit';
+import { countryHint, COUNTRY_HINT_HEADER } from './edgeGeo';
 
 export class ApiError extends Error {
   status: number;
@@ -199,6 +200,13 @@ function isTimeout(e: unknown): boolean {
 
 async function _fetchGet(path: string, headers: Record<string, string>, timeoutMs: number): Promise<unknown> {
   if (!headers['Accept-Language']) headers['Accept-Language'] = langTag();
+  // The visitor's country as the edge reported it to the browser — see
+  // edgeGeo.ts. A hint: the backend only ever spends it on the operator
+  // console's origin note, never on a price, an order or the visitor IP.
+  if (!headers[COUNTRY_HINT_HEADER]) {
+    const cc = countryHint();
+    if (cc) headers[COUNTRY_HINT_HEADER] = cc;
+  }
   let res: Response;
   try {
     const base = (CFG.API_BASE || '/api').replace(/\/$/, '');
@@ -270,6 +278,11 @@ export async function api(
 ): Promise<Record<string, any>> {
   const h: Record<string, string> = { ...headers };
   if (!h['Accept-Language']) h['Accept-Language'] = langTag();
+  // Same edge-country hint as the GET path above.
+  if (!h[COUNTRY_HINT_HEADER]) {
+    const cc = countryHint();
+    if (cc) h[COUNTRY_HINT_HEADER] = cc;
+  }
   let payload: string | undefined;
   if (body !== undefined) {
     h['Content-Type'] = 'application/json';

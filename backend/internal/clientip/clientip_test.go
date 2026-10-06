@@ -78,19 +78,20 @@ func TestResolveTrustBoundaries(t *testing.T) {
 		{name: "authenticated forwarded", peer: "127.0.0.1", trust: true, p: Policy{SharedSecret: secret}, headers: map[string][]string{ProxySecretHeader: {secret}, "X-Forwarded-For": {"203.0.113.8"}}, wantIP: "203.0.113.8", source: "trusted-proxy"},
 		{name: "verified CF metadata", peer: "127.0.0.1", trust: true, p: Policy{SharedSecret: secret}, headers: map[string][]string{ProxySecretHeader: {secret}, "X-Forwarded-For": {"203.0.113.8"}, "CF-Ray": {"fixture"}, "CF-Connecting-IP": {"203.0.113.8"}, "CF-IPCountry": {"TR"}}, wantIP: "203.0.113.8", source: "cloudflare", wantCountry: "TR", cf: true},
 		{name: "inconsistent CF metadata", peer: "127.0.0.1", trust: true, p: Policy{SharedSecret: secret}, headers: map[string][]string{ProxySecretHeader: {secret}, "X-Forwarded-For": {"203.0.113.8"}, "CF-Ray": {"fixture"}, "CF-Connecting-IP": {"203.0.113.9"}}, fail: true},
-		// Pages-in-front-of-the-tunnel shape: a trusted hop, no shared secret,
-		// edge-set CF-IPCountry. Country is taken; the IP still comes from the
-		// normalized chain, never from a CF header.
+		// No-shared-secret shape: a trusted hop carries the edge's own
+		// metadata. Country is taken; the IP still comes from the normalized
+		// chain, never from a CF header.
 		{name: "edge country without secret", peer: "127.0.0.1", trust: true, headers: map[string][]string{"X-Forwarded-For": {"203.0.113.8"}, "CF-Ray": {"fixture"}, "CF-IPCountry": {"TR"}}, wantIP: "203.0.113.8", source: "trusted-proxy", wantCountry: "TR", cf: true},
 		{name: "no ray, bare CF country ignored", peer: "127.0.0.1", trust: true, headers: map[string][]string{"X-Forwarded-For": {"203.0.113.8"}, "CF-IPCountry": {"TR"}}, wantIP: "203.0.113.8", source: "trusted-proxy"},
-		// ...but the edge's own restatement is taken, ray or no ray: this is
-		// the shape the live deployment produces (the tunnel drops CF-Ray).
+		// ...but our-own-header restatement is taken, ray or no ray: a
+		// Pages or self-hosted-proxy deployment produces exactly this.
 		{name: "restated country without ray", peer: "127.0.0.1", trust: true, headers: map[string][]string{"X-Forwarded-For": {"203.0.113.8"}, ClientCountryHeader: {"DE"}}, wantIP: "203.0.113.8", source: "trusted-proxy", wantCountry: "DE"},
 		{name: "garbage country ignored", peer: "127.0.0.1", trust: true, headers: map[string][]string{"X-Forwarded-For": {"203.0.113.8"}, "CF-Ray": {"fixture"}, "CF-IPCountry": {"Turkiye"}}, wantIP: "203.0.113.8", source: "trusted-proxy", cf: true},
 		{name: "untrusted edge headers ignored", peer: "203.0.113.1", trust: true, headers: map[string][]string{"CF-Ray": {"fixture"}, "CF-IPCountry": {"TR"}}, wantIP: "203.0.113.1", source: "socket"},
-		// The tunnel that fronts this shop drops CF-Ray/CF-IPCountry, so the
-		// edge re-states the country on its OWN header. Same trust level: it is
-		// only read from an already-trusted hop, and it can never move the IP.
+		// A deployment whose edge does not pass Cloudflare's own headers
+		// through re-states the country on the hop's OWN header. Same trust
+		// level: only read from an already-trusted hop, never able to move the
+		// IP.
 		{name: "edge restated country", peer: "127.0.0.1", trust: true, headers: map[string][]string{"X-Forwarded-For": {"203.0.113.8"}, ClientCountryHeader: {"TR"}}, wantIP: "203.0.113.8", source: "trusted-proxy", wantCountry: "TR"},
 		{name: "restated country lowercased", peer: "127.0.0.1", trust: true, headers: map[string][]string{"X-Forwarded-For": {"203.0.113.8"}, ClientCountryHeader: {"tr"}}, wantIP: "203.0.113.8", source: "trusted-proxy", wantCountry: "TR"},
 		{name: "restated country garbage ignored", peer: "127.0.0.1", trust: true, headers: map[string][]string{"X-Forwarded-For": {"203.0.113.8"}, ClientCountryHeader: {"Turkey!"}}, wantIP: "203.0.113.8", source: "trusted-proxy"},
@@ -142,5 +143,38 @@ func TestGateAndCachedIdentity(t *testing.T) {
 		} else if calls != 0 || ctx.Response.StatusCode() != fasthttp.StatusForbidden || !strings.Contains(string(ctx.Response.Body()), "UNVERIFIED_PROXY") {
 			t.Fatal("invalid user agent accepted")
 		}
+	}
+}
+
+func TestCountryHint(t *testing.T) {
+	for _, tc := range []struct{ name, raw, want string }{
+		{"valid", "TR", "TR"},
+		{"lowercase", "de", "DE"},
+		{"free text", "Turkiye", ""},
+		{"unknown placeholder", "XX", ""},
+		{"empty", "", ""},
+	} {
+		ctx := requestContext(net.ParseIP("203.0.113.1"), map[string][]string{CountryHintHeader: {tc.raw}})
+		if got := CountryHint(ctx); got != tc.want {
+			t.Errorf("%s: hint %q read as %q, want %q", tc.name, tc.raw, got, tc.want)
+		}
+	}
+
+	// A hint is not evidence. Resolve must ignore it completely, so a scripts
+	// on the page cannot steer anything that hangs off the resolved address —
+	// the presence note spends it, and nothing else does.
+	ctx := requestContext(net.ParseIP("127.0.0.1"), map[string][]string{
+		"X-Forwarded-For": {"203.0.113.8"},
+		CountryHintHeader: {"TR"},
+	})
+	info := Resolve(ctx, true, Policy{HeaderMode: "forwarded"})
+	if info.Country != "" {
+		t.Errorf("Resolve took the browser hint: %+v", info)
+	}
+	if info.IP != "203.0.113.8" || info.Source != "trusted-proxy" {
+		t.Errorf("Resolve changed: %+v", info)
+	}
+	if got := CountryHint(ctx); got != "TR" {
+		t.Errorf("hint lost: %q", got)
 	}
 }

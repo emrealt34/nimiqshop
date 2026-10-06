@@ -24,10 +24,13 @@ import (
  * out), Hub login, the presence heartbeat, and BOTH checkout paths.
  *
  * The write is one small user record, throttled per account, and it can never
- * fail a request: presence is operational metadata, never a gate. The IP is
- * the same value clientip.Resolve already gives the checkout for the
- * supplier's X-Forwarded-For, and the country is Cloudflare's CF-IPCountry —
- * no third-party geo lookup is called, for this or anything else.
+ * fail a request: presence is operational metadata, never a gate. The IP is the
+ * same value clientip.Resolve already gives the checkout for the supplier's
+ * X-Forwarded-For. The country comes from the edge whenever the hop carries it
+ * (CF-IPCountry, or the edge's own restatement), and otherwise from the hint the
+ * browser fetched from the same-origin edge trace — see withEdgeCountry,
+ * clientip.CountryHint and src/lib/edgeGeo.ts. No third-party geo lookup is
+ * called, for this or anything else.
  */
 
 // presenceNoteGap bounds how often one account's origin may be rewritten.
@@ -45,7 +48,25 @@ var presenceNoteLast sync.Map
 // itself. Safe to call from any authenticated handler; cheap enough for the
 // heartbeat, which is why the panel finally has an address for everyone.
 func (h *Handlers) noteUserPresence(ctx *fasthttp.RequestCtx, userID string) {
-	h.noteUserPresenceFrom(userID, clientip.Resolve(ctx, h.Cfg.TrustProxy, h.Cfg.ClientIPPolicy()))
+	info := clientip.Resolve(ctx, h.Cfg.TrustProxy, h.Cfg.ClientIPPolicy())
+	h.noteUserPresenceFrom(userID, h.withEdgeCountry(ctx, info))
+}
+
+// withEdgeCountry adds the browser-reported country when the server could not
+// settle one itself: the live deployment's edge does not pass Cloudflare's
+// CF-IPCountry through, so without this every row in the People panel would
+// keep a blank flag however often the customer visited.
+//
+// It is deliberately a separate step rather than something clientip.Resolve
+// does: callers that resolved the address for their OWN use (the checkout
+// hands it to the supplier) must keep exactly what the chain said, and only the
+// presence note — a display label in the operator console — may fall back to a
+// value a script could have set.
+func (h *Handlers) withEdgeCountry(ctx *fasthttp.RequestCtx, info clientip.Info) clientip.Info {
+	if info.Country == "" {
+		info.Country = clientip.CountryHint(ctx)
+	}
+	return info
 }
 
 // noteUserPresenceFrom is the same for handlers that already resolved the IP

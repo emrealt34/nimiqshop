@@ -40,6 +40,7 @@
  */
 import { _setSessionGetter, _setCSRFGetter } from './api';
 import { CFG } from './config';
+import { hintHeaders } from './edgeGeo';
 
 /** Non-secret session metadata. Nothing here can authenticate a request. */
 export interface SessionInfo {
@@ -221,7 +222,7 @@ export function signOut(silent = false): void {
       fetch(base + '/auth/logout', {
         method: 'POST',
         credentials: credentialsFor(base),
-        headers: csrfToken() ? { 'X-CSRF-Token': csrfToken() } : {},
+        headers: { ...(csrfToken() ? { 'X-CSRF-Token': csrfToken() } : {}), ...hintHeaders() },
         cache: 'no-store',
       }).catch(() => {});
     } catch {
@@ -256,6 +257,7 @@ async function confirmSessionEnded(): Promise<boolean> {
       const res = await fetch(base + '/auth/session', {
         method: 'GET',
         credentials: credentialsFor(base),
+        headers: hintHeaders(),
         cache: 'no-store',
       });
       if (!res.ok) return true; // server problem, not an expired session
@@ -353,6 +355,7 @@ export async function bootstrapSession(): Promise<boolean> {
     const res = await fetch(base + '/auth/session', {
       method: 'GET',
       credentials: credentialsFor(base),
+      headers: hintHeaders(),
       cache: 'no-store',
     });
     if (!res.ok) return isAuthed();
