@@ -79,8 +79,8 @@ export function LightningRailPills() {
   return (
     <RailPills
       pills={[
-        { bg: '#0582CA', img: asset('/img/nimiq-hexagon.png?v=40'), label: t('checkout.lpPayWithNimOrUsdt') },
-        { bg: '#0E6BA8', img: asset('/img/btc-lightning.png'), label: t('checkout.lpBtcNetwork') },
+        { bg: '#0582CA', img: asset('/img/nimiq-pay.webp'), label: t('checkout.lpPayWithNimOrUsdt') },
+        
       ]}
     />
   );

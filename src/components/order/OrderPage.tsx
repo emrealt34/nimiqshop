@@ -687,7 +687,7 @@ function PayNowCard({ q }: { q: any }) {
             <span className="big-nim">{coinAmountLabel(q) || t('orderPage.amountShownBelow')}</span>
           ) : nimBase ? (
             <>
-              <img className="pay-nim-ico" src={asset("/img/nimiq-hexagon.png?v=40")} draggable={false} alt="NIM" width={22} height={22} style={{ pointerEvents: "none", borderRadius: 5 }} />
+              <img className="pay-nim-ico" src={asset("/img/nimiq-pay.webp")} draggable={false} alt="NIM" width={22} height={22} style={{ pointerEvents: "none", borderRadius: 5 }} />
               <span className="big-nim">{t('checkout.flowFeeSuffix', { amount: nimBase })}</span>
             </>
           ) : (
