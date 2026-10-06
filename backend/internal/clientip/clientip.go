@@ -239,16 +239,18 @@ func Resolve(ctx *fasthttp.RequestCtx, trustProxy bool, policies ...Policy) Info
 		// visited. Country ONLY, and only from an already-trusted hop: the
 		// visitor IP was settled from the peeled chain above.
 		if len(ctx.Request.Header.Peek("CF-Ray")) > 0 {
-			// Cloudflare answered this request itself.
+			// Cloudflare answered this request itself, so its own attribution
+			// may be taken. Without the ray trace a bare CF-IPCountry is just a
+			// header somebody sent, and it is ignored.
 			result.Cloudflare = true
-		}
-		if result.Country == "" {
 			result.Country = country(string(ctx.Request.Header.Peek("CF-IPCountry")))
 		}
 		if result.Country == "" {
-			// ...and when Cloudflare's own geolocation header does not survive
-			// the hop (a tunnel drops it), our edge's restatement of it
-			// (request.cf.country) does — see ClientCountryHeader.
+			// Our edge's restatement (request.cf.country) travels on a header
+			// of our own, because Cloudflare's CF-* set does not survive every
+			// hop of this stack — see ClientCountryHeader. Both repos' hops
+			// delete any client-supplied copy first, so from a trusted hop this
+			// is the edge's word, not the visitor's.
 			result.Country = country(string(ctx.Request.Header.Peek(ClientCountryHeader)))
 		}
 	}

@@ -82,7 +82,10 @@ func TestResolveTrustBoundaries(t *testing.T) {
 		// edge-set CF-IPCountry. Country is taken; the IP still comes from the
 		// normalized chain, never from a CF header.
 		{name: "edge country without secret", peer: "127.0.0.1", trust: true, headers: map[string][]string{"X-Forwarded-For": {"203.0.113.8"}, "CF-Ray": {"fixture"}, "CF-IPCountry": {"TR"}}, wantIP: "203.0.113.8", source: "trusted-proxy", wantCountry: "TR", cf: true},
-		{name: "no ray no country", peer: "127.0.0.1", trust: true, headers: map[string][]string{"X-Forwarded-For": {"203.0.113.8"}, "CF-IPCountry": {"TR"}}, wantIP: "203.0.113.8", source: "trusted-proxy"},
+		{name: "no ray, bare CF country ignored", peer: "127.0.0.1", trust: true, headers: map[string][]string{"X-Forwarded-For": {"203.0.113.8"}, "CF-IPCountry": {"TR"}}, wantIP: "203.0.113.8", source: "trusted-proxy"},
+		// ...but the edge's own restatement is taken, ray or no ray: this is
+		// the shape the live deployment produces (the tunnel drops CF-Ray).
+		{name: "restated country without ray", peer: "127.0.0.1", trust: true, headers: map[string][]string{"X-Forwarded-For": {"203.0.113.8"}, ClientCountryHeader: {"DE"}}, wantIP: "203.0.113.8", source: "trusted-proxy", wantCountry: "DE"},
 		{name: "garbage country ignored", peer: "127.0.0.1", trust: true, headers: map[string][]string{"X-Forwarded-For": {"203.0.113.8"}, "CF-Ray": {"fixture"}, "CF-IPCountry": {"Turkiye"}}, wantIP: "203.0.113.8", source: "trusted-proxy", cf: true},
 		{name: "untrusted edge headers ignored", peer: "203.0.113.1", trust: true, headers: map[string][]string{"CF-Ray": {"fixture"}, "CF-IPCountry": {"TR"}}, wantIP: "203.0.113.1", source: "socket"},
 		// The tunnel that fronts this shop drops CF-Ray/CF-IPCountry, so the
