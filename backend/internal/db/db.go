@@ -256,10 +256,10 @@ func New(dir string, cfgs ...Options) (*Store, error) {
 	} else {
 		opts = opts.WithIndexCacheSize(16 * 1024 * 1024)
 	}
-	if v := envPositiveInt("BADGER_NUM_COMPACTORS"); v > 0 && v <= 16 {
+	if v := envPositiveInt("BADGER_NUM_COMPACTORS"); v > 1 && v <= 16 {
 		opts = opts.WithNumCompactors(int(v))
 	} else {
-		opts = opts.WithNumCompactors(1)
+		opts = opts.WithNumCompactors(2) // Badger requires AT LEAST 2 compactors
 	}
 
 	bdb, err := badger.Open(opts)
