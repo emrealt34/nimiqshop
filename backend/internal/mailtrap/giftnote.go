@@ -5,15 +5,9 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"html"
-	"image"
-	"image/color"
-	"image/draw"
 	"image/png"
-	"math"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
@@ -178,7 +172,6 @@ const emailCSS = `  :root{color-scheme:light;supported-color-schemes:light}
   .ExternalClass,.ExternalClass p,.ExternalClass span,.ExternalClass td,.ExternalClass div{line-height:inherit}
   /* The donor mosaic is a table of 1x1px cells: without these resets some
      clients give the cells a minimum height from the inherited line box. */
-  .donor-img td{font-size:0!important;line-height:0!important}
   @media only screen and (max-width:620px){
     .email-container{width:100%!important;max-width:100%!important}
     .px-outer{padding-left:10px!important;padding-right:10px!important}
@@ -188,7 +181,6 @@ const emailCSS = `  :root{color-scheme:light;supported-color-schemes:light}
     .item-line{font-size:15px!important}
     .donor-cell{display:block!important;width:100%!important;padding:0 0 12px 0!important;text-align:center!important}
     .donor-info{display:block!important;width:100%!important;padding-left:0!important;text-align:center!important}
-    .donor-img{margin:0 auto!important}
     .addr{font-size:11px!important}
     .cta-table{width:100%!important}
     .cta-link{display:block!important;text-align:center!important}
@@ -239,26 +231,29 @@ func (n GiftNote) Build(cfg Config) (Message, error) {
 
 	text := n.textBody(site, product, body)
 	htmlBody := n.htmlBody(site, product, body, subject)
-	// Gmail clips an HTML body at ~102 KB and then the rest of the mail is
-	// lost. The avatar mosaic is the only large, input-dependent part, so when
-	// the whole body would exceed the budget the avatar is dropped (the card
-	// keeps the wallet address) instead of risking the clip.
-	if len(htmlBody) > MailHTMLBudget && n.GifterIdenticonDataURI != "" {
-		lean := n
-		lean.GifterIdenticonDataURI = ""
-		htmlBody = lean.htmlBody(site, product, body, subject)
-	}
+	// Gmail clips an HTML body at ~102 KB. The body is text and layout only (the
+	// avatar is an attachment), so this is a guard, not an expected cut.
 	if len(htmlBody) > MailHTMLBudget {
 		return Message{}, ErrMailTooLarge
 	}
+	var attachments []Attachment
+	if icon, ok := identiconImage(n.GifterIdenticonDataURI); ok {
+		attachments = append(attachments, Attachment{
+			Filename:    "buyer-identicon.png",
+			ContentType: "image/png",
+			Data:        icon,
+			ContentID:   identiconContentID,
+		})
+	}
 
 	return Message{
-		To:       []Address{n.Recipient},
-		Subject:  subject,
-		Text:     text,
-		HTML:     htmlBody,
-		Category: fallback(n.Category, cfg.Category+GiftCategorySuffix),
-		OrderID:  n.OrderID,
+		To:          []Address{n.Recipient},
+		Subject:     subject,
+		Text:        text,
+		HTML:        htmlBody,
+		Category:    fallback(n.Category, cfg.Category+GiftCategorySuffix),
+		OrderID:     n.OrderID,
+		Attachments: attachments,
 		CustomVariables: map[string]any{
 			"kind":    "gift_note",
 			"product": product,
@@ -522,7 +517,8 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 		if n.Anonymous {
 			b.WriteString(anonymousCard())
 		} else if strings.TrimSpace(n.GifterNimiqAddress) != "" {
-			b.WriteString(identityCard(esc(groupAddress(n.GifterNimiqAddress)), n.GifterIdenticonDataURI, n.Self))
+			_, withIcon := identiconImage(n.GifterIdenticonDataURI)
+			b.WriteString(identityCard(esc(groupAddress(n.GifterNimiqAddress)), withIcon, n.Self))
 		} else {
 			b.WriteString(plainSenderCard())
 		}
@@ -718,251 +714,6 @@ func plainSenderCard() string {
 	return panel(font, inner)
 }
 
-// Mosaic geometry of the donor avatar: 72x72 cells, one CSS pixel each, which
-// is a pixel-exact redraw of the identicon at the size it is displayed — the
-// 160px source is sampled on a 72-grid and every cell is one real pixel, so
-// the avatar in the inbox is as sharp as the one on the page.
-//
-// Sizing is a hard constraint, not a taste call: Gmail clips a message over
-// ~102KB, and the mosaic is by far the biggest thing in the note. Measured on
-// the real @nimiq/identicons face (flat areas compress into long runs, which is
-// what keeps this affordable):
-//
-//	32x32 cells, 2px (the previous version)  ~18KB  — visibly blocky, the
-//	                                                 character's face and hat
-//	                                                 were unreadable
-//	72x72 cells, 1px (this version)          ~49KB  — pixel-exact; the whole
-//	                                                 note stays ~60KB, a third
-//	                                                 below the clip
-//	88x88 cells, 1px                         ~69KB  — would leave ~25KB of
-//	                                                 headroom for everything
-//	                                                 else, too close to the cut
-//
-// The owner's verdict on the old one was blunt and right ("avatar bile bozuk
-// gözüküyor") — at 32 cells the identicon loses exactly what makes it an
-// identity: the face.
-const (
-	identN       = 72 // mosaic cells per side (area-averaged)
-	identCell    = 1
-	identPalette = 8 // colours the face is clustered into: few colours = long, cheap runs
-)
-
-// identiconTable re-draws the donor's identicon PNG as a bgcolor-cell mosaic.
-//
-// Why not an <img>: Gmail strips data: URIs from image sources and CID inline
-// attachments render unreliably in webmail, so an embedded avatar arrives as
-// an empty box for a chunk of recipients. A table of bgcolor cells is the one
-// graphics primitive every mail client renders, so that is what ships.
-//
-// The URI must still pass safeDataImage. Any PNG the decoder understands is
-// accepted and converted to NRGBA (RGBA, palette, gray and 16-bit sources all
-// arrive as *image.RGBA / *image.Paletted / *image.Gray otherwise, and a
-// silently missing avatar is exactly the bug this replaces); anything else
-// keeps the placeholder avatar. Identicon gradients become stepped cell
-// colours — the deterministic pattern, which is the identity, survives exactly.
-func identiconTable(dataURI string) string {
-	u := safeDataImage(dataURI)
-	if u == "" {
-		return ""
-	}
-	const pngPrefix = "data:image/png;base64,"
-	if !strings.HasPrefix(u, pngPrefix) {
-		return "" // an SVG cannot be rasterized here; the card drops the avatar
-	}
-	raw, err := base64.StdEncoding.DecodeString(strings.TrimSpace(strings.TrimPrefix(u, pngPrefix)))
-	if err != nil {
-		return ""
-	}
-	src, err := png.Decode(bytes.NewReader(raw))
-	if err != nil {
-		return ""
-	}
-	bounds := src.Bounds()
-	if bounds.Dx() < 1 || bounds.Dy() < 1 {
-		return ""
-	}
-	// One conversion for every source type (palette, gray, 16-bit, RGBA).
-	nrgba := image.NewNRGBA(image.Rect(0, 0, bounds.Dx(), bounds.Dy()))
-	draw.Draw(nrgba, nrgba.Bounds(), src, bounds.Min, draw.Src)
-	w, h := bounds.Dx(), bounds.Dy()
-
-	// Each cell is the AREA AVERAGE of its source rectangle (not one point),
-	// composited over the card paper; then the grid is clustered into a small
-	// palette so the face is made of a few clean colours, not gradient noise.
-	grid := make([]rgbF, identN*identN)
-	for iy := 0; iy < identN; iy++ {
-		for ix := 0; ix < identN; ix++ {
-			x0, x1 := ix*w/identN, (ix+1)*w/identN
-			y0, y1 := iy*h/identN, (iy+1)*h/identN
-			if x1 <= x0 {
-				x1 = x0 + 1
-			}
-			if y1 <= y0 {
-				y1 = y0 + 1
-			}
-			if x1 > w {
-				x1 = w
-			}
-			if y1 > h {
-				y1 = h
-			}
-			grid[iy*identN+ix] = cellAverage(nrgba, x0, x1, y0, y1)
-		}
-	}
-	colors := paletteMosaic(grid)
-
-	var sb strings.Builder
-	sb.WriteString(`<table class="donor-img" role="presentation" width="` + strconv.Itoa(identN) + `" cellpadding="0" cellspacing="0" border="0" bgcolor="` + mailPaper + `" style="width:` + strconv.Itoa(identN) + `px;border-collapse:collapse;border-spacing:0;font-size:0;line-height:0">`)
-	for iy := 0; iy < identN; iy++ {
-		row := colors[iy*identN : (iy+1)*identN]
-		sb.WriteString(`<tr style="font-size:0;line-height:0">`)
-		for ix := 0; ix < identN; {
-			run := 1
-			for ix+run < identN && row[ix+run] == row[ix] {
-				run++
-			}
-			if run == 1 {
-				sb.WriteString(`<td bgcolor="` + row[ix] + `" width="` + strconv.Itoa(identCell) + `" height="` + strconv.Itoa(identCell) + `" style="font-size:0;line-height:0">&nbsp;</td>`)
-			} else {
-				sb.WriteString(`<td bgcolor="` + row[ix] + `" colspan="` + strconv.Itoa(run) + `" width="` + strconv.Itoa(run*identCell) + `" height="` + strconv.Itoa(identCell) + `" style="font-size:0;line-height:0">&nbsp;</td>`)
-			}
-			ix += run
-		}
-		sb.WriteString("</tr>")
-	}
-	sb.WriteString("</table>")
-
-	// A SQUARE gold frame around the mosaic. The old rounded border was
-	// clipped by table cells in several clients, leaving the corners broken.
-	return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" bgcolor="` + mailGold + `" style="margin:0 auto"><tr><td style="padding:2px;background:` + mailGold + `;font-size:0;line-height:0">` + sb.String() + `</td></tr></table>`
-}
-
-// rgbF is a colour in 0..255 per channel, kept as float for averaging.
-type rgbF [3]float64
-
-// cellAverage is the area average of one source rectangle. Premultiplied, so a
-// transparent corner pixel pulls the cell toward the paper, not toward black,
-// and then composited over the card paper.
-func cellAverage(img *image.NRGBA, x0, x1, y0, y1 int) rgbF {
-	var sum rgbF
-	var sa, n float64
-	for y := y0; y < y1; y++ {
-		for x := x0; x < x1; x++ {
-			c := img.NRGBAAt(x, y)
-			a := float64(c.A) / 255
-			sum[0] += float64(c.R) * a
-			sum[1] += float64(c.G) * a
-			sum[2] += float64(c.B) * a
-			sa += a
-			n++
-		}
-	}
-	if n == 0 {
-		return rgbF{246, 239, 220}
-	}
-	ar := sa / n
-	return rgbF{
-		sum[0]/n + 246*(1-ar),
-		sum[1]/n + 239*(1-ar),
-		sum[2]/n + 220*(1-ar),
-	}
-}
-
-// paletteMosaic clusters the cell colours into identPalette colours (k-means,
-// deterministic: centroids seeded from evenly spaced cells) and returns each
-// cell's palette colour as hex. Few colours means long same-colour runs, which
-// is what keeps the mosaic small enough for Gmail's 102 KB clip limit.
-func paletteMosaic(grid []rgbF) []string {
-	k := identPalette
-	if len(grid) < k {
-		k = len(grid)
-	}
-	cent := make([]rgbF, k)
-	for c := range cent {
-		cent[c] = grid[c*len(grid)/k]
-	}
-	assign := make([]int, len(grid))
-	for iter := 0; iter < 16; iter++ {
-		changed := false
-		for i, p := range grid {
-			best, bd := 0, math.MaxFloat64
-			for c := range cent {
-				d := dist2(p, cent[c])
-				if d < bd {
-					best, bd = c, d
-				}
-			}
-			if assign[i] != best || iter == 0 {
-				changed = true
-			}
-			assign[i] = best
-		}
-		if !changed {
-			break
-		}
-		sums := make([]rgbF, k)
-		counts := make([]float64, k)
-		for i, p := range grid {
-			c := assign[i]
-			for ch := 0; ch < 3; ch++ {
-				sums[c][ch] += p[ch]
-			}
-			counts[c]++
-		}
-		for c := range cent {
-			if counts[c] > 0 {
-				for ch := 0; ch < 3; ch++ {
-					cent[c][ch] = sums[c][ch] / counts[c]
-				}
-			}
-		}
-	}
-	out := make([]string, len(grid))
-	for i := range grid {
-		out[i] = hexRGB(cent[assign[i]])
-	}
-	return out
-}
-
-func dist2(a, b rgbF) float64 {
-	dr, dg, db := a[0]-b[0], a[1]-b[1], a[2]-b[2]
-	return dr*dr + dg*dg + db*db
-}
-
-func hexRGB(c rgbF) string {
-	var v [3]int
-	for ch := 0; ch < 3; ch++ {
-		x := int(math.Round(c[ch]))
-		if x < 0 {
-			x = 0
-		}
-		if x > 255 {
-			x = 255
-		}
-		v[ch] = x
-	}
-	return fmt.Sprintf("#%02x%02x%02x", v[0], v[1], v[2])
-}
-
-// pngComposite is one mosaic cell's colour: the source pixel, alpha-composited
-// over the card background (mailPaper, the same tone the avatar table sits on)
-// so the identicon's transparent corners disappear into the card instead of
-// showing a box.
-func pngComposite(c color.Color) string {
-	nc := color.NRGBAModel.Convert(c).(color.NRGBA)
-	if nc.A >= 250 {
-		return fmt.Sprintf("#%02x%02x%02x", nc.R, nc.G, nc.B)
-	}
-	if nc.A <= 5 {
-		return mailPaper
-	}
-	ar := float64(nc.A) / 255.0
-	r := int(float64(nc.R)*ar + 246*(1-ar))
-	g := int(float64(nc.G)*ar + 239*(1-ar))
-	bl := int(float64(nc.B)*ar + 220*(1-ar))
-	return fmt.Sprintf("#%02x%02x%02x", r, g, bl)
-}
-
 // wordmark renders the site name with the dot before the TLD in gold, the way
 // the navbar does: nimiqshop.io -> nimiqshop<gold>.</gold>io.
 func wordmark(site string) string {
@@ -994,31 +745,62 @@ func anonymousCard() string {
 // identityCard is the donor block: their REAL Nimiq identicon (as a mosaic,
 // see identiconTable) and their wallet address — never a name. On phones the
 // two stack, centred, inside the same panel.
+// identiconContentID is the Content-ID of the buyer's identicon attachment.
+const identiconContentID = "buyer-identicon"
+
+// identiconMaxBytes bounds the avatar PNG so config cannot smuggle a large
+// payload through the identicon field.
+const identiconMaxBytes = 256 << 10
+
+// identiconImage returns the buyer's Nimiq identicon as PNG bytes. The frontend
+// sends a data:image/png URI; it is accepted only if it decodes as a real PNG of
+// sane size. ok=false means the mail goes out without an avatar.
+//
+// The PNG ships as an INLINE ATTACHMENT (cid:) and is shown at full resolution.
+// The earlier cell mosaic was a workaround for Gmail blocking data: images, but
+// at 72 cells it lost the face (mouth, lower body). Attachments do not count
+// toward Gmail's ~102 KB clip, so the size budget no longer depends on the
+// avatar.
+func identiconImage(dataURI string) ([]byte, bool) {
+	u := safeDataImage(dataURI)
+	const pngPrefix = "data:image/png;base64,"
+	if u == "" || !strings.HasPrefix(u, pngPrefix) {
+		return nil, false
+	}
+	raw, err := base64.StdEncoding.DecodeString(strings.TrimSpace(strings.TrimPrefix(u, pngPrefix)))
+	if err != nil || len(raw) == 0 || len(raw) > identiconMaxBytes {
+		return nil, false
+	}
+	cfg, err := png.DecodeConfig(bytes.NewReader(raw))
+	if err != nil || cfg.Width < 1 || cfg.Height < 1 || cfg.Width > 1024 || cfg.Height > 1024 {
+		return nil, false
+	}
+	return raw, true
+}
+
 // identityCard renders the wallet/identicon card. self=true is the buyer's own
-// plain purchase: "Paid from" instead of "From", and no gift wording.
-func identityCard(addr, identURI string, self bool) string {
+// plain purchase: "Paid from" instead of "From", and no gift wording. withIcon
+// says whether the identicon attachment is part of the message.
+func identityCard(addr string, withIcon bool, self bool) string {
 	font := emailFont
-	img := identiconTable(identURI)
 	addrCell := `<div class="addr" style="font-family:` + emailMono + `;font-size:12px;line-height:1.5;color:` + mailInk + `;word-break:break-all">` + addr + `</div>`
-	info := `<td class="donor-info" style="vertical-align:middle;padding-left:` + avatarGap(img) + `">` +
+	avatar := ""
+	gap := "0"
+	if withIcon {
+		gap = "16px"
+		// A bordered square around the full-resolution face. The img alt text is
+		// what a client with images blocked shows instead.
+		img := `<img src="cid:` + identiconContentID + `" width="72" height="72" alt="Nimiq identicon of the buyer's wallet" style="display:block;width:72px;height:72px;border:0;outline:none">`
+		frame := `<table role="presentation" cellpadding="0" cellspacing="0" border="0" bgcolor="` + mailGold + `" style="margin:0 auto;border:2px solid ` + mailGold + `"><tr><td style="padding:0;font-size:0;line-height:0">` + img + `</td></tr></table>`
+		avatar = `<td class="donor-cell" width="84" valign="middle" style="width:84px;text-align:center">` + frame + `</td>`
+	}
+	info := `<td class="donor-info" style="vertical-align:middle;padding-left:` + gap + `">` +
 		eyebrow(font, paidOrFrom(self)) +
 		addrCell +
 		`<div style="font-size:11.5px;line-height:1.5;color:` + mailInkFaint + `;padding-top:4px">` + identityFootnote(self) + `</div>` +
 		`</td>`
-	avatar := ""
-	if img != "" {
-		// Only a real identicon gets a cell: no empty box when none was sent.
-		avatar = `<td class="donor-cell" width="` + strconv.Itoa(identN+4) + `" valign="middle" style="width:` + strconv.Itoa(identN+4) + `px;text-align:center">` + img + `</td>`
-	}
 	inner := `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>` + avatar + info + `</tr></table>`
 	return panel(font, inner)
-}
-
-func avatarGap(img string) string {
-	if img == "" {
-		return "0"
-	}
-	return "16px"
 }
 
 func wrap(s string, width int) string {

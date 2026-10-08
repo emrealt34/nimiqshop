@@ -2,6 +2,7 @@ package mailtrap
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
@@ -50,6 +51,18 @@ type Message struct {
 	// (the send API has none), so it never replaces a send-once marker such as
 	// db.Quote.GiftNotifiedAt.
 	MessageID string
+	// Attachments are sent with the message. An attachment with a ContentID is
+	// inline and is referenced from the HTML body as cid:<ContentID>.
+	Attachments []Attachment
+}
+
+// Attachment is a file sent with a Message.
+type Attachment struct {
+	Filename    string
+	ContentType string
+	Data        []byte
+	// ContentID, when set, makes the attachment inline (cid:<ContentID>).
+	ContentID string
 }
 
 // Kind classifies a transport failure so the caller can decide between retrying
@@ -180,6 +193,20 @@ func (c *Client) Send(ctx context.Context, m Message) ([]string, error) {
 	}
 	if vars := m.variables(); len(vars) > 0 {
 		req.CustomVariables = vars
+	}
+	for _, a := range m.Attachments {
+		sa := mailtrapsdk.Attachment{
+			Content:  base64.StdEncoding.EncodeToString(a.Data),
+			Type:     a.ContentType,
+			Filename: a.Filename,
+		}
+		if a.ContentID != "" {
+			sa.Disposition = mailtrapsdk.DispositionInline
+			sa.ContentID = a.ContentID
+		} else {
+			sa.Disposition = mailtrapsdk.DispositionAttachment
+		}
+		req.Attachments = append(req.Attachments, sa)
 	}
 
 	resp, _, err := c.api.Send(ctx, req)

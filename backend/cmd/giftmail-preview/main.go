@@ -13,10 +13,12 @@
 package main
 
 import (
+	"encoding/base64"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"nimiqshop/internal/mailtrap"
@@ -81,8 +83,18 @@ func main() {
 			fmt.Println("BUILD ERROR:", tc.name, err)
 			os.Exit(1)
 		}
+		// The sent mail references the avatar as cid:, which a browser cannot
+		// load from a local file. For the preview only, inline the attachment
+		// as a data URI so the page shows what the recipient sees.
+		html := m.HTML
+		for _, att := range m.Attachments {
+			if att.ContentID != "" {
+				uri := "data:" + att.ContentType + ";base64," + base64.StdEncoding.EncodeToString(att.Data)
+				html = strings.ReplaceAll(html, "cid:"+att.ContentID, uri)
+			}
+		}
 		p := filepath.Join(*outDir, tc.name+".html")
-		if err := os.WriteFile(p, []byte(m.HTML), 0o644); err != nil {
+		if err := os.WriteFile(p, []byte(html), 0o644); err != nil {
 			fmt.Println("WRITE ERROR:", err)
 			os.Exit(1)
 		}

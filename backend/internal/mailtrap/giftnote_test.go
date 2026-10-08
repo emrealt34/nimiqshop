@@ -127,65 +127,84 @@ func TestDeliveryInferenceAndFormatting(t *testing.T) {
 	}
 }
 
-func TestIdenticonRenderingAndAlpha(t *testing.T) {
-	for _, input := range []string{"", "https://tracker.invalid/pixel", "data:image/svg+xml;base64,abc", "data:image/png;base64,%%%", "data:image/png;base64," + base64.StdEncoding.EncodeToString([]byte("not a PNG"))} {
-		if identiconTable(input) != "" {
-			t.Fatal("invalid PNG accepted")
+// The avatar ships as an inline PNG attachment, not a cell mosaic, so it keeps
+// every feature of the real identicon. These tests pin the accept/reject rules,
+// the cid: wiring, and that the bytes the recipient gets are the bytes we got.
+func TestIdenticonAttachment(t *testing.T) {
+	for _, input := range []string{"", "https://tracker.invalid/pixel", "data:image/svg+xml;base64,abc", "data:image/png;base64,%%%", "data:image/png;base64,\u0000" + base64.StdEncoding.EncodeToString([]byte("not a PNG"))} {
+		if _, ok := identiconImage(input); ok {
+			t.Fatalf("invalid avatar accepted: %q", input)
 		}
 	}
-	// Any PNG the decoder understands renders — not just 8-bit RGBA. A gray or
-	// palette source used to fall through to the placeholder, which the
-	// recipient sees as a missing avatar; the mosaic is the one thing the whole
-	// donor block exists for, so it is converted instead of dropped.
-	gray := identiconTable(pngURI(t, image.NewGray(image.Rect(0, 0, 8, 8))))
-	if !strings.Contains(gray, `class="donor-img"`) {
-		t.Fatal("gray PNG should still render a mosaic")
+	// Any PNG the decoder understands is accepted, not just 8-bit RGBA.
+	gray := pngURI(t, image.NewGray(image.Rect(0, 0, 8, 8)))
+	if _, ok := identiconImage(gray); !ok {
+		t.Fatal("gray PNG rejected")
 	}
-	if !strings.Contains(gray, "background:"+mailGold) {
-		t.Fatal("mosaic lost its square gold frame")
+	// Oversized payloads are refused so config cannot smuggle bulk through here.
+	big := image.NewNRGBA(image.Rect(0, 0, 1024, 1024))
+	rng := rand.New(rand.NewSource(3))
+	for i := range big.Pix {
+		big.Pix[i] = uint8(rng.Intn(256))
 	}
+	if _, ok := identiconImage(pngURI(t, big)); ok {
+		t.Fatal("oversized avatar accepted")
+	}
+
 	img := image.NewNRGBA(image.Rect(0, 0, 32, 32))
 	for y := 0; y < 32; y++ {
 		for x := 0; x < 32; x++ {
-			shade := uint8(0)
-			if x%2 == 0 {
-				shade = 200
-			}
-			img.SetNRGBA(x, y, color.NRGBA{R: shade, G: 20, B: 40, A: 128})
+			img.SetNRGBA(x, y, color.NRGBA{R: uint8(x * 8), G: 20, B: uint8(y * 8), A: 255})
 		}
 	}
 	uri := pngURI(t, img)
-	mosaic := identiconTable(uri)
-	// One <tr> per cell row, and runs may compress horizontally but never
-	// below one cell per row.
-	if !strings.Contains(mosaic, `class="donor-img"`) || strings.Count(mosaic, "<tr ") != identN {
-		t.Fatalf("mosaic rows: %d", strings.Count(mosaic, "<tr "))
+	raw, ok := identiconImage(uri)
+	if !ok {
+		t.Fatal("valid PNG rejected")
 	}
-	if got := strings.Count(mosaic, "<td "); got < identN || got > identN*identN {
-		t.Fatalf("mosaic cells out of range: %d", got)
+	n := GiftNote{Recipient: Address{Email: "friend@example.com"}, GifterNimiqAddress: "NQ00", GifterIdenticonDataURI: uri, ProductLabel: "Steam · 50 USD", SiteName: "nimiqshop.io", OrderID: "Q-9"}
+	msg, err := n.Build(Config{})
+	if err != nil {
+		t.Fatal(err)
 	}
-	solid := image.NewNRGBA(image.Rect(0, 0, 1, 1))
-	solid.SetNRGBA(0, 0, color.NRGBA{R: 100, A: 128})
-	if !strings.Contains(identiconTable(pngURI(t, solid)), `colspan="72"`) {
-		t.Fatal("solid row not compressed")
+	if len(msg.Attachments) != 1 {
+		t.Fatalf("want 1 attachment, got %d", len(msg.Attachments))
 	}
-	card := identityCard("NQ00", uri, false)
-	if !strings.Contains(card, "NQ00") || !strings.Contains(card, "background:"+mailPanel) || !strings.Contains(card, mailGold) {
-		t.Fatal("identity card lost its address, panel or ring")
+	att := msg.Attachments[0]
+	if att.ContentID != identiconContentID || att.ContentType != "image/png" || !bytes.Equal(att.Data, raw) {
+		t.Fatal("identicon attachment does not carry the buyer's exact PNG")
 	}
-	if strings.Contains(identityCard("", "", false), "donor-cell") {
-		t.Fatal("no identicon must mean no empty avatar box")
+	if !strings.Contains(msg.HTML, `src="cid:`+identiconContentID+`"`) {
+		t.Fatal("HTML does not reference the inline identicon")
+	}
+	if strings.Contains(msg.HTML, "data:image") || strings.Contains(msg.HTML, "donor-img") {
+		t.Fatal("HTML must not embed the bitmap or a cell mosaic")
+	}
+
+	// No identicon: no attachment, no image, no empty avatar box.
+	bare := GiftNote{Recipient: Address{Email: "friend@example.com"}, GifterNimiqAddress: "NQ00", ProductLabel: "Steam · 50 USD", SiteName: "nimiqshop.io", OrderID: "Q-10"}
+	m2, err := bare.Build(Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(m2.Attachments) != 0 || strings.Contains(m2.HTML, "cid:") || strings.Contains(m2.HTML, `class="donor-cell"`) {
+		t.Fatal("no identicon must mean no attachment and no avatar box")
+	}
+	// Anonymous orders never carry the identicon, even when one was sent.
+	anon := n
+	anon.Anonymous = true
+	m3, err := anon.Build(Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(m3.Attachments) != 0 || strings.Contains(m3.HTML, "cid:") {
+		t.Fatal("anonymous mail carried the identicon")
+	}
+	if strings.Contains(identityCard("NQ00", false, false), `class="donor-cell"`) {
+		t.Fatal("card without an icon must have no avatar cell")
 	}
 	if !strings.Contains(anonymousCard(), "anonymous") || !strings.Contains(anonymousCard(), "background:"+mailPanel) {
 		t.Fatal("anonymous card")
-	}
-	for _, tc := range []struct {
-		c    color.NRGBA
-		want string
-	}{{color.NRGBA{R: 1, G: 2, B: 3, A: 255}, "#010203"}, {color.NRGBA{A: 0}, mailPaper}, {color.NRGBA{R: 0, G: 0, B: 0, A: 128}, "#7a776d"}} {
-		if got := pngComposite(tc.c); got != tc.want {
-			t.Errorf("alpha: %s != %s", got, tc.want)
-		}
 	}
 }
 
@@ -282,6 +301,11 @@ func TestGmailBudgetHoldsForWorstCaseInputs(t *testing.T) {
 		}
 		if !strings.Contains(msg.HTML, "from:noreply@cryptorefills.com") || !strings.Contains(msg.Text, "from:noreply@cryptorefills.com") {
 			t.Fatalf("%s: the sender search fallback is missing", name)
+		}
+		for _, a := range msg.Attachments {
+			if len(a.Data) > identiconMaxBytes {
+				t.Fatalf("%s: avatar attachment %d bytes is over the cap", name, len(a.Data))
+			}
 		}
 	}
 }
