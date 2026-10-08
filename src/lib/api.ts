@@ -679,7 +679,10 @@ export interface WalletBalanceResponse {
 export const getWalletBalance = (opts: { fresh?: boolean } = {}) =>
   api(`/wallet/balance${opts.fresh ? '?fresh=1' : ''}`, {
     auth: true,
-    timeoutMs: 9000,
+    // The server reads the account balance and the stake in sequence, each
+    // with its own 6 s budget (up to 12 s). A shorter client timeout reported
+    // a slow phone connection as a balance error.
+    timeoutMs: 15000,
     // Display-only: a failed balance probe must never end the session.
     quiet: true,
   }) as Promise<WalletBalanceResponse>;

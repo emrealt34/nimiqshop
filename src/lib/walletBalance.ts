@@ -613,8 +613,18 @@ export function refreshWalletBalance({ force = false }: { force?: boolean } = {}
   else emit({ ...current, status: 'loading' });
 
   inflight = readBalance(force)
-    .then((next) => emit(next))
-    .catch(() => emit({ ...EMPTY, status: 'error', failure: 'unknown' }))
+    .then((next) => {
+      // A failed refresh after a good reading keeps the good reading on screen
+      // (marked stale). Only a first-ever failure shows the error state.
+      if (next.status === 'error' && current.status === 'ready') {
+        return emit({ ...current, stale: true });
+      }
+      return emit(next);
+    })
+    .catch(() => {
+      if (current.status === 'ready') return emit({ ...current, stale: true });
+      return emit({ ...EMPTY, status: 'error', failure: 'unknown' });
+    })
     .finally(() => {
       inflight = null;
     });
