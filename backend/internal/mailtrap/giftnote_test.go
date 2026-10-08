@@ -9,6 +9,7 @@ import (
 	"image/color"
 	"image/png"
 	"math/rand"
+	"nimiqshop/internal/itemtile"
 
 	"nimiqshop/internal/sampleassets"
 	"strings"
@@ -399,20 +400,23 @@ func TestItemListTilesAndAttachments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(msg.HTML, `bgcolor="#1b2838"`) || !strings.Contains(msg.HTML, `bgcolor="#ff9900"`) {
-		t.Fatal("brand tiles must carry the brand background")
+	steamTile := itemtile.Render(steamLogo, "#1b2838")
+	if !strings.Contains(msg.HTML, `src="cid:`+itemTileCID(steamTile)+`"`) {
+		t.Fatal("tile does not reference its rendered attachment")
 	}
-	if !strings.Contains(msg.HTML, `src="cid:`+itemLogoCID(steamLogo)+`"`) {
-		t.Fatal("tile does not reference its logo attachment")
-	}
-	logoAttachments := 0
+	// Steam (twice) + Amazon + the bag tile shared by the nine extras = 3 tiles.
+	tileAttachments := 0
 	for _, a := range msg.Attachments {
 		if strings.HasPrefix(a.ContentID, "item-") {
-			logoAttachments++
+			tileAttachments++
 		}
 	}
-	if logoAttachments != 1 {
-		t.Fatalf("two lines with one logo must share one attachment, got %d", logoAttachments)
+	if tileAttachments != 3 {
+		t.Fatalf("lines with one brand must share one attachment; want 3 distinct tiles, got %d", tileAttachments)
+	}
+	// Two products per row: 8 shown items = 4 rows, no 3-cell row.
+	if got := strings.Count(msg.HTML, "<tr><td width=\"50%\""); got != 4 {
+		t.Fatalf("product grid rows = %d, want 4 (two per row)", got)
 	}
 	// 3 distinct lines + 9 extras = 12; 8 are shown, 4 are summarised.
 	if !strings.Contains(msg.HTML, "+ 4 more in this order") {
@@ -425,24 +429,14 @@ func TestItemListTilesAndAttachments(t *testing.T) {
 		t.Fatalf("expected %d shown extra rows, got %d", maxNoteItems-3, strings.Count(msg.HTML, ">Extra<"))
 	}
 
-	// Catalog colour text is never reflected into CSS.
-	for _, bad := range []string{"red;background:url(x)", "rgb(300,0,0)", "expression(alert(1))", ""} {
-		if got := tileColor(bad); got != "#ffffff" {
-			t.Fatalf("tileColor(%q) = %q, want white", bad, got)
-		}
-	}
-	if got := tileColor("rgb(255, 153, 0)"); got != "#ff9900" {
-		t.Fatalf("rgb colour = %q", got)
-	}
-
-	// An oversized logo is dropped: the tile falls back to a letter and no
-	// attachment or cid reference is left dangling.
+	// An oversized logo is dropped: the tile falls back to the bag icon, and
+	// every cid reference still has its attachment.
 	big := GiftNote{Recipient: Address{Email: "buyer@example.com"}, Items: []GiftItem{{Name: "Big", Qty: 1, Logo: make([]byte, maxItemLogoBytes+1)}}, ProductLabel: "Big", SiteName: "nimiqshop.io", OrderID: "Q-31"}
 	bm, err := big.Build(Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(bm.Attachments) != 0 || strings.Contains(bm.HTML, "cid:item-") {
-		t.Fatal("oversized logo must not be attached or referenced")
+	if len(bm.Attachments) != 1 || !strings.Contains(bm.HTML, `src="cid:item-`) {
+		t.Fatalf("oversized logo must fall back to a bag tile attachment; attachments=%d", len(bm.Attachments))
 	}
 }

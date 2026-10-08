@@ -8,16 +8,15 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"html"
 	"image/png"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"nimiqshop/internal/i18n"
+	"nimiqshop/internal/itemtile"
 )
 
 // GiftNote is the "someone sent you a gift" email — the ONLY message the shop
@@ -253,17 +252,14 @@ func (n GiftNote) Build(cfg Config) (Message, error) {
 	if n.Self {
 		attachments = append(attachments, shopLogoAttachment())
 	}
-	seenLogo := map[string]bool{}
+	seenTile := map[string]bool{}
 	for _, it := range n.Items {
-		if len(it.Logo) == 0 {
+		cid := itemTileCID(it.tile)
+		if seenTile[cid] {
 			continue
 		}
-		cid := itemLogoCID(it.Logo)
-		if seenLogo[cid] {
-			continue
-		}
-		seenLogo[cid] = true
-		attachments = append(attachments, Attachment{Filename: cid + ".png", ContentType: "image/png", Data: it.Logo, ContentID: cid})
+		seenTile[cid] = true
+		attachments = append(attachments, Attachment{Filename: cid + ".png", ContentType: "image/png", Data: it.tile, ContentID: cid})
 	}
 	if icon, ok := identiconImage(n.GifterIdenticonDataURI); ok {
 		attachments = append(attachments, Attachment{
@@ -566,9 +562,7 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 	b.WriteString(`                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>` + "\n")
 	b.WriteString(`                  <td style="vertical-align:top">` + "\n")
 	b.WriteString(`                    ` + eyebrow(font, itemLabelFor(n)) + "\n")
-	if len(n.Items) > 0 {
-		b.WriteString(`                    ` + itemsBlock(font, n.Items, n.itemsMore) + "\n")
-	} else {
+	if len(n.Items) == 0 {
 		item := n.itemEmoji()
 		if product != "" {
 			item += "&nbsp;" + esc(product)
@@ -587,6 +581,11 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 	b.WriteString(`                    <div style="font-size:13px;color:` + mailInkDim + `;font-family:` + font + `">` + esc(sentLine) + `</div>` + "\n")
 	b.WriteString("                  </td>\n")
 	b.WriteString("                </tr></table>\n")
+	// The product grid spans the whole card, under the header, so it is centred
+	// on the card rather than sitting in the left column.
+	if len(n.Items) > 0 {
+		b.WriteString(`                ` + itemsBlock(font, n.Items, n.itemsMore) + "\n")
+	}
 	b.WriteString("              </td>\n")
 	b.WriteString("            </tr>\n")
 
@@ -808,8 +807,10 @@ type GiftItem struct {
 	Qty int
 	// BgColor is the brand's own tile background (hex or rgb()). Empty = white.
 	BgColor string
-	// Logo is a small PNG tile (see brandlogo). Nil = a neutral letter tile.
+	// Logo is a small PNG tile (see brandlogo). Nil = the storefront's bag icon.
 	Logo []byte
+	// tile is the brand tile drawn for the mail (see itemtile); set by sanitizeItems.
+	tile []byte
 }
 
 // maxNoteItems bounds the product list. A bigger order says how many more it
@@ -839,90 +840,60 @@ func sanitizeItems(in []GiftItem) ([]GiftItem, int) {
 			more++
 			continue
 		}
+		it.tile = itemtile.Render(it.Logo, it.BgColor)
 		out = append(out, it)
 	}
 	return out, more
 }
 
-// itemLogoCID is the stable Content-ID of a logo: the same logo shared by two
-// lines is attached once.
-func itemLogoCID(logo []byte) string {
-	sum := sha256.Sum256(logo)
+// itemTileCID is the stable Content-ID of a rendered tile: the same brand
+// shared by two lines is attached once.
+func itemTileCID(tile []byte) string {
+	sum := sha256.Sum256(tile)
 	return "item-" + hex.EncodeToString(sum[:6])
 }
 
-var (
-	hexColorRe = regexp.MustCompile(`^#([0-9a-fA-F]{6})$`)
-	rgbColorRe = regexp.MustCompile(`^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})`)
-)
-
-// tileColor returns a safe CSS colour for a brand background: #rrggbb or
-// rgb(r,g,b) only. Anything else is white, so catalog text never reaches CSS.
-func tileColor(bg string) string {
-	v := strings.TrimSpace(bg)
-	if m := hexColorRe.FindStringSubmatch(v); m != nil {
-		return "#" + strings.ToLower(m[1])
-	}
-	if m := rgbColorRe.FindStringSubmatch(v); m != nil {
-		var c [3]int
-		for i := range c {
-			n, err := strconv.Atoi(m[i+1])
-			if err != nil || n > 255 {
-				return "#ffffff"
-			}
-			c[i] = n
-		}
-		return fmt.Sprintf("#%02x%02x%02x", c[0], c[1], c[2])
-	}
-	return "#ffffff"
-}
-
-// itemTile is the brand tile: the logo on the brand's own background, or the
-// product's first letter when there is no logo.
-func itemTile(cid, bg, name string) string {
-	color := tileColor(bg)
-	inner := ""
-	if cid != "" {
-		inner = `<img src="cid:` + cid + `" width="40" height="40" alt="` + esc(name) + `" style="display:block;width:40px;height:40px;border:0">`
-	} else {
-		inner = `<div style="font-size:20px;font-weight:700;line-height:40px;color:` + mailInk + `;font-family:` + emailFont + `">` + esc(initialOf(name)) + `</div>`
-	}
-	return `<table role="presentation" width="52" cellpadding="0" cellspacing="0" border="0" bgcolor="` + color + `" style="width:52px;background:` + color + `;border-radius:10px"><tr><td align="center" valign="middle" style="width:40px;padding:6px;font-size:0;line-height:0">` + inner + `</td></tr></table>`
-}
-
-func initialOf(name string) string {
-	for _, r := range strings.TrimSpace(name) {
-		return strings.ToUpper(string(r))
-	}
-	return "?"
-}
-
-// itemsBlock renders the product list. Each row is the brand tile, the name
-// with its quantity, and the face value underneath.
+// itemsBlock renders the product list as a two-column grid, like the storefront's
+// product tiles. Each cell is the brand tile, the name with its quantity, and the
+// face value underneath. Rows hold at most two items.
 func itemsBlock(font string, items []GiftItem, more int) string {
 	var b strings.Builder
 	b.WriteString(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:6px">`)
-	for _, it := range items {
-		cid := ""
-		if len(it.Logo) > 0 {
-			cid = itemLogoCID(it.Logo)
+	for i := 0; i < len(items); i += 2 {
+		b.WriteString("<tr>")
+		b.WriteString(itemCell(font, items[i], true))
+		if i+1 < len(items) {
+			b.WriteString(itemCell(font, items[i+1], false))
+		} else {
+			b.WriteString(`<td width="50%" style="width:50%"></td>`)
 		}
-		label := strings.TrimSpace(it.Name)
-		if it.Qty > 1 {
-			label += " ×" + strconv.Itoa(it.Qty)
-		}
-		detail := ""
-		if d := strings.TrimSpace(it.Detail); d != "" {
-			detail = `<div style="font-size:13px;line-height:1.4;color:` + mailInkDim + `;font-family:` + font + `">` + esc(d) + `</div>`
-		}
-		b.WriteString(`<tr><td width="52" valign="middle" style="width:52px;padding:0 0 10px 0">` + itemTile(cid, it.BgColor, it.Name) + `</td>` +
-			`<td valign="middle" style="padding:0 0 10px 12px"><div style="font-size:16px;font-weight:700;line-height:1.3;color:` + mailInk + `;font-family:` + font + `">` + esc(label) + `</div>` + detail + `</td></tr>`)
+		b.WriteString("</tr>")
 	}
 	if more > 0 {
-		b.WriteString(`<tr><td colspan="2" style="padding:0 0 10px 0;font-size:13px;color:` + mailInkFaint + `;font-family:` + font + `">+ ` + strconv.Itoa(more) + ` more in this order</td></tr>`)
+		b.WriteString(`<tr><td colspan="2" style="padding:4px 0 10px 0;font-size:13px;color:` + mailInkFaint + `;font-family:` + font + `">+ ` + strconv.Itoa(more) + ` more in this order</td></tr>`)
 	}
 	b.WriteString("</table>")
 	return b.String()
+}
+
+// itemCell is one product in the grid. The tile is 137px wide, the storefront's
+// product tile size on a phone (136.5px), drawn from the 2x PNG; it shrinks on
+// narrow screens.
+func itemCell(font string, it GiftItem, left bool) string {
+	// Both columns get equal side padding and centred content, so the grid
+	// sits in the middle of the panel rather than hugging the left edge.
+	pad := "0 8px 16px 8px"
+	label := strings.TrimSpace(it.Name)
+	if it.Qty > 1 {
+		label += " ×" + strconv.Itoa(it.Qty)
+	}
+	detail := ""
+	if d := strings.TrimSpace(it.Detail); d != "" {
+		detail = `<div style="font-size:13px;line-height:1.4;color:` + mailInkDim + `;font-family:` + font + `;text-align:center">` + esc(d) + `</div>`
+	}
+	img := `<img src="cid:` + itemTileCID(it.tile) + `" width="137" height="86" alt="` + esc(it.Name) + `" style="display:block;margin:0 auto;width:137px;max-width:100%;height:auto;border:0;outline:none">`
+	return `<td width="50%" valign="top" align="center" style="width:50%;padding:` + pad + `;text-align:center">` + img +
+		`<div style="font-size:14px;font-weight:700;line-height:1.3;color:` + mailInk + `;font-family:` + font + `;padding-top:8px;text-align:center">` + esc(label) + `</div>` + detail + `</td>`
 }
 
 // itemsText is the plain-text twin of itemsBlock.
@@ -1001,10 +972,11 @@ func identityCard(addr string, withIcon bool, self bool) string {
 	gap := "0"
 	if withIcon {
 		gap = "16px"
-		// A bordered square around the full-resolution face. The img alt text is
-		// what a client with images blocked shows instead.
-		img := `<img src="cid:` + identiconContentID + `" width="72" height="72" alt="Nimiq identicon of the buyer's wallet" style="display:block;width:72px;height:72px;border:0;outline:none">`
-		frame := `<table role="presentation" cellpadding="0" cellspacing="0" border="0" bgcolor="` + mailGold + `" style="margin:0 auto;border:2px solid ` + mailGold + `"><tr><td style="padding:0;font-size:0;line-height:0">` + img + `</td></tr></table>`
+		// The face sits on the panel with no frame or background: the identicon
+		// PNG is transparent around the hexagon, so the avatar is drawn as-is.
+		// The img alt text is what a client with images blocked shows instead.
+		img := `<img src="cid:` + identiconContentID + `" width="72" height="72" alt="Nimiq identicon of the buyer's wallet" style="display:block;width:72px;height:72px;border:0;outline:none;background:transparent">`
+		frame := `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;background:transparent;border:0"><tr><td style="padding:0;font-size:0;line-height:0;background:transparent">` + img + `</td></tr></table>`
 		avatar = `<td class="donor-cell" width="84" valign="middle" style="width:84px;text-align:center">` + frame + `</td>`
 	}
 	info := `<td class="donor-info" style="vertical-align:middle;padding-left:` + gap + `">` +

@@ -33,9 +33,9 @@ const (
 	// MaxSourcePixels caps the decoded size, so a small file that declares a
 	// huge canvas cannot exhaust memory (decompression-bomb guard).
 	MaxSourcePixels = 4000 * 4000
-	// TileSide is the output edge in pixels: 2x the 40px the mail shows, so it
-	// stays sharp on high-density screens.
-	TileSide = 80
+	// TileSide is the output edge in pixels. The order mail draws the logo at
+	// up to 92% of a 150px-wide tile, so 240px keeps it sharp at 2x density.
+	TileSide = 240
 )
 
 var urlRe = regexp.MustCompile(`https?://[^\s)\]]+`)
