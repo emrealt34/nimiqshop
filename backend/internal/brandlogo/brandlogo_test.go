@@ -8,6 +8,7 @@ import (
 	"image/png"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"sync/atomic"
 	"testing"
 )
@@ -89,5 +90,22 @@ func TestResolverMissingLogoIsNilAndCached(t *testing.T) {
 	}
 	if r.PNG(ctx, "http://insecure.example/logo.png") != nil {
 		t.Fatal("non-https logo must never be fetched")
+	}
+}
+
+// The catalog serves WebP for every brand. This real logo must decode to a
+// tile; before the WebP decoder was linked, every real logo fell back to a
+// letter tile.
+func TestRealCatalogWebPLogoDecodes(t *testing.T) {
+	data, err := os.ReadFile("testdata/esim.webp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tile, err := tileFromBytes(data)
+	if err != nil {
+		t.Fatalf("webp logo rejected: %v", err)
+	}
+	if _, err := png.Decode(bytes.NewReader(tile)); err != nil {
+		t.Fatal(err)
 	}
 }

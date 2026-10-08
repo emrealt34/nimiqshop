@@ -10,6 +10,7 @@ require (
 	github.com/klauspost/compress v1.20.1
 	github.com/mailtrap/mailtrap-go v0.3.0
 	github.com/valyala/fasthttp v1.74.0
+	golang.org/x/image v0.46.0
 )
 
 require (

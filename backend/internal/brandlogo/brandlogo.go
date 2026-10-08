@@ -15,6 +15,9 @@ import (
 	"image/color"
 	_ "image/gif" // logos may arrive as GIF, PNG or JPEG
 	_ "image/jpeg"
+	// The catalog serves WebP (every storefront logo is .webp); the standard
+	// library has no WebP decoder.
+	_ "golang.org/x/image/webp"
 	"image/png"
 	"io"
 	"net/http"
@@ -144,7 +147,7 @@ func (r *Resolver) fetch(ctx context.Context, u string) ([]byte, error) {
 	return body, nil
 }
 
-// tileFromBytes decodes a raster logo and returns a TileSide-bounded PNG,
+// tileFromBytes decodes a raster logo (PNG, JPEG, GIF or WebP) and returns a TileSide-bounded PNG,
 // keeping the aspect ratio and transparency.
 func tileFromBytes(data []byte) ([]byte, error) {
 	cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
