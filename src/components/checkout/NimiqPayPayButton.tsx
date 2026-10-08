@@ -27,7 +27,7 @@ import {
   type PayLightningOutcome,
 } from '../../lib/nimiqPay';
 import { useWalletBalance } from '../wallet/WalletBalance';
-import { SPEND_MARGIN } from '../../lib/walletBalance';
+import { requiredNim } from '../../lib/walletBalance';
 
 /** NIM with enough precision to be recognisable (see WalletBalance.nimText). */
 /**
@@ -190,10 +190,10 @@ export function NimiqPayPayButton({
   // (2026-10-05): "o kırmızı yerde tam hataları söyleyebilirdi" — our sentence
   // explains, the wallet's sentence is the evidence, and support can trace it.
   const walletErr = outcome && 'wallet' in outcome ? outcome.wallet : undefined;
-  // The shortfall carries the shop's 1% cushion (SPEND_MARGIN), so the number
+  // The shortfall carries the shop's cushion (requiredNim), so the number
   // the buyer reads is the number they must actually hold: amount + fee + the
   // rate's next tick.
-  const needTotal = amountNim > 0 ? amountNim * (1 + SPEND_MARGIN) : 0;
+  const needTotal = amountNim > 0 ? requiredNim(amountNim) : 0;
   const shortfall = (() => {
     if (outcome?.status !== 'insufficient' || !(needTotal > 0)) return 0;
     if (wallet.status !== 'ready') return 0;

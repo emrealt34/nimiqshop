@@ -29,7 +29,7 @@ import {
   subscribeWalletBalance,
   affordableUnits,
   coversTarget,
-  SPEND_MARGIN,
+  requiredNim,
   type WalletBalanceState,
 } from '../../lib/walletBalance';
 import { Icon } from '../ui/Icon';
@@ -149,11 +149,11 @@ export function WalletBalance({
     if (!ready || !(targetNim > 0)) return null;
     /* Affordability is decided on SPENDABLE NIM only (staked NIM cannot pay),
        and with the 1% cushion the shop keeps on every verdict — see
-       SPEND_MARGIN: an exact comparison promises something the wallet's own fee
+       the cushion (requiredNim): an exact comparison promises something the wallet's own fee
        and the next rate tick can take away, and the buyer pays for that with a
        refused payment. The DISPLAYED balance is never adjusted. */
     const units = affordableUnits(state.availableNim, targetNim);
-    const missing = Math.max(0, targetNim * (1 + SPEND_MARGIN) - state.availableNim);
+    const missing = Math.max(0, requiredNim(targetNim) - state.availableNim);
     if (targetTotal) {
       return coversTarget(targetNim, state.availableNim)
         ? { ok: true, text: t('wallet.enough') }

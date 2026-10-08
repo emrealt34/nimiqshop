@@ -45,33 +45,52 @@ import { classifyWalletError, readWalletError, type WalletErrorClass } from './w
 export const LUNA_PER_NIM = 100000;
 
 /**
- * SPEND_MARGIN — the cushion the affordability verdict leaves on top of a
- * price. Owner (2026-10-06): "o your wallet nime yüzde 1 margin ekle ki hata
- * olmasın diye".
+ * SPEND_MARGIN — the percentage cushion every payment keeps on top of its price.
  *
- * WHY IT EXISTS: an exact comparison is a promise the shop cannot keep. The
- * Nimiq Pay fee rides on top of the converted amount, the rate moves between
- * the quote and the signature, and the wallet's own fee estimation happens
- * after both. A buyer told "your balance covers this" one luna short of the
- * real total gets a REFUSED payment instead — which is exactly the failure the
- * red box has to explain. One percent is small enough never to hide a real,
- * affordable purchase and large enough to absorb those three effects.
+ * WHY: a Lightning payment in Nimiq Pay is not a plain NIM transfer. Pay swaps
+ * NIM into BTC, and that swap carries its own fee plus a Bitcoin network fee.
+ * Pay does not publish those fees, and the rate moves between the quote and the
+ * signature. A payment that is short by even one luna is REFUSED, so the cushion
+ * has to cover that cost. It was 1% and that was too little; it is now 5%.
  *
  * The DISPLAYED balance is never adjusted by it: the buyer sees what they hold.
- * Only verdicts ("you can afford this", "you are short") use the margin.
+ * Only verdicts ("you can afford this", "you are short") use the cushion.
  */
-export const SPEND_MARGIN = 0.01;
+export const SPEND_MARGIN = 0.05;
 
-/** What the balance verdict treats as available: the true figure less 1%. */
-export function spendableWithMargin(availableNim: number): number {
-  return Math.max(0, Math.floor(Number(availableNim || 0) * (1 - SPEND_MARGIN) * 100000) / 100000);
+/**
+ * SPEND_FLOOR_NIM — a fixed minimum cushion, in NIM, added on top of the
+ * percentage. It is 0 for now: the Bitcoin network fee is a fixed cost per
+ * payment, and Pay does not publish its size. Set this to the amount observed in
+ * real refused payments once it is known.
+ *
+ * It is deliberately NOT a USD amount. NIM trades at a few hundredths of a cent,
+ * so "$1" is thousands of NIM and would wrongly block ordinary purchases.
+ */
+export const SPEND_FLOOR_NIM = 0;
+
+/** The cushion in NIM: the larger of the percentage and the fixed floor. */
+function cushionNim(targetNim: number): number {
+  return Math.max(targetNim * SPEND_MARGIN, SPEND_FLOOR_NIM);
 }
 
-/** True when the spendable balance covers `targetNim` plus the margin. */
+/**
+ * requiredNim — the NIM a payment of `targetNim` needs in the wallet: the price
+ * plus the cushion. Every affordability decision in the app goes through this
+ * one function, so the strip, the card, the sheet and the pay button can never
+ * disagree about how much is needed.
+ */
+export function requiredNim(targetNim: number): number {
+  const target = Number(targetNim || 0);
+  if (!(target > 0)) return 0;
+  return target + cushionNim(target);
+}
+
+/** True when the spendable balance covers `targetNim` plus the cushion. */
 export function coversTarget(targetNim: number, availableNim: number): boolean {
   const target = Number(targetNim || 0);
   if (!(target > 0)) return true;
-  return Number(availableNim || 0) >= target * (1 + SPEND_MARGIN);
+  return Number(availableNim || 0) >= requiredNim(target);
 }
 
 /**
@@ -79,28 +98,33 @@ export function coversTarget(targetNim: number, availableNim: number): boolean {
  * integers on the strip, in the card and in the toast.
  *   need   → UP   (never understate what the payment will ask for)
  *   have   → DOWN (never claim more than the wallet really holds)
- * Owner (2026-10-06): "bakiyemin yetmediği şeyleri almaya çalışırken karta ve
- * normal toast çıkmadı" — this is the one place that decides whether the buyer
- * is short, so the strip, the card and the toast can never disagree.
  */
 export function neededWholeNim(targetNim: number): number {
-  const target = Number(targetNim || 0);
-  if (!(target > 0)) return 0;
-  return Math.ceil(target * (1 + SPEND_MARGIN));
+  const need = requiredNim(targetNim);
+  return need > 0 ? Math.ceil(need) : 0;
 }
 
 export function shortByWholeNim(targetNim: number, availableNim: number): number {
-  const need = Number(targetNim || 0) * (1 + SPEND_MARGIN);
+  const need = requiredNim(targetNim);
   const have = Number(availableNim || 0);
   if (!(need > 0) || have >= need) return 0;
   return Math.max(1, Math.ceil(need - have));
 }
 
-/** How many `unitNim`-priced units the balance can buy, margin included. */
+/**
+ * How many `unitNim`-priced units the balance can buy, cushion included.
+ *
+ * Solved directly from requiredNim so it can never disagree with coversTarget.
+ * For n units the requirement is max(n·u·(1+m), n·u + F), which fits the balance
+ * only when BOTH n·u·(1+m) ≤ have AND n·u + F ≤ have.
+ */
 export function affordableUnits(availableNim: number, unitNim: number): number {
   const unit = Number(unitNim || 0);
-  if (!(unit > 0)) return 0;
-  return Math.floor(spendableWithMargin(availableNim) / unit);
+  const have = Number(availableNim || 0);
+  if (!(unit > 0) || !(have > 0)) return 0;
+  const byPercent = Math.floor(have / (unit * (1 + SPEND_MARGIN)));
+  const byFloor = Math.floor((have - SPEND_FLOOR_NIM) / unit);
+  return Math.max(0, Math.min(byPercent, byFloor));
 }
 
 /** How long a reading stays fresh. Short on purpose: it sits next to prices. */
