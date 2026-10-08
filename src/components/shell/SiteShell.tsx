@@ -478,7 +478,9 @@ function LoginSheetContent({ close }: { close: () => void }) {
   const inPay = inNimiqPay();
 
   useEffect(() => {
-    void prefetchHubLogin();
+    // Inside Nimiq Pay the login never touches Hub, so a Hub challenge is wasted.
+    if (!inPay) void prefetchHubLogin();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const signedIn = (address: string) => {

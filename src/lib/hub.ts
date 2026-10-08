@@ -172,6 +172,9 @@ export async function loginWithNimiqPay(
   const sdkProvider = await initNimiqMiniApp();
   const payProvider: any = sdkProvider || getNimiqProvider();
   if (!canUsePayProvider(payProvider)) {
+    // Already inside Pay: the provider failed to load. Opening the nimiqpay://
+    // link here would just try to launch the app we are running in.
+    if (inNimiqPay()) throw new Error(tr('hub.bridgeFailed'));
     return new Promise((resolve) => {
       openInNimiqPay(() => resolve({ needsInstall: true }));
     });
