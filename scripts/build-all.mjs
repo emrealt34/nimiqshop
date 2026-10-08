@@ -239,10 +239,17 @@ function buildFrontend({ force = false } = {}) {
   // default PUBLIC_API_URL from backend/.env is baked into every page
   // (API_BASE seed + CSP connect-src + preconnect) so `npm run build` alone
   // produces a dist/ pointed at the right API for cross-domain deployments.
-  const envApiUrl = String(process.env.API_URL || process.env.PUBLIC_API_URL || '').trim();
-  const apiUrl = envApiUrl || readEnvValue(join(root, 'backend', '.env'), 'PUBLIC_API_URL');
-  const buildEnv = apiUrl ? { ...process.env, API_URL: apiUrl, PUBLIC_API_URL: apiUrl } : process.env;
-  if (apiUrl) log(`API_URL (from ${envApiUrl ? 'environment' : 'backend/.env PUBLIC_API_URL'}): ${apiUrl}`);
+  // SAME-ORIGIN BY DEFAULT. backend/.env's PUBLIC_API_URL is the BACKEND's
+  // own setting (its public address). It used to be copied here, which baked
+  // the API origin into every page as API_BASE. The browser then called
+  // shopapi.* from shop.*: a cross-site session cookie that Safari and Nimiq
+  // Pay refuse, so sign-in looked fine and vanished on the next page load. An
+  // absolute API origin is used only when the build environment sets API_URL
+  // or PUBLIC_API_URL explicitly (for example the Pages workflow sets /api).
+  const apiUrl = String(process.env.API_URL || process.env.PUBLIC_API_URL || '').trim();
+  const buildEnv = process.env;
+  if (apiUrl) log(`API_URL (from environment): ${apiUrl}`);
+  else log("API_URL not set: frontend uses the same-origin '/api' proxy (session cookies stay first-party)");
   try {
     run('npm', ['run', 'build'], root, buildEnv);
   } catch (e) {
