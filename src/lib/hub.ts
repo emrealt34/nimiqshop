@@ -5,7 +5,7 @@
  */
 import { CFG } from './config';
 import { bytesToHex } from './format';
-import { detectMobilePlatform, getNimiqProvider, initNimiqMiniApp, openInNimiqPay } from './miniapp';
+import { detectMobilePlatform, getNimiqProvider, inNimiqPay, initNimiqMiniApp, openInNimiqPay } from './miniapp';
 import { authChallenge, hubLogin as apiHubLogin } from './api';
 import { saveSession } from './session';
 import { ensureLib } from './vendorLoad';
@@ -125,7 +125,7 @@ function hubSignMessage(message: string): Promise<any> {
   // Desktop keeps the default popup (a mismatched PopupRequestBehavior is what
   // Hub renders as Invalid request, so no custom popup object is built here).
   const HubApi = (window as any).HubApi;
-  const behavior = detectMobilePlatform() && HubApi && HubApi.RedirectRequestBehavior
+  const behavior = detectMobilePlatform() && !inNimiqPay() && HubApi && HubApi.RedirectRequestBehavior
     ? new HubApi.RedirectRequestBehavior()
     : undefined;
   return h.signMessage({

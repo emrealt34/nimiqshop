@@ -53,7 +53,7 @@ import {
   type DailyLimit,
 } from '../../lib/dailyLimit';
 import { isAuthed } from '../../lib/session';
-import { loginWithHub, friendlyHubError } from '../../lib/hub';
+import { loginWithHub, loginWithNimiqPay, friendlyHubError } from '../../lib/hub';
 import { deliverySummary, payRail, payActionLine , coinAmountLabel, coinAmountLabelFor } from '../../lib/deliveryCopy';
 import { asset, pagePath } from '../../lib/asset';
 import { normalizePath } from '../../lib/router';
@@ -243,8 +243,12 @@ export function openSingleBuyFlow(opts: {
           <button
             className="btn btn-gold btn-block btn-lg mt-2"
             onClick={() => {
-              loginWithHub()
-                .then(() => {
+              // Inside Nimiq Pay the wallet is Pay itself. Sending the buyer to
+              // Hub here opened hub.nimiq.com inside the app: the logo page.
+              const login = inNimiqPay() ? loginWithNimiqPay() : loginWithHub();
+              login
+                .then((r) => {
+                  if ('needsInstall' in r && r.needsInstall) return;
                   close();
                   toast(tr('checkout.flowConnected'), 'success');
                   setTimeout(go, 100);
