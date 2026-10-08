@@ -348,6 +348,10 @@ func (n GiftNote) textBody(site, product, message string) string {
 			}
 		}
 	}
+	if n.Self && n.GifterNimiqAddress != "" && !n.Anonymous {
+		b.WriteString("\nPaid from the Nimiq wallet:\n")
+		b.WriteString("  " + groupAddress(n.GifterNimiqAddress) + "\n")
+	}
 	if product != "" {
 		b.WriteString("\nItem: " + product + "\n")
 		if !n.PurchasedAt.IsZero() {
@@ -486,14 +490,16 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 	b.WriteString("              </td>\n")
 	b.WriteString("            </tr>\n")
 
-	// identity (gift only)
-	if !n.Self {
+	// identity. A gift shows the sender card (anonymous / wallet / plain). A
+	// plain purchase shows the BUYER's own wallet and Nimiq identicon when the
+	// order carries an address; without one it shows nothing.
+	if !n.Self || (!n.Anonymous && strings.TrimSpace(n.GifterNimiqAddress) != "") {
 		b.WriteString("            <tr>\n")
 		b.WriteString(`              <td class="px-card" style="padding:18px 26px 0 26px">` + "\n")
 		if n.Anonymous {
 			b.WriteString(anonymousCard())
 		} else if strings.TrimSpace(n.GifterNimiqAddress) != "" {
-			b.WriteString(identityCard(esc(groupAddress(n.GifterNimiqAddress)), n.GifterIdenticonDataURI))
+			b.WriteString(identityCard(esc(groupAddress(n.GifterNimiqAddress)), n.GifterIdenticonDataURI, n.Self))
 		} else {
 			b.WriteString(plainSenderCard())
 		}
@@ -648,6 +654,20 @@ func eyebrow(font, text string) string {
 func panel(font, inner string) string {
 	return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:` + mailPanel + `;border:1px dashed ` + mailDash + `;border-radius:14px">` +
 		`<tr><td style="padding:15px 16px;font-family:` + font + `">` + inner + `</td></tr></table>`
+}
+
+func paidOrFrom(self bool) string {
+	if self {
+		return "Paid from"
+	}
+	return "From"
+}
+
+func identityFootnote(self bool) string {
+	if self {
+		return "This is the wallet that paid for your order."
+	}
+	return "Their wallet is the signature — the note carries no name."
 }
 
 // plainSenderCard is the gift-without-a-wallet case: the note still says a gift
@@ -810,7 +830,9 @@ func anonymousCard() string {
 // identityCard is the donor block: their REAL Nimiq identicon (as a mosaic,
 // see identiconTable) and their wallet address — never a name. On phones the
 // two stack, centred, inside the same panel.
-func identityCard(addr, identURI string) string {
+// identityCard renders the wallet/identicon card. self=true is the buyer's own
+// plain purchase: "Paid from" instead of "From", and no gift wording.
+func identityCard(addr, identURI string, self bool) string {
 	font := emailFont
 	img := identiconTable(identURI)
 	avatar := `<div class="donor-img" style="width:` + strconv.Itoa(identN) + `px;height:` + strconv.Itoa(identN) + `px;border-radius:14px;background:` + mailPaper + `;border:2px solid ` + mailGold + `"></div>`
@@ -823,9 +845,9 @@ func identityCard(addr, identURI string) string {
 	inner := `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>` +
 		`<td class="donor-cell" width="` + strconv.Itoa(identN) + `" valign="middle" style="width:` + strconv.Itoa(identN) + `px;text-align:center">` + avatar + `</td>` +
 		`<td class="donor-info" style="padding-left:16px;vertical-align:middle">` +
-		eyebrow(font, "From") +
+		eyebrow(font, paidOrFrom(self)) +
 		addrCell +
-		`<div style="font-size:11.5px;line-height:1.5;color:` + mailInkFaint + `;padding-top:4px">Their wallet is the signature — the note carries no name.</div>` +
+		`<div style="font-size:11.5px;line-height:1.5;color:` + mailInkFaint + `;padding-top:4px">` + identityFootnote(self) + `</div>` +
 		`</td></tr></table>`
 	return panel(font, inner)
 }

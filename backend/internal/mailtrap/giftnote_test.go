@@ -166,11 +166,11 @@ func TestIdenticonRenderingAndAlpha(t *testing.T) {
 	if !strings.Contains(identiconTable(pngURI(t, solid)), `colspan="72"`) {
 		t.Fatal("solid row not compressed")
 	}
-	card := identityCard("NQ00", uri)
+	card := identityCard("NQ00", uri, false)
 	if !strings.Contains(card, "NQ00") || !strings.Contains(card, "background:"+mailPanel) || !strings.Contains(card, mailGold) {
 		t.Fatal("identity card lost its address, panel or ring")
 	}
-	if !strings.Contains(identityCard("", ""), "background:"+mailPaper) {
+	if !strings.Contains(identityCard("", "", false), "background:"+mailPaper) {
 		t.Fatal("placeholder avatar lost its paper tone")
 	}
 	if !strings.Contains(anonymousCard(), "anonymous") || !strings.Contains(anonymousCard(), "background:"+mailPanel) {
