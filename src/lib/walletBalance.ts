@@ -157,8 +157,6 @@ export interface WalletBalanceState {
    */
   hostNim?: number;
   shopNim?: number;
-  /** The stake figure was derived from the wallet's own (higher) reading. */
-  stakeInferred?: boolean;
   /** A unit mismatch was detected and corrected (host reported NIM, not luna). */
   unitCorrected?: boolean;
   /** True while a previous reading is on screen during a refresh. */
@@ -450,33 +448,29 @@ async function readBalance(force = false): Promise<WalletBalanceState> {
     const unitCorrected = looksLikeUnitMixUp(host, shop.luna);
     const hostLuna = unitCorrected ? Math.round(host * UNIT_FACTOR) : host;
 
-    /* RECONCILE, DON'T ACCUSE (owner, 2026-10-06: "kesinlikle hata var,
-       spendable NIM yazıyor Nimiq Pay'de ama…"). Two live reads of ONE address
-       can differ for exactly two honest reasons: the shop's figure is a few
-       seconds old, or the wallet's view folds in something a plain chain read
-       cannot see — stake, or a contract balance. So:
-         • SPENDABLE takes the LOWER of the two: what can be spent is never
-           overstated, in either world;
-         • the difference becomes the stake/total the wallet is showing, so the
-           reconciliation line ALWAYS adds up to the number in Nimiq Pay;
-         • what each source said is carried on the state, so the card can show
-           the comparison instead of a claim. */
-    const spendLuna = Math.min(shop.luna, hostLuna);
-    const higherLuna = Math.max(shop.luna, hostLuna);
+    /* WHICH FIGURE IS SPENDABLE. A Nimiq Pay payment (payLightningInvoice) is
+       signed and funded by the Pay host from its own active account(s), not
+       from the shop's session address. So the host's reading is the spendable
+       figure. The shop's reading of the session address can legitimately be 0
+       while the host shows the funds (e.g. NIM sitting in an HTLC/contract
+       account the session address does not point at); that must not hide the
+       balance or open the low-balance sheet.
+
+       What is NOT spendable is stake. Stake comes only from what the shop's
+       backend reports as staked/inactive/retired. It is never inferred from the
+       gap between two reads: that gap is what produced a "staked" label for
+       funds that were not staked. */
+    const spendLuna = hostLuna;
     const reportedStakeNim = shop.stakedNim + shop.inactiveNim + shop.retiredNim;
-    const inferredTotalStakeNim = Math.max(0, (higherLuna - spendLuna) / LUNA_PER_NIM);
-    const totalStakeNim = Math.max(reportedStakeNim, inferredTotalStakeNim);
-    // Keep active, inactive, and retired amounts separate; the UI adds them once.
-    const stakedNim = Math.max(0, totalStakeNim - shop.inactiveNim - shop.retiredNim);
-    const differs = higherLuna - spendLuna > Math.max(1, spendLuna * 0.01);
     const availableNim = spendLuna / LUNA_PER_NIM;
-    /* The total includes spendable plus active and inactive stake, each once. */
-    const totalNim = availableNim + totalStakeNim;
+    /* The total is spendable plus the stake the backend reports, each once. */
+    const totalNim = availableNim + reportedStakeNim;
+    const differs = Math.abs(hostLuna - shop.luna) > Math.max(1, Math.min(hostLuna, shop.luna) * 0.01);
     const state: WalletBalanceState = {
       status: 'ready',
       luna: spendLuna,
       availableNim,
-      stakedNim,
+      stakedNim: shop.stakedNim,
       inactiveNim: shop.inactiveNim,
       retiredNim: shop.retiredNim,
       totalNim,
@@ -487,7 +481,6 @@ async function readBalance(force = false): Promise<WalletBalanceState> {
       mismatch: differs,
       hostNim: hostLuna / LUNA_PER_NIM,
       shopNim: shop.luna / LUNA_PER_NIM,
-      stakeInferred: inferredTotalStakeNim > reportedStakeNim + 0.0000001,
       at: Date.now(),
       ...base,
     };

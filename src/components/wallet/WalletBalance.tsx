@@ -249,14 +249,6 @@ export function WalletBalance({
         </span>
       )}
 
-      {/* When the wallet's own reading is the higher one, the difference is
-          stake (or a contract balance) the plain chain read could not see — the
-          reason the reconciliation line exists at all. */}
-      {ready && state.stakeInferred && (
-        <span className="wal-note xs faint">
-          <Icon name="info" size={12} /> {t('wallet.stakeNote', { nim: nimText(state.stakedNim) })}
-        </span>
-      )}
 
       {inNimiqPay() && state.debugLines && (
         <details className="wal-note xs" style={{ marginTop: 8 }}>
