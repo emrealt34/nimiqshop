@@ -237,17 +237,6 @@ export function WalletBalance({
         </span>
       )}
 
-      {/* THE COMPARISON, NOT A VERDICT. Two live reads of one address can
-          differ honestly (a few seconds of cache, or a wallet view that folds in
-          stake). The card therefore states what each source said, and the total
-          above is reconciled from both, so the line adds up to the number the
-          buyer sees in Nimiq Pay (owner, 2026-10-06). */}
-      {ready && state.mismatch && state.hostNim !== undefined && state.shopNim !== undefined && (
-        <span className="wal-note xs faint">
-          <Icon name="info" size={12} />
-          {t('wallet.compareLine', { pay: nimText(state.hostNim), shop: nimText(state.shopNim) })}
-        </span>
-      )}
 
 
       {inNimiqPay() && state.debugLines && (
