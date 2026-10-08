@@ -89,8 +89,8 @@ func newTestNotifier(t *testing.T, enabled bool) (*Notifier, *fakeRPC, *db.Store
 	return n, f, store
 }
 
-// The payment-confirmed memo is exactly "Your order is on the way #<id>".
-func paidMemoFor(id string) string { return "Your order is on the way #" + id }
+// The payment-confirmed memo is exactly this text, with no order id.
+const paidMemo = "Your order is on the way"
 
 // A paid order sends exactly one 1-Luna transfer to the buyer, carrying the
 // order id, and never a second one for the same order.
@@ -121,9 +121,11 @@ func TestPaidOrderSendsOneLunaMemoWithOrderID(t *testing.T) {
 	if !bytes.Contains(raw, recipient) {
 		t.Fatal("transaction does not pay the buyer's address")
 	}
-	memo := paidMemoFor(testOrderID)
-	if !bytes.Contains(raw, []byte(memo)) {
-		t.Fatalf("transaction does not carry the memo %q", memo)
+	if !bytes.Contains(raw, []byte(paidMemo)) {
+		t.Fatalf("transaction does not carry the memo %q", paidMemo)
+	}
+	if bytes.Contains(raw, []byte(testOrderID)) {
+		t.Fatal("the order id must not be written on chain")
 	}
 
 	// Same order again (webhook + poll, crash-restart): never a second send.
@@ -135,18 +137,17 @@ func TestPaidOrderSendsOneLunaMemoWithOrderID(t *testing.T) {
 	}
 }
 
-// The memo keeps the full 36-character id: a truncated id could not be matched
-// against the order page. It must fit the 64-byte chain limit exactly.
-func TestPaidMemoKeepsFullIDAndFitsChainLimit(t *testing.T) {
+// The memo is fixed text with no order id, and fits the 64-byte chain limit.
+func TestPaidMemoIsFixedTextWithoutOrderID(t *testing.T) {
 	m := Memo(ReasonOrderPaid, testOrderID)
-	if m != paidMemoFor(testOrderID) {
-		t.Fatalf("memo = %q, want %q", m, paidMemoFor(testOrderID))
+	if m != paidMemo {
+		t.Fatalf("memo = %q, want %q", m, paidMemo)
+	}
+	if strings.Contains(m, testOrderID) {
+		t.Fatal("paid memo leaks the order id")
 	}
 	if len(m) > maxMemoLen {
 		t.Fatalf("paid memo is %d bytes, over the %d-byte limit", len(m), maxMemoLen)
-	}
-	if !strings.HasSuffix(m, testOrderID) {
-		t.Fatalf("paid memo does not end with the full order id: %q", m)
 	}
 }
 

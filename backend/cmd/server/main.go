@@ -420,17 +420,12 @@ func main() {
 	}
 	// The order-ready memo: one per fulfilled quote, keyed on the quote id
 	// so a tracker re-run or crash-restart can never send it twice.
-	// Payment-confirmed memo to the buyer: "Your order is on the way #<id>".
-	// The id is the full order id the buyer sees on the order page, so anyone
-	// can match the on-chain memo to the order. Fires once, at the moment the
+	// Payment-confirmed memo to the buyer: "Your order is on the way". No order
+	// id on chain (owner decision, privacy). Fires once, at the moment the
 	// payment is confirmed, not at fulfilment.
 	settlement.SetPaidNotifyFn(func(q db.Quote) {
 		if q.UserID == "" {
 			return // anonymous order: no address to message
-		}
-		if len(q.ID) != 36 {
-			log.Printf("notify: order-paid memo skipped for quote %q: unexpected id length", q.ID)
-			return
 		}
 		ctxN, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()

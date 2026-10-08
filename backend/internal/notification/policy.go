@@ -36,8 +36,7 @@ type Reason string
 
 const (
 	// ReasonOrderPaid — the payment is confirmed and the order is on its way.
-	// The memo carries the order id, so anyone holding the id can check on
-	// chain that the shop acknowledged that order at payment time.
+	// The memo carries no order id (owner decision): it only says so.
 	ReasonOrderPaid Reason = "order_paid"
 	// ReasonCashbackPaid — real money arrived in their wallet.
 	ReasonCashbackPaid Reason = "cashback_paid"
@@ -157,9 +156,9 @@ func Allow(r Reason, optedOut bool, lastSameAt time.Time, budgetUsed int, now ti
 // the wallet).
 func Memo(r Reason, detail string) string {
 	if r == ReasonOrderPaid {
-		// The order id is appended whole, never after a ": " and never cut: the
-		// memo is only useful if the id in it matches the id the buyer sees.
-		return TrimMemo("Your order is on the way #" + strings.TrimSpace(detail))
+		// Fixed text, no order id: the id would tie the buyer's address to
+		// the order on chain for anyone who learns the id.
+		return "Your order is on the way"
 	}
 	var base string
 	switch r {
