@@ -51,12 +51,13 @@ export const LUNA_PER_NIM = 100000;
  * NIM into BTC, and that swap carries its own fee plus a Bitcoin network fee.
  * Pay does not publish those fees, and the rate moves between the quote and the
  * signature. A payment that is short by even one luna is REFUSED, so the cushion
- * has to cover that cost. Owner (2026-10-08) set it back to 1%.
+ * has to cover that cost. It is 5%: the safer value, since Pay's fees are
+ * not published and a 1% cushion is easily exceeded by them.
  *
  * The DISPLAYED balance is never adjusted by it: the buyer sees what they hold.
  * Only verdicts ("you can afford this", "you are short") use the cushion.
  */
-export const SPEND_MARGIN = 0.01;
+export const SPEND_MARGIN = 0.05;
 
 /**
  * SPEND_FLOOR_NIM — a fixed minimum cushion, in NIM, added on top of the
