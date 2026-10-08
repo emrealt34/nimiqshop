@@ -69,14 +69,14 @@ export function friendlyHubError(err: unknown): string {
 
 /* ---------------- Login via Hub signMessage ---------------- */
 function hubAppName(): string {
-  return 'nim.shop';
+  return 'nimiqshop.io';
 }
 
 function challengeMessage(challenge: any): string {
   const msg = challenge && challenge.message;
   if (typeof msg === 'string' && msg.trim()) return msg;
   const nonce = String((challenge && challenge.nonce) || '');
-  return `nim.shop login: ${nonce}`;
+  return `nimiqshop.io login: ${nonce}`;
 }
 
 function canUsePayProvider(payProvider: any): boolean {
@@ -161,6 +161,34 @@ export function loginWithHub(_onProgress?: (step: 'challenge' | 'sign') => void)
     const challenge = cached || (await fetchChallenge());
     return signWith(challenge);
   });
+}
+
+/** Pays one star rating through Hub's checkout (the buyer's own wallet signs).
+ *  Desktop opens Hub in a popup and resolves with the transaction hash. On a
+ *  phone Hub's redirect behaviour is used: the page reloads when Hub returns,
+ *  and the rating flow resumes from its saved pending entry (no hash needed,
+ *  the shop finds the transaction on chain). */
+export async function sendRatingWithHub(req: {
+  recipient: string;
+  value: number;
+  fee: number;
+  extraData: string;
+}): Promise<{ hash?: string }> {
+  await loadHubApi();
+  const h = getHub();
+  const HubApi = (window as any).HubApi;
+  const mobile = detectMobilePlatform() && !inNimiqPay();
+  const behavior = mobile && HubApi && HubApi.RedirectRequestBehavior
+    ? new HubApi.RedirectRequestBehavior()
+    : undefined;
+  const signed = await h.checkout({
+    appName: hubAppName(),
+    recipient: req.recipient,
+    value: req.value,
+    fee: req.fee,
+    extraData: req.extraData,
+  }, behavior);
+  return { hash: signed && typeof signed.hash === 'string' ? signed.hash : undefined };
 }
 
 /** Nimiq Pay login. Inside the app this signs via the Mini App provider.

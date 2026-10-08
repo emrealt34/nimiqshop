@@ -156,9 +156,11 @@ func (h *Handlers) ListOrders(ctx *fasthttp.RequestCtx) {
 		CurrentStage      int             `json:"current_stage"`
 		Payload           json.RawMessage `json:"payload,omitempty"`
 
-		Rating   int        `json:"rating,omitempty"`
-		RatedAt  *time.Time `json:"rated_at,omitempty"`
-		RatingTx string     `json:"rating_tx,omitempty"`
+		Rating        int        `json:"rating,omitempty"`
+		RatedAt       *time.Time `json:"rated_at,omitempty"`
+		RatingTx      string     `json:"rating_tx,omitempty"`
+		RatingComment string     `json:"rating_comment,omitempty"`
+		RatingEdits   int        `json:"rating_edits,omitempty"`
 	}
 
 	out := make([]orderRow, 0, len(orders))
@@ -195,6 +197,8 @@ func (h *Handlers) ListOrders(ctx *fasthttp.RequestCtx) {
 			Rating:            o.Rating,
 			RatedAt:           o.RatedAt,
 			RatingTx:          o.RatingTx,
+			RatingComment:     visibleRatingComment(o.RatingComment, o.RatingCommentHidden),
+			RatingEdits:       o.RatingEdits,
 		})
 	}
 	writeJSON(ctx, fasthttp.StatusOK, out)
@@ -271,6 +275,13 @@ func (h *Handlers) GetOrder(ctx *fasthttp.RequestCtx) {
 		"refund":              orderRefund(order),
 		"support_ticket":      ticketInfo,
 		"support_messages":    messages,
+		// Rating state for the owner. A hidden comment is withheld here too:
+		// hiding it is an admin decision that applies to the shop UI as a whole.
+		"rating":         order.Rating,
+		"rated_at":       order.RatedAt,
+		"rating_tx":      order.RatingTx,
+		"rating_comment": visibleRatingComment(order.RatingComment, order.RatingCommentHidden),
+		"rating_edits":   order.RatingEdits,
 	}
 	for k, v := range recipient {
 		if s, ok := v.(string); ok && s != "" {
@@ -339,4 +350,13 @@ func storedJSONOrNull(b []byte) json.RawMessage {
 		return v
 	}
 	return json.RawMessage("null")
+}
+
+// visibleRatingComment is the comment as the buyer may see it on their own
+// purchase: empty once an admin has hidden it.
+func visibleRatingComment(comment string, hidden bool) string {
+	if hidden {
+		return ""
+	}
+	return comment
 }

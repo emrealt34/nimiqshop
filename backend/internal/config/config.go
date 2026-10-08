@@ -134,12 +134,9 @@ type Config struct {
 	PoolFeedAPIKey      string
 	PoolFeedPollSeconds int
 
-	// 1-Luna wallet-memo notification channel. OFF by default: it signs
-	// and broadcasts real transactions, so it must be validated against a
-	// funded key via cmd/notif-test first. It reuses the cashback wallet
-	// seed unless NOTIFY_WALLET_SEED overrides it — one funded key is
-	// enough, and asking operators to fund two is a footgun.
-	NotifyWalletEnabled bool
+	// 1-Luna wallet-memo notification channel (order-ready memo to the buyer).
+	// No env switch: it runs whenever a notify/cashback seed is set. Star
+	// ratings are separate: buyers pay the CASHBACK wallet to rate.
 	NotifyWalletSeed    string
 	NotifyWalletNetwork string
 	NotifyWalletFeeLuna int
@@ -782,7 +779,6 @@ func Load() Config {
 		PoolFeedAPIKey:       strings.TrimSpace(os.Getenv("POOL_FEED_API_KEY")),
 		PoolFeedPollSeconds:  envInt("POOL_FEED_POLL_SECONDS", 30),
 
-		NotifyWalletEnabled: envBool("NOTIFY_WALLET_ENABLED", false),
 		NotifyWalletSeed:    notifyWalletSeed(),
 		NotifyWalletNetwork: strings.ToLower(env("NOTIFY_WALLET_NETWORK", env("CASHBACK_NETWORK", "mainnet"))),
 		NotifyWalletFeeLuna: envInt("NOTIFY_WALLET_FEE_LUNA", 1),
@@ -1042,19 +1038,13 @@ func (c Config) Validate() error {
 	if c.AdminBootstrapToken != "" && len(c.AdminBootstrapToken) < 32 {
 		return fmt.Errorf("ADMIN_BOOTSTRAP_TOKEN must be at least 32 random bytes")
 	}
-	if c.NotifyWalletEnabled {
-		seed := strings.TrimPrefix(c.NotifyWalletSeed, "0x")
-		if len(seed) != 64 {
-			return fmt.Errorf("NOTIFY_WALLET_ENABLED requires NOTIFY_WALLET_SEED (or CASHBACK_WALLET_SEED) as a 32-byte hex seed (64 hex chars) or a BIP39 recovery phrase")
-		}
+	// The notify memo channel runs whenever a notify/cashback seed is present.
+	if strings.TrimSpace(c.NotifyWalletSeed) != "" {
 		if c.NotifyWalletNetwork != "mainnet" && c.NotifyWalletNetwork != "testnet" {
 			return fmt.Errorf("NOTIFY_WALLET_NETWORK must be mainnet or testnet")
 		}
 		if c.NotifyWalletFeeLuna < 0 {
 			return fmt.Errorf("NOTIFY_WALLET_FEE_LUNA cannot be negative")
-		}
-		if c.NimiqRPCURL == "" {
-			return fmt.Errorf("NIMIQ_RPC_URL is required when NOTIFY_WALLET_ENABLED is set")
 		}
 	}
 	if c.CashbackEnabled {

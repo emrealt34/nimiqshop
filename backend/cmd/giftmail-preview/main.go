@@ -46,13 +46,13 @@ func main() {
 		Recipient:              mailtrap.Address{Email: "friend@mail.com", Name: "Friend"},
 		GifterNimiqAddress:     wallet,
 		GifterIdenticonDataURI: identiconPNG(),
-		SiteName:               "nim.shop",
+		SiteName:               "nimiqshop.io",
 		ProductLabel:           "Steam · 50 USD",
 		Message:                "Happy birthday! 🎂 Enjoy the game!",
 		OrderID:                "Q-8842",
 		PurchasedAt:            time.Date(2026, 9, 11, 9, 24, 0, 0, time.UTC),
-		ShopURL:                "https://nim.shop",
-		SupportURL:             "https://nim.shop/support",
+		ShopURL:                "https://nimiqshop.io",
+		SupportURL:             "https://nimiqshop.io/support",
 		StakeValidatorAddress:  validator,
 	}
 
@@ -64,6 +64,15 @@ func main() {
 		{"anonymous", func() mailtrap.GiftNote {
 			n := base
 			n.Anonymous = true
+			return n
+		}()},
+		// Plain purchase (no gift): the buyer IS the recipient. This is the
+		// order-confirmation mail a normal checkout sends (GiftNote.Self).
+		{"purchase", func() mailtrap.GiftNote {
+			n := base
+			n.Self = true
+			n.Recipient = mailtrap.Address{Email: "clientanti1s@gmail.com"}
+			n.Message = ""
 			return n
 		}()},
 	} {

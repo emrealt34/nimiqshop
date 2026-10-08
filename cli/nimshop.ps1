@@ -1,4 +1,4 @@
-# nim.shop CLI (Windows) — start / stop / status / logs for a release install.
+# nimiqshop.io CLI (Windows) — start / stop / status / logs for a release install.
 #
 #   nimshop start     start backend + frontend (one process)
 #   nimshop stop
@@ -53,7 +53,7 @@ switch ($Command) {
     Set-Content -Path $PidFile -Value $proc.Id -NoNewline
     Start-Sleep -Milliseconds 600
     if (Get-Process -Id $proc.Id -ErrorAction SilentlyContinue) {
-      "nim.shop started (pid $($proc.Id))  ->  http://127.0.0.1:$(Get-ListenPort)" # DevSkim: ignore DS162092 the CLI stack listens on loopback by design
+      "nimiqshop.io started (pid $($proc.Id))  ->  http://127.0.0.1:$(Get-ListenPort)" # DevSkim: ignore DS162092 the CLI stack listens on loopback by design
     } else {
       if (Test-Path $LogFile) { Get-Content $LogFile -Tail 40 | Write-Error }
       Die "server exited — see $LogFile"
@@ -84,7 +84,7 @@ switch ($Command) {
   }
   default {
     @"
-nim.shop CLI
+nimiqshop.io CLI
 
   nimshop start     start backend + frontend (one process)
   nimshop stop

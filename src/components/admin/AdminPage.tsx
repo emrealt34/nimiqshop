@@ -9,6 +9,7 @@ import { Icon, type IconName } from '../ui/Icon';
 import { PlayersPanel, UsersPanel } from './AdminPeoplePanel';
 import { SystemPanel } from './AdminSystemPanel';
 import { MaintenancePanel } from './AdminMaintenancePanel';
+import { AdminRatingsPanel } from './AdminRatingsPanel';
 import { AppRoot } from '../AppRoot';
 import { useSheet, useToast } from '../AppProviders';
 import {
@@ -46,7 +47,7 @@ function badge(label: string, on: boolean, detail?: string) {
   );
 }
 
-type AdminSection = 'overview' | 'catalog' | 'orders' | 'cashback' | 'people' | 'email' | 'maintenance';
+type AdminSection = 'overview' | 'catalog' | 'orders' | 'cashback' | 'people' | 'ratings' | 'email' | 'maintenance';
 
 type RuleOption = { value: string; label: string };
 
@@ -95,6 +96,7 @@ const ADMIN_SECTIONS: Array<{ id: AdminSection; label: string; hint: string; ico
   { id: 'orders', label: 'Orders', hint: 'cashback & tx', icon: 'receipt' },
   { id: 'cashback', label: 'Cashback', hint: 'rates & ledgers', icon: 'wallet' },
   { id: 'people', label: 'People', hint: 'users & players', icon: 'user' },
+  { id: 'ratings', label: 'Ratings', hint: 'stars & comments', icon: 'star' },
   { id: 'email', label: 'Email', hint: 'Mailtrap tools', icon: 'send' },
   // The only destructive surface in the console gets its own tab, so it can
   // never be clicked by accident while working on the page that is open daily.
@@ -1346,6 +1348,8 @@ export function AdminContent() {
         return <CashbackPanel />;
       case 'people':
         return <UsersPanel />;
+      case 'ratings':
+        return <AdminRatingsPanel />;
       case 'email':
         return <><StatusCard status={status} /><Composer status={status} /><TestEmailCard /></>;
       case 'maintenance':

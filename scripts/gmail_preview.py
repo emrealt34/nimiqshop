@@ -66,7 +66,7 @@ def gmail_page(email_html: str, subject: str, snippet: str) -> str:
         <div class="msg-row">
           <div class="sender-av">n</div>
           <div class="sender">
-            <b>nim.shop</b> <span class="addr">&lt;hello@shop.nimiqbase.com&gt;</span><span class="to">to me</span><br>
+            <b>nimiqshop.io</b> <span class="addr">&lt;hello@shop.nimiqbase.com&gt;</span><span class="to">to me</span><br>
           </div>
           <div class="msg-actions">
             <span class="time">11 Sep, 09:24</span>
@@ -112,12 +112,12 @@ if __name__ == "__main__":
     shoot(
         "/var/tmp/giftmail-preview/named.html",
         "A gift arrived for you 🎁 — and planted a tree 🌳",
-        "Someone sent you a gift via nim.shop — Steam · 50 USD, and a tree is being planted. Here is what arrived and where to find it.",
+        "Someone sent you a gift via nimiqshop.io — Steam · 50 USD, and a tree is being planted. Here is what arrived and where to find it.",
         "/home/user/nimshop-extract/nimshop/ekran-goruntuleri/gmail-hediye-notu-isimli.png",
     )
     shoot(
         "/var/tmp/giftmail-preview/anonymous.html",
         "Someone sent you a gift 🎁 — and planted a tree 🌳",
-        "Someone (anonymous) sent you a gift via nim.shop — Steam · 50 USD, and a tree is being planted. Here is what arrived and where to find it.",
+        "Someone (anonymous) sent you a gift via nimiqshop.io — Steam · 50 USD, and a tree is being planted. Here is what arrived and where to find it.",
         "/home/user/nimshop-extract/nimshop/ekran-goruntuleri/gmail-hediye-notu-anonim.png",
     )

@@ -1,7 +1,7 @@
 {
   "name": "nimiqshop-astro",
   "version": "2.1.0",
-  "description": "nim.shop frontend \u2014 Astro + React frontend for the nim.shop gift-card marketplace. Visual/behavioral parity with the original vanilla-JS build.",
+  "description": "nimiqshop.io frontend \u2014 Astro + React frontend for the nimiqshop.io gift-card marketplace. Visual/behavioral parity with the original vanilla-JS build.",
   "type": "module",
   "scripts": {
     "dev": "astro dev --host 0.0.0.0",

@@ -67,12 +67,18 @@ type Order struct {
 	// Rating is the 1-5 star rating the buyer left after delivery (0 = unrated).
 	Rating  int        `json:"rating,omitempty"`
 	RatedAt *time.Time `json:"rated_at,omitempty"`
-	// RatingTx is the Nimiq transaction hash that anchors the rating on-chain
-	// (1 Luna + a memo naming the stars and the order). It is the public proof
-	// anyone can check without our database; empty means not anchored (yet).
-	RatingTx  string    `json:"rating_tx,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	// RatingTx is the Nimiq transaction hash of the buyer's own rating payment
+	// (1 Luna + fee, memo "<stars>[ <comment>]"). It is the public proof anyone
+	// can check without our database; empty means no on-chain rating yet.
+	RatingTx string `json:"rating_tx,omitempty"`
+	// RatingComment is the optional short comment the buyer signed into the
+	// rating memo (a-z 0-9 and spaces, see internal/ratings). RatingEdits counts
+	// the on-chain ratings this record has carried, the first one included.
+	RatingComment       string    `json:"rating_comment,omitempty"`
+	RatingCommentHidden bool      `json:"rating_comment_hidden,omitempty"`
+	RatingEdits         int       `json:"rating_edits,omitempty"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
 }
 
 // RatingAggregate is the running global star-rating summary. It is stored as a
@@ -273,9 +279,12 @@ type Quote struct {
 	// Rating is the 1-5 star rating the buyer left after delivery (0 = unrated).
 	Rating  int        `json:"rating,omitempty"`
 	RatedAt *time.Time `json:"rated_at,omitempty"`
-	// RatingTx anchors the rating on-chain (see Order.RatingTx).
-	RatingTx  string    `json:"rating_tx,omitempty"`
-	UpdatedAt time.Time `json:"updated_at"`
+	// RatingTx is the buyer's rating payment on-chain (see Order.RatingTx).
+	RatingTx            string    `json:"rating_tx,omitempty"`
+	RatingComment       string    `json:"rating_comment,omitempty"`
+	RatingCommentHidden bool      `json:"rating_comment_hidden,omitempty"`
+	RatingEdits         int       `json:"rating_edits,omitempty"`
+	UpdatedAt           time.Time `json:"updated_at"`
 	// NimUsdRate / EstimatedNIM are snapshotted at quote time so cashback
 	// (1% of the product's NIM price) is computed from the rate the buyer
 	// actually saw, not a later oracle tick. Zero means "unknown — skip".

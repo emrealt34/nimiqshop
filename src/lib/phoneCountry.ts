@@ -45,7 +45,7 @@ export type PhoneCountry = {
 };
 
 /**
- * The countries nim.shop can sell a number into. `national` is the length of
+ * The countries nimiqshop.io can sell a number into. `national` is the length of
  * the number WITHOUT the country code, trunk prefix removed — deliberately a
  * range: it exists to catch "5 digits" and "20 digits", not to out-lawyer a
  * carrier's new numbering plan.

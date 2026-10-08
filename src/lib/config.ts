@@ -64,12 +64,12 @@ export const CFG: AppConfig = new Proxy({ ...DEFAULTS }, {
 
 /**
  * The product wordmark shown in the navbar (owner, 2026-10-05: "navbar'da site
- * adı yerine nim.shop yaz"). Deliberately NOT siteName(): that is the live
+ * adı yerine nimiqshop.io yaz"). Deliberately NOT siteName(): that is the live
  * hostname and it stays in titles, share links, delivery notes and the API
  * copy. The 404 page already printed this same wordmark by hand; this is the
  * one place it is defined for the app chrome.
  */
-export const BRAND_NAME = 'nim.shop';
+export const BRAND_NAME = 'nimiqshop.io';
 
 /** Live shop hostname. One value for titles, footer, Hub, copy. */
 export function siteName(): string {

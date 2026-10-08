@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# nim.shop installer (Linux) — downloads the latest GitHub Release (backend
+# nimiqshop.io installer (Linux) — downloads the latest GitHub Release (backend
 # binary + frontend .zip) and wires a one-command CLI. No Go/Node compile
 # needed. Windows uses install.ps1 instead; macOS is not supported.
 #   curl -fsSL https://github.com/emrealt34/nimiqshop/releases/latest/download/install.sh | bash

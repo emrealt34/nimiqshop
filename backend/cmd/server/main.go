@@ -382,22 +382,41 @@ func main() {
 	}
 	cbWorker.Run(ctx)
 
-	// 1-Luna WALLET MEMO channel. Until now this package existed but was
-	// never constructed — settlement.NotifyFn stayed nil, so the "your
-	// order is ready" memo the code was written for never fired. Wire it,
-	// gated by NOTIFY_WALLET_ENABLED and the send policy in
-	// internal/notification/policy.go (opt-out, cooldown, monthly budget).
+	// 1-Luna WALLET MEMO channel. The order-ready memo is sent to the buyer
+	// (1 Luna + fee, from the notify wallet) once a product order is
+	// fulfilled. There is no env switch: the channel is ON whenever a funded
+	// key exists (NOTIFY_WALLET_SEED, or the cashback wallet seed as fallback).
+	// The per-user opt-out and the send policy in internal/notification still
+	// apply. Star ratings are separate and use the cashback wallet address.
 	notifyNetID := byte(nimiq.NetworkMainnet)
 	if cfg.NotifyWalletNetwork == "testnet" {
 		notifyNetID = byte(nimiq.NetworkTestnet)
 	}
+	notifyOn := strings.TrimSpace(cfg.NotifyWalletSeed) != "" && cfg.NimiqRPCURL != ""
 	walletNotifier := notification.New(
 		nimiq.NewClient(cfg.NimiqRPCURL, cfg.NimiqRPCURL2), store,
-		cfg.NotifyWalletSeed, notifyNetID, int64(cfg.NotifyWalletFeeLuna), cfg.NotifyWalletEnabled,
+		cfg.NotifyWalletSeed, notifyNetID, int64(cfg.NotifyWalletFeeLuna), notifyOn,
 	)
 	h.WalletNotifier = walletNotifier
-	if walletNotifier.Enabled() {
-		log.Printf("notify: wallet memo channel enabled (network=%s fee=%d Luna)", cfg.NotifyWalletNetwork, cfg.NotifyWalletFeeLuna)
+	// Star ratings: the buyer pays the CASHBACK wallet 1 Luna plus the network
+	// fee. The verifier reads that address's counterparty transactions from
+	// the chain. Independent of the notify memo channel above.
+	if cfg.NimiqRPCURL != "" && cfg.CashbackWalletSeed != "" {
+		if cbAddr, err := nimiq.AddressFromSeed(cfg.CashbackWalletSeed); err == nil {
+			h.RatingRPC = nimiq.NewClient(cfg.NimiqRPCURL, cfg.NimiqRPCURL2)
+			h.RatingRecipient = cbAddr
+			h.RatingFeeLuna = int64(cfg.NotifyWalletFeeLuna)
+			log.Printf("ratings: on-chain star ratings enabled (pay cashback wallet %s, fee %d Luna)", cbAddr, cfg.NotifyWalletFeeLuna)
+		} else {
+			log.Printf("ratings: cashback address could not be derived, star ratings disabled: %v", err)
+		}
+	} else {
+		log.Printf("ratings: CASHBACK_WALLET_SEED or NIMIQ_RPC_URL missing, star ratings disabled")
+	}
+	if notifyOn {
+		log.Printf("notify: order-ready memo channel enabled (network=%s fee=%d Luna)", cfg.NotifyWalletNetwork, cfg.NotifyWalletFeeLuna)
+	} else {
+		log.Printf("notify: order-ready memo channel off (no NOTIFY_WALLET_SEED/CASHBACK_WALLET_SEED or NIMIQ_RPC_URL)")
 	}
 	// The order-ready memo: one per fulfilled quote, keyed on the quote id
 	// so a tracker re-run or crash-restart can never send it twice.
@@ -931,6 +950,9 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 	r.POST("/api/admin/orders/{id}/sync", adminOnly(h.AdminSyncOrder))
 	r.POST("/api/admin/orders/{id}/refund", adminOnly(h.AdminRefundOrder))
 	r.GET("/api/admin/quotes", adminOnly(h.AdminListQuotes))
+	r.GET("/api/admin/ratings", adminOnly(h.AdminListRatings))
+	r.POST("/api/admin/ratings/comments", adminOnly(h.AdminSetRatingComments))
+	r.POST("/api/admin/ratings/{kind}/{id}/hide", adminOnly(h.AdminHideRatingComment))
 	r.GET("/api/admin/transactions", adminOnly(h.AdminListTransactions))
 	r.GET("/api/admin/manual-review", adminOnly(h.AdminManualReview))
 	r.POST("/api/admin/quotes/{id}/resolve", adminOnly(h.AdminResolveQuote))
@@ -988,6 +1010,7 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 	r.POST("/api/quotes/batch", authedTiered(aCheckout, h.CreateQuoteBatch))
 	r.GET("/api/quotes", authed(h.ListUserQuotes))
 	r.GET("/api/quotes/{id}", authed(h.GetUserQuote))
+	r.POST("/api/quotes/{id}/rating/intent", authedTiered(aWrite, h.RatingIntentQuote))
 	r.POST("/api/quotes/{id}/rate", authedTiered(aWrite, h.RateQuote))
 
 	// Catalog (public, no auth needed to browse)
@@ -1023,6 +1046,8 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 	// amount) plus the buyer's voluntary star rating.
 	r.GET("/api/activity", wrap(publicCached(30, 300, h.ListActivity)))
 	r.GET("/api/ratings/summary", wrap(publicCached(300, 1800, h.RatingSummary)))
+	r.GET("/api/ratings/config", wrap(h.RatingConfig))
+	r.GET("/api/ratings/comments", wrap(publicCached(60, 300, h.RatingComments)))
 	// Public LIVE tracking: anyone can see an order's current stage by id, but
 	// delivery codes stay owner-only. This is the anti-fraud transparency proof.
 	// Public by design, but per-ORDER and meant to be live: caching it would
@@ -1060,6 +1085,9 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 	// one to the verified client IP. Presence must never 401 a shopper, which
 	// is why this is OptionalAuth and not RequireAuth.
 	r.POST("/api/presence", wrap(pinPrivate(middleware.OptionalAuth(cfg.JWTSecret, authOpts(cfg), aPresence.Limit(h.PresenceHeartbeat)))))
+	// Star ratings are signed and paid by the buyer (1 Luna + fee to the shop
+	// wallet). The intent returns the memo to sign; rate verifies the chain.
+	r.POST("/api/orders/{id}/rating/intent", authedTiered(aWrite, h.RatingIntentOrder))
 	r.POST("/api/orders/{id}/rate", authedTiered(aWrite, h.RateOrder))
 	r.GET("/api/account/limits", authed(h.GetAccountLimits))
 	// Wallet-memo channel controls (opt-out).

@@ -14,7 +14,7 @@
 //  http://www.denso-wave.com/qrcode/faqpatent-e.html
 //
 //---------------------------------------------------------------------
-// Vendored for nim.shop with one local change: the createSvgTag renderer is
+// Vendored for nimiqshop.io with one local change: the createSvgTag renderer is
 // removed (see the note at its former place); everything else is upstream.
 //---------------------------------------------------------------------
 var qrcode = function() {
@@ -373,7 +373,7 @@ var qrcode = function() {
       return qrHtml;
     };
     // createSvgTag (string-assembled SVG markup) is intentionally absent from
-    // this copy: nim.shop draws the code from the module matrix itself
+    // this copy: nimiqshop.io draws the code from the module matrix itself
     // (src/components/checkout/QR.tsx) and never emits vendor-built markup.
     _this.createDataURL = function(cellSize, margin) {
       cellSize = cellSize || 2;

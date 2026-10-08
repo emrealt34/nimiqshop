@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# install-systemd.sh — one command to build nim.shop, wire its secrets, and
+# install-systemd.sh — one command to build nimiqshop.io, wire its secrets, and
 # install it as two systemd services that run in the background and
 # auto-launch on every boot.
 #
@@ -268,7 +268,7 @@ IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
 cat <<SUMMARY
 
 ──────────────────────────────────────────────────────────────────────
- nim.shop is installed and running in the background
+ nimiqshop.io is installed and running in the background
 
    Site         : $IP:$FRONTEND_PORT   (plain HTTP on the LAN — terminate TLS
                   in front of it before exposing the shop publicly)

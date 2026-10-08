@@ -564,10 +564,11 @@ export function StarsDisplay({ rating, size = 16, label = '' }: { rating: number
   );
 }
 
-export function StarPicker({ onSelect, size = 34 }: { onSelect?: (r: number) => void; size?: number }) {
+export function StarPicker({ onSelect, size = 34, value: controlled }: { onSelect?: (r: number) => void; size?: number; value?: number }) {
   const { t } = useT();
-  const [value, setValue] = useState(0);
+  const [inner, setInner] = useState(0);
   const [hover, setHover] = useState(0);
+  const value = controlled ?? inner;
   const paint = hover || value;
   return (
     <div className="stars picker">
@@ -580,7 +581,7 @@ export function StarPicker({ onSelect, size = 34 }: { onSelect?: (r: number) => 
           onMouseEnter={() => setHover(i)}
           onMouseLeave={() => setHover(0)}
           onClick={() => {
-            setValue(i);
+            setInner(i);
             if (onSelect) onSelect(i);
           }}
         >

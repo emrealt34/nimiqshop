@@ -17,6 +17,7 @@ import { useInterval } from '../../lib/useInterval';
 import { useToast } from '../AppProviders';
 import { StatusBadge, StarsDisplay, EmptyState, ErrorState, Skel, NimMark, OnChainProof, ClockTime } from '../ui/uiKit';
 import { Pager } from '../ui/Pager';
+import { RecentRatingComments } from '../rating/RatingFlow';
 import { useT, t as i18nT } from '../../i18n';
 import { pagePath } from '../../lib/asset';
 
@@ -320,6 +321,7 @@ export function ActivityView() {
                 })}
               </div>
             </div>
+            <RecentRatingComments />
           </div>
         )}
       </div>

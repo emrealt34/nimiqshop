@@ -1,5 +1,5 @@
 {
-  "//": "Strings that are legitimately identical in every language: brand names (nim.shop, the navbar wordmark), product names (Nimiq Pay/Hub/Wallet), mock data. Keep this short — anything else must go through t(). Mock catalog brands mirror tests/e2e/support/fixtures.ts. 'NIM cashback', 'Staker boost', 'Cashback & staking', 'Stake in NIM' are the real tr/de/fr translations (loanwords).",
+  "//": "Strings that are legitimately identical in every language: brand names (nimiqshop.io, the navbar wordmark), product names (Nimiq Pay/Hub/Wallet), mock data. Keep this short — anything else must go through t(). Mock catalog brands mirror tests/e2e/support/fixtures.ts. 'NIM cashback', 'Staker boost', 'Cashback & staking', 'Stake in NIM' are the real tr/de/fr translations (loanwords).",
   "exact": [
     "Amazon Gift Card",
     "Steam Gift Card",

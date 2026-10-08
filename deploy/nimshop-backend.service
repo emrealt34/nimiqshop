@@ -1,5 +1,5 @@
 [Unit]
-Description=nim.shop Go backend (API on :__API_PORT__)
+Description=nimiqshop.io Go backend (API on :__API_PORT__)
 Documentation=file://__APP_HOME__/README_SETUP.md
 After=network-online.target
 Wants=network-online.target

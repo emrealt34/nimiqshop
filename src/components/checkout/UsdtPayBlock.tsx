@@ -199,7 +199,7 @@ export function UsdtPayBlock({ quote, expired, onLaunchRequested }: {
         <div className="pay-qr mt-3">
           {/* Centre mark = the shop's own brand tile. (Owner, 2026-10-05:
               the QR used to carry the PAYER's identicon badge on top of it —
-              "şu adamın avatarı değil, nim.shop logosu olmalı".) */}
+              "şu adamın avatarı değil, nimiqshop.io logosu olmalı".) */}
           <div className="pay-qr-frame">
             <QR text={address} size={29} center={asset("/img/brand-icon-96.png")} />
           </div>

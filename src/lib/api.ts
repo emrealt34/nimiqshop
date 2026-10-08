@@ -717,8 +717,21 @@ export const adminUpdateSupportTicketStatus = (ticketId: string, status: string)
 /* ---------------- Market / misc ---------------- */
 export const getActivity = (limit = 50) => api(`/activity?limit=${limit}`);
 export const trackOrder = (id: string) => api(`/track/${encodeURIComponent(id)}`);
-export const rateOrder = (id: string, rating: number) => api(`/orders/${encodeURIComponent(id)}/rate`, { method: 'POST', body: { rating }, auth: true });
-export const rateQuote = (id: string, rating: number) => api(`/quotes/${encodeURIComponent(id)}/rate`, { method: 'POST', body: { rating }, auth: true });
+/* ---- On-chain star ratings (buyer signs and pays 1 Luna + fee) ----------
+ * intent → the memo the buyer's wallet signs; rate → the shop verifies the
+ * buyer's transaction on the chain and saves the rating. rate answers 202
+ * {status:"pending"} while the chain has not confirmed the transaction yet. */
+export type RatingKind = 'order' | 'quote';
+export interface RatingBody { stars: number; comment?: string; tx_hash?: string }
+const ratingBase = (kind: RatingKind, id: string) => `/${kind === 'quote' ? 'quotes' : 'orders'}/${encodeURIComponent(id)}`;
+export const getRatingConfig = () => api('/ratings/config');
+export const getRatingComments = () => api('/ratings/comments');
+export const ratingIntent = (kind: RatingKind, id: string, body: RatingBody) =>
+  api(`${ratingBase(kind, id)}/rating/intent`, { method: 'POST', body, auth: true });
+export const submitRating = (kind: RatingKind, id: string, body: RatingBody) =>
+  api(`${ratingBase(kind, id)}/rate`, { method: 'POST', body, auth: true });
+export const rateOrder = (id: string, body: RatingBody) => submitRating('order', id, body);
+export const rateQuote = (id: string, body: RatingBody) => submitRating('quote', id, body);
 export const getAccountLimits = () => api('/account/limits', { auth: true });
 export const getCashbackRate = () => api('/cashback/rate');
 export const validateCashbackCode = (code: string, orderUSD = 0) => api(`/cashback/code?code=${encodeURIComponent(code)}&order_usd=${encodeURIComponent(String(orderUSD > 0 ? orderUSD : 0))}`);
@@ -966,4 +979,9 @@ export const adminGetStakeLedger = () => api('/admin/stake-ledger');
 export const adminResetStakeLedger = (address: string) =>
   api('/admin/stake-ledger/reset', { method: 'POST', body: { address } });
 export const adminListQuotes = (limit = 50) => api('/admin/quotes?limit=' + encodeURIComponent(limit));
+export const adminListRatings = () => api('/admin/ratings');
+export const adminSetRatingComments = (enabled: boolean) =>
+  api('/admin/ratings/comments', { method: 'POST', body: { enabled } });
+export const adminHideRatingComment = (kind: 'order' | 'quote', id: string, hidden: boolean) =>
+  api(`/admin/ratings/${kind}/${encodeURIComponent(id)}/hide`, { method: 'POST', body: { hidden } });
 export const adminGetOrder = (id: string) => api('/admin/orders/' + encodeURIComponent(id));

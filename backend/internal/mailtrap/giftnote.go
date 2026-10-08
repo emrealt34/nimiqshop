@@ -363,7 +363,7 @@ func (n GiftNote) textBody(site, product, message string) string {
 	}
 	b.WriteString("\nWhere is " + n.itemWord() + "?\n")
 	b.WriteString(wrap(n.deliveryLine(), 76) + "\n")
-	b.WriteString("\nIt arrives from noreply@cryptorefills.com — watch that inbox (and the spam folder).\n")
+	b.WriteString("\nIt arrives from noreply@cryptorefills.com — watch that inbox (and the spam folder).\nOpen that sender's mail: " + cryptorefillsInboxURL + "\n")
 	if u := safeURL(n.ShopURL); u != "" {
 		b.WriteString("\nWant to give back? Browse gifts and top-ups:\n")
 		b.WriteString("  " + u + "\n")
@@ -550,7 +550,7 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 	b.WriteString(`                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:` + mailPanel + `;border:1px dashed ` + mailDash + `;border-radius:12px">` + "\n")
 	b.WriteString(`                  <tr><td style="padding:13px 15px;font-size:13px;line-height:1.6;color:` + mailInkDim + `;font-family:` + font + `">` + "\n")
 	b.WriteString(`                    <strong style="color:` + mailInk + `">Where is ` + esc(n.itemWord()) + `?</strong><br>` + "\n")
-	b.WriteString(`                    ` + esc(n.deliveryLine()) + ` It arrives from <strong style="color:` + mailInk + `">noreply@cryptorefills.com</strong> — watch that inbox (and the spam folder).` + "\n")
+	b.WriteString(`                    ` + esc(n.deliveryLine()) + ` It arrives from <a href="` + cryptorefillsInboxURL + `" style="color:` + mailInk + `;font-weight:700;text-decoration:underline">noreply@cryptorefills.com</a> — tap to open its mail in Gmail, and watch the spam folder too.` + "\n")
 	b.WriteString("                  </td></tr>\n")
 	b.WriteString("                </table>\n")
 	b.WriteString("              </td>\n")
@@ -620,6 +620,10 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 }
 
 // giftWord names the note itself, so a receipt never calls itself a gift.
+// cryptorefillsInboxURL opens Gmail filtered to mail from the CryptoRefills
+// sender, so the buyer lands on the delivery mail with one tap.
+const cryptorefillsInboxURL = "https://mail.google.com/mail/u/0/#search/from%3Anoreply%40cryptorefills.com"
+
 func giftWord(self bool) string {
 	if self {
 		return "order"

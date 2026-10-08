@@ -3,8 +3,6 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"errors"
-	"log"
 	"math"
 	"regexp"
 	"sort"
@@ -18,7 +16,6 @@ import (
 	"nimiqshop/internal/clientip"
 	"nimiqshop/internal/db"
 	"nimiqshop/internal/middleware"
-	"nimiqshop/internal/notification"
 )
 
 /* activity_handlers.go — public, fully-transparent payment feed + star ratings.
@@ -500,133 +497,6 @@ func sanitizePresenceID(raw string) string {
 		return ""
 	}
 	return id
-}
-
-// anchorRating writes the rating ON-CHAIN: a 1-Luna transaction to the rater's
-// own address whose memo names the stars and the order ("… rating 5/5 order
-// ab12cd34"). The memo is the proof — public, immutable and readable by anyone
-// on an explorer, with no trust in our database. Returns the tx hash, or "" when
-// the anchor was skipped (wallet notifier off) or failed; a failed anchor never
-// fails the rating itself, which is already saved.
-func (h *Handlers) anchorRating(refID, orderID, userID string, stars int) string {
-	n := h.WalletNotifier
-	if n == nil || !n.Enabled() || strings.TrimSpace(userID) == "" {
-		return ""
-	}
-	ctxN, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	tx, err := n.NotifyTx(ctxN, refID, userID, notification.RatingMemo(orderID, stars))
-	if err != nil {
-		log.Printf("rating: on-chain anchor failed for %s: %v", orderID, err)
-		return ""
-	}
-	return tx
-}
-
-type rateOrderRequest struct {
-	Rating int `json:"rating"`
-}
-
-// RateOrder lets the authenticated owner of a DELIVERED order record a 1-5 star
-// rating. It is idempotent and returns the updated global summary so the UI can
-// refresh the aggregate in one round trip.
-func (h *Handlers) RateOrder(ctx *fasthttp.RequestCtx) {
-	orderID, _ := ctx.UserValue("id").(string)
-	userID := middleware.UserID(ctx)
-
-	var req rateOrderRequest
-	if err := readJSON(ctx, &req); err != nil || req.Rating < 1 || req.Rating > 5 {
-		writeError(ctx, fasthttp.StatusBadRequest, "rating must be an integer from 1 to 5")
-		return
-	}
-
-	o, agg, err := h.Store.SetOrderRating(orderID, userID, req.Rating)
-	if errors.Is(err, db.ErrNotFound) {
-		writeError(ctx, fasthttp.StatusNotFound, "order not found")
-		return
-	}
-	if errors.Is(err, db.ErrConflict) {
-		writeError(ctx, fasthttp.StatusConflict, "this order cannot be rated yet (delivery must complete)")
-		return
-	}
-	if err != nil {
-		writeError(ctx, fasthttp.StatusInternalServerError, "could not save rating")
-		return
-	}
-
-	// The rating is saved; now make it provable. Idempotent per (order, stars):
-	// re-rating the same order with the same value never pays a second time, a
-	// CHANGED rating gets its own anchor (the newest memo is the truth).
-	// An ANONYMOUS order is never anchored: a shop→buyer memo transaction with
-	// the order id on it would tie that wallet to a row whose whole point is
-	// that it carries no address. The rating itself still counts.
-	txHash := ""
-	if !o.Anonymous {
-		txHash = h.anchorRating("rating:order:"+o.ID+":"+strconv.Itoa(o.Rating), o.ID, userID, o.Rating)
-	}
-	if txHash != "" {
-		if e := h.Store.SetOrderRatingTx(o.ID, txHash); e != nil {
-			log.Printf("rating: order %s anchored as %s but the proof hash could not be stored: %v", o.ID, txHash, e)
-		}
-	}
-
-	writeJSON(ctx, fasthttp.StatusOK, map[string]interface{}{
-		"order_id":  o.ID,
-		"rating":    o.Rating,
-		"rated_at":  o.RatedAt,
-		"rating_tx": txHash,
-		"summary":   ratingSummaryShape(agg),
-	})
-}
-
-type rateQuoteRequest struct {
-	Rating int `json:"rating"`
-}
-
-// RateQuote lets the authenticated owner of a FULFILLED direct-NIM purchase
-// record a 1-5 star rating. Mirrors RateOrder; returns the updated summary.
-func (h *Handlers) RateQuote(ctx *fasthttp.RequestCtx) {
-	quoteID, _ := ctx.UserValue("id").(string)
-	userID := middleware.UserID(ctx)
-
-	var req rateQuoteRequest
-	if err := readJSON(ctx, &req); err != nil || req.Rating < 1 || req.Rating > 5 {
-		writeError(ctx, fasthttp.StatusBadRequest, "rating must be an integer from 1 to 5")
-		return
-	}
-
-	q, agg, err := h.Store.SetQuoteRating(quoteID, userID, req.Rating)
-	if errors.Is(err, db.ErrNotFound) {
-		writeError(ctx, fasthttp.StatusNotFound, "order not found")
-		return
-	}
-	if errors.Is(err, db.ErrConflict) {
-		writeError(ctx, fasthttp.StatusConflict, "this order cannot be rated yet (delivery must complete)")
-		return
-	}
-	if err != nil {
-		writeError(ctx, fasthttp.StatusInternalServerError, "could not save rating")
-		return
-	}
-
-	// Same on-chain anchor as RateOrder (see anchorRating).
-	txHash := ""
-	if !q.Anonymous {
-		txHash = h.anchorRating("rating:quote:"+q.ID+":"+strconv.Itoa(q.Rating), q.ID, userID, q.Rating)
-	}
-	if txHash != "" {
-		if e := h.Store.SetQuoteRatingTx(q.ID, txHash); e != nil {
-			log.Printf("rating: quote %s anchored as %s but the proof hash could not be stored: %v", q.ID, txHash, e)
-		}
-	}
-
-	writeJSON(ctx, fasthttp.StatusOK, map[string]interface{}{
-		"order_id":  q.ID,
-		"rating":    q.Rating,
-		"rated_at":  q.RatedAt,
-		"rating_tx": txHash,
-		"summary":   ratingSummaryShape(agg),
-	})
 }
 
 // GetAccountLimits returns the signed-in user's daily order/spend usage and

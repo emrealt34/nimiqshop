@@ -9,7 +9,7 @@ import { UnifiedThumb, BrandThumbStack } from '../ui/UnifiedThumb';
 import { FlagMark } from '../ui/FlagMark';
 import { AppRoot } from '../AppRoot';
 import { openLoginSheet } from '../shell/SiteShell';
-import { listOrders, listQuotes, rateOrder, rateQuote } from '../../lib/api';
+import { listOrders, listQuotes } from '../../lib/api';
 import { brandMetaFor } from '../../lib/catalogMeta';
 import { cleanProductLabel, cleanBatchProductLabels, fmtDate, fmtDuration, fmtNum, quoteFaceValue, countryName } from '../../lib/format';
 import { friendlyApiMessage, errorDetailLine } from '../../lib/api';
@@ -19,7 +19,7 @@ import { quoteStages, isTerminalStatus, isDeliveredStatus, isIssueStatus } from 
 import { deliverySummary, payRail } from '../../lib/deliveryCopy';
 import { useInterval } from '../../lib/useInterval';
 import { useToast, useSheet } from '../AppProviders';
-import { StatusBadge, MiniProgress, StarsDisplay, StarPicker, EmptyState, ErrorState, LockedSignInCard, SkeletonCards, NimAmount, OnChainProof, ClockTime } from '../ui/uiKit';
+import { StatusBadge, MiniProgress, StarsDisplay, EmptyState, ErrorState, LockedSignInCard, SkeletonCards, NimAmount, OnChainProof, ClockTime } from '../ui/uiKit';
 import { Pager } from '../ui/Pager';
 import { useT, t as i18nT } from '../../i18n';
 import { pagePath } from '../../lib/asset';
@@ -283,18 +283,6 @@ export function OrdersView() {
   const orderPageSafe = Math.min(orderPage, orderPageCount - 1);
   const orderRows = filtered.slice(orderPageSafe * ORDERS_PER_PAGE, orderPageSafe * ORDERS_PER_PAGE + ORDERS_PER_PAGE);
 
-  const doRate = async (r: any, val: number) => {
-    try {
-      const res: any = await (r.rowKind === 'quote' ? rateQuote(r.id, val) : rateOrder(r.id, val));
-      // Anchored on-chain: say so, and name the transaction (the explorer link
-      // sits on the row itself once the list refreshes).
-      toast(res && res.rating_tx ? t('ordersPage.ratedOnChain') : t('ordersPage.ratedThanks'), 'success');
-      load();
-    } catch (e) {
-      toast(friendlyApiMessage(e, t('ordersPage.rateError')), 'error');
-    }
-  };
-
   if (authed === null) {
     // Auth not decided yet (server HTML / first paint): neutral skeleton only.
     return (
@@ -366,7 +354,7 @@ export function OrdersView() {
           <div className="fade-in">
             <div className="order-list">
               {orderRows.map((r, i) => (
-                <OrderRow key={i} r={r} onRate={doRate} />
+                <OrderRow key={i} r={r} />
               ))}
             </div>
             <Pager page={orderPageSafe} pageCount={orderPageCount} onPage={setOrderPage} />
@@ -412,7 +400,7 @@ function awaitingPay(x: any): boolean {
   return Number.isFinite(t) ? t > Date.now() : true;
 }
 
-function OrderRow({ r, onRate }: { r: any; onRate: (r: any, val: number) => void }) {
+function OrderRow({ r }: { r: any }) {
   const { t } = useT();
   const href = pagePath(r.rowKind === 'quote' ? `/order?type=quote&id=${encodeURIComponent(r.id)}` : `/order?id=${encodeURIComponent(r.id)}`);
   const [rated] = useState(r.rating > 0);
@@ -459,9 +447,11 @@ function OrderRow({ r, onRate }: { r: any; onRate: (r: any, val: number) => void
       );
     } else if (!rated) {
       ratingNode = (
-        <span className="row ord-rate" style={{ gap: '6px', alignItems: 'center' }} onClick={(e) => e.preventDefault()}>
+        // Rating (stars + optional comment, paid by the buyer) happens on the
+        // order page, so the row only points there.
+        <span className="row ord-rate" style={{ gap: '6px', alignItems: 'center' }}>
           <span className="xs faint">{t('common.rate')}</span>
-          <StarPicker size={16} onSelect={(val) => onRate(r, val)} />
+          <StarsDisplay rating={0} size={14} />
         </span>
       );
     }

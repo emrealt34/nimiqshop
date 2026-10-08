@@ -3,7 +3,6 @@ package db
 import (
 	"encoding/json"
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/dgraph-io/badger/v4"
@@ -290,85 +289,6 @@ func (s *Store) GetOrderByIdempotencyKey(userID, key string) (Order, error) {
 }
 
 /* ---------------- Public activity feed + ratings ---------------- */
-
-// SetOrderRating records a 1-5 star rating on a delivered order owned by the
-// caller, and updates the global RatingAggregate in the SAME transaction so
-// the public average can never diverge from the individual ratings. It is
-// idempotent: re-submitting the same value is a no-op; changing a value
-// adjusts the aggregate by the delta. Returns the updated aggregate.
-func (s *Store) SetOrderRating(orderID, userID string, rating int) (Order, RatingAggregate, error) {
-	var o Order
-	var agg RatingAggregate
-	if rating < 1 || rating > 5 {
-		return o, agg, ErrConflict
-	}
-	err := s.Update(func(txn *badger.Txn) error {
-		if e := getJSON(txn, orderKey(orderID), &o); e != nil {
-			return e
-		}
-		if o.UserID != userID {
-			return ErrNotFound
-		}
-		if !isDeliveredStatus(o.Status) {
-			return ErrConflict // not delivered yet — not rateable
-		}
-
-		agg = loadAggregate(txn)
-		old := o.Rating
-		if old == rating {
-			return nil // idempotent no-op
-		}
-
-		now := time.Now().UTC()
-		o.Rating = rating
-		o.RatedAt = &now
-
-		blob, e := marshal(o)
-		if e != nil {
-			return e
-		}
-		if e := txn.Set(orderKey(o.ID), blob); e != nil {
-			return e
-		}
-
-		if old == 0 {
-			// first rating for this order
-			agg.Count++
-			agg.Sum += rating
-			agg.Dist[rating]++
-		} else {
-			// rating changed: adjust sum and distribution, count unchanged
-			agg.Sum += rating - old
-			agg.Dist[old]--
-			agg.Dist[rating]++
-		}
-		return saveAggregate(txn, agg)
-	})
-	return o, agg, err
-}
-
-// SetOrderRatingTx stores the on-chain proof hash for a rating that was just
-// anchored (see handlers.RateOrder). Best-effort by design: the rating itself
-// is already saved, so a failure here costs only the proof link, never the
-// rating. A later successful anchor simply overwrites the hash.
-func (s *Store) SetOrderRatingTx(orderID, txHash string) error {
-	if strings.TrimSpace(txHash) == "" {
-		return nil
-	}
-	return s.Update(func(txn *badger.Txn) error {
-		var o Order
-		if e := getJSON(txn, orderKey(orderID), &o); e != nil {
-			return e
-		}
-		o.RatingTx = txHash
-		o.UpdatedAt = time.Now().UTC()
-		blob, e := marshal(o)
-		if e != nil {
-			return e
-		}
-		return txn.Set(orderKey(o.ID), blob)
-	})
-}
 
 // ListFeedOrders returns the most recently delivered orders (newest-first) for
 // the public activity feed, scanned through the ix:feed:o index.

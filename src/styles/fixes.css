@@ -1419,7 +1419,7 @@ html.in-nimiq-pay #main.page {
 }
 
 /* ========================================================================
-   Impact card v4 — a real nim.shop receipt, not a generic green dashboard.
+   Impact card v4 — a real nimiqshop.io receipt, not a generic green dashboard.
    This deliberately uses the same kraft / ink / stamp-red language as the
    rest of the shop: hard ink edge, offset shadow, dashed receipt rules and
    one restrained green impact panel.
@@ -2472,7 +2472,7 @@ label.oos-toggle > span {
     white-space: nowrap;
   }
   /* The static 404 header carries the same control (a ghost link home). Its
-     long French label ("Connecter le portefeuille") squeezed "nim.shop" to
+     long French label ("Connecter le portefeuille") squeezed "nimiqshop.io" to
      55px at 360/390 and the scan read the wordmark as truncated. */
   .topbar .btn.btn-ghost .btn-label { display: none; }
   .topbar .btn.btn-ghost .btn-label-short { display: inline; }
@@ -3277,11 +3277,11 @@ body {
    finding it fixes; the scan fails the build if any of them regresses.
    ========================================================================== */
 
-/* Wordmark: the name is a 7-glyph product word ("nim.shop", owner 2026-10-05)
+/* Wordmark: the name is a 7-glyph product word ("nimiqshop.io", owner 2026-10-05)
    and needs ~60px of rail — not the ~235px "shop.nimiqbase.com" needed — so it
    fits beside the four compacted header controls from 360px up. Only the 320px
    rail still keeps the icon-only brand (the link keeps its aria-label). */
-@media (max-width: 359.98px) {
+@media (max-width: 389.98px) {
   .topbar #site-wordmark { display: none !important; }
 }
 
@@ -3834,4 +3834,12 @@ input[type="range"]:focus-visible { outline: 2px solid var(--stamp); outline-off
 .amt-btn:disabled{ opacity:.45; cursor:not-allowed }
 @media (max-width:420px){
   .amt-table{ font-size:var(--fs-2xs, .68rem) }
+}
+
+/* The shop name is "nimiqshop.io" (12 glyphs, was 7). On phones between 390px
+   and 479px the wordmark sits beside four controls and clipped to "nimiqsho…".
+   One step smaller type fits it whole from 390px; below that the wordmark is
+   hidden and the icon carries the brand (same rule as the 320px rail). */
+@media (min-width: 390px) and (max-width: 479.98px) {
+  .topbar .brand { font-size: 0.95rem; }
 }

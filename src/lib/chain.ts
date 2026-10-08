@@ -1,8 +1,9 @@
 /**
  * chain.ts — public, read-only links into the Nimiq chain.
  *
- * The shop anchors every star rating on-chain (1 Luna + a memo naming the stars
- * and the order), so the UI must be able to point at that transaction. The
+ * Every star rating is signed and paid by the buyer on-chain (1 Luna + the
+ * network fee, memo "<stars>[ <comment>]"), so the UI must be able to point
+ * at that transaction. The
  * explorer is nimiq.watch: its URL is the bare 64-hex hash behind `#`.
  * Anything that is not a hash or an NQ address returns null, so a truncated or
  * hand-typed value can never become a link (and never a `javascript:` URL).

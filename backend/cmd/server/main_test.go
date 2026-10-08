@@ -391,7 +391,10 @@ func TestShopperFlowTestMode(t *testing.T) {
 		t.Errorf("bogus test action accepted: %s", truncate(res.body))
 	}
 	// Fulfilled quotes feed the public activity and ratings surfaces.
-	if res := s.do(http.MethodPost, "/api/quotes/"+quoteID+"/rate", map[string]any{"stars": 5, "comment": "great"}, auth); res.status >= 500 {
+	// Ratings need the buyer's on-chain transaction, which only exists when the
+	// shop wallet is configured. Without it the honest answer is 503 ("not
+	// available"); anything else >= 500 is a bug.
+	if res := s.do(http.MethodPost, "/api/quotes/"+quoteID+"/rate", map[string]any{"stars": 5, "comment": "great"}, auth); res.status >= 500 && res.status != http.StatusServiceUnavailable {
 		t.Errorf("rate quote: %d %s", res.status, res.body)
 	}
 	if res := s.do(http.MethodGet, "/api/track/"+quoteID, nil, nil); res.status >= 500 {
@@ -407,7 +410,7 @@ func TestShopperFlowTestMode(t *testing.T) {
 	if res := s.do(http.MethodPost, "/api/orders/"+orderID+"/refresh", nil, auth); res.status >= 500 {
 		t.Errorf("order refresh: %d %s", res.status, res.body)
 	}
-	if res := s.do(http.MethodPost, "/api/orders/"+orderID+"/rate", map[string]any{"stars": 5}, auth); res.status >= 500 {
+	if res := s.do(http.MethodPost, "/api/orders/"+orderID+"/rate", map[string]any{"stars": 5}, auth); res.status >= 500 && res.status != http.StatusServiceUnavailable {
 		t.Errorf("rate order: %d %s", res.status, res.body)
 	}
 

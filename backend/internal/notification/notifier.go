@@ -174,25 +174,6 @@ func (n *Notifier) NotifyTx(ctx context.Context, refID, recipientFriendly, memo 
 	return txHash, nil
 }
 
-// RatingMemo is the PUBLIC proof line for a star rating. The memo is what a
-// block explorer shows, so it names the shop, the stars and the order the
-// rating belongs to: anyone can read it off the chain, forever, without
-// trusting our database. Order ids are UUIDs — the first block is enough to
-// recognise one, and it keeps the line inside the 64-byte memo ceiling.
-func RatingMemo(orderID string, stars int) string {
-	if stars < 1 {
-		stars = 1
-	}
-	if stars > 5 {
-		stars = 5
-	}
-	id := strings.TrimSpace(orderID)
-	if len(id) > 8 {
-		id = id[:8]
-	}
-	return TrimMemo(fmt.Sprintf("%s rating %d/5 order %s", shopHost(), stars, id))
-}
-
 // notifySimulated is Notify with the chain steps replaced by a marker: the
 // idempotency ledger is written exactly like a real send (so repeat runs are
 // still at-most-once and the admin views show the notification), but no

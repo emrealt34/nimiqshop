@@ -12,7 +12,8 @@ import { UnifiedThumb, BrandThumbStack } from '../ui/UnifiedThumb';
 import { FlagMark } from '../ui/FlagMark';
 import { AppRoot } from '../AppRoot';
 import { openLoginSheet } from '../shell/SiteShell';
-import { friendlyApiMessage, getOrder, refreshOrder, getQuote, refreshQuote, rateOrder, rateQuote, getProduct, allowNewPurchase, createQuote, errorDetailLine } from '../../lib/api';
+import { friendlyApiMessage, getOrder, refreshOrder, getQuote, refreshQuote, getProduct, allowNewPurchase, createQuote, errorDetailLine } from '../../lib/api';
+import { RatingFlow, type RatingCurrent } from '../rating/RatingFlow';
 import { isAuthed } from '../../lib/session';
 import { useSession } from '../../lib/useSession';
 import { quoteStages, isTerminalStatus, shouldAskRating, ratingDismissedKey } from '../../lib/orderTrack';
@@ -56,7 +57,6 @@ import {
   KvSkeleton,
   kindMeta,
   StarsDisplay,
-  StarPicker,
   NimAmount,
 } from '../ui/uiKit';
 import { LightningPayBlock } from '../checkout/LightningPayBlock';
@@ -83,22 +83,19 @@ const ORDER_REDEEM_STEPS: Record<string, string[]> = {
 };
 
 /**
- * Body of the "Rate your delivery" sheet.
- *
- * A component rather than a pre-built element: the sheet outlives the render
- * pass that opened it, so it must subscribe to the translator itself. That way
- * a rating prompt that opens before this visitor's dictionary chunk arrives
- * (or a language switch while it is open) re-renders in the right language
- * instead of freezing in English.
+ * Body of the "Rate your delivery" sheet. The sheet outlives the render pass
+ * that opened it, so the rating form subscribes to the translator itself and a
+ * language switch while it is open re-renders correctly.
  */
-function RateDeliveryPrompt({ onRate, onLater }: { onRate: (stars: number) => void; onLater: () => void }) {
+function RateDeliveryPrompt({ kind, id, onSaved, onLater }: { kind: 'order' | 'quote'; id: string; onSaved: (res: any) => void; onLater: () => void }) {
   const { t } = useT();
+  const none: RatingCurrent = { rated: false, stars: 0, comment: '', edits: 0 };
   return (
-    <div className="center" style={{ padding: '4px 2px 2px' }}>
+    <div style={{ padding: '4px 2px 2px' }}>
       <div className="strong" style={{ fontSize: '1.05rem' }}>{t('orderPage.howWasDelivery')}</div>
       <div className="small muted mt-1">{t('orderPage.howWasIt')}</div>
-      <div className="mt-2" style={{ display: 'flex', justifyContent: 'center' }}>
-        <StarPicker size={34} onSelect={onRate} />
+      <div className="mt-2">
+        <RatingFlow kind={kind} id={id} current={none} onSaved={onSaved} />
       </div>
       <button className="btn btn-ghost btn-block mt-2" onClick={onLater}>
         <Icon name="clock" size={16} />
@@ -385,12 +382,20 @@ function HelpCard() {
   );
 }
 
-function RatingCard({ status, rating, onRate }: { status: string; rating: number; onRate: (r: number) => Promise<unknown> }) {
+function RatingCard({ kind, id, status, rating, comment, edits, onSaved }: {
+  kind: 'order' | 'quote';
+  id: string;
+  status: string;
+  rating: number;
+  comment: string;
+  edits: number;
+  onSaved: () => void;
+}) {
   const { t } = useT();
-  const { toast } = useToast();
+  const [changing, setChanging] = useState(false);
   if (!isTerminalStatus(status)) return null;
   if (['failed', 'refunded', 'expired', 'denied', 'blocked'].includes(String(status).toLowerCase())) return null;
-  if (rating && rating > 0) {
+  if (rating && rating > 0 && !changing) {
     return (
       <div className="card">
         <div className="card-title">{t('orderPage.ratePurchase')}</div>
@@ -400,6 +405,12 @@ function RatingCard({ status, rating, onRate }: { status: string; rating: number
             <StarsDisplay rating={rating} size={26} />
             <span className="small faint">{t('orderPage.thanks')}</span>
           </div>
+          {comment ? <div className="small mt-1" style={{ wordBreak: 'break-word' }}>&ldquo;{comment}&rdquo;</div> : null}
+          {edits < 5 ? (
+            <button className="btn btn-ghost btn-sm mt-2" type="button" onClick={() => setChanging(true)}>
+              {t('rating.change')}
+            </button>
+          ) : null}
         </div>
       </div>
     );
@@ -408,17 +419,20 @@ function RatingCard({ status, rating, onRate }: { status: string; rating: number
     <div className="card">
       <div className="card-title">{t('orderPage.ratePurchase')}</div>
       <div className="small muted mb-1">{t('orderPage.howWasIt')}</div>
-      <StarPicker
-        size={26}
-        onSelect={async (r) => {
-          try {
-            await onRate(r);
-            toast(t('orderPage.ratedThanks'), 'success');
-          } catch (err) {
-            toast(friendlyApiMessage(err, t('orderPage.rateError')), 'error');
-          }
+      <RatingFlow
+        kind={kind}
+        id={id}
+        current={{ rated: rating > 0, stars: rating || 0, comment: comment || '', edits: edits || 0 }}
+        onSaved={() => {
+          setChanging(false);
+          onSaved();
         }}
       />
+      {changing ? (
+        <button className="btn btn-ghost btn-sm mt-2" type="button" onClick={() => setChanging(false)}>
+          {t('rating.cancelChange')}
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -847,15 +861,6 @@ export function OrderView() {
     })) return;
     rateAskedFor.current = rowId;
     const laterKey = ratingDismissedKey(isQuote ? 'quote' : 'order', rowId);
-    const rate = async (stars: number) => {
-      try {
-        await (isQuote ? rateQuote(rowId, stars) : rateOrder(rowId, stars));
-        toast(t('orderPage.ratedThanks'), 'success');
-      } catch (e) {
-        toast(friendlyApiMessage(e, t('orderPage.rateError')), 'error');
-      }
-      load(false);
-    };
     openSheet({
       // Both the heading and the body translate at RENDER time. The prompt
       // opens the moment the order payload lands, which can beat this
@@ -865,9 +870,12 @@ export function OrderView() {
       title: (tr) => tr('orderPage.rateTitle'),
       render: (close) => (
         <RateDeliveryPrompt
-          onRate={(stars) => {
-            rate(stars);
+          kind={isQuote ? 'quote' : 'order'}
+          id={rowId}
+          onSaved={() => {
+            toast(i18nT('orderPage.ratedThanks'), 'success');
             close();
+            load(false);
           }}
           onLater={() => {
             try { localStorage.setItem(laterKey, '1'); } catch {}
@@ -964,10 +972,10 @@ export function OrderView() {
   const o = isQuote ? null : data;
 
   if (isQuote && q) {
-    return <QuoteContent q={q} refund={data.refund} fulfillment={data.fulfillment} />;
+    return <QuoteContent q={q} refund={data.refund} fulfillment={data.fulfillment} onChanged={() => load(false)} />;
   }
   if (o) {
-    return <OrderContent o={o} />;
+    return <OrderContent o={o} onChanged={() => load(false)} />;
   }
   return null;
 }
@@ -1001,7 +1009,7 @@ function payMethodLabel(q: any): string {
   if (m === 'nimiq_pay') return i18nT('orderPage.payBtcLightning');
   return m ? m.replace(/_/g, ' ') : coin === 'NIM' ? i18nT('orderPage.payBtcLightning') : '—';
 }
-function OrderContent({ o }: { o: any }) {
+function OrderContent({ o, onChanged }: { o: any; onChanged: () => void }) {
   const { t } = useT();
   const meta = kindMeta(o.kind);
   const payload = o.payload || {};
@@ -1167,9 +1175,13 @@ function OrderContent({ o }: { o: any }) {
 
   const rateCard = (
     <RatingCard
+      kind="order"
+      id={o.id}
       status={o.status}
       rating={o.rating || 0}
-      onRate={(r) => rateOrder(o.id, r)}
+      comment={o.rating_comment || ''}
+      edits={o.rating_edits || 0}
+      onSaved={onChanged}
     />
   );
   if (rateCard) rightItems.push(rateCard);
@@ -1190,7 +1202,7 @@ function OrderContent({ o }: { o: any }) {
   );
 }
 
-function QuoteContent({ q, refund, fulfillment }: { q: any; refund?: any; fulfillment?: any }) {
+function QuoteContent({ q, refund, fulfillment, onChanged }: { q: any; refund?: any; fulfillment?: any; onChanged: () => void }) {
   const { t } = useT();
   const stages = quoteStages(q);
   // Channel + rail are needed by the timeline near the top and the summary
@@ -1430,7 +1442,17 @@ function QuoteContent({ q, refund, fulfillment }: { q: any; refund?: any; fulfil
 
   if (refund) rightItems.push(refundCardForQuote(refund, t));
 
-  const rateCard = <RatingCard status={q.status} rating={q.rating || 0} onRate={(r) => rateQuote(q.id, r)} />;
+  const rateCard = (
+    <RatingCard
+      kind="quote"
+      id={q.id}
+      status={q.status}
+      rating={q.rating || 0}
+      comment={q.rating_comment || ''}
+      edits={q.rating_edits || 0}
+      onSaved={onChanged}
+    />
+  );
   if (rateCard) rightItems.push(rateCard);
 
   rightItems.push(<HelpCard key="support" />);

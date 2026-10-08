@@ -52,6 +52,12 @@ type Handlers struct {
 	// delegation the pool's own index has not recorded yet (or has lost)
 	// still earns the staker rate. Nil = pool-only, the old behaviour.
 	Chain *chainstake.Verifier
+	// RatingRPC reads buyer rating transactions from the Nimiq chain. With
+	// RatingRecipient (the CASHBACK wallet the buyer pays) it turns star ratings on:
+	// without both, rating endpoints answer 503 and nothing is saved.
+	RatingRPC       *nimiq.Client
+	RatingRecipient string
+	RatingFeeLuna   int64
 	// Mail is the Mailtrap email transport — the ONLY one: the SMTP client
 	// and the SMS sender are gone. It carries the fulfillment gift note
 	// (settlement tracker + admin retry), the operator's direct emails and

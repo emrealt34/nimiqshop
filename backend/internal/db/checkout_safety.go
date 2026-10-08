@@ -172,6 +172,9 @@ func (q Quote) PublicQuote(now time.Time) Quote {
 	if !q.CanPay(now) {
 		q.WalletAddress = ""
 	}
+	if q.RatingCommentHidden {
+		q.RatingComment = "" // an admin-hidden comment is withheld everywhere
+	}
 	return q
 }
 

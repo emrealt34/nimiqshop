@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# nim.shop CLI — start / stop / status / logs for a release install.
+# nimiqshop.io CLI — start / stop / status / logs for a release install.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -29,7 +29,7 @@ case "$cmd" in
     sleep 0.4
     if pid_alive; then
       port=$(sed -n 's/^LISTEN_ADDR=://p' "$ENV_FILE" | head -1)
-      echo "nim.shop started (pid $(cat "$PID_FILE"))  →  http://127.0.0.1:${port:-8085}"
+      echo "nimiqshop.io started (pid $(cat "$PID_FILE"))  →  http://127.0.0.1:${port:-8085}"
     else
       tail -n 40 "$LOG_FILE" >&2 || true
       die "server exited — see $LOG_FILE"
@@ -65,7 +65,7 @@ case "$cmd" in
     ;;
   *)
     cat <<EOF
-nim.shop CLI
+nimiqshop.io CLI
 
   nimshop start     start backend + frontend (one process)
   nimshop stop

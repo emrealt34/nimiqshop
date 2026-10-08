@@ -2,7 +2,7 @@
   "name": "nimshop-devtools",
   "private": true,
   "version": "2.0.0",
-  "description": "Devtools launcher for nim.shop — builds the Go backend and Astro frontend automatically, then starts the full stack (with optional Cloudflare Quick Tunnel).",
+  "description": "Devtools launcher for nimiqshop.io — builds the Go backend and Astro frontend automatically, then starts the full stack (with optional Cloudflare Quick Tunnel).",
   "type": "module",
   "scripts": {
     "start": "node devtools.mjs tunnel",

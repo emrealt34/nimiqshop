@@ -38,6 +38,8 @@ var wipeNamespaces = []wipeNamespace{
 	{"Customer accounts", "u:"},
 	{"Customer address index", "ix:u:addr:"},
 	{"Ratings Aggregate", "meta:rating_aggregate"},
+	{"Rating comments", "meta:ratings_"},
+	{"Rating proofs", "ratingtx:"},
 	{"Orders", "o:"},
 	{"Order indexes", "ix:o:"},
 	{"Quotes (checkouts)", "q:"},
