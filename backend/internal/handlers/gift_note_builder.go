@@ -46,6 +46,14 @@ func (h *Handlers) BuildGiftNoteFromQuote(q db.Quote, lang string) mailtrap.Gift
 		Lang:         lang,
 	}
 	note.Self = strings.TrimSpace(q.GiftChannel) != "email"
+	// The product list, one tile per line, like the order page. A multi-line
+	// order is named by its brands, not by one line's face value.
+	if items := h.giftItemsFor(q); len(items) > 0 {
+		note.Items = items
+		if len(items) > 1 {
+			note.ProductLabel = giftLabelFor(items)
+		}
+	}
 	if !q.Anonymous {
 		if q.UserID != "" {
 			if u, err := h.Store.GetUser(q.UserID); err == nil {

@@ -3,12 +3,17 @@ package mailtrap
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	_ "embed"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"html"
 	"image/png"
 	"net/url"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -77,6 +82,12 @@ type GiftNote struct {
 	// "Turkcell · 100 TRY top-up". Optional but very worth setting: a gift email
 	// that never says what arrived looks like phishing.
 	ProductLabel string
+	// Items is the product list, one entry per line of the order, shown the way
+	// the site's order list shows it (brand tile, name, face value, quantity).
+	// Empty falls back to ProductLabel alone.
+	Items []GiftItem
+	// itemsMore counts order lines beyond maxNoteItems; set by Build.
+	itemsMore int
 	// Message is the buyer's personal text. Escaped for HTML and never
 	// interpreted as markup.
 	Message string
@@ -209,6 +220,7 @@ func (n GiftNote) Build(cfg Config) (Message, error) {
 		n.GifterNimiqAddress = ""
 		n.GifterIdenticonDataURI = ""
 	}
+	n.Items, n.itemsMore = sanitizeItems(n.Items)
 	site := fallback(strings.TrimSpace(n.SiteName), "shop.nimiqbase.com")
 	product := strings.TrimSpace(n.ProductLabel)
 	tr := n.tr()
@@ -240,6 +252,18 @@ func (n GiftNote) Build(cfg Config) (Message, error) {
 	var attachments []Attachment
 	if n.Self {
 		attachments = append(attachments, shopLogoAttachment())
+	}
+	seenLogo := map[string]bool{}
+	for _, it := range n.Items {
+		if len(it.Logo) == 0 {
+			continue
+		}
+		cid := itemLogoCID(it.Logo)
+		if seenLogo[cid] {
+			continue
+		}
+		seenLogo[cid] = true
+		attachments = append(attachments, Attachment{Filename: cid + ".png", ContentType: "image/png", Data: it.Logo, ContentID: cid})
 	}
 	if icon, ok := identiconImage(n.GifterIdenticonDataURI); ok {
 		attachments = append(attachments, Attachment{
@@ -374,7 +398,12 @@ func (n GiftNote) textBody(site, product, message string) string {
 		b.WriteString("\nPaid from the Nimiq wallet:\n")
 		b.WriteString("  " + groupAddress(n.GifterNimiqAddress) + "\n")
 	}
-	if product != "" {
+	if len(n.Items) > 0 {
+		b.WriteString("\nItems:\n" + itemsText(n.Items, n.itemsMore))
+		if !n.PurchasedAt.IsZero() {
+			b.WriteString("Sent: " + n.PurchasedAt.UTC().Format("2 Jan 2006") + "\n")
+		}
+	} else if product != "" {
 		b.WriteString("\nItem: " + product + "\n")
 		if !n.PurchasedAt.IsZero() {
 			b.WriteString("Sent: " + n.PurchasedAt.UTC().Format("2 Jan 2006") + "\n")
@@ -412,7 +441,6 @@ func (n GiftNote) textBody(site, product, message string) string {
 // site/product/message come from Build; subject is passed in so the <title>
 // can never disagree with the Subject header.
 func (n GiftNote) htmlBody(site, product, message, subject string) string {
-	esc := func(v string) string { return html.EscapeString(strings.TrimSpace(v)) }
 	lines := strings.Split(message, "\n")
 	for i, l := range lines {
 		lines[i] = esc(l)
@@ -537,14 +565,18 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 	b.WriteString(`              <td class="px-card" style="padding:20px 26px 18px 26px">` + "\n")
 	b.WriteString(`                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>` + "\n")
 	b.WriteString(`                  <td style="vertical-align:top">` + "\n")
-	b.WriteString(`                    ` + eyebrow(font, itemLabel(n.Self)) + "\n")
-	item := n.itemEmoji()
-	if product != "" {
-		item += "&nbsp;" + esc(product)
+	b.WriteString(`                    ` + eyebrow(font, itemLabelFor(n)) + "\n")
+	if len(n.Items) > 0 {
+		b.WriteString(`                    ` + itemsBlock(font, n.Items, n.itemsMore) + "\n")
 	} else {
-		item += "&nbsp;" + esc(n.itemWord())
+		item := n.itemEmoji()
+		if product != "" {
+			item += "&nbsp;" + esc(product)
+		} else {
+			item += "&nbsp;" + esc(n.itemWord())
+		}
+		b.WriteString(`                    <div class="item-line" style="font-size:17px;font-weight:700;color:` + mailInk + `;font-family:` + font + `">` + item + `</div>` + "\n")
 	}
-	b.WriteString(`                    <div class="item-line" style="font-size:17px;font-weight:700;color:` + mailInk + `;font-family:` + font + `">` + item + `</div>` + "\n")
 	b.WriteString("                  </td>\n")
 	b.WriteString(`                  <td align="right" style="vertical-align:top;white-space:nowrap;padding-left:12px">` + "\n")
 	b.WriteString(`                    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:` + mailInkFaint + `;padding-bottom:4px;font-family:` + font + `">Sent</div>` + "\n")
@@ -679,6 +711,18 @@ func giftWord(self bool) string {
 	return "gift"
 }
 
+// itemLabelFor is the eyebrow above the product list: singular for one line,
+// plural when the order has several.
+func itemLabelFor(n GiftNote) string {
+	if len(n.Items) > 1 || n.itemsMore > 0 {
+		if n.Self {
+			return "Your items"
+		}
+		return "Their gifts"
+	}
+	return itemLabel(n.Self)
+}
+
 // itemLabel is the eyebrow above the item line.
 func itemLabel(self bool) string {
 	if self {
@@ -751,6 +795,155 @@ func anonymousCard() string {
 // identityCard is the donor block: their REAL Nimiq identicon (as a mosaic,
 // see identiconTable) and their wallet address — never a name. On phones the
 // two stack, centred, inside the same panel.
+// esc escapes text for HTML content and attribute values.
+func esc(v string) string { return html.EscapeString(strings.TrimSpace(v)) }
+
+// GiftItem is one product line in the note.
+type GiftItem struct {
+	// Name is the brand or product family, e.g. "Steam".
+	Name string
+	// Detail is the face value, e.g. "50 USD". Optional.
+	Detail string
+	// Qty above 1 shows as "×N".
+	Qty int
+	// BgColor is the brand's own tile background (hex or rgb()). Empty = white.
+	BgColor string
+	// Logo is a small PNG tile (see brandlogo). Nil = a neutral letter tile.
+	Logo []byte
+}
+
+// maxNoteItems bounds the product list. A bigger order says how many more it
+// has instead of growing the mail.
+const maxNoteItems = 8
+
+// maxItemLogoBytes bounds each logo attachment. Logos are prepared by
+// brandlogo at a few KB; anything larger is dropped rather than mailed.
+const maxItemLogoBytes = 64 << 10
+
+// sanitizeItems keeps at most maxNoteItems entries with a usable name, quantity
+// and bounded logo. A dropped logo leaves a letter tile, never a broken image.
+func sanitizeItems(in []GiftItem) ([]GiftItem, int) {
+	var out []GiftItem
+	more := 0
+	for _, it := range in {
+		if strings.TrimSpace(it.Name) == "" {
+			continue
+		}
+		if it.Qty < 1 {
+			it.Qty = 1
+		}
+		if len(it.Logo) > maxItemLogoBytes {
+			it.Logo = nil
+		}
+		if len(out) == maxNoteItems {
+			more++
+			continue
+		}
+		out = append(out, it)
+	}
+	return out, more
+}
+
+// itemLogoCID is the stable Content-ID of a logo: the same logo shared by two
+// lines is attached once.
+func itemLogoCID(logo []byte) string {
+	sum := sha256.Sum256(logo)
+	return "item-" + hex.EncodeToString(sum[:6])
+}
+
+var (
+	hexColorRe = regexp.MustCompile(`^#([0-9a-fA-F]{6})$`)
+	rgbColorRe = regexp.MustCompile(`^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})`)
+)
+
+// tileColor returns a safe CSS colour for a brand background: #rrggbb or
+// rgb(r,g,b) only. Anything else is white, so catalog text never reaches CSS.
+func tileColor(bg string) string {
+	v := strings.TrimSpace(bg)
+	if m := hexColorRe.FindStringSubmatch(v); m != nil {
+		return "#" + strings.ToLower(m[1])
+	}
+	if m := rgbColorRe.FindStringSubmatch(v); m != nil {
+		var c [3]int
+		for i := range c {
+			n, err := strconv.Atoi(m[i+1])
+			if err != nil || n > 255 {
+				return "#ffffff"
+			}
+			c[i] = n
+		}
+		return fmt.Sprintf("#%02x%02x%02x", c[0], c[1], c[2])
+	}
+	return "#ffffff"
+}
+
+// itemTile is the brand tile: the logo on the brand's own background, or the
+// product's first letter when there is no logo.
+func itemTile(cid, bg, name string) string {
+	color := tileColor(bg)
+	inner := ""
+	if cid != "" {
+		inner = `<img src="cid:` + cid + `" width="40" height="40" alt="` + esc(name) + `" style="display:block;width:40px;height:40px;border:0">`
+	} else {
+		inner = `<div style="font-size:20px;font-weight:700;line-height:40px;color:` + mailInk + `;font-family:` + emailFont + `">` + esc(initialOf(name)) + `</div>`
+	}
+	return `<table role="presentation" width="52" cellpadding="0" cellspacing="0" border="0" bgcolor="` + color + `" style="width:52px;background:` + color + `;border-radius:10px"><tr><td align="center" valign="middle" style="width:40px;padding:6px;font-size:0;line-height:0">` + inner + `</td></tr></table>`
+}
+
+func initialOf(name string) string {
+	for _, r := range strings.TrimSpace(name) {
+		return strings.ToUpper(string(r))
+	}
+	return "?"
+}
+
+// itemsBlock renders the product list. Each row is the brand tile, the name
+// with its quantity, and the face value underneath.
+func itemsBlock(font string, items []GiftItem, more int) string {
+	var b strings.Builder
+	b.WriteString(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:6px">`)
+	for _, it := range items {
+		cid := ""
+		if len(it.Logo) > 0 {
+			cid = itemLogoCID(it.Logo)
+		}
+		label := strings.TrimSpace(it.Name)
+		if it.Qty > 1 {
+			label += " ×" + strconv.Itoa(it.Qty)
+		}
+		detail := ""
+		if d := strings.TrimSpace(it.Detail); d != "" {
+			detail = `<div style="font-size:13px;line-height:1.4;color:` + mailInkDim + `;font-family:` + font + `">` + esc(d) + `</div>`
+		}
+		b.WriteString(`<tr><td width="52" valign="middle" style="width:52px;padding:0 0 10px 0">` + itemTile(cid, it.BgColor, it.Name) + `</td>` +
+			`<td valign="middle" style="padding:0 0 10px 12px"><div style="font-size:16px;font-weight:700;line-height:1.3;color:` + mailInk + `;font-family:` + font + `">` + esc(label) + `</div>` + detail + `</td></tr>`)
+	}
+	if more > 0 {
+		b.WriteString(`<tr><td colspan="2" style="padding:0 0 10px 0;font-size:13px;color:` + mailInkFaint + `;font-family:` + font + `">+ ` + strconv.Itoa(more) + ` more in this order</td></tr>`)
+	}
+	b.WriteString("</table>")
+	return b.String()
+}
+
+// itemsText is the plain-text twin of itemsBlock.
+func itemsText(items []GiftItem, more int) string {
+	var b strings.Builder
+	for _, it := range items {
+		line := "  - " + strings.TrimSpace(it.Name)
+		if it.Qty > 1 {
+			line += " x" + strconv.Itoa(it.Qty)
+		}
+		if d := strings.TrimSpace(it.Detail); d != "" {
+			line += " (" + d + ")"
+		}
+		b.WriteString(line + "\n")
+	}
+	if more > 0 {
+		b.WriteString("  + " + strconv.Itoa(more) + " more in this order\n")
+	}
+	return b.String()
+}
+
 // shopLogoContentID is the Content-ID of the shop logo shown on order mail.
 const shopLogoContentID = "shop-logo"
 

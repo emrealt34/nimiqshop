@@ -367,3 +367,82 @@ func TestOrderMailShowsShopLogoNotTick(t *testing.T) {
 		t.Fatal("gift mail icon changed or logo leaked into a gift")
 	}
 }
+
+// rawPNG is a plain PNG of the given size, as the brandlogo package produces.
+func rawPNG(t *testing.T, w, h int) []byte {
+	t.Helper()
+	img := image.NewNRGBA(image.Rect(0, 0, w, h))
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			img.SetNRGBA(x, y, color.NRGBA{R: 40, G: 90, B: 200, A: 255})
+		}
+	}
+	var b bytes.Buffer
+	if err := png.Encode(&b, img); err != nil {
+		t.Fatal(err)
+	}
+	return b.Bytes()
+}
+
+// The product list shows each line's own brand tile (its logo on its own
+// background), shares one attachment between lines with the same logo, says how
+// many lines did not fit, and never puts catalog text into CSS.
+func TestItemListTilesAndAttachments(t *testing.T) {
+	steamLogo := rawPNG(t, 40, 40)
+	steam := GiftItem{Name: "Steam", Detail: "50 USD", Qty: 2, BgColor: "#1b2838", Logo: steamLogo}
+	items := []GiftItem{steam, steam, {Name: "Amazon", Detail: "25 USD", Qty: 1, BgColor: "rgb(255, 153, 0)"}}
+	for i := 0; i < 9; i++ {
+		items = append(items, GiftItem{Name: "Extra", Qty: 1})
+	}
+	n := GiftNote{Recipient: Address{Email: "buyer@example.com"}, Self: true, Items: items, ProductLabel: "Steam + Amazon", SiteName: "nimiqshop.io", OrderID: "Q-30"}
+	msg, err := n.Build(Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(msg.HTML, `bgcolor="#1b2838"`) || !strings.Contains(msg.HTML, `bgcolor="#ff9900"`) {
+		t.Fatal("brand tiles must carry the brand background")
+	}
+	if !strings.Contains(msg.HTML, `src="cid:`+itemLogoCID(steamLogo)+`"`) {
+		t.Fatal("tile does not reference its logo attachment")
+	}
+	logoAttachments := 0
+	for _, a := range msg.Attachments {
+		if strings.HasPrefix(a.ContentID, "item-") {
+			logoAttachments++
+		}
+	}
+	if logoAttachments != 1 {
+		t.Fatalf("two lines with one logo must share one attachment, got %d", logoAttachments)
+	}
+	// 3 distinct lines + 9 extras = 12; 8 are shown, 4 are summarised.
+	if !strings.Contains(msg.HTML, "+ 4 more in this order") {
+		t.Fatal("the overflow line is missing")
+	}
+	if !strings.Contains(msg.Text, "  - Steam x2 (50 USD)") || !strings.Contains(msg.Text, "  + 4 more in this order") {
+		t.Fatalf("plain-text list wrong:\n%s", msg.Text)
+	}
+	if strings.Count(msg.HTML, ">Extra<") != maxNoteItems-3 {
+		t.Fatalf("expected %d shown extra rows, got %d", maxNoteItems-3, strings.Count(msg.HTML, ">Extra<"))
+	}
+
+	// Catalog colour text is never reflected into CSS.
+	for _, bad := range []string{"red;background:url(x)", "rgb(300,0,0)", "expression(alert(1))", ""} {
+		if got := tileColor(bad); got != "#ffffff" {
+			t.Fatalf("tileColor(%q) = %q, want white", bad, got)
+		}
+	}
+	if got := tileColor("rgb(255, 153, 0)"); got != "#ff9900" {
+		t.Fatalf("rgb colour = %q", got)
+	}
+
+	// An oversized logo is dropped: the tile falls back to a letter and no
+	// attachment or cid reference is left dangling.
+	big := GiftNote{Recipient: Address{Email: "buyer@example.com"}, Items: []GiftItem{{Name: "Big", Qty: 1, Logo: make([]byte, maxItemLogoBytes+1)}}, ProductLabel: "Big", SiteName: "nimiqshop.io", OrderID: "Q-31"}
+	bm, err := big.Build(Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(bm.Attachments) != 0 || strings.Contains(bm.HTML, "cid:item-") {
+		t.Fatal("oversized logo must not be attached or referenced")
+	}
+}

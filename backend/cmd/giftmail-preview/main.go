@@ -58,11 +58,27 @@ func main() {
 		StakeValidatorAddress:  validator,
 	}
 
+	// Sample brand tiles: the shop logo stands in for a brand logo, so the
+	// preview shows the real tile layout. Production logos come from brandlogo.
+	logo, _ := os.ReadFile("../public/img/brand-icon.png")
+	multi := base
+	multi.Self = true
+	multi.ProductLabel = "Steam + Amazon + Netflix"
+	multi.Items = []mailtrap.GiftItem{
+		{Name: "Steam", Detail: "50 USD", Qty: 2, BgColor: "#1b2838", Logo: logo},
+		{Name: "Amazon", Detail: "25 USD", Qty: 1, BgColor: "#ff9900"},
+		{Name: "Netflix", Detail: "30 USD", Qty: 1, BgColor: "#e50914", Logo: logo},
+	}
+	for i := 0; i < 6; i++ {
+		multi.Items = append(multi.Items, mailtrap.GiftItem{Name: "Google Play", Detail: "10 USD", Qty: 1, BgColor: "#ffffff"})
+	}
+
 	for _, tc := range []struct {
 		name string
 		note mailtrap.GiftNote
 	}{
 		{"named", base},
+		{"order-multi", multi},
 		{"anonymous", func() mailtrap.GiftNote {
 			n := base
 			n.Anonymous = true
