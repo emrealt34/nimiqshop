@@ -33,6 +33,7 @@ import {
   type WalletBalanceState,
 } from '../../lib/walletBalance';
 import { Icon } from '../ui/Icon';
+import { inNimiqPay } from '../../lib/miniapp';
 import { useToast } from '../AppProviders';
 
 // Several wallet strips can mount together; notify once per page instead of
@@ -255,6 +256,15 @@ export function WalletBalance({
         <span className="wal-note xs faint">
           <Icon name="info" size={12} /> {t('wallet.stakeNote', { nim: nimText(state.stakedNim) })}
         </span>
+      )}
+
+      {inNimiqPay() && state.debugLines && (
+        <details className="wal-note xs" style={{ marginTop: 8 }}>
+          <summary style={{ cursor: 'pointer' }}>Balance debug</summary>
+          <pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', fontSize: 10, margin: '6px 0 0' }}>
+            {state.debugLines.join('\\n')}
+          </pre>
+        </details>
       )}
     </>
   );

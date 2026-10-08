@@ -165,6 +165,8 @@ export interface WalletBalanceState {
   stale?: boolean;
   at?: number;
   failure?: WalletBalanceFailure;
+  /** On-screen diagnostics for Nimiq Pay balance troubleshooting. */
+  debugLines?: string[];
 }
 
 const EMPTY: WalletBalanceState = {
@@ -357,13 +359,49 @@ async function readBalance(force = false): Promise<WalletBalanceState> {
      NOTHING while the server could have answered. The host bridge still needs
      one, so it is gated separately below. */
   const signedIn = isAuthed();
-  const hostAvailable = !!(inNimiqPay() || getNimiqProvider());
+  const insidePay = inNimiqPay();
+  const hostAvailable = !!(insidePay || getNimiqProvider());
+  const debugLines: string[] = [
+    `inPay=${insidePay} signedIn=${signedIn}`,
+    `session=${String(address || '(none)')}`,
+  ];
 
+  // In Nimiq Pay the active account is authoritative. It may itself be an
+  // HTLC account, while the shop session still contains the ordinary wallet
+  // address used during login. Querying only the session address makes an
+  // active HTLC appear as 0 NIM and incorrectly opens the low-balance sheet.
+  // listAccounts() is already the account-selection primitive used by Pay
+  // login; use its active address for the host-side balance lookup only.
+  let hostAddresses = address ? [address] : [];
+  if (hostAvailable) {
+    try {
+      const provider: any = (await initNimiqMiniApp()) || getNimiqProvider();
+      if (provider && typeof provider.listAccounts === 'function') {
+        const accounts = await provider.listAccounts();
+        const listed = Array.isArray(accounts)
+          ? accounts.map((value: unknown) => String(value || '').trim()).filter(isNimiqAddress)
+          : [];
+        // Some Pay hosts expose more than one selected account. Include every
+        // account the host explicitly returned: an HTLC account may be present
+        // beside the ordinary account, and looking only at accounts[0] leaves
+        // its balance out of the affordability check.
+        hostAddresses = Array.from(new Set(listed.length ? listed : hostAddresses));
+        debugLines.push(`providerAccounts=${hostAddresses.length ? hostAddresses.join(',') : '(none)'}`);
+      }
+    } catch (error) {
+      debugLines.push(`listAccountsError=${error instanceof Error ? error.message : String(error)}`);
+      // Account listing can be unavailable on older hosts; fall back to the
+      // signed-in address and let the normal balance-support path report it.
+    }
+  }
+
+  if (!hostAddresses.length) debugLines.push('providerAccounts=(none)');
   let shop: ShopReading | null = null;
   let shopError: unknown = null;
   if (signedIn) {
     try {
       shop = await shopReading(force);
+      debugLines.push(`shop=${shop.luna} luna; stake=${shop.stakedNim} NIM; addr=${shop.address || '(none)'}`);
     } catch (e) {
       shopError = e;
     }
@@ -379,20 +417,28 @@ async function readBalance(force = false): Promise<WalletBalanceState> {
       hostSupport = undefined;
     }
   }
-  if (address && hostAvailable) {
+  if (hostAddresses.length && hostAvailable) {
     try {
-      host = await bridgeLuna(address);
+      const readings = await Promise.all(hostAddresses.map((account) => bridgeLuna(account)));
+      // Keep the host's account balances together. This is still display-only;
+      // the payment provider remains the authority on whether an HTLC can be
+      // spent under its conditions.
+      host = readings.reduce((sum, luna) => sum + luna, 0);
+      debugLines.push(`host=${host} luna across ${hostAddresses.length} account(s)`);
     } catch (e) {
       hostError = e;
       // A host may expose generic request() without implementing getBalance.
       // Treat its explicit unsupported-method response as an update requirement,
       // not as an ordinary transient balance failure.
       if (classifyWalletError(e) === 'unsupported') hostSupport = 'update-required';
+      debugLines.push(`hostError=${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
+  if (host !== null && hostAddresses.length) address = hostAddresses[0];
   if (!address && shop?.address) address = shop.address;
-  const base = { address, network: shop?.network || '', hostBalance: hostSupport };
+  debugLines.push(`finalAddress=${address || '(none)'}`);
+  const base = { address, network: shop?.network || '', hostBalance: hostSupport, debugLines };
 
   // BOTH: reconcile. The session wallet is the one the shop charges, so it wins
   // any disagreement — but a clean five-orders-of-magnitude gap is a unit
