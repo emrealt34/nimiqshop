@@ -53,8 +53,12 @@ type Staker struct {
 	StakeLuna int64
 	// Delegation is the validator the chain reports (canonical, no spaces).
 	Delegation string
-	CheckedAt  time.Time
-	FromCache  bool
+	// Elsewhere is true when the chain shows a live stake with ANOTHER validator
+	// (not ours); ElsewhereLuna is that balance. Staked stays false for them.
+	Elsewhere     bool
+	ElsewhereLuna int64
+	CheckedAt     time.Time
+	FromCache     bool
 }
 
 type entry struct {
@@ -155,6 +159,10 @@ func (v *Verifier) Verify(ctx context.Context, address string) (Staker, error) {
 	}
 	if !st.Staked {
 		st.StakeLuna = 0
+		if info.HasStake() && st.Delegation != "" {
+			st.Elsewhere = true
+			st.ElsewhereLuna = info.Balance
+		}
 	}
 	v.store(addr, st, now)
 	return st, nil

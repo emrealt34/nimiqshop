@@ -1046,6 +1046,8 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 	r.GET("/api/cashback/code", tiered(tPromo, pinPrivate(h.PublicCashbackCode)))
 	r.GET("/api/cashback/me", authed(h.CashbackMe))
 	r.GET("/api/poolstake/me", authed(h.PoolStakeMe))
+	// Public validator name + logo (Nimiq validators registry, cached upstream).
+	r.GET("/api/poolstake/validator", wrap(publicCached(3600, 86400, h.ValidatorInfo)))
 	r.POST("/api/poolstake/refresh", authedTiered(aPool, h.PoolStakeRefresh))
 	// The buyer just broadcast a stake to our pool; the pool has NOT indexed
 	// it yet. Record the pending note so the fulfillment path never pays a

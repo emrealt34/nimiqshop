@@ -64,6 +64,7 @@ import { CashbackImpactSection } from './CashbackImpactSection';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AppRoot } from '../AppRoot';
 import { Icon } from '../ui/Icon';
+import { ElsewhereStake } from './ElsewhereStake';
 import { CashbackCalculator } from './CashbackCalculator';
 import { useSheet, useToast } from '../AppProviders';
 import { useSession } from '../../lib/useSession';
@@ -627,8 +628,27 @@ export function CashbackView() {
   // calculator for everyone — the stake form must not disappear when the
   // programme fails to load (staking needs no programme: the buyer's wallet
   // signs it).
+  // Staked with ANOTHER validator: one clear card (that validator + a Change
+  // button). No amount or preset form, because a new delegation would only
+  // create a second staker.
+  const elsewhereValidator = authed && !stakedHere && mine?.other_validator ? mine.other_validator : '';
   const stakeFooter = (
     <div id="cb-stake-form">
+      {elsewhereValidator ? (
+        <>
+          <div className="card-title">
+            <Icon name="bolt" size={16} /> {t('cashback.elsewhereTitle')}
+          </div>
+          <ElsewhereStake
+            address={elsewhereValidator}
+            stakeNim={mine?.other_stake_nim ?? 0}
+            canMove={!!validator && supportsOp({ kind: 'changeDelegation', delegation: validator })}
+            busy={busy === 'changeDelegation'}
+            onMove={doMove}
+          />
+        </>
+      ) : (
+      <>
       <div className="card-title">
         <Icon name="bolt" size={16} /> {t('cashback.formAddToStake')}
       </div>
@@ -728,6 +748,8 @@ export function CashbackView() {
             <div className="xs faint mt-2">{t('cashback.formWithdrawResets', { pct: pct(stakerBaseBps) })}</div>
           </div>
         </details>
+      )}
+      </>
       )}
     </div>
   );

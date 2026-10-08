@@ -308,6 +308,10 @@ func (h *Handlers) poolStakeMeFor(ctx *fasthttp.RequestCtx, address string) {
 						fmtNIM(cs.StakeLuna), h.Cfg.PoolValidatorAddress)
 				} else if cerr != nil {
 					resp["chain_check_error"] = "rpc unavailable"
+				} else if cs.Elsewhere {
+					// Staked with ANOTHER validator: the page offers to move it.
+					resp["other_validator"] = cs.Delegation
+					resp["other_stake_nim"] = float64(cs.ElsewhereLuna) / lunaPerNIM
 				}
 			}
 			// Pool answers only whether they are staked. The rate is the

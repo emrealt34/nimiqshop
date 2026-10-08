@@ -113,6 +113,9 @@ export type MyStake = {
   cashback_percent: number;
   boosted: boolean;
   pool_validator_address: string;
+  /** Set when the chain shows the buyer's stake with ANOTHER validator. */
+  other_validator?: string;
+  other_stake_nim?: number;
   staker_program_enabled?: boolean;
   stake_check_error?: string;
   /** ISO date the shop first saw a positive stake. */
@@ -277,6 +280,8 @@ function parseMyStake(r: any): MyStake | null {
     cashback_percent: Number(r.cashback_percent) || 0,
     boosted: !!r.boosted,
     pool_validator_address: String(r.pool_validator_address || '').trim(),
+    other_validator: r.other_validator ? String(r.other_validator) : undefined,
+    other_stake_nim: Number(r.other_stake_nim) > 0 ? Number(r.other_stake_nim) : undefined,
     staker_program_enabled: r.staker_program_enabled ? true : undefined,
     stake_check_error: r.stake_check_error ? String(r.stake_check_error) : undefined,
     staked_since: r.staked_since ? String(r.staked_since) : undefined,

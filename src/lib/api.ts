@@ -728,6 +728,9 @@ export const validateCashbackCode = (code: string, orderUSD = 0) => api(`/cashba
 // backend (RequireAuth) — without `auth: true` the real server answers
 // 401 {"error":"missing bearer token"} for every cashback-page load.
 export const getPoolStake = () => api('/poolstake/me', { auth: true });
+/** Public name + logo of a validator (Nimiq's registry, via our backend). */
+export const getValidatorInfo = (address: string) =>
+  api('/poolstake/validator?address=' + encodeURIComponent(address));
 /** The buyer's own cashback ledger: lifetime totals + individual payouts. */
 export const getMyCashback = () => api('/cashback/me', { auth: true });
 export const getCashbackLeaderboard = (bucket: 'week' | 'month' | 'all' | string = 'all') =>
