@@ -3,6 +3,7 @@ package mailtrap
 import (
 	"bytes"
 	"context"
+	_ "embed"
 	"encoding/base64"
 	"errors"
 	"html"
@@ -237,6 +238,9 @@ func (n GiftNote) Build(cfg Config) (Message, error) {
 		return Message{}, ErrMailTooLarge
 	}
 	var attachments []Attachment
+	if n.Self {
+		attachments = append(attachments, shopLogoAttachment())
+	}
 	if icon, ok := identiconImage(n.GifterIdenticonDataURI); ok {
 		attachments = append(attachments, Attachment{
 			Filename:    "buyer-identicon.png",
@@ -446,7 +450,9 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 		sub = "from someone anonymous via " + site
 	}
 	if n.Self {
-		badge, heading = "✅", "Your order is on its way"
+		// The shop logo (the site header's mark), not an emoji. It ships as an
+		// inline PNG attachment; see shopLogoAttachment.
+		badge, heading = shopLogoImg, "Your order is on its way"
 	}
 
 	// The card is built from nested tables with every structural style inline
@@ -745,6 +751,20 @@ func anonymousCard() string {
 // identityCard is the donor block: their REAL Nimiq identicon (as a mosaic,
 // see identiconTable) and their wallet address — never a name. On phones the
 // two stack, centred, inside the same panel.
+// shopLogoContentID is the Content-ID of the shop logo shown on order mail.
+const shopLogoContentID = "shop-logo"
+
+//go:embed assets/brand-icon.png
+var shopLogoPNG []byte
+
+// shopLogoImg is the logo as an inline image. It is trusted, constant markup;
+// the alt text is what a client with images blocked shows.
+const shopLogoImg = `<img src="cid:` + shopLogoContentID + `" width="48" height="48" alt="nimiqshop.io" style="display:block;margin:0 auto;width:48px;height:48px;border:0;outline:none">`
+
+func shopLogoAttachment() Attachment {
+	return Attachment{Filename: "nimiqshop-logo.png", ContentType: "image/png", Data: shopLogoPNG, ContentID: shopLogoContentID}
+}
+
 // identiconContentID is the Content-ID of the buyer's identicon attachment.
 const identiconContentID = "buyer-identicon"
 

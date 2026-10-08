@@ -332,3 +332,38 @@ func TestFooterGrammar(t *testing.T) {
 		}
 	}
 }
+
+// The purchase mail shows the shop logo (inline PNG), never the old tick emoji;
+// gift mail keeps its gift icon and carries no logo.
+func TestOrderMailShowsShopLogoNotTick(t *testing.T) {
+	order := GiftNote{Recipient: Address{Email: "buyer@example.com"}, Self: true, ProductLabel: "Steam · 50 USD", SiteName: "nimiqshop.io", OrderID: "Q-20"}
+	msg, err := order.Build(Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The subject/<title> keeps its own emoji; the body's hero icon must not.
+	body := msg.HTML[strings.Index(msg.HTML, "</title>"):]
+	if strings.Contains(body, "✅") {
+		t.Fatal("order mail body still shows the tick emoji")
+	}
+	if !strings.Contains(msg.HTML, `src="cid:`+shopLogoContentID+`"`) {
+		t.Fatal("order mail does not reference the shop logo")
+	}
+	found := false
+	for _, a := range msg.Attachments {
+		if a.ContentID == shopLogoContentID {
+			found = bytes.Equal(a.Data, shopLogoPNG) && a.ContentType == "image/png"
+		}
+	}
+	if !found {
+		t.Fatal("shop logo attachment missing or not the PNG")
+	}
+	gift := GiftNote{Recipient: Address{Email: "friend@example.com"}, ProductLabel: "Steam · 50 USD", SiteName: "nimiqshop.io", OrderID: "Q-21"}
+	gm, err := gift.Build(Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(gm.HTML, "🎁") || strings.Contains(gm.HTML, "cid:"+shopLogoContentID) {
+		t.Fatal("gift mail icon changed or logo leaked into a gift")
+	}
+}
