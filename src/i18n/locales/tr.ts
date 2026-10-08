@@ -1747,6 +1747,7 @@ const tr = {
     mismatch: 'Nimiq Pay farklı bir tutar bildirdi; zincirden okunan değer gösteriliyor.',
     afford: { one: 'Bakiyen bunun için yetiyor', other: 'Bakiyenle en fazla {{count}} adet alabilirsin' },
     enough: 'Bakiyen bu sipariş için yeterli',
+    tight: 'Bakiyen fiyata yetiyor ama ücret payını karşılamıyor; ödeme hata verebilir.',
     short: '{{nim}} NIM eksik',
     error: 'Bakiye şu an okunamadı',
     signIn: 'NIM bakiyeni görmek için cüzdanınla giriş yap',

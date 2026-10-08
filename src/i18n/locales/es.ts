@@ -1746,6 +1746,7 @@ const es = {
     mismatch: 'Nimiq Pay informó de otra cifra; se muestra el valor leído en la cadena.',
     afford: { one: 'Tu saldo cubre uno de estos', other: 'Tu saldo cubre hasta {{count}} de estos' },
     enough: 'Tu saldo cubre este pedido',
+    tight: 'Tu saldo cubre el precio pero no el margen para comisiones; el pago podría fallar.',
     short: 'Te faltan {{nim}} NIM',
     error: 'No se pudo leer el saldo',
     signIn: 'Inicia sesión con tu wallet para ver tu saldo en NIM',

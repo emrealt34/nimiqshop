@@ -1746,6 +1746,7 @@ const fr = {
     mismatch: 'Nimiq Pay a signalé un autre montant ; la valeur lue sur la chaîne est affichée.',
     afford: { one: 'Votre solde suffit pour celui-ci', other: 'Votre solde couvre jusqu’à {{count}} unités' },
     enough: 'Votre solde couvre cette commande',
+    tight: 'Votre solde couvre le prix mais pas la marge pour les frais ; le paiement peut échouer.',
     short: 'Il vous manque {{nim}} NIM',
     error: 'Solde illisible pour le moment',
     signIn: 'Connectez votre wallet pour voir votre solde NIM',

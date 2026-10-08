@@ -23,7 +23,7 @@ import type { ReactNode } from 'react';
 import { useT, type Translator } from '../../i18n';
 import { Icon } from '../ui/Icon';
 import { useWalletBalance } from './WalletBalance';
-import { coversTarget, neededWholeNim, shortByWholeNim } from '../../lib/walletBalance';
+import { coversTarget, isTight, neededWholeNim, shortByWholeNim } from '../../lib/walletBalance';
 
 /** The subset of the sheet provider this module needs (keeps it caller-agnostic).
  *  Mirrors the provider's own SheetTitle shape exactly, so any caller can pass
@@ -70,6 +70,8 @@ export function LowBalanceSheet({
   const short = shortByWholeNim(targetNim, state.availableNim);
   const ready = state.status === 'ready';
   const covers = ready && coversTarget(targetNim, state.availableNim);
+  // Covers the price but not the fee margin: a warning, not a shortage.
+  const tight = ready && !covers && isTight(targetNim, state.availableNim);
 
   return (
     <div className="lowbal" data-testid="low-balance-popup">
@@ -77,7 +79,7 @@ export function LowBalanceSheet({
         <Icon name={covers ? 'check' : 'alert'} size={20} />
         <div className="lowbal-fig-body">
           <div className="strong">
-            {covers ? t('wallet.shortFixed') : t('wallet.shortTitle')}
+            {covers ? t('wallet.shortFixed') : tight ? t('wallet.tight') : t('wallet.shortTitle')}
           </div>
           <div className="small muted">
             {t('checkout.flowLowBalanceBody', { need, have, short })}

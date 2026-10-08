@@ -95,6 +95,18 @@ export function coversTarget(targetNim: number, availableNim: number): boolean {
 }
 
 /**
+ * True when the balance covers the price itself but NOT the cushion on top of
+ * it. That band is where Pay's fees can still refuse a payment, so the buyer
+ * must be told it may fail, not that the balance "covers" it.
+ */
+export function isTight(targetNim: number, availableNim: number): boolean {
+  const target = Number(targetNim || 0);
+  if (!(target > 0)) return false;
+  const have = Number(availableNim || 0);
+  return have >= target && have < requiredNim(target);
+}
+
+/**
  * The whole NIM figures the warning sentences use — the buyer sees the same
  * integers on the strip, in the card and in the toast.
  *   need   → UP   (never understate what the payment will ask for)

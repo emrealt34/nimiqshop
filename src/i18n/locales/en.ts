@@ -1755,6 +1755,7 @@ const en = {
     mismatch: 'Nimiq Pay reported a different figure; the value read from the chain is shown.',
     afford: { one: 'Your balance covers one of these', other: 'Your balance covers up to {{count}} of these' },
     enough: 'Your balance covers this order',
+    tight: 'Your balance covers the price but not the fee margin, so the payment may fail.',
     short: 'You are {{nim}} NIM short',
     error: 'Balance could not be read',
     signIn: 'Sign in with your wallet to see your NIM balance',

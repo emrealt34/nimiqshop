@@ -1746,6 +1746,7 @@ const de = {
     mismatch: 'Nimiq Pay meldete einen anderen Betrag; angezeigt wird der Wert aus der Chain.',
     afford: { one: 'Dein Guthaben reicht dafür', other: 'Dein Guthaben reicht für bis zu {{count}} davon' },
     enough: 'Dein Guthaben deckt diese Bestellung',
+    tight: 'Dein Guthaben reicht für den Preis, aber nicht für den Gebührenpuffer; die Zahlung kann fehlschlagen.',
     short: 'Es fehlen {{nim}} NIM',
     error: 'Guthaben konnte nicht gelesen werden',
     signIn: 'Melde dich mit deiner Wallet an, um dein NIM-Guthaben zu sehen',

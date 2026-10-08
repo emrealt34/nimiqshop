@@ -29,6 +29,7 @@ import {
   subscribeWalletBalance,
   affordableUnits,
   coversTarget,
+  isTight,
   requiredNim,
   type WalletBalanceState,
 } from '../../lib/walletBalance';
@@ -154,14 +155,18 @@ export function WalletBalance({
        refused payment. The DISPLAYED balance is never adjusted. */
     const units = affordableUnits(state.availableNim, targetNim);
     const missing = Math.max(0, requiredNim(targetNim) - state.availableNim);
+    /* Inside the cushion the balance covers the price but may not cover the
+       wallet's fees. Saying "covers" there is a promise Pay can break, so the
+       buyer is warned instead. */
+    const tight = isTight(targetNim, state.availableNim);
     if (targetTotal) {
-      return coversTarget(targetNim, state.availableNim)
-        ? { ok: true, text: t('wallet.enough') }
-        : { ok: false, text: t('wallet.short', { nim: nimShortText(missing) }) };
+      if (coversTarget(targetNim, state.availableNim)) return { ok: true, text: t('wallet.enough') };
+      if (tight) return { ok: false, text: t('wallet.tight') };
+      return { ok: false, text: t('wallet.short', { nim: nimShortText(missing) }) };
     }
-    return units >= 1
-      ? { ok: true, text: t('wallet.afford', { count: units }) }
-      : { ok: false, text: t('wallet.short', { nim: nimShortText(missing) }) };
+    if (units >= 1) return { ok: true, text: t('wallet.afford', { count: units }) };
+    if (tight) return { ok: false, text: t('wallet.tight') };
+    return { ok: false, text: t('wallet.short', { nim: nimShortText(missing) }) };
   })();
 
   const localCurrency = localCurrencyCode();
