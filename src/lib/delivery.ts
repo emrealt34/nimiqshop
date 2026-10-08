@@ -17,6 +17,13 @@ import { t as tr } from '../i18n';
 let memGiftChannel = '';
 let memGiftMsg = '';
 let memGiftIdenticon = '';
+/** The buyer's own identicon, prepared at checkout for EVERY order so the
+ *  order mail can show the wallet that paid, gift or not. Kept apart from the
+ *  gift extras, which are cleared whenever the gift option is switched off. */
+let buyerIdenticon = '';
+export function setBuyerIdenticon(png: string) {
+  buyerIdenticon = png;
+}
 
 export function setGiftExtras(channel: string, message: string) {
   memGiftChannel = channel;
@@ -76,9 +83,11 @@ export function buildOrderRequest(
   if (gift && ch) {
     req.gift_channel = ch;
     if (gMsg) req.gift_message = gMsg;
-    // The email avatar for a NAMED gift — never sent on an anonymous one.
-    if (memGiftIdenticon && !anonymous) req.gifter_identicon = memGiftIdenticon;
   }
+  // The buyer's identicon for the order mail: gift or plain purchase alike.
+  // Never sent on an anonymous order (the mail must not identify the buyer).
+  const avatar = memGiftIdenticon || buyerIdenticon;
+  if (avatar && !anonymous) req.gifter_identicon = avatar;
   if (isTopUp) {
     req.phone_number = phone || '';
     if (gift && ch && (email || '').trim()) {

@@ -19,7 +19,9 @@ import { useCart, itemKey, type CartItem } from '../../lib/cartStore';
 import { useSheet, useToast } from '../AppProviders';
 import { createQuote, createQuoteBatch, forgetQuote, getQuote, friendlyApiMessage, authorizePaymentLaunch, cachedNimRate, errorDetailLine } from '../../lib/api';
 import { canRenewQuote, paymentInFlight } from '../../lib/pay';
-import { buildOrderRequest, getGiftExtras, type DeliveryInfo } from '../../lib/delivery';
+import { buildOrderRequest, getGiftExtras, setBuyerIdenticon, type DeliveryInfo } from '../../lib/delivery';
+import { identiconPngDataUrl } from '../../lib/identicon';
+import { getAddress } from '../../lib/session';
 import { isValidEmail } from '../../lib/validate';
 import { giftRowFields } from '../../lib/giftNote';
 import { uuid } from '../../lib/format';
@@ -298,6 +300,13 @@ export function CheckoutFlow({
   onNavigateOrders: () => void;
 }) {
   const { t } = useT();
+  // Prepare the buyer's identicon once per checkout, for every order (see
+  // buildOrderRequest). Failure just leaves the mail without an avatar.
+  useEffect(() => {
+    const addr = getAddress();
+    if (!addr) return;
+    identiconPngDataUrl(addr).then((png) => setBuyerIdenticon(png)).catch(() => setBuyerIdenticon(''));
+  }, []);
   const cart = useCart();
   const { toast } = useToast();
   const [phase, setPhase] = useState<Phase>({ kind: 'delivery' });

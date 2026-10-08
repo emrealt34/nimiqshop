@@ -8,6 +8,9 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"math/rand"
+
+	"nimiqshop/internal/sampleassets"
 	"strings"
 	"testing"
 	"time"
@@ -138,8 +141,8 @@ func TestIdenticonRenderingAndAlpha(t *testing.T) {
 	if !strings.Contains(gray, `class="donor-img"`) {
 		t.Fatal("gray PNG should still render a mosaic")
 	}
-	if !strings.Contains(gray, "border:2px solid "+mailGold) {
-		t.Fatal("mosaic lost its brand ring")
+	if !strings.Contains(gray, "background:"+mailGold) {
+		t.Fatal("mosaic lost its square gold frame")
 	}
 	img := image.NewNRGBA(image.Rect(0, 0, 32, 32))
 	for y := 0; y < 32; y++ {
@@ -170,8 +173,8 @@ func TestIdenticonRenderingAndAlpha(t *testing.T) {
 	if !strings.Contains(card, "NQ00") || !strings.Contains(card, "background:"+mailPanel) || !strings.Contains(card, mailGold) {
 		t.Fatal("identity card lost its address, panel or ring")
 	}
-	if !strings.Contains(identityCard("", "", false), "background:"+mailPaper) {
-		t.Fatal("placeholder avatar lost its paper tone")
+	if strings.Contains(identityCard("", "", false), "donor-cell") {
+		t.Fatal("no identicon must mean no empty avatar box")
 	}
 	if !strings.Contains(anonymousCard(), "anonymous") || !strings.Contains(anonymousCard(), "background:"+mailPanel) {
 		t.Fatal("anonymous card")
@@ -217,7 +220,7 @@ func TestGiftNoteCardSpeaksTheSitesDesignSystem(t *testing.T) {
 		}
 	}
 	for _, piece := range []string{
-		`class="email-container"`, `class="px-card`, `class="donor-img"`, `class="cta-link"`,
+		`class="email-container"`, `class="px-card`, `class="addr"`, `class="cta-link"`,
 		"Where is the gift card code?", "noreply@cryptorefills.com", "Reference",
 	} {
 		if !strings.Contains(h, piece) {
@@ -241,5 +244,67 @@ func TestGiftNoteCardSpeaksTheSitesDesignSystem(t *testing.T) {
 	}
 	if !strings.Contains(selfMsg.HTML, "Your order is on its way") {
 		t.Error("self-purchase headline missing")
+	}
+}
+
+// Gmail clips an HTML body at ~102 KB. Whatever the inputs, Build must return a
+// body under MailHTMLBudget, never a clipped one: worst-case text, escape-heavy
+// characters, a long product label and a noisy (non-identicon) avatar.
+func TestGmailBudgetHoldsForWorstCaseInputs(t *testing.T) {
+	noisy := image.NewNRGBA(image.Rect(0, 0, 160, 160))
+	rng := rand.New(rand.NewSource(7))
+	for y := 0; y < 160; y++ {
+		for x := 0; x < 160; x++ {
+			noisy.SetNRGBA(x, y, color.NRGBA{R: uint8(rng.Intn(256)), G: uint8(rng.Intn(256)), B: uint8(rng.Intn(256)), A: 255})
+		}
+	}
+	longMsg := strings.Repeat("<&>\"' hi ", 400) // 3600 chars, cut to the 2000 cap
+	cases := map[string]GiftNote{
+		"noisy avatar + escape-heavy message": {
+			Recipient: Address{Email: "friend@example.com"}, Message: longMsg,
+			GifterNimiqAddress: "NQ73 SE1X YRRF Q8NC DQCP HLJM NR85 8P7V 2HPD", GifterIdenticonDataURI: pngURI(t, noisy),
+			ProductLabel: strings.Repeat("Steam · 500 USD ", 30), SiteName: "nimiqshop.io", OrderID: "Q-1",
+		},
+		"sample identicon, plain purchase": {
+			Recipient: Address{Email: "buyer@example.com"}, Self: true,
+			GifterNimiqAddress: "NQ73 SE1X YRRF Q8NC DQCP HLJM NR85 8P7V 2HPD", GifterIdenticonDataURI: sampleassets.IdenticonDataURI(),
+			ProductLabel: "Steam · 50 USD", SiteName: "nimiqshop.io", OrderID: "Q-2",
+		},
+	}
+	for name, note := range cases {
+		msg, err := note.Build(Config{})
+		if err != nil {
+			t.Fatalf("%s: build failed: %v", name, err)
+		}
+		t.Logf("%s: HTML %d bytes (budget %d, Gmail clips ~102000)", name, len(msg.HTML), MailHTMLBudget)
+		if len(msg.HTML) > MailHTMLBudget {
+			t.Fatalf("%s: HTML is %d bytes, over the %d budget", name, len(msg.HTML), MailHTMLBudget)
+		}
+		if !strings.Contains(msg.HTML, "from:noreply@cryptorefills.com") || !strings.Contains(msg.Text, "from:noreply@cryptorefills.com") {
+			t.Fatalf("%s: the sender search fallback is missing", name)
+		}
+	}
+}
+
+// The footer reads as clean English: "an order" / "a gift", one "The" per sentence.
+func TestFooterGrammar(t *testing.T) {
+	for _, self := range []bool{true, false} {
+		n := GiftNote{Recipient: Address{Email: "a@example.com"}, Self: self, SiteName: "nimiqshop.io"}
+		msg, err := n.Build(Config{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, bad := range []string{"The the", "about a order", "about an gift"} {
+			if strings.Contains(msg.HTML, bad) || strings.Contains(msg.Text, bad) {
+				t.Fatalf("self=%v: bad copy %q", self, bad)
+			}
+		}
+		want := "about a gift"
+		if self {
+			want = "about an order"
+		}
+		if !strings.Contains(msg.HTML, want) {
+			t.Fatalf("self=%v: footer missing %q", self, want)
+		}
 	}
 }

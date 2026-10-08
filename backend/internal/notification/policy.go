@@ -158,7 +158,13 @@ func Memo(r Reason, detail string) string {
 	var base string
 	switch r {
 	case ReasonOrderFulfilled:
-		base = "Your " + shopHost() + " order is ready"
+		// The buyer reads this on-chain next to the 1-Luna transfer: say what
+		// happens next. Drop the shop name if it would push the memo past 64
+		// bytes, so the call to action is never cut off.
+		base = "Your " + shopHost() + " order is on its way: check your email"
+		if len(base) > maxMemoLen {
+			base = "Your order is on its way: check your email"
+		}
 	case ReasonCashbackPaid:
 		base = "Cashback from " + shopHost()
 	case ReasonSupportReply:

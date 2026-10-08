@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"html"
 	"image"
 	"image/color"
 	"image/draw"
 	"image/png"
+	"math"
 	"net/url"
 	"strconv"
 	"strings"
@@ -237,6 +239,18 @@ func (n GiftNote) Build(cfg Config) (Message, error) {
 
 	text := n.textBody(site, product, body)
 	htmlBody := n.htmlBody(site, product, body, subject)
+	// Gmail clips an HTML body at ~102 KB and then the rest of the mail is
+	// lost. The avatar mosaic is the only large, input-dependent part, so when
+	// the whole body would exceed the budget the avatar is dropped (the card
+	// keeps the wallet address) instead of risking the clip.
+	if len(htmlBody) > MailHTMLBudget && n.GifterIdenticonDataURI != "" {
+		lean := n
+		lean.GifterIdenticonDataURI = ""
+		htmlBody = lean.htmlBody(site, product, body, subject)
+	}
+	if len(htmlBody) > MailHTMLBudget {
+		return Message{}, ErrMailTooLarge
+	}
 
 	return Message{
 		To:       []Address{n.Recipient},
@@ -251,6 +265,15 @@ func (n GiftNote) Build(cfg Config) (Message, error) {
 		},
 	}, nil
 }
+
+// MailHTMLBudget is the largest HTML body Build will return. Gmail clips at
+// about 102 KB, so this leaves a wide margin for headers and encoding.
+const MailHTMLBudget = 90_000
+
+// ErrMailTooLarge is returned if a body still exceeds MailHTMLBudget after the
+// avatar has been dropped. It cannot happen with the bounded inputs above; it
+// exists so an oversized mail is refused, never sent clipped.
+var ErrMailTooLarge = errors.New("mailtrap: gift note body exceeds the mail size budget")
 
 func (n GiftNote) validate() error {
 	if !looksLikeAddress(n.Recipient.Email) {
@@ -367,7 +390,7 @@ func (n GiftNote) textBody(site, product, message string) string {
 	}
 	b.WriteString("\nWhere is " + n.itemWord() + "?\n")
 	b.WriteString(wrap(n.deliveryLine(), 76) + "\n")
-	b.WriteString("\nIt arrives from noreply@cryptorefills.com — watch that inbox (and the spam folder).\nOpen that sender's mail: " + cryptorefillsInboxURL + "\n")
+	b.WriteString("\nIt arrives from noreply@cryptorefills.com.\nOpen that sender's mail: " + cryptorefillsInboxURL + "\nOr search your inbox for: from:noreply@cryptorefills.com (and check the spam folder).\n")
 	if u := safeURL(n.ShopURL); u != "" {
 		b.WriteString("\nWant to give back? Browse gifts and top-ups:\n")
 		b.WriteString("  " + u + "\n")
@@ -463,7 +486,7 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 	// ---- brand line: the shop's own wordmark, same gold dot as the navbar --
 	b.WriteString("      <tr>\n")
 	b.WriteString(`        <td style="padding:0 2px 12px 2px;font-family:` + font + `">` + "\n")
-	b.WriteString(`          <span style="font-size:16px;font-weight:800;color:` + mailInk + `;letter-spacing:-.01em">nim<span style="color:` + mailGold + `">.</span>shop</span>` + "\n")
+	b.WriteString(`          <span style="font-size:16px;font-weight:800;color:` + mailInk + `;letter-spacing:-.01em">` + wordmark(site) + `</span>` + "\n")
 	b.WriteString(`          <span style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:` + mailInkFaint + `">&nbsp;&nbsp;` + giftWord(n.Self) + ` note</span>` + "\n")
 	b.WriteString("        </td>\n")
 	b.WriteString("      </tr>\n")
@@ -556,7 +579,7 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 	b.WriteString(`                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:` + mailPanel + `;border:1px dashed ` + mailDash + `;border-radius:12px">` + "\n")
 	b.WriteString(`                  <tr><td style="padding:13px 15px;font-size:13px;line-height:1.6;color:` + mailInkDim + `;font-family:` + font + `">` + "\n")
 	b.WriteString(`                    <strong style="color:` + mailInk + `">Where is ` + esc(n.itemWord()) + `?</strong><br>` + "\n")
-	b.WriteString(`                    ` + esc(n.deliveryLine()) + ` It arrives from <a href="` + cryptorefillsInboxURL + `" style="color:` + mailInk + `;font-weight:700;text-decoration:underline">noreply@cryptorefills.com</a> — tap to open its mail in Gmail, and watch the spam folder too.` + "\n")
+	b.WriteString(`                    ` + esc(n.deliveryLine()) + ` It arrives from <a href="` + cryptorefillsInboxURL + `" style="color:` + mailInk + `;font-weight:700;text-decoration:underline">noreply@cryptorefills.com</a>. Tap it to open that sender's mail, or search your inbox for <strong style="color:` + mailInk + `">from:noreply@cryptorefills.com</strong>. Check the spam folder too.` + "\n")
 	b.WriteString("                  </td></tr>\n")
 	b.WriteString("                </table>\n")
 	b.WriteString("              </td>\n")
@@ -602,7 +625,7 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 	if ref := strings.TrimSpace(n.OrderID); ref != "" {
 		b.WriteString(`                <div style="padding-top:8px;color:` + mailInkFaint + `;font-size:11px;font-family:` + emailMono + `">Reference ` + esc(ref) + `</div>` + "\n")
 	}
-	b.WriteString(`                <div style="padding-top:8px;font-size:11px;color:` + mailInkFaint + `">This email tells you about a ` + esc(giftWord(n.Self)) + `. The ` + esc(n.itemWord()) + ` is delivered separately by ` + esc(site) + `&rsquo;s partner CryptoRefills and is never included in this email.</div>` + "\n")
+	b.WriteString(`                <div style="padding-top:8px;font-size:11px;color:` + mailInkFaint + `">This email tells you about ` + esc(articleFor(giftWord(n.Self))) + ` ` + esc(giftWord(n.Self)) + `. ` + esc(capFirst(n.itemWord())) + ` is delivered separately by ` + esc(site) + `&rsquo;s partner CryptoRefills and is never included in this email.</div>` + "\n")
 	b.WriteString("              </td>\n")
 	b.WriteString("            </tr>\n")
 	b.WriteString("          </table>\n")
@@ -629,6 +652,23 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 // cryptorefillsInboxURL opens Gmail filtered to mail from the CryptoRefills
 // sender, so the buyer lands on the delivery mail with one tap.
 const cryptorefillsInboxURL = "https://mail.google.com/mail/u/0/#search/from%3Anoreply%40cryptorefills.com"
+
+// articleFor returns "an" before a vowel sound and "a" otherwise, so the copy
+// reads "an order" and "a gift" without a hard-coded article.
+func articleFor(word string) string {
+	if w := strings.ToLower(word); w != "" && strings.ContainsRune("aeiou", rune(w[0])) {
+		return "an"
+	}
+	return "a"
+}
+
+// capFirst upper-cases the first letter of a sentence fragment.
+func capFirst(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
+}
 
 func giftWord(self bool) string {
 	if self {
@@ -702,8 +742,9 @@ func plainSenderCard() string {
 // gözüküyor") — at 32 cells the identicon loses exactly what makes it an
 // identity: the face.
 const (
-	identN    = 72
-	identCell = 1
+	identN       = 72 // mosaic cells per side (area-averaged)
+	identCell    = 1
+	identPalette = 8 // colours the face is clustered into: few colours = long, cheap runs
 )
 
 // identiconTable re-draws the donor's identicon PNG as a bgcolor-cell mosaic.
@@ -726,7 +767,7 @@ func identiconTable(dataURI string) string {
 	}
 	const pngPrefix = "data:image/png;base64,"
 	if !strings.HasPrefix(u, pngPrefix) {
-		return "" // an SVG cannot be rasterized here; the placeholder keeps the layout
+		return "" // an SVG cannot be rasterized here; the card drops the avatar
 	}
 	raw, err := base64.StdEncoding.DecodeString(strings.TrimSpace(strings.TrimPrefix(u, pngPrefix)))
 	if err != nil {
@@ -736,58 +777,171 @@ func identiconTable(dataURI string) string {
 	if err != nil {
 		return ""
 	}
-	// One conversion for every source type: draw the decoded image onto an
-	// NRGBA canvas, which is also where a palette or gray PNG picks up full
-	// alpha. Non-premultiplied on purpose — pngComposite expects straight
-	// colours, exactly like the checkout's canvas output.
 	bounds := src.Bounds()
 	if bounds.Dx() < 1 || bounds.Dy() < 1 {
 		return ""
 	}
+	// One conversion for every source type (palette, gray, 16-bit, RGBA).
 	nrgba := image.NewNRGBA(image.Rect(0, 0, bounds.Dx(), bounds.Dy()))
 	draw.Draw(nrgba, nrgba.Bounds(), src, bounds.Min, draw.Src)
-	b := nrgba.Bounds()
-	clampX := func(v int) int {
-		if v > b.Max.X-1 {
-			return b.Max.X - 1
-		}
-		return v
-	}
-	clampY := func(v int) int {
-		if v > b.Max.Y-1 {
-			return b.Max.Y - 1
-		}
-		return v
-	}
-	var sb strings.Builder
-	sb.WriteString(`<table class="donor-img" role="presentation" width="` + strconv.Itoa(identN) + `" cellpadding="0" cellspacing="0" border="0" style="width:` + strconv.Itoa(identN) + `px;margin:0 auto;border-collapse:separate;border-spacing:0;border-radius:14px;overflow:hidden;border:2px solid ` + mailGold + `;font-size:0;line-height:0">`)
+	w, h := bounds.Dx(), bounds.Dy()
+
+	// Each cell is the AREA AVERAGE of its source rectangle (not one point),
+	// composited over the card paper; then the grid is clustered into a small
+	// palette so the face is made of a few clean colours, not gradient noise.
+	grid := make([]rgbF, identN*identN)
 	for iy := 0; iy < identN; iy++ {
-		sy := clampY(int((float64(iy)+0.5)*float64(b.Dy())/identN) + b.Min.Y)
-		// The font-size/line-height reset lives on the <tr> (inherited by the
-		// cells), not each <td> — keeps the mosaic percentage down.
+		for ix := 0; ix < identN; ix++ {
+			x0, x1 := ix*w/identN, (ix+1)*w/identN
+			y0, y1 := iy*h/identN, (iy+1)*h/identN
+			if x1 <= x0 {
+				x1 = x0 + 1
+			}
+			if y1 <= y0 {
+				y1 = y0 + 1
+			}
+			if x1 > w {
+				x1 = w
+			}
+			if y1 > h {
+				y1 = h
+			}
+			grid[iy*identN+ix] = cellAverage(nrgba, x0, x1, y0, y1)
+		}
+	}
+	colors := paletteMosaic(grid)
+
+	var sb strings.Builder
+	sb.WriteString(`<table class="donor-img" role="presentation" width="` + strconv.Itoa(identN) + `" cellpadding="0" cellspacing="0" border="0" bgcolor="` + mailPaper + `" style="width:` + strconv.Itoa(identN) + `px;border-collapse:collapse;border-spacing:0;font-size:0;line-height:0">`)
+	for iy := 0; iy < identN; iy++ {
+		row := colors[iy*identN : (iy+1)*identN]
 		sb.WriteString(`<tr style="font-size:0;line-height:0">`)
 		for ix := 0; ix < identN; {
-			sx := clampX(int((float64(ix)+0.5)*float64(b.Dx())/identN) + b.Min.X)
-			col := pngComposite(nrgba.At(sx, sy))
 			run := 1
-			for ix+run < identN {
-				sx2 := clampX(int((float64(ix+run)+0.5)*float64(b.Dx())/identN) + b.Min.X)
-				if pngComposite(nrgba.At(sx2, sy)) != col {
-					break
-				}
+			for ix+run < identN && row[ix+run] == row[ix] {
 				run++
 			}
 			if run == 1 {
-				sb.WriteString(`<td bgcolor="` + col + `" width="` + strconv.Itoa(identCell) + `" height="` + strconv.Itoa(identCell) + `">&nbsp;</td>`)
+				sb.WriteString(`<td bgcolor="` + row[ix] + `" width="` + strconv.Itoa(identCell) + `" height="` + strconv.Itoa(identCell) + `" style="font-size:0;line-height:0">&nbsp;</td>`)
 			} else {
-				sb.WriteString(`<td bgcolor="` + col + `" colspan="` + strconv.Itoa(run) + `" width="` + strconv.Itoa(run*identCell) + `" height="` + strconv.Itoa(identCell) + `">&nbsp;</td>`)
+				sb.WriteString(`<td bgcolor="` + row[ix] + `" colspan="` + strconv.Itoa(run) + `" width="` + strconv.Itoa(run*identCell) + `" height="` + strconv.Itoa(identCell) + `" style="font-size:0;line-height:0">&nbsp;</td>`)
 			}
 			ix += run
 		}
 		sb.WriteString("</tr>")
 	}
 	sb.WriteString("</table>")
-	return sb.String()
+
+	// A SQUARE gold frame around the mosaic. The old rounded border was
+	// clipped by table cells in several clients, leaving the corners broken.
+	return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" bgcolor="` + mailGold + `" style="margin:0 auto"><tr><td style="padding:2px;background:` + mailGold + `;font-size:0;line-height:0">` + sb.String() + `</td></tr></table>`
+}
+
+// rgbF is a colour in 0..255 per channel, kept as float for averaging.
+type rgbF [3]float64
+
+// cellAverage is the area average of one source rectangle. Premultiplied, so a
+// transparent corner pixel pulls the cell toward the paper, not toward black,
+// and then composited over the card paper.
+func cellAverage(img *image.NRGBA, x0, x1, y0, y1 int) rgbF {
+	var sum rgbF
+	var sa, n float64
+	for y := y0; y < y1; y++ {
+		for x := x0; x < x1; x++ {
+			c := img.NRGBAAt(x, y)
+			a := float64(c.A) / 255
+			sum[0] += float64(c.R) * a
+			sum[1] += float64(c.G) * a
+			sum[2] += float64(c.B) * a
+			sa += a
+			n++
+		}
+	}
+	if n == 0 {
+		return rgbF{246, 239, 220}
+	}
+	ar := sa / n
+	return rgbF{
+		sum[0]/n + 246*(1-ar),
+		sum[1]/n + 239*(1-ar),
+		sum[2]/n + 220*(1-ar),
+	}
+}
+
+// paletteMosaic clusters the cell colours into identPalette colours (k-means,
+// deterministic: centroids seeded from evenly spaced cells) and returns each
+// cell's palette colour as hex. Few colours means long same-colour runs, which
+// is what keeps the mosaic small enough for Gmail's 102 KB clip limit.
+func paletteMosaic(grid []rgbF) []string {
+	k := identPalette
+	if len(grid) < k {
+		k = len(grid)
+	}
+	cent := make([]rgbF, k)
+	for c := range cent {
+		cent[c] = grid[c*len(grid)/k]
+	}
+	assign := make([]int, len(grid))
+	for iter := 0; iter < 16; iter++ {
+		changed := false
+		for i, p := range grid {
+			best, bd := 0, math.MaxFloat64
+			for c := range cent {
+				d := dist2(p, cent[c])
+				if d < bd {
+					best, bd = c, d
+				}
+			}
+			if assign[i] != best || iter == 0 {
+				changed = true
+			}
+			assign[i] = best
+		}
+		if !changed {
+			break
+		}
+		sums := make([]rgbF, k)
+		counts := make([]float64, k)
+		for i, p := range grid {
+			c := assign[i]
+			for ch := 0; ch < 3; ch++ {
+				sums[c][ch] += p[ch]
+			}
+			counts[c]++
+		}
+		for c := range cent {
+			if counts[c] > 0 {
+				for ch := 0; ch < 3; ch++ {
+					cent[c][ch] = sums[c][ch] / counts[c]
+				}
+			}
+		}
+	}
+	out := make([]string, len(grid))
+	for i := range grid {
+		out[i] = hexRGB(cent[assign[i]])
+	}
+	return out
+}
+
+func dist2(a, b rgbF) float64 {
+	dr, dg, db := a[0]-b[0], a[1]-b[1], a[2]-b[2]
+	return dr*dr + dg*dg + db*db
+}
+
+func hexRGB(c rgbF) string {
+	var v [3]int
+	for ch := 0; ch < 3; ch++ {
+		x := int(math.Round(c[ch]))
+		if x < 0 {
+			x = 0
+		}
+		if x > 255 {
+			x = 255
+		}
+		v[ch] = x
+	}
+	return fmt.Sprintf("#%02x%02x%02x", v[0], v[1], v[2])
 }
 
 // pngComposite is one mosaic cell's colour: the source pixel, alpha-composited
@@ -807,6 +961,16 @@ func pngComposite(c color.Color) string {
 	g := int(float64(nc.G)*ar + 239*(1-ar))
 	bl := int(float64(nc.B)*ar + 220*(1-ar))
 	return fmt.Sprintf("#%02x%02x%02x", r, g, bl)
+}
+
+// wordmark renders the site name with the dot before the TLD in gold, the way
+// the navbar does: nimiqshop.io -> nimiqshop<gold>.</gold>io.
+func wordmark(site string) string {
+	name, tld, ok := strings.Cut(strings.TrimSpace(site), ".")
+	if !ok || name == "" || tld == "" {
+		return html.EscapeString(strings.TrimSpace(site))
+	}
+	return html.EscapeString(name) + `<span style="color:` + mailGold + `">.</span>` + html.EscapeString(tld)
 }
 
 // anonymousCard replaces identityCard for anonymous gifts: no identicon, no
@@ -835,21 +999,26 @@ func anonymousCard() string {
 func identityCard(addr, identURI string, self bool) string {
 	font := emailFont
 	img := identiconTable(identURI)
-	avatar := `<div class="donor-img" style="width:` + strconv.Itoa(identN) + `px;height:` + strconv.Itoa(identN) + `px;border-radius:14px;background:` + mailPaper + `;border:2px solid ` + mailGold + `"></div>`
-	if img != "" {
-		avatar = img
-	}
-	// The wallet IS the identity: it is a public blockchain address, and it is
-	// what the recipient would use to send something back.
 	addrCell := `<div class="addr" style="font-family:` + emailMono + `;font-size:12px;line-height:1.5;color:` + mailInk + `;word-break:break-all">` + addr + `</div>`
-	inner := `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>` +
-		`<td class="donor-cell" width="` + strconv.Itoa(identN) + `" valign="middle" style="width:` + strconv.Itoa(identN) + `px;text-align:center">` + avatar + `</td>` +
-		`<td class="donor-info" style="padding-left:16px;vertical-align:middle">` +
+	info := `<td class="donor-info" style="vertical-align:middle;padding-left:` + avatarGap(img) + `">` +
 		eyebrow(font, paidOrFrom(self)) +
 		addrCell +
 		`<div style="font-size:11.5px;line-height:1.5;color:` + mailInkFaint + `;padding-top:4px">` + identityFootnote(self) + `</div>` +
-		`</td></tr></table>`
+		`</td>`
+	avatar := ""
+	if img != "" {
+		// Only a real identicon gets a cell: no empty box when none was sent.
+		avatar = `<td class="donor-cell" width="` + strconv.Itoa(identN+4) + `" valign="middle" style="width:` + strconv.Itoa(identN+4) + `px;text-align:center">` + img + `</td>`
+	}
+	inner := `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>` + avatar + info + `</tr></table>`
 	return panel(font, inner)
+}
+
+func avatarGap(img string) string {
+	if img == "" {
+		return "0"
+	}
+	return "16px"
 }
 
 func wrap(s string, width int) string {
