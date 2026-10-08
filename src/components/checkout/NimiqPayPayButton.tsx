@@ -27,7 +27,6 @@ import {
   type PayLightningOutcome,
 } from '../../lib/nimiqPay';
 import { useWalletBalance } from '../wallet/WalletBalance';
-import { requiredNim } from '../../lib/walletBalance';
 
 /** NIM with enough precision to be recognisable (see WalletBalance.nimText). */
 /**
@@ -35,12 +34,6 @@ import { requiredNim } from '../../lib/walletBalance';
  * gösterme … tam nim göster" — the same rule the balance strip follows, so the
  * refusal sentence and the figure above the button can be compared at a glance.
  */
-function nim(n: number): string {
-  const v = Number(n);
-  if (!isFinite(v)) return '0';
-  return String(Math.round(v));
-}
-
 export type NimiqPayPayLabels = {
   idle: string;
   paying: string;
@@ -108,7 +101,6 @@ export function NimiqPayPayButton({
   onSubmitted,
   onBeforePay,
   labels,
-  amountNim = 0,
   className = 'btn btn-gold btn-block',
 }: {
   invoice: string;
@@ -122,7 +114,7 @@ export function NimiqPayPayButton({
    */
   onBeforePay?: () => boolean | Promise<boolean>;
   labels?: Partial<NimiqPayPayLabels>;
-  /** The NIM this payment costs (amount + the host's fee is added on top). */
+  /** Kept for callers; the button never gates on it (payment is always attempted). */
   amountNim?: number;
   className?: string;
 }) {
@@ -131,7 +123,7 @@ export function NimiqPayPayButton({
   // The balance is already on screen; a refusal can therefore say HOW short the
   // wallet is instead of only that something failed. Shared reading: no extra
   // network call.
-  const { state: wallet, refresh: refreshWallet } = useWalletBalance();
+  const { refresh: refreshWallet } = useWalletBalance();
   // Label priority: explicit prop → i18n key → built-in English fallback.
   const label = (k: keyof NimiqPayPayLabels): string => {
     if (labels && labels[k] != null) return labels[k] as string;
@@ -180,9 +172,11 @@ export function NimiqPayPayButton({
   const message = outcome
     ? outcome.status === 'updateRequired'
       ? t('wallet.updatePayToast')
-      : label(outcome.status as keyof NimiqPayPayLabels)
+      : label((outcome.status === 'insufficient' ? 'declined' : outcome.status) as keyof NimiqPayPayLabels)
     : '';
-  const tone = outcome ? toneFor(outcome) : 'info';
+  // A refusal is shown as a neutral "not approved". The shop never states a
+  // balance verdict on this button; the wallet's own words are shown below.
+  const tone = outcome ? (outcome.status === 'insufficient' ? 'info' : toneFor(outcome)) : 'info';
   const hash = outcome && 'hash' in outcome ? outcome.hash : undefined;
   const swapId = outcome && 'swapId' in outcome ? outcome.swapId : undefined;
 
@@ -190,22 +184,6 @@ export function NimiqPayPayButton({
   // (2026-10-05): "o kırmızı yerde tam hataları söyleyebilirdi" — our sentence
   // explains, the wallet's sentence is the evidence, and support can trace it.
   const walletErr = outcome && 'wallet' in outcome ? outcome.wallet : undefined;
-  // The shortfall carries the shop's cushion (requiredNim), so the number
-  // the buyer reads is the number they must actually hold: amount + fee + the
-  // rate's next tick.
-  const needTotal = amountNim > 0 ? requiredNim(amountNim) : 0;
-  const shortfall = (() => {
-    if (outcome?.status !== 'insufficient' || !(needTotal > 0)) return 0;
-    if (wallet.status !== 'ready') return 0;
-    // Rounded UP: a shortage never reads as "0 NIM".
-    return Math.ceil(Math.max(0, needTotal - wallet.availableNim));
-  })();
-  // Pay refused the spend. Only say the balance is short when it really is.
-  // The earlier version printed "need 724, have 737", which contradicts itself.
-  const refused = outcome?.status === 'insufficient' && needTotal > 0 && wallet.status === 'ready';
-  const needHave = refused && wallet.availableNim < needTotal;
-  const coveredButRefused = refused && wallet.availableNim >= needTotal;
-
   return (
     <div className="nimiq-pay-trigger mt-2">
       <button
@@ -223,19 +201,6 @@ export function NimiqPayPayButton({
       {message ? (
         <p className="xs mt-1" role="status" aria-live="polite" style={{ color: TONE_COLOR[tone], margin: '6px 2px 0' }}>
           {message}
-        </p>
-      ) : null}
-
-      {needHave ? (
-        <p className="xs" style={{ color: TONE_COLOR.error, margin: '4px 2px 0', fontWeight: 700 }}>
-          {t('orderPage.nimiqPay.needHave', { need: nim(needTotal), have: nim(wallet.availableNim) })}
-          {shortfall > 0 ? ' ' + t('wallet.short', { nim: nim(shortfall) }) : ''}
-        </p>
-      ) : null}
-
-      {coveredButRefused ? (
-        <p className="xs" style={{ color: TONE_COLOR.error, margin: '4px 2px 0', fontWeight: 700 }}>
-          {t('orderPage.nimiqPay.coveredButRefused', { have: nim(wallet.availableNim) })}
         </p>
       ) : null}
 

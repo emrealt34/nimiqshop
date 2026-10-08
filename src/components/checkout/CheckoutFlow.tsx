@@ -40,7 +40,6 @@ import { StakerCashbackLine } from '../staker/StakerCashback';
 import { currentCashbackCode } from '../../lib/cashbackCode';
 import { nimAmountText, nimAmountFor } from '../../lib/nim';
 import { refreshWalletBalance } from '../../lib/walletBalance';
-import { guardLowBalance } from '../wallet/LowBalanceSheet';
 import { useWalletBalance } from '../wallet/WalletBalance';
 import { fmtUSD } from '../../lib/format';
 import { deliveryLine, youGetText } from '../../lib/deliveryCopy';
@@ -904,16 +903,6 @@ export function PayScreen({
    * (re-evaluated live inside the dialog), or cancel. The attempt only proceeds
    * on an explicit choice — never silently, and never blocked either.
    */
-  const askBeforePaying = useCallback(
-    () =>
-      guardLowBalance({
-        openSheet,
-        targetNim: needNim,
-        availableNim: walletState.availableNim,
-        ready: walletReady,
-      }),
-    [needNim, openSheet, walletReady, walletState.availableNim]
-  );
   const settled = useRef(false);
   let uri = '';
   try { if (invoice) uri = lightningPaymentURI(invoice); } catch {}
@@ -1129,7 +1118,6 @@ export function PayScreen({
             <NimiqPayPayButton
               invoice={invoice}
               amountNim={Number(nimAmountFor(current, cachedNimRate())) || 0}
-              onBeforePay={askBeforePaying}
               className="btn btn-gold btn-block btn-lg"
             />
           </div>
@@ -1139,8 +1127,6 @@ export function PayScreen({
             className="btn btn-gold btn-block btn-lg"
             style={{ marginTop: 12 }}
             onClick={async () => {
-              // The popup answers first; "continue anyway" proceeds right here.
-              if (!(await askBeforePaying())) return;
               rememberLightningPayment(invoice, { kind: 'quote', ref: quoteIdOf(current) });
               void authorizePaymentLaunch(quoteIdOf(current)).catch(() => {});
               // Outside Nimiq Pay the button must DO something: desktop gets
