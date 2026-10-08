@@ -82,7 +82,7 @@ func (h *Handlers) CryptoRefillsWebhook(ctx *fasthttp.RequestCtx) {
 		h.supplierError(ctx, err, "could not verify order")
 		return
 	}
-	changed, err := h.Store.ApplySupplierOrder(q.ID, order)
+	changed, err := settlement.ApplySupplierOrderNotify(h.Store, q.ID, order)
 	if err != nil {
 		log.Printf("webhook: quote %s could not persist supplier observation: %v", q.ID, err)
 		ctx.Response.Header.Set("Retry-After", "5")

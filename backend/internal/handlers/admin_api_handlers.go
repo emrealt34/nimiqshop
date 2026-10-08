@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"nimiqshop/internal/settlement"
 	"strconv"
 	"strings"
 	"time"
@@ -509,7 +510,7 @@ func (h *Handlers) AdminSyncOrder(ctx *fasthttp.RequestCtx) {
 			h.supplierError(ctx, err, "could not verify supplier status")
 			return
 		}
-		if _, err := h.Store.ApplySupplierOrder(q.ID, order); err != nil {
+		if _, err := settlement.ApplySupplierOrderNotify(h.Store, q.ID, order); err != nil {
 			adminStoreError(ctx)
 			return
 		}

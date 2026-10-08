@@ -32,7 +32,7 @@ func (h *Handlers) PaymentLaunch(ctx *fasthttp.RequestCtx) {
 		h.supplierError(ctx, err, "could not verify current payment state; wallet not opened")
 		return
 	}
-	changed, err := h.Store.ApplySupplierOrder(q.ID, order)
+	changed, err := settlement.ApplySupplierOrderNotify(h.Store, q.ID, order)
 	if err != nil {
 		writeError(ctx, 503, "supplier update could not be saved; wallet not opened")
 		return
@@ -84,7 +84,7 @@ func (h *Handlers) RefreshQuote(ctx *fasthttp.RequestCtx) {
 		h.supplierError(ctx, err, "live supplier status unavailable")
 		return
 	}
-	changed, err := h.Store.ApplySupplierOrder(q.ID, order)
+	changed, err := settlement.ApplySupplierOrderNotify(h.Store, q.ID, order)
 	if err != nil {
 		writeError(ctx, 503, "supplier state could not be saved")
 		return

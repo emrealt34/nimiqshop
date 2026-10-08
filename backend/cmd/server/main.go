@@ -420,22 +420,29 @@ func main() {
 	}
 	// The order-ready memo: one per fulfilled quote, keyed on the quote id
 	// so a tracker re-run or crash-restart can never send it twice.
-	settlement.SetNotifyFn(func(q db.Quote) {
+	// Payment-confirmed memo to the buyer: "Your order is on the way #<id>".
+	// The id is the full order id the buyer sees on the order page, so anyone
+	// can match the on-chain memo to the order. Fires once, at the moment the
+	// payment is confirmed, not at fulfilment.
+	settlement.SetPaidNotifyFn(func(q db.Quote) {
 		if q.UserID == "" {
+			return // anonymous order: no address to message
+		}
+		if len(q.ID) != 36 {
+			log.Printf("notify: order-paid memo skipped for quote %q: unexpected id length", q.ID)
 			return
 		}
 		ctxN, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		// Admin test-center orders go through the same policy pipeline but
-		// SIMULATED: no transaction is ever signed or broadcast.
+		refID := "quote:" + q.ID + ":paid"
 		var err error
 		if q.TestMode {
-			_, err = walletNotifier.NotifyReasonSimulated(ctxN, notification.ReasonOrderFulfilled, "quote:"+q.ID, q.UserID, "")
+			_, err = walletNotifier.NotifyReasonSimulated(ctxN, notification.ReasonOrderPaid, refID, q.UserID, q.ID)
 		} else {
-			_, err = walletNotifier.NotifyReason(ctxN, notification.ReasonOrderFulfilled, "quote:"+q.ID, q.UserID, "")
+			_, err = walletNotifier.NotifyReason(ctxN, notification.ReasonOrderPaid, refID, q.UserID, q.ID)
 		}
 		if err != nil {
-			log.Printf("notify: order-ready memo for quote %s failed: %v", q.ID, err)
+			log.Printf("notify: order-paid memo for quote %s failed: %v", q.ID, err)
 		}
 	})
 

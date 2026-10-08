@@ -460,7 +460,7 @@ func (w *OrderTracker) attachRecoveredOrder(q db.Quote, order *cryptorefills.Ord
 	if err != nil {
 		_ = w.Store.HoldQuote(q.ID, "recovered order is not safely payable; verify supplier state")
 		if cryptorefills.MapToQuoteStatus(order.Status) != "awaiting_payment" {
-			_, _ = w.Store.ApplySupplierOrder(q.ID, order)
+			_, _ = ApplySupplierOrderNotify(w.Store, q.ID, order)
 		}
 		return
 	}
@@ -672,7 +672,7 @@ func (w *OrderTracker) trackOne(ctx context.Context, q db.Quote) {
 		}
 		return
 	}
-	changed, err := w.Store.ApplySupplierOrder(q.ID, order)
+	changed, err := ApplySupplierOrderNotify(w.Store, q.ID, order)
 	if err != nil {
 		log.Printf("tracker: quote %s persistence failure: %v", q.ID, err)
 		return
@@ -683,23 +683,6 @@ func (w *OrderTracker) trackOne(ctx context.Context, q db.Quote) {
 			w.notifyFulfilled(latest)
 		}
 	}
-}
-
-// Notify is an optional hook (notification fan-out) invoked after a
-// fulfillment lands. It runs in its own goroutine by the assignee.
-//
-// The hooks are stored in atomic.Value, not bare package vars: the tracker
-// fires them from background goroutines for the whole process lifetime, so
-// any late (re)assignment — tests, future hot re-wiring — must be race-free
-// against those reads.
-var notifyFnVal atomic.Value // func(db.Quote)
-
-// SetNotifyFn wires the wallet-memo hook. Safe to call at any time.
-func SetNotifyFn(fn func(q db.Quote)) { notifyFnVal.Store(fn) }
-
-func notifyFn() func(q db.Quote) {
-	fn, _ := notifyFnVal.Load().(func(q db.Quote))
-	return fn
 }
 
 // MailNotifyFn is the seam for the fulfilled-order EMAIL hook; main wires it.
@@ -735,16 +718,9 @@ func mailNotifyFn() func(q db.Quote) {
 // number), so they stay silent instead of mailing nobody.
 func HasMailRecipient(q db.Quote) bool { return strings.TrimSpace(q.CustomerEmail) != "" }
 
-// Notify is the seam for the notification package; main wires it.
+// notifyFulfilled fires the fulfilled-order email. The wallet memo is NOT sent
+// here: it goes out at payment confirmation (see ApplySupplierOrderNotify).
 func (w *OrderTracker) notifyFulfilled(q db.Quote) {
-	// NotifyFn is the wallet-memo hook. Test-center orders fire it too —
-	// everything works, only the payment is simulated: main.go routes a
-	// TestMode quote to the notifier's SIMULATED path (policy checks and
-	// send-ledger recording, but no signed transaction, no RPC).
-	if fn := notifyFn(); fn != nil {
-		qq := q
-		safe.Go("settlement:notify", func() { fn(qq) })
-	}
 	// Fulfilled-order email: EVERY purchase with a delivery address, gift or
 	// not (owner, 2026-10-05). The hook owns its own send-once marker.
 	if fn := mailNotifyFn(); fn != nil && HasMailRecipient(q) {

@@ -27,6 +27,10 @@ var testBuyer = func() string {
 	return addr
 }()
 
+// testOrderID is the full quote id as the buyer sees it on the order page
+// (a 36-character UUID).
+const testOrderID = "3f2a9c1e-7b4d-4e8a-9f10-5c6d2b8e7a41"
+
 // fakeRPC answers the two JSON-RPC calls the notifier makes and records every
 // transaction it is asked to broadcast, so the test can inspect the real signed
 // bytes the shop would have sent.
@@ -85,19 +89,22 @@ func newTestNotifier(t *testing.T, enabled bool) (*Notifier, *fakeRPC, *db.Store
 	return n, f, store
 }
 
-// A fulfilled product order sends exactly one 1-Luna transfer to the buyer,
-// carrying the "order is on its way" memo, and never a second one for the same
-// order.
-func TestFulfilledOrderSendsOneLunaMemoToBuyer(t *testing.T) {
+// The payment-confirmed memo is exactly "Your order is on the way #<id>".
+func paidMemoFor(id string) string { return "Your order is on the way #" + id }
+
+// A paid order sends exactly one 1-Luna transfer to the buyer, carrying the
+// order id, and never a second one for the same order.
+func TestPaidOrderSendsOneLunaMemoWithOrderID(t *testing.T) {
 	n, f, _ := newTestNotifier(t, true)
 	ctx := context.Background()
+	ref := "quote:" + testOrderID + ":paid"
 
-	sent, err := n.NotifyReason(ctx, ReasonOrderFulfilled, "quote:q-1", testBuyer, "")
+	sent, err := n.NotifyReason(ctx, ReasonOrderPaid, ref, testBuyer, testOrderID)
 	if err != nil {
 		t.Fatalf("notify: %v", err)
 	}
 	if !sent {
-		t.Fatal("fulfilled order was not sent to the buyer")
+		t.Fatal("paid order was not sent to the buyer")
 	}
 	pushes := f.broadcasts()
 	if len(pushes) != 1 {
@@ -114,13 +121,13 @@ func TestFulfilledOrderSendsOneLunaMemoToBuyer(t *testing.T) {
 	if !bytes.Contains(raw, recipient) {
 		t.Fatal("transaction does not pay the buyer's address")
 	}
-	memo := Memo(ReasonOrderFulfilled, "")
+	memo := paidMemoFor(testOrderID)
 	if !bytes.Contains(raw, []byte(memo)) {
 		t.Fatalf("transaction does not carry the memo %q", memo)
 	}
 
-	// Same order again (tracker re-run, crash-restart): never a second send.
-	if _, err := n.NotifyReason(ctx, ReasonOrderFulfilled, "quote:q-1", testBuyer, ""); err != nil {
+	// Same order again (webhook + poll, crash-restart): never a second send.
+	if _, err := n.NotifyReason(ctx, ReasonOrderPaid, ref, testBuyer, testOrderID); err != nil {
 		t.Fatalf("second notify: %v", err)
 	}
 	if got := len(f.broadcasts()); got != 1 {
@@ -128,13 +135,42 @@ func TestFulfilledOrderSendsOneLunaMemoToBuyer(t *testing.T) {
 	}
 }
 
+// The memo keeps the full 36-character id: a truncated id could not be matched
+// against the order page. It must fit the 64-byte chain limit exactly.
+func TestPaidMemoKeepsFullIDAndFitsChainLimit(t *testing.T) {
+	m := Memo(ReasonOrderPaid, testOrderID)
+	if m != paidMemoFor(testOrderID) {
+		t.Fatalf("memo = %q, want %q", m, paidMemoFor(testOrderID))
+	}
+	if len(m) > maxMemoLen {
+		t.Fatalf("paid memo is %d bytes, over the %d-byte limit", len(m), maxMemoLen)
+	}
+	if !strings.HasSuffix(m, testOrderID) {
+		t.Fatalf("paid memo does not end with the full order id: %q", m)
+	}
+}
+
+// Every memo fits the 64-byte ceiling even with a long shop name.
+func TestMemosFitTheChainLimit(t *testing.T) {
+	prev := ShopName
+	defer func() { ShopName = prev }()
+	for _, name := range []string{"nimiqshop.io", "a-very-long-shop-domain.example.co.uk", strings.Repeat("x", 80)} {
+		ShopName = name
+		for _, r := range Reasons() {
+			if m := Memo(r, testOrderID); len(m) > maxMemoLen {
+				t.Fatalf("memo for %s with shop %q is %d bytes: %q", r, name, len(m), m)
+			}
+		}
+	}
+}
+
 // An opted-out buyer receives nothing, and nothing is broadcast.
-func TestFulfilledOrderRespectsOptOut(t *testing.T) {
+func TestPaidOrderRespectsOptOut(t *testing.T) {
 	n, f, store := newTestNotifier(t, true)
 	if err := store.SetWalletNotifyEnabled(testBuyer, false); err != nil {
 		t.Fatal(err)
 	}
-	sent, err := n.NotifyReason(context.Background(), ReasonOrderFulfilled, "quote:q-2", testBuyer, "")
+	sent, err := n.NotifyReason(context.Background(), ReasonOrderPaid, "quote:q-2:paid", testBuyer, "q-2")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,29 +191,10 @@ func TestNotifierOffWithoutSeed(t *testing.T) {
 	if n.Enabled() {
 		t.Fatal("notifier must be off without a seed")
 	}
-	if sent, _ := n.NotifyReason(context.Background(), ReasonOrderFulfilled, "quote:q-3", testBuyer, ""); sent {
+	if sent, _ := n.NotifyReason(context.Background(), ReasonOrderPaid, "quote:q-3:paid", testBuyer, testOrderID); sent {
 		t.Fatal("sent without a seed")
 	}
 	if len(f.broadcasts()) != 0 {
 		t.Fatal("broadcast without a seed")
-	}
-}
-
-// Every memo fits the 64-byte ceiling, and the fulfilled one tells the buyer to
-// check their email, even with a long shop name.
-func TestMemosFitTheChainLimit(t *testing.T) {
-	prev := ShopName
-	defer func() { ShopName = prev }()
-	for _, name := range []string{"nimiqshop.io", "a-very-long-shop-domain.example.co.uk", strings.Repeat("x", 80)} {
-		ShopName = name
-		for _, r := range Reasons() {
-			if m := Memo(r, ""); len(m) > maxMemoLen {
-				t.Fatalf("memo for %s with shop %q is %d bytes: %q", r, name, len(m), m)
-			}
-		}
-		m := Memo(ReasonOrderFulfilled, "")
-		if !strings.Contains(m, "check your email") {
-			t.Fatalf("fulfilled memo lost its call to action: %q", m)
-		}
 	}
 }

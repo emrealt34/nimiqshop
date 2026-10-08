@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"hash/fnv"
+	"nimiqshop/internal/settlement"
 	"sort"
 	"strings"
 	"sync"
@@ -246,7 +247,7 @@ func (h *Handlers) finishSupplierCreation(ctx *fasthttp.RequestCtx, q db.Quote, 
 		// A creation response can already be a delivery/failure state; observe
 		// it, but NEVER expose an unvalidated invoice as a way to pay again.
 		if cryptorefills.MapToQuoteStatus(order.Status) != "awaiting_payment" {
-			_, _ = h.Store.ApplySupplierOrder(q.ID, order)
+			_, _ = settlement.ApplySupplierOrderNotify(h.Store, q.ID, order)
 		}
 		if latest, err := h.Store.GetQuote(q.ID); err == nil {
 			h.writeQuoteCreatedExtra(ctx, latest, map[string]any{"code": "INVOICE_NOT_PAYABLE", "detail": "This order is not available for payment. Check its status or contact support; do not pay a replacement invoice."})

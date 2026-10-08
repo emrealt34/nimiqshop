@@ -35,9 +35,10 @@ import (
 type Reason string
 
 const (
-	// ReasonOrderFulfilled — the thing they paid for is ready. This is the
-	// notification users actively wait for.
-	ReasonOrderFulfilled Reason = "order_fulfilled"
+	// ReasonOrderPaid — the payment is confirmed and the order is on its way.
+	// The memo carries the order id, so anyone holding the id can check on
+	// chain that the shop acknowledged that order at payment time.
+	ReasonOrderPaid Reason = "order_paid"
 	// ReasonCashbackPaid — real money arrived in their wallet.
 	ReasonCashbackPaid Reason = "cashback_paid"
 	// ReasonSupportReply — they asked a question and it was answered.
@@ -63,10 +64,10 @@ type reasonPolicy struct {
 }
 
 var reasonPolicies = map[Reason]reasonPolicy{
-	ReasonOrderFulfilled: {Cooldown: 0, CountsToBudget: false, Description: "their order is ready"},
-	ReasonCashbackPaid:   {Cooldown: 0, CountsToBudget: false, Description: "cashback landed in their wallet"},
-	ReasonSupportReply:   {Cooldown: 0, CountsToBudget: false, Description: "their support ticket was answered"},
-	ReasonOrderProblem:   {Cooldown: 0, CountsToBudget: false, Description: "an order needs their attention"},
+	ReasonOrderPaid:    {Cooldown: 0, CountsToBudget: false, Description: "payment confirmed, order on its way"},
+	ReasonCashbackPaid: {Cooldown: 0, CountsToBudget: false, Description: "cashback landed in their wallet"},
+	ReasonSupportReply: {Cooldown: 0, CountsToBudget: false, Description: "their support ticket was answered"},
+	ReasonOrderProblem: {Cooldown: 0, CountsToBudget: false, Description: "an order needs their attention"},
 }
 
 // MonthlyBudget is the ceiling on WE-initiated messages per user per rolling
@@ -155,16 +156,13 @@ func Allow(r Reason, optedOut bool, lastSameAt time.Time, budgetUsed int, now ti
 // memo can end in half a UTF-8 character and render as a replacement box in
 // the wallet).
 func Memo(r Reason, detail string) string {
+	if r == ReasonOrderPaid {
+		// The order id is appended whole, never after a ": " and never cut: the
+		// memo is only useful if the id in it matches the id the buyer sees.
+		return TrimMemo("Your order is on the way #" + strings.TrimSpace(detail))
+	}
 	var base string
 	switch r {
-	case ReasonOrderFulfilled:
-		// The buyer reads this on-chain next to the 1-Luna transfer: say what
-		// happens next. Drop the shop name if it would push the memo past 64
-		// bytes, so the call to action is never cut off.
-		base = "Your " + shopHost() + " order is on its way: check your email"
-		if len(base) > maxMemoLen {
-			base = "Your order is on its way: check your email"
-		}
 	case ReasonCashbackPaid:
 		base = "Cashback from " + shopHost()
 	case ReasonSupportReply:
