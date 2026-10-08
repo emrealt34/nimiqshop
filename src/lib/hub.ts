@@ -5,7 +5,7 @@
  */
 import { CFG } from './config';
 import { bytesToHex } from './format';
-import { getNimiqProvider, initNimiqMiniApp, openInNimiqPay } from './miniapp';
+import { detectMobilePlatform, getNimiqProvider, initNimiqMiniApp, openInNimiqPay } from './miniapp';
 import { authChallenge, hubLogin as apiHubLogin } from './api';
 import { saveSession } from './session';
 import { ensureLib } from './vendorLoad';
@@ -117,12 +117,21 @@ function takePrefetch(): HubChallenge | null {
 
 function hubSignMessage(message: string): Promise<any> {
   const h = getHub();
-  // Default popup behavior from HubApi — do not wrap a custom one; a
-  // mismatched PopupRequestBehavior is what Hub renders as Invalid request.
+  // On a phone the default popup is the wrong tool: browsers block a popup
+  // that opens after an await, and a Hub window that opens without its request
+  // just shows the Nimiq logo and waits. Use Hub's own REDIRECT behaviour there.
+  // The pending login is already saved in sessionStorage, and
+  // initHubRedirectHandling resumes it when Hub sends the user back.
+  // Desktop keeps the default popup (a mismatched PopupRequestBehavior is what
+  // Hub renders as Invalid request, so no custom popup object is built here).
+  const HubApi = (window as any).HubApi;
+  const behavior = detectMobilePlatform() && HubApi && HubApi.RedirectRequestBehavior
+    ? new HubApi.RedirectRequestBehavior()
+    : undefined;
   return h.signMessage({
     appName: hubAppName(),
     message: String(message),
-  });
+  }, behavior);
 }
 
 /** Browser Hub login. Must be called from a click; signMessage is started
