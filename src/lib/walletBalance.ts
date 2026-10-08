@@ -417,12 +417,27 @@ async function readBalance(force = false): Promise<WalletBalanceState> {
   }
   if (hostAddresses.length && hostAvailable) {
     try {
-      const readings = await Promise.all(hostAddresses.map((account) => bridgeLuna(account)));
+      // One account failing (an HTLC/contract address the host cannot read,
+      // a single timeout) must NOT wipe out the balance of the others. Sum the
+      // accounts that answered and record the ones that did not.
+      const settled = await Promise.allSettled(hostAddresses.map((account) => bridgeLuna(account)));
+      const readings: number[] = [];
+      let firstError: unknown = null;
+      settled.forEach((r, i) => {
+        if (r.status === 'fulfilled') {
+          readings.push(r.value);
+          debugLines.push(`acct${i}=${r.value} luna`);
+        } else {
+          if (firstError === null) firstError = r.reason;
+          debugLines.push(`acct${i}Error=${r.reason instanceof Error ? r.reason.message : String(r.reason)}`);
+        }
+      });
+      if (!readings.length) throw firstError;
       // Keep the host's account balances together. This is still display-only;
       // the payment provider remains the authority on whether an HTLC can be
       // spent under its conditions.
       host = readings.reduce((sum, luna) => sum + luna, 0);
-      debugLines.push(`host=${host} luna across ${hostAddresses.length} account(s)`);
+      debugLines.push(`host=${host} luna across ${readings.length}/${hostAddresses.length} account(s)`);
     } catch (e) {
       hostError = e;
       // A host may expose generic request() without implementing getBalance.
