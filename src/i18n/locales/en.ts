@@ -1381,6 +1381,7 @@ const en = {
       error: 'The payment could not be started. The wallet’s own message is below.',
       insufficient: 'The wallet refused this payment: not enough NIM for the amount plus the network fee.',
       needHave: 'You need about {{need}} NIM — your wallet has {{have}} NIM.',
+      coveredButRefused: 'Your wallet shows {{have}} NIM, which covers this amount, but Nimiq Pay still refused the payment. The wallet message below gives the reason.',
       said: 'Nimiq Pay said: {{message}}',
       waiting: 'Keep this page open — your order updates automatically once the merchant is paid.',
       directNotice: 'Open the saved payment request in the Nimiq Pay app. Payment goes directly to CryptoRefills; {{site}} never receives the funds.',

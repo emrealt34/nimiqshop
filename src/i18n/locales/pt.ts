@@ -1372,6 +1372,7 @@ const pt = {
       error: 'O pagamento não pôde ser iniciado. A mensagem da carteira está abaixo.',
       insufficient: 'A carteira recusou este pagamento: NIM insuficiente para o valor mais a taxa de rede.',
       needHave: 'Precisas de cerca de {{need}} NIM — a tua carteira tem {{have}} NIM.',
+      coveredButRefused: 'A tua carteira mostra {{have}} NIM, o que cobre este valor, mas o Nimiq Pay recusou o pagamento mesmo assim. A mensagem da carteira abaixo indica o motivo.',
       said: 'A Nimiq Pay disse: {{message}}',
       waiting: 'Mantenha esta página aberta — seu pedido é atualizado automaticamente assim que o lojista é pago.',
       directNotice: 'Abra o pedido de pagamento guardado na sua carteira Lightning. O pagamento vai diretamente para a CryptoRefills; {{site}} nunca recebe os fundos.',

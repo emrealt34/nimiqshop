@@ -1373,6 +1373,7 @@ const tr = {
       error: 'Ödeme başlatılamadı. Cüzdanın kendi mesajı aşağıda.',
       insufficient: 'Cüzdan bu ödemeyi reddetti: tutar + ağ ücreti için yeterli NIM yok.',
       needHave: 'Yaklaşık {{need}} NIM gerekiyor — cüzdanında {{have}} NIM var.',
+      coveredButRefused: 'Cüzdanında {{have}} NIM var, bu tutara yetiyor; ama Nimiq Pay ödemeyi yine de reddetti. Nedeni aşağıdaki cüzdan mesajında.',
       said: 'Nimiq Pay dedi ki: {{message}}',
       waiting: 'Bu sayfayı açık tut — satıcıya ödeme ulaşınca siparişin otomatik güncellenir.',
       directNotice: 'Kaydedilmiş ödeme talebini Nimiq Pay uygulamasında aç. Ödeme doğrudan CryptoRefills’e gider; {{site}} fonları asla almaz.',

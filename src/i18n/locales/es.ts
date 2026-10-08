@@ -1372,6 +1372,7 @@ const es = {
       error: 'No se pudo iniciar el pago. El mensaje de la wallet está abajo.',
       insufficient: 'La wallet rechazó este pago: NIM insuficiente para el importe más la comisión de red.',
       needHave: 'Necesitas unos {{need}} NIM — tu wallet tiene {{have}} NIM.',
+      coveredButRefused: 'Tu wallet muestra {{have}} NIM, que cubren este importe, pero Nimiq Pay rechazó el pago igualmente. El mensaje de la wallet de abajo indica el motivo.',
       said: 'Nimiq Pay dijo: {{message}}',
       waiting: 'Mantén esta página abierta: tu pedido se actualiza automáticamente cuando se paga al comercio.',
       directNotice: 'Abre la solicitud de pago guardada en tu wallet Lightning. El pago va directamente a CryptoRefills; {{site}} nunca recibe los fondos.',

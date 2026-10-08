@@ -200,7 +200,11 @@ export function NimiqPayPayButton({
     // Rounded UP: a shortage never reads as "0 NIM".
     return Math.ceil(Math.max(0, needTotal - wallet.availableNim));
   })();
-  const needHave = outcome?.status === 'insufficient' && needTotal > 0 && wallet.status === 'ready';
+  // Pay refused the spend. Only say the balance is short when it really is.
+  // The earlier version printed "need 724, have 737", which contradicts itself.
+  const refused = outcome?.status === 'insufficient' && needTotal > 0 && wallet.status === 'ready';
+  const needHave = refused && wallet.availableNim < needTotal;
+  const coveredButRefused = refused && wallet.availableNim >= needTotal;
 
   return (
     <div className="nimiq-pay-trigger mt-2">
@@ -226,6 +230,12 @@ export function NimiqPayPayButton({
         <p className="xs" style={{ color: TONE_COLOR.error, margin: '4px 2px 0', fontWeight: 700 }}>
           {t('orderPage.nimiqPay.needHave', { need: nim(needTotal), have: nim(wallet.availableNim) })}
           {shortfall > 0 ? ' ' + t('wallet.short', { nim: nim(shortfall) }) : ''}
+        </p>
+      ) : null}
+
+      {coveredButRefused ? (
+        <p className="xs" style={{ color: TONE_COLOR.error, margin: '4px 2px 0', fontWeight: 700 }}>
+          {t('orderPage.nimiqPay.coveredButRefused', { have: nim(wallet.availableNim) })}
         </p>
       ) : null}
 
