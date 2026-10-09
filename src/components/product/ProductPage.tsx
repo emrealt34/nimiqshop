@@ -830,7 +830,8 @@ export function ProductPage() {
               </span>
             </div>
             <p className="mt-2 small">
-              {product.descKey ? t(product.descKey, product.descParams) : product.description}
+              {/* Mixed families must describe the selected package, not the family-wide kind. */}
+              {product.descKey ? t(fallbackBlurbKey(effectiveType), product.descParams) : product.description}
             </p>
           </div>
         </div>
@@ -891,7 +892,7 @@ export function ProductPage() {
             göreyim". */}
         <WalletBalance variant="line" targetNim={currentProductNIM()} className="mt-2" />
 
-        <HowToRedeemCard product={product} info={info} termsText={termsText} />
+        <HowToRedeemCard product={product} deliveryType={effectiveType} info={info} termsText={termsText} />
 
         {/* Owner (2026-10-04): same collapsed design as the pay screen —
             closed by default, opens on tap. */}
@@ -1088,15 +1089,16 @@ function RangeChooser({
   );
 }
 
-function HowToRedeemCard({ product, info, termsText }: { product: ProductDetail; info: { title: string; steps: string[]; note: string }; termsText: string }) {
+function HowToRedeemCard({ product, deliveryType, info, termsText }: { product: ProductDetail; deliveryType: string; info: { title: string; steps: string[]; note: string }; termsText: string }) {
   const { t } = useT();
   const rich = product.rich;
   const useRich = rich && rich.howToRedeem;
-  const chips = chipKeys(product.type);
+  // Use the same selected-package kind as the hero and redeem steps.
+  const chips = chipKeys(deliveryType);
   return (
     <div className="card mt-2 howto">
       <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-        <Icon name={product.type === 'phone_refill' ? 'bolt' : product.type === 'esim' ? 'phone' : 'gift'} size={16} />
+        <Icon name={deliveryType === 'phone_refill' ? 'bolt' : deliveryType === 'esim' ? 'phone' : 'gift'} size={16} />
         <span>{t(info.title)} — {t('productPage.deliveredBy')}</span>
       </div>
       {rich && rich.redeemGeo && (
