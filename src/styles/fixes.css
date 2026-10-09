@@ -3843,3 +3843,23 @@ input[type="range"]:focus-visible { outline: 2px solid var(--stamp); outline-off
 @media (min-width: 390px) and (max-width: 479.98px) {
   .topbar .brand { font-size: 0.95rem; }
 }
+
+/* Mobile browser chrome stability (2026-10-09).
+   Keep the fixed shell bars on their own compositor layers: mobile Safari and
+   Chromium otherwise re-rasterize fixed elements as the address/tool bars
+   collapse during a swipe, which looks like the bottom tabs jump up and down.
+   Also remove the oversized gap between the fixed header and the first page
+   content on phones (the safe-area inset is already included in this offset). */
+@media (max-width: 719px) {
+  .topbar,
+  .tabbar {
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+  }
+
+  #main {
+    padding-top: calc(var(--header-h) + var(--sat) + 4px) !important;
+  }
+}
