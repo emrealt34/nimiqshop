@@ -82,7 +82,9 @@ func TestResolverMissingLogoIsNilAndCached(t *testing.T) {
 	r := New()
 	r.HTTP = srv.Client()
 	ctx := context.Background()
-	if r.PNG(ctx, srv.URL+"/gone.png") != nil || r.PNG(ctx, srv.URL+"/gone.png") != nil {
+	first := r.PNG(ctx, srv.URL+"/gone.png")
+	second := r.PNG(ctx, srv.URL+"/gone.png")
+	if first != nil || second != nil {
 		t.Fatal("missing logo must be nil")
 	}
 	if hits.Load() != 1 {

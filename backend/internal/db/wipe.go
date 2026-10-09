@@ -35,6 +35,9 @@ type wipeNamespace struct {
 // wipeNamespaces is the complete list of customer-owned namespaces. Order is
 // display order in the preview; it has no effect on the delete.
 var wipeNamespaces = []wipeNamespace{
+	{"Quiz competitions and questions", "quiz:c:"},
+	{"Quiz competition indexes", "quiz:ix:"},
+	{"Quiz attempts and prize contacts", "quiz:a:"},
 	{"Customer accounts", "u:"},
 	{"Customer address index", "ix:u:addr:"},
 	{"Ratings Aggregate", "meta:rating_aggregate"},

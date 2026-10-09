@@ -116,6 +116,7 @@ function payload(p: string, method: string, o: ApiOptions): unknown {
   if (p === '/orders') return o.authed ? [order('o1', 'delivered', 0), order('o2', 'supplier_processing', 1), order('o3', 'failed', 2)] : [];
   if (p.startsWith('/orders/')) return order(p.split('/')[2], 'delivered', 0);
   if (p === '/quotes') return [];
+  if (p === '/quiz') return { items: [], server_time: iso() };
   if (p === '/support/tickets') return o.authed ? [{ id: 't1', subject: 'Code not received', status: 'open', created_at: iso(1), updated_at: iso(0), messages: [] }] : [];
   if (p.startsWith('/support/tickets/')) return { id: 't1', subject: 'Code not received', status: 'open', created_at: iso(1), messages: [{ id: 'm1', from: 'user', body: 'Hello', created_at: iso(1) }] };
   if (p === '/wallet/balance') {

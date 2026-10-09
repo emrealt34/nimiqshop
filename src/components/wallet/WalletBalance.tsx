@@ -18,13 +18,14 @@
  * Shapes: `card` (home), `line` (product / cart / checkout), `chip` (orders).
  * Every failure mode renders as a quiet state, never a broken screen.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useT } from '../../i18n';
 import { fmtMoney, fmtNIM, localCurrencyCode } from '../../lib/format';
 import { cachedFX, getFXRates, onRatesChange } from '../../lib/api';
 import { NIM_LOGO } from '../../lib/nim';
 import {
   getWalletBalanceState,
+  getWalletBalanceServerState,
   refreshWalletBalance,
   subscribeWalletBalance,
   affordableUnits,
@@ -43,11 +44,9 @@ let updatePayToastShown = false;
 
 /** Subscribe to the shared reading (one lookup feeds every mounted strip). */
 export function useWalletBalance(): { state: WalletBalanceState; refresh: () => void } {
-  const [state, setState] = useState<WalletBalanceState>(() => getWalletBalanceState());
+  const state = useSyncExternalStore(subscribeWalletBalance, getWalletBalanceState, getWalletBalanceServerState);
   useEffect(() => {
-    const off = subscribeWalletBalance(setState);
     void refreshWalletBalance();
-    return off;
   }, []);
   return { state, refresh: () => void refreshWalletBalance({ force: true }) };
 }

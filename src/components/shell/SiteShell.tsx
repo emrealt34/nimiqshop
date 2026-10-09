@@ -38,19 +38,21 @@ export type ShellKey =
   | 'track'
   | 'order'
   | 'cashback'
+  | 'quiz'
   | 'none';
 
 /**
  * Nav data. The `labelKey` points at a translation entry under `nav.*` so the
  * same data renders in 6 languages without duplication.
  */
-const NAV: { key: ShellKey; labelKey: 'shop' | 'activity' | 'orders' | 'cashback' | 'support'; href: string; icon: Parameters<typeof Icon>[0]['name'] }[] = [
+const NAV: { key: ShellKey; labelKey: 'shop' | 'activity' | 'orders' | 'cashback' | 'quiz' | 'support'; href: string; icon: Parameters<typeof Icon>[0]['name'] }[] = [
   { key: 'shop',        labelKey: 'shop',       href: '/',             icon: 'bag' },
   { key: 'activity',    labelKey: 'activity',   href: '/activity',     icon: 'pulse' },
   { key: 'orders',      labelKey: 'orders',     href: '/orders',       icon: 'receipt' },
   { key: 'cashback',    labelKey: 'cashback',   href: '/cashback',     icon: 'coins' },
   // Owner (2026-10-05): the leaderboard lives INSIDE the cashback page — no
   // separate nav tab any more.
+  { key: 'quiz',        labelKey: 'quiz',       href: '/quiz',         icon: 'star' },
   { key: 'support',     labelKey: 'support',    href: '/support',      icon: 'headset' },
 ];
 
@@ -367,8 +369,23 @@ function AccountArea({ operatorConsole = false }: { operatorConsole?: boolean })
 
 function TopBar({ activeKey, awaiting }: { activeKey: ShellKey; awaiting?: number }) {
   const { t } = useT();
+  const headerRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+    const root = document.documentElement;
+    const measure = () => {
+      const height = `${Math.ceil(header.getBoundingClientRect().height)}px`;
+      if (root.style.getPropertyValue('--shell-header-height') !== height) root.style.setProperty('--shell-header-height', height);
+    };
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(header, { box: 'border-box' });
+    window.addEventListener('resize', measure);
+    return () => { observer?.disconnect(); window.removeEventListener('resize', measure); root.style.removeProperty('--shell-header-height'); };
+  }, []);
   return (
-    <header className="topbar">
+    <header className="topbar" ref={headerRef}>
       {/* data-fit-row: the runtime re-fit (src/lib/fitText.ts) keeps the six
           links inside this row and tightens the row itself if a language needs
           more than the labels can shrink to. */}
@@ -434,17 +451,22 @@ function TabBar({ activeKey, awaiting }: { activeKey: ShellKey; awaiting?: numbe
     if (!bar || typeof ResizeObserver === 'undefined') return;
     const root = document.documentElement;
     const apply = () => {
-      if (getComputedStyle(bar).display === 'none') { root.style.removeProperty('--tabbar-h'); return; }
-      // Height without the safe-area inset — every consumer adds var(--sab) itself.
-      const sab = Math.max(0, parseFloat(getComputedStyle(bar).paddingBottom) - 6);
-      const h = Math.ceil(bar.getBoundingClientRect().height - sab);
-      if (h > 0) root.style.setProperty('--tabbar-h', `${Math.max(60, h)}px`);
+      const style = getComputedStyle(bar);
+      if (style.display === 'none') { root.style.removeProperty('--tabbar-h'); root.style.removeProperty('--shell-tabbar-height'); return; }
+      const height = Math.ceil(bar.getBoundingClientRect().height);
+      // Reserve the actual bar ONCE, including its safe area. The old '- 6'
+      // assumed padding that later CSS had removed and invented a bottom gap.
+      const fullHeight = `${height}px`;
+      if (root.style.getPropertyValue('--shell-tabbar-height') !== fullHeight) root.style.setProperty('--shell-tabbar-height', fullHeight);
+      const inset = Math.max(0, parseFloat(style.paddingBottom) || 0);
+      const contentHeight = `${Math.max(0, height - inset)}px`;
+      if (root.style.getPropertyValue('--tabbar-h') !== contentHeight) root.style.setProperty('--tabbar-h', contentHeight);
     };
     apply();
     const ro = new ResizeObserver(apply);
-    ro.observe(bar);
+    ro.observe(bar, { box: 'border-box' });
     window.addEventListener('resize', apply);
-    return () => { ro.disconnect(); window.removeEventListener('resize', apply); root.style.removeProperty('--tabbar-h'); };
+    return () => { ro.disconnect(); window.removeEventListener('resize', apply); root.style.removeProperty('--tabbar-h'); root.style.removeProperty('--shell-tabbar-height'); };
   }, [host]);
 
   const bar = (
@@ -521,9 +543,12 @@ function LoginSheetContent({ close }: { close: () => void }) {
             }
             setBusy('hub');
             loginWithHub()
-              .then((r) => signedIn(r.address))
-              .catch((err) => setError(friendlyHubError(err)))
-              .finally(() => setBusy(null));
+              .then((r) => {
+                if ('address' in r) { signedIn(r.address); setBusy(null); }
+                // Redirecting is a successful hand-off, not a failed wallet
+                // request. Stay busy until navigation; do not consume the challenge.
+              })
+              .catch((err) => { setError(friendlyHubError(err)); setBusy(null); });
           }}
           style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', width: '100%', justifyContent: 'center' }}
         >

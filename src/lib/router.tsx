@@ -66,6 +66,7 @@ const imports: Record<string, () => Promise<unknown>> = {
   '/track': () => import('../components/track/TrackPage'),
   '/admin': () => import('../components/admin/AdminPage'),
   '/cashback': () => import('../components/cashback/CashbackPage'),
+  '/quiz': () => import('../components/quiz/QuizPage'),
 };
 
 const PAGES: Record<string, ComponentType> = {
@@ -80,6 +81,7 @@ const PAGES: Record<string, ComponentType> = {
   '/track': lazy(() => imports['/track']().then((m: any) => ({ default: m.TrackView }))),
   '/admin': lazy(() => imports['/admin']().then((m: any) => ({ default: m.AdminContent }))),
   '/cashback': lazy(() => imports['/cashback']().then((m: any) => ({ default: m.CashbackView }))),
+  '/quiz': lazy(() => imports['/quiz']().then((m: any) => ({ default: m.QuizView }))),
 };
 
 // `titleKey` points at a pageTitle.* entry — the tab title follows the
@@ -101,6 +103,7 @@ export const ROUTES: Route[] = [
   { path: '/track', key: 'track', titleKey: 'pageTitle.track', comp: PAGES['/track'] },
   { path: '/admin', key: 'none', titleKey: 'pageTitle.admin', comp: PAGES['/admin'] },
   { path: '/cashback', key: 'cashback', titleKey: 'pageTitle.cashback', comp: PAGES['/cashback'] },
+  { path: '/quiz', key: 'quiz', titleKey: 'pageTitle.quiz', comp: PAGES['/quiz'] },
   // REQ-63: leaderboard merged into cashback — the old path renders the merged page.
   { path: '/leaderboard', key: 'cashback', titleKey: 'pageTitle.cashback', comp: PAGES['/cashback'] },
 ];
@@ -116,6 +119,7 @@ const KEY_PATH: Record<ShellKey, string> = {
   track: '/track',
   order: '/order',
   cashback: '/cashback',
+  quiz: '/quiz',
   none: '/admin',
 };
 

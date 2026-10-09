@@ -635,6 +635,12 @@ export function getWalletBalanceState(): WalletBalanceState {
   return current;
 }
 
+/** Stable SSR/first-hydration snapshot. A session event may warm `current`
+ * before Astro hydrates the home island; it must not change the initial HTML. */
+export function getWalletBalanceServerState(): WalletBalanceState {
+  return EMPTY;
+}
+
 export function subscribeWalletBalance(fn: (s: WalletBalanceState) => void): () => void {
   listeners.add(fn);
   return () => listeners.delete(fn);

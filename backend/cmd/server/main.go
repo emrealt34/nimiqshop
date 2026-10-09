@@ -952,6 +952,16 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 	r.POST("/api/admin/orders/{id}/sync", adminOnly(h.AdminSyncOrder))
 	r.POST("/api/admin/orders/{id}/refund", adminOnly(h.AdminRefundOrder))
 	r.GET("/api/admin/quotes", adminOnly(h.AdminListQuotes))
+	// Quiz authoring and manual awards use the separate operator session.
+	r.GET("/api/admin/quiz", adminOnly(h.AdminListQuizzes))
+	r.POST("/api/admin/quiz", adminOnly(h.AdminCreateQuiz))
+	r.PUT("/api/admin/quiz/{id}", adminOnly(h.AdminUpdateQuiz))
+	r.DELETE("/api/admin/quiz/{id}", adminOnly(h.AdminDeleteQuiz))
+	r.POST("/api/admin/quiz/{id}/publish", adminOnly(h.AdminPublishQuiz))
+	r.POST("/api/admin/quiz/{id}/cancel", adminOnly(h.AdminCancelQuiz))
+	r.GET("/api/admin/quiz/{id}/entries", adminOnly(h.AdminQuizEntries))
+	r.POST("/api/admin/quiz/{id}/finalize", adminOnly(h.AdminFinalizeQuiz))
+	r.POST("/api/admin/quiz/{id}/delivered", adminOnly(h.AdminDeliverQuizPrize))
 	r.GET("/api/admin/ratings", adminOnly(h.AdminListRatings))
 	r.POST("/api/admin/ratings/comments", adminOnly(h.AdminSetRatingComments))
 	r.POST("/api/admin/ratings/{kind}/{id}/hide", adminOnly(h.AdminHideRatingComment))
@@ -1087,6 +1097,13 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 	// one to the verified client IP. Presence must never 401 a shopper, which
 	// is why this is OptionalAuth and not RequireAuth.
 	r.POST("/api/presence", wrap(pinPrivate(middleware.OptionalAuth(cfg.JWTSecret, authOpts(cfg), aPresence.Limit(h.PresenceHeartbeat)))))
+	// EVERY quiz endpoint is authenticated, including competition/prize reads.
+	r.GET("/api/quiz", authed(h.ListQuizzes))
+	r.GET("/api/quiz/{id}", authed(h.GetQuiz))
+	r.POST("/api/quiz/{id}/start", authedTiered(aWrite, h.StartQuiz))
+	r.PUT("/api/quiz/{id}/answers", authedTiered(aWrite, h.SaveQuizProgress))
+	r.POST("/api/quiz/{id}/submit", authedTiered(aWrite, h.SubmitQuiz))
+	r.POST("/api/quiz/{id}/claim", authedTiered(aWrite, h.ClaimQuizPrize))
 	// Star ratings are signed and paid by the buyer (1 Luna + fee to the shop
 	// wallet). The intent returns the memo to sign; rate verifies the chain.
 	r.POST("/api/orders/{id}/rating/intent", authedTiered(aWrite, h.RatingIntentOrder))

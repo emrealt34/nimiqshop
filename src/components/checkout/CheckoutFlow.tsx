@@ -16,7 +16,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../ui/Icon';
 import { ErrorDetail } from '../ui/uiKit';
 import { useCart, itemKey, type CartItem } from '../../lib/cartStore';
-import { useSheet, useToast } from '../AppProviders';
+import { useToast } from '../AppProviders';
 import { createQuote, createQuoteBatch, forgetQuote, getQuote, friendlyApiMessage, authorizePaymentLaunch, cachedNimRate, errorDetailLine } from '../../lib/api';
 import { canRenewQuote, paymentInFlight } from '../../lib/pay';
 import { buildOrderRequest, getGiftExtras, setBuyerIdenticon, type DeliveryInfo } from '../../lib/delivery';
@@ -42,7 +42,6 @@ import { StakerCashbackLine } from '../staker/StakerCashback';
 import { currentCashbackCode } from '../../lib/cashbackCode';
 import { nimAmountText, nimAmountFor } from '../../lib/nim';
 import { refreshWalletBalance } from '../../lib/walletBalance';
-import { useWalletBalance } from '../wallet/WalletBalance';
 import { fmtUSD } from '../../lib/format';
 import { deliveryLine, youGetText } from '../../lib/deliveryCopy';
 import {
@@ -877,19 +876,11 @@ export function PayScreen({
   onResult: (ok: boolean) => void;
 }) {
   const { t } = useT();
-  // The short-balance popup is a sheet, so the pay screen needs the opener
-  // (owner, 2026-10-06: "popup olarak çıkacaktı o yetersiz, seçenek sunacaktı").
-  const { openSheet } = useSheet();
   const [liveQuote, setLiveQuote] = useState(quote);
   const [expired, setExpired] = useState(false);
   useEffect(() => { setLiveQuote(quote); setExpired(false); }, [quote]);
   const current = { ...quote, ...liveQuote };
   const invoice = quoteBolt11(current);
-
-  /* The buyer's own NIM, already read for the strip above — no extra request. */
-  const { state: walletState } = useWalletBalance();
-  const needNim = Number(nimAmountFor(current, cachedNimRate())) || 0;
-  const walletReady = walletState.status === 'ready';
 
   /**
    * THE WARNING, at the moment of the attempt.

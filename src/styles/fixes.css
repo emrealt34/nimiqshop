@@ -3844,22 +3844,81 @@ input[type="range"]:focus-visible { outline: 2px solid var(--stamp); outline-off
   .topbar .brand { font-size: 0.95rem; }
 }
 
-/* Mobile browser chrome stability (2026-10-09).
-   Keep the fixed shell bars on their own compositor layers: mobile Safari and
-   Chromium otherwise re-rasterize fixed elements as the address/tool bars
-   collapse during a swipe, which looks like the bottom tabs jump up and down.
-   Also remove the oversized gap between the fixed header and the first page
-   content on phones (the safe-area inset is already included in this offset). */
-@media (max-width: 719px) {
-  .topbar,
-  .tabbar {
+/* Shell geometry (2026-10-09): one measured header offset and one bottom
+   reservation. Never stack main padding, footer margin and safe-area padding
+   for the same fixed bar. Native scrolling owns mobile chrome transitions. */
+/* Avoid rubber-band gaps beyond the document; ordinary vertical scrolling remains native. */
+html { overscroll-behavior-y: none; }
+#page-content { display: flow-root; }
+#main.page {
+  padding-top: calc(var(--shell-header-height, calc(var(--header-h) + var(--sat) + 2px)) + 6px) !important;
+  padding-bottom: 16px !important;
+  min-height: 0;
+}
+body { padding-bottom: 0; }
+.footer { margin: 0 !important; padding-block: 16px !important; flex-shrink: 0; }
+@media (max-width: 1199px) {
+  body { padding-bottom: var(--shell-tabbar-height, calc(var(--tabbar-h) + var(--sab))); }
+  .topbar, .tabbar {
     -webkit-transform: translateZ(0);
     transform: translateZ(0);
     -webkit-backface-visibility: hidden;
     backface-visibility: hidden;
   }
+}
 
-  #main {
-    padding-top: calc(var(--header-h) + var(--sat) + 4px) !important;
-  }
+/* Nimiq quiz — the same kraft cards, product tiles and stamp controls. */
+.quiz-page { display:flex; flex-direction:column; gap:16px; }
+.quiz-heading { display:flex; align-items:center; gap:12px; }
+.quiz-heading > svg { flex-shrink:0; color:var(--stamp); }
+.quiz-heading h1 { margin:0; font-family:var(--font-serif); font-size:var(--fs-2xl); }
+.quiz-heading p { margin:4px 0 0; }
+.quiz-page h2, .quiz-admin h2 { margin:0; font-size:var(--fs-xl); overflow-wrap:anywhere; }
+.quiz-page h3 { margin:0 0 8px; }
+.quiz-gate { text-align:center; padding:28px 18px; }
+.quiz-gate > svg { margin:0 auto 12px; color:var(--stamp); }
+.quiz-selector { margin:0; }
+.quiz-prize { display:flex; align-items:center; gap:16px; padding:16px; margin:16px 0; border:2px dashed var(--line-dash); border-radius:var(--r-l); background:var(--surface-2); }
+.quiz-prize-thumb { flex:0 0 104px; width:104px; }
+.quiz-prize-copy { flex:1; min-width:0; }
+.quiz-prize-copy h2 { margin:4px 0 8px; font-family:var(--font-serif); }
+.quiz-prize-copy p { margin:6px 0 0; overflow-wrap:anywhere; }
+.quiz-eyebrow { display:flex; align-items:center; gap:6px; text-transform:uppercase; letter-spacing:.06em; font-size:var(--fs-xs); font-weight:900; color:var(--ink-dim); }
+.quiz-prize-value { font-weight:900; background:var(--gold-grad-soft); border-color:var(--gold-600); }
+.quiz-facts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin:16px 0; }
+.quiz-facts dt { color:var(--ink-dim); font-size:var(--fs-xs); }
+.quiz-facts dd { margin:0; font-weight:800; font-size:var(--fs-sm); overflow-wrap:anywhere; }
+.quiz-rules { border-top:1px dashed var(--line-dash); padding-top:12px; }
+.quiz-result { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:12px; margin-top:12px; background:var(--green-soft); border:1px dashed var(--green); border-radius:var(--r-m); }
+.quiz-result > span { flex-basis:100%; }
+.quiz-winner, .quiz-admin-decision { margin-top:16px; padding:16px; background:var(--gold-grad-soft); border:1.5px dashed var(--line-dash); border-radius:var(--r-m); }
+.quiz-game { display:flex; flex-direction:column; gap:16px; }
+.quiz-question { min-width:0; }
+.quiz-question legend { padding:0 6px; max-width:100%; font-weight:900; overflow-wrap:anywhere; }
+.quiz-option { display:grid; grid-template-columns:20px minmax(0,1fr); gap:10px; align-items:center; padding:12px; margin-top:8px; border:1.5px dashed var(--line-dash); border-radius:var(--r-m); background:var(--surface-2); cursor:pointer; }
+.quiz-option span { overflow-wrap:anywhere; }
+.quiz-option input { margin:0; accent-color:var(--stamp); }
+.quiz-option.is-chosen { border-color:var(--stamp); background:var(--stamp-soft); }
+.quiz-option:focus-within { outline:2px solid var(--stamp); outline-offset:2px; }
+.quiz-leaderboard ol { list-style:none; padding:0; margin:12px 0 0; }
+.quiz-leaderboard li { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:10px 0; border-top:1px dashed var(--line-dash); }
+.quiz-leaderboard li > span { display:flex; align-items:center; gap:6px; min-width:0; overflow-wrap:anywhere; }
+.quiz-leaderboard li strong { white-space:nowrap; }
+.quiz-admin-list { display:grid; gap:12px; margin-top:16px; }
+.quiz-form-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.quiz-draft textarea { min-height:80px; }
+.quiz-admin-question { margin:12px 0; padding:16px; border:1.5px dashed var(--line-dash); border-radius:var(--r-m); min-width:0; }
+.quiz-admin-question legend { font-weight:900; }
+.quiz-admin-option { display:grid; grid-template-columns:20px minmax(0,1fr) auto; align-items:center; gap:8px; margin-top:8px; }
+.quiz-admin-option input[type=radio] { accent-color:var(--stamp); }
+.quiz-entry { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; border-top:1px dashed var(--line-dash); padding:12px 0; }
+.quiz-entry > div { min-width:0; }
+.quiz-entry > div:last-child { display:flex; flex-direction:column; align-items:flex-end; gap:6px; flex-shrink:0; }
+.quiz-entry code { font-size:var(--fs-xs); overflow-wrap:anywhere; }
+@media(max-width:479px) {
+  .quiz-prize { gap:12px; padding:12px; align-items:flex-start; }
+  .quiz-prize-thumb { flex-basis:72px; width:72px; }
+  .quiz-form-grid { grid-template-columns:minmax(0,1fr); }
+  .quiz-entry { flex-direction:column; }
+  .quiz-entry > div:last-child { flex-direction:row; align-items:center; }
 }

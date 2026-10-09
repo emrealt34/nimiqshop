@@ -26,6 +26,10 @@ import (
 //	ix:q:user:<user_id>:<rts>:<id>     -> quote_id
 //	ix:q:status:<status>:<id>          -> quote_id
 //
+// quiz:c:<id> -> admin-authored competition (private answers)
+// quiz:ix:<rts>:<id> -> newest-first competition index
+// quiz:a:<competition_id>:<user_id> -> one resumable, server-scored attempt
+//
 // NOTE: shop.nimiqbase.com is non-custodial — there is no balance, no deposit, and no
 // internal USD ledger. The old d:<deposit> / l:<ledger_entry> keyspaces and
 // their indexes have been removed entirely.

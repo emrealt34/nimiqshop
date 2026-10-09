@@ -115,7 +115,9 @@ function takePrefetch(): HubChallenge | null {
   return p.challenge;
 }
 
-function hubSignMessage(message: string): Promise<any> {
+export type HubLoginResult = { address: string } | { redirecting: true };
+
+function hubSignMessage(message: string): Promise<{ signed: any } | { redirecting: true }> {
   const h = getHub();
   // On a phone the default popup is the wrong tool: browsers block a popup
   // that opens after an await, and a Hub window that opens without its request
@@ -128,24 +130,34 @@ function hubSignMessage(message: string): Promise<any> {
   const behavior = detectMobilePlatform() && !inNimiqPay() && HubApi && HubApi.RedirectRequestBehavior
     ? new HubApi.RedirectRequestBehavior()
     : undefined;
-  return h.signMessage({
+  const response = h.signMessage({
     appName: hubAppName(),
     message: String(message),
   }, behavior);
+  // RedirectRequestBehavior returns void (or resolves before navigation), not
+  // a signature. A void response can also come from Hub's own fallback
+  // redirect, even without a mobile user agent. Preserve the challenge.
+  return Promise.resolve(response).then((signed) =>
+    behavior || signed === undefined ? { redirecting: true as const } : { signed }
+  );
 }
 
 /** Browser Hub login. Must be called from a click; signMessage is started
  *  before any network wait when a challenge was prefetched. */
-export function loginWithHub(_onProgress?: (step: 'challenge' | 'sign') => void): Promise<{ address: string }> {
+export function loginWithHub(_onProgress?: (step: 'challenge' | 'sign') => void): Promise<HubLoginResult> {
   const ready = (window as any).HubApi ? Promise.resolve() : loadHubApi();
   const cached = takePrefetch();
 
   const signWith = (challenge: HubChallenge) => {
     savePending(LOGIN_KEY, { challenge_token: challenge.challenge_token, message: challenge.message });
-    return hubSignMessage(challenge.message)
-      .then((signed) => {
+    let response: ReturnType<typeof hubSignMessage>;
+    try { response = hubSignMessage(challenge.message); }
+    catch (err) { clearPending(LOGIN_KEY); return Promise.reject(err); }
+    return response
+      .then<HubLoginResult>((result) => {
+        if ('redirecting' in result) return result;
         clearPending(LOGIN_KEY);
-        return finishLogin(challenge.challenge_token, signed);
+        return finishLogin(challenge.challenge_token, result.signed);
       })
       .catch((err) => {
         clearPending(LOGIN_KEY);
@@ -227,6 +239,7 @@ export async function loginWithNimiqPay(
 }
 
 async function finishLogin(challengeToken: string, signed: any): Promise<{ address: string }> {
+  if (!signed || typeof signed !== 'object') throw new Error(tr('hub.incomplete'));
   const address = signed.address || signed.signer;
   const publicKey =
     signed.signerPublicKey || signed.publicKey || (signed.signer instanceof Uint8Array ? signed.signer : undefined);

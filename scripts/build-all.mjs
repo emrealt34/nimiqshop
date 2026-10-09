@@ -50,23 +50,6 @@ function run(cmd, args, cwd = root, env = process.env) {
   if (r.status !== 0) throw new Error(`${cmd} exited with status ${r.status}`);
 }
 
-// readEnvValue pulls one KEY= value out of a .env file (last assignment wins,
-// comments ignored). Used so backend/.env's PUBLIC_API_URL can drive the
-// frontend build without duplicating the URL anywhere else.
-function readEnvValue(file, key) {
-  try {
-    const text = readFileSync(file, 'utf8');
-    let value = '';
-    for (const line of text.split('\n')) {
-      const m = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/.exec(line);
-      if (m && m[1] === key) value = m[2].replace(/^["']|["']$/g, '');
-    }
-    return value.trim();
-  } catch {
-    return '';
-  }
-}
-
 function newerThan(src, target) {
   try { return statSync(src).mtimeMs > statSync(target).mtimeMs; } catch { return !existsSync(target); }
 }

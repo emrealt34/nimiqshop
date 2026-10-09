@@ -1,0 +1,7 @@
+---
+import BaseLayout from '../layouts/Base.astro';
+import { QuizPage } from '../components/quiz/QuizPage';
+---
+<BaseLayout title="Nimiq Quiz — shop.nimiqbase.com" titleKey="pageTitle.quiz" activeKey="quiz">
+  <QuizPage client:load />
+</BaseLayout>
