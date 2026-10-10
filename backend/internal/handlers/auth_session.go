@@ -126,7 +126,8 @@ func (h *Handlers) AuthSession(ctx *fasthttp.RequestCtx) {
 	}
 
 	writeJSON(ctx, fasthttp.StatusOK, map[string]interface{}{
-		"authed": true,
+		"authed":          true,
+		"is_test_account": h.isTestAccountUser(user.ID),
 		"user": map[string]string{
 			"id":            user.ID,
 			"nimiq_address": user.NimiqAddress,

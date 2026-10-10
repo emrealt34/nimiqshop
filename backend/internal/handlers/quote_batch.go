@@ -538,7 +538,7 @@ func (h *Handlers) createQuoteBatchInner(ctx *fasthttp.RequestCtx, userID string
 		Anonymous:           req.Anonymous,
 		// TEST MODE: real validation and pricing, simulated payment (see
 		// createQuoteInner's branch — the batch shares the semantics).
-		TestMode:           h.Cfg.TestMode,
+		TestMode:           h.simulatedPaymentFor(userID),
 		CashbackCode:       cashbackView.Code,
 		CashbackCodeBps:    cashbackView.Bps,
 		CashbackCodeMaxUSD: cashbackView.PromoCapUSD,
@@ -578,7 +578,7 @@ func (h *Handlers) createQuoteBatchInner(ctx *fasthttp.RequestCtx, userID string
 
 	// TEST MODE: no real supplier order — simulated attach, same batch
 	// payload back to the customer (see createQuoteInner's branch).
-	if h.Cfg.TestMode {
+	if h.simulatedPaymentFor(userID) {
 		if !faceTotalsComplete {
 			faceByCurrency = nil
 		}

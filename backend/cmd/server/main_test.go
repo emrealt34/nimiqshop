@@ -377,6 +377,11 @@ func TestShopperFlowTestMode(t *testing.T) {
 
 	// Simulated payment (TEST_MODE) walks the quote through the supplier
 	// ladder to fulfilled without any real supplier or chain.
+	// Simulated payment is for listed test wallets only, even under TEST_MODE
+	// (see TestTestAccountSimulatedPayment), so list this wallet first.
+	if res := s.do(http.MethodPost, "/api/admin/test-accounts", map[string]any{"address": address}, s.adminHeaders()); res.status != 201 {
+		t.Fatalf("list test wallet: %d %s", res.status, res.body)
+	}
 	pay := s.do(http.MethodPost, "/api/quotes/"+quoteID+"/test-pay", map[string]any{}, auth)
 	if pay.status != 200 {
 		t.Fatalf("test-pay: %d %s", pay.status, pay.body)

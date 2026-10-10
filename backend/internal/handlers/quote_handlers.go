@@ -414,7 +414,7 @@ func (h *Handlers) createQuoteInner(ctx *fasthttp.RequestCtx, userID string, req
 		// TEST MODE: the quote rides the REAL pipeline, but its payment is
 		// simulated end to end (no supplier order, TESTSIM- attach, the
 		// customer pays through the simulated pay button).
-		TestMode: h.Cfg.TestMode,
+		TestMode: h.simulatedPaymentFor(userID),
 		// Gift notification metadata — already canonicalized and checked
 		// against this order's contacts above, and persisted BEFORE the
 		// supplier call so the tracker can send the email when fulfillment
@@ -467,7 +467,7 @@ func (h *Handlers) createQuoteInner(ctx *fasthttp.RequestCtx, userID string, req
 	// the write-ahead quote) — from here NO real supplier order is created.
 	// Attach a simulated invoice instead; the customer "pays" it with the
 	// simulated pay button (POST /api/quotes/{id}/test-pay).
-	if h.Cfg.TestMode {
+	if h.simulatedPaymentFor(userID) {
 		h.finishSimulatedCreation(ctx, q, faceUSD, func(latest db.Quote) {
 			h.writeQuoteCreatedExtra(ctx, latest, map[string]any{"simulated_payment": true})
 		})
@@ -901,7 +901,8 @@ func (h *Handlers) GetUserQuote(ctx *fasthttp.RequestCtx) {
 		fulfillment = q.Fulfillment
 	}
 	out := map[string]interface{}{
-		"test_mode":   h.Cfg.TestMode,
+		"test_mode":   h.Cfg.TestMode || q.TestMode,
+		"test_pay":    h.canTestPay(q),
 		"quote":       q.PublicQuote(time.Now().UTC()),
 		"can_pay":     q.CanPay(time.Now().UTC()),
 		"fulfillment": fulfillment,

@@ -60,6 +60,7 @@ import {
   NimAmount,
 } from '../ui/uiKit';
 import { LightningPayBlock } from '../checkout/LightningPayBlock';
+import { TestPayButton } from '../checkout/TestPayButton';
 import { NimiqPayPayButton } from '../checkout/NimiqPayPayButton';
 import { PaymentCountdown } from '../checkout/PaymentCountdown';
 import { deliverySummary, payRail, payActionLine, linesOf , coinAmountLabel, coinAmountLabelFor } from '../../lib/deliveryCopy';
@@ -704,6 +705,7 @@ function PayNowCard({ q }: { q: any }) {
       </div>
 
       <LightningRailPills />
+      <TestPayButton quoteId={q.id} />
       <div className="pay-hero mt-2">
         <div className="pay-hero-label">{t('checkout.flowDirect')}</div>
         <div className="pay-hero-amt">

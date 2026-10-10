@@ -12,6 +12,7 @@ import { MaintenancePanel } from './AdminMaintenancePanel';
 import { AdminRatingsPanel } from './AdminRatingsPanel';
 import { AdminQuizPanel } from './AdminQuizPanel';
 import { AdminTestCenterPanel } from './AdminTestCenterPanel';
+import { AdminTestAccountsCard } from './AdminTestAccountsCard';
 import { AppRoot } from '../AppRoot';
 import { useSheet, useToast } from '../AppProviders';
 import {
@@ -1374,7 +1375,7 @@ export function AdminContent() {
       case 'email':
         return <><StatusCard status={status} /><Composer status={status} /><TestEmailCard /></>;
       case 'test':
-        return <AdminTestCenterPanel />;
+        return <><AdminTestAccountsCard /><AdminTestCenterPanel /></>;
       case 'maintenance':
         return <MaintenancePanel />;
       case 'overview':

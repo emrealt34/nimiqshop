@@ -72,7 +72,8 @@ func (h *Handlers) writeQuoteCreatedExtra(ctx *fasthttp.RequestCtx, q db.Quote, 
 		status = fasthttp.StatusCreated
 	}
 	resp := map[string]interface{}{
-		"test_mode":          h.Cfg.TestMode,
+		"test_mode":          h.Cfg.TestMode || q.TestMode,
+		"test_pay":           h.canTestPay(q),
 		"quote_id":           q.ID,
 		"status":             q.Status,
 		"payment_handoff_at": q.PaymentHandoffAt,

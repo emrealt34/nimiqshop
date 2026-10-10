@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"errors"
-	"strings"
 
 	"github.com/valyala/fasthttp"
 
@@ -27,18 +26,18 @@ import (
 //
 //	POST /api/quotes/{id}/test-pay  { "action":"auto" }   (body optional)
 func (h *Handlers) UserTestPay(ctx *fasthttp.RequestCtx) {
-	if !h.Cfg.TestMode {
-		writeError(ctx, fasthttp.StatusNotFound, "test mode is disabled")
-		return
-	}
 	id, _ := ctx.UserValue("id").(string)
 	userID := middleware.UserID(ctx)
+	if !h.isTestAccountUser(userID) {
+		writeError(ctx, fasthttp.StatusNotFound, "test payment is not available for this account")
+		return
+	}
 	q, err := h.Store.GetQuoteForUser(id, userID)
 	if err != nil {
 		writeError(ctx, fasthttp.StatusNotFound, "quote not found")
 		return
 	}
-	if !q.TestMode || !strings.HasPrefix(q.SupplierOrderID, "TESTSIM-") {
+	if !h.canTestPay(q) {
 		writeError(ctx, fasthttp.StatusConflict, "this order cannot be test-paid")
 		return
 	}

@@ -957,6 +957,15 @@ export const adminTestEmail = (req: Record<string, unknown>) => api('/admin/test
 export const adminTestPurchase = (req: Record<string, unknown>) => api('/admin/test-purchase', { method: 'POST', body: req });
 export const adminTestPay = (quoteId: string, action: 'auto' | 'broadcast' | 'confirm' | 'deliver' = 'auto') =>
   api('/admin/test-pay', { method: 'POST', body: { quote_id: quoteId, action } });
+// Test accounts: wallets the admin lists. A listed wallet's own simulated order
+// is paid through userTestPay (no real money, no supplier order).
+export const adminTestAccounts = () => api('/admin/test-accounts');
+export const adminAddTestAccount = (address: string, label: string) =>
+  api('/admin/test-accounts', { method: 'POST', body: { address, label } });
+export const adminRemoveTestAccount = (address: string) =>
+  api(`/admin/test-accounts/${encodeURIComponent(address)}`, { method: 'DELETE' });
+export const userTestPay = (quoteId: string) =>
+  api(`/quotes/${encodeURIComponent(quoteId)}/test-pay`, { method: 'POST', body: {}, auth: true });
 export const adminTestQuote = (quoteId: string) => api(`/admin/test-quote/${encodeURIComponent(quoteId)}`);
 export const adminCatalogRules = (opts: { path?: string; method?: string; body?: unknown } = {}) =>
   api('/admin/catalog-rules' + (opts.path || ''), opts.method ? { method: opts.method, body: opts.body } : {});
