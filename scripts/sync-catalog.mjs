@@ -136,7 +136,7 @@ async function pool(items, worker, concurrency) {
  * verified in order (TR first, then by listing size); anything not reached in
  * this run keeps its listing flags.
  */
-const VERIFY_BUDGET_MS = Number(process.env.CATALOG_VERIFY_BUDGET_MS) || 15 * 60_000;
+const VERIFY_BUDGET_MS = Number(process.env.CATALOG_VERIFY_BUDGET_MS) || 10 * 60_000;
 const VERIFY_CONCURRENCY = 2;
 // The supplier answers a steady ~1 request/second without refusing; bursts
 // of parallel product reads from one runner get 403 for minutes at a time.
