@@ -9,6 +9,7 @@ import (
 	"image/color"
 	"image/png"
 	"math/rand"
+	"nimiqshop/internal/i18n"
 	"nimiqshop/internal/itemtile"
 
 	"nimiqshop/internal/sampleassets"
@@ -168,10 +169,16 @@ func TestIdenticonAttachment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(msg.Attachments) != 1 {
-		t.Fatalf("want 1 attachment, got %d", len(msg.Attachments))
+	// The shop logo rides along on every note, so the identicon is one of two.
+	if len(msg.Attachments) != 2 {
+		t.Fatalf("want 2 attachments (identicon + logo), got %d", len(msg.Attachments))
 	}
-	att := msg.Attachments[0]
+	var att Attachment
+	for _, a := range msg.Attachments {
+		if a.ContentID == identiconContentID {
+			att = a
+		}
+	}
 	if att.ContentID != identiconContentID || att.ContentType != "image/png" || !bytes.Equal(att.Data, raw) {
 		t.Fatal("identicon attachment does not carry the buyer's exact PNG")
 	}
@@ -188,8 +195,14 @@ func TestIdenticonAttachment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(m2.Attachments) != 0 || strings.Contains(m2.HTML, "cid:") || strings.Contains(m2.HTML, `class="donor-cell"`) {
-		t.Fatal("no identicon must mean no attachment and no avatar box")
+	// Only the shop logo may ride along: no identicon attachment, image or box.
+	for _, a := range m2.Attachments {
+		if a.ContentID == identiconContentID {
+			t.Fatal("no identicon must mean no identicon attachment")
+		}
+	}
+	if strings.Contains(m2.HTML, "cid:"+identiconContentID) || strings.Contains(m2.HTML, `class="donor-cell"`) {
+		t.Fatal("no identicon must mean no avatar box")
 	}
 	// Anonymous orders never carry the identicon, even when one was sent.
 	anon := n
@@ -198,13 +211,18 @@ func TestIdenticonAttachment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(m3.Attachments) != 0 || strings.Contains(m3.HTML, "cid:") {
-		t.Fatal("anonymous mail carried the identicon")
+	for _, a := range m3.Attachments {
+		if a.ContentID == identiconContentID {
+			t.Fatal("anonymous mail carried the identicon")
+		}
 	}
-	if strings.Contains(identityCard("NQ00", false, false), `class="donor-cell"`) {
+	if strings.Contains(m3.HTML, "cid:"+identiconContentID) {
+		t.Fatal("anonymous mail referenced the identicon")
+	}
+	if strings.Contains(identityCard("NQ00", false, false, i18n.For(i18n.EN)), `class="donor-cell"`) {
 		t.Fatal("card without an icon must have no avatar cell")
 	}
-	if !strings.Contains(anonymousCard(), "anonymous") || !strings.Contains(anonymousCard(), "background:"+mailPanel) {
+	if !strings.Contains(anonymousCard(i18n.For(i18n.EN)), "anonymous") || !strings.Contains(anonymousCard(i18n.For(i18n.EN)), "background:"+mailPanel) {
 		t.Fatal("anonymous card")
 	}
 }
@@ -364,8 +382,9 @@ func TestOrderMailShowsShopLogoNotTick(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(gm.HTML, "🎁") || strings.Contains(gm.HTML, "cid:"+shopLogoContentID) {
-		t.Fatal("gift mail icon changed or logo leaked into a gift")
+	// The hero badge is the shop logo on gifts too, never the 🎁 emoji.
+	if strings.Contains(gm.HTML, ">🎁</td>") || !strings.Contains(gm.HTML, "cid:"+shopLogoContentID) {
+		t.Fatal("gift mail must show the shop logo, not the gift emoji")
 	}
 }
 
@@ -436,7 +455,8 @@ func TestItemListTilesAndAttachments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(bm.Attachments) != 1 || !strings.Contains(bm.HTML, `src="cid:item-`) {
+	// The shop logo is always attached, so the bag tile fallback is the second one.
+	if len(bm.Attachments) != 2 || !strings.Contains(bm.HTML, `src="cid:item-`) {
 		t.Fatalf("oversized logo must fall back to a bag tile attachment; attachments=%d", len(bm.Attachments))
 	}
 }

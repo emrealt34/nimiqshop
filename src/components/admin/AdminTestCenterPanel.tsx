@@ -114,7 +114,6 @@ export function AdminTestCenterPanel() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [giftMessage, setGiftMessage] = useState('');
-  const [anonymous, setAnonymous] = useState(false);
 
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [running, setRunning] = useState(false);
@@ -263,7 +262,6 @@ export function AdminTestCenterPanel() {
           email: email.trim(),
           phone_number: phone.trim() || undefined,
           gift_message: giftMessage.trim() || undefined,
-          anonymous,
           payment_method: PAYMENT_METHOD,
           cashback_destination: 'cashback',
         });
@@ -422,12 +420,6 @@ export function AdminTestCenterPanel() {
       <div className="field">
         <label>Gift message (optional, makes it a gift email)</label>
         <input className="input" type="text" placeholder="Happy birthday!" value={giftMessage} onChange={(e) => setGiftMessage(e.target.value)} />
-      </div>
-      <div className="field">
-        <label style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
-          <input type="checkbox" checked={anonymous} onChange={(e) => setAnonymous(e.target.checked)} />
-          Anonymous buyer (hide the buyer identity in the email)
-        </label>
       </div>
       <div className="field">
         <label>Payment rail</label>

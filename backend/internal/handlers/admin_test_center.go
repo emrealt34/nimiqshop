@@ -65,7 +65,6 @@ type adminTestPurchaseRequest struct {
 	Email               string  `json:"email"`
 	PhoneNumber         string  `json:"phone_number,omitempty"`
 	GiftMessage         string  `json:"gift_message,omitempty"`
-	Anonymous           bool    `json:"anonymous,omitempty"`
 	GifterIdenticon     string  `json:"gifter_identicon,omitempty"`
 	PaymentMethod       string  `json:"payment_method,omitempty"` // nimiq_pay
 	CashbackDestination string  `json:"cashback_destination,omitempty"`
@@ -118,13 +117,14 @@ func (h *Handlers) AdminTestPurchase(ctx *fasthttp.RequestCtx) {
 	}
 
 	// Gift note: same canonicalization as the checkout (channel is email —
-	// the note's one and only carrier), same anonymous/avatar rules.
+	// the note's one and only carrier), same avatar rules. The test form has
+	// no anonymous option: every test buyer is named.
 	gift, giftErr := normalizeGiftNoteShape(giftChannelFor(req.GiftMessage), req.GiftMessage)
 	if giftErr != nil {
 		writeError(ctx, fasthttp.StatusBadRequest, giftErr.Error())
 		return
 	}
-	req.GifterIdenticon = normalizeGifterIdenticon(req.GifterIdenticon, req.Anonymous, gift.Channel)
+	req.GifterIdenticon = normalizeGifterIdenticon(req.GifterIdenticon, false, gift.Channel)
 
 	if req.PhoneNumber != "" {
 		norm, err := phone.Normalize(req.PhoneNumber, req.Country)
@@ -286,7 +286,6 @@ func (h *Handlers) AdminTestPurchase(ctx *fasthttp.RequestCtx) {
 		Coin:               coin, Network: network,
 		PaymentMethod:       method,
 		CashbackDestination: dest,
-		Anonymous:           req.Anonymous,
 		GiftChannel:         gift.Channel, GiftMessage: gift.Message,
 		GifterIdenticonDataURI: req.GifterIdenticon,
 		// The whole point of this flag: real pipeline, simulated supplier,
@@ -605,7 +604,6 @@ func testQuoteView(store *db.Store, q db.Quote, applied []string) map[string]any
 		"customer_email":     q.CustomerEmail,
 		"gift_channel":       q.GiftChannel,
 		"gift_message":       q.GiftMessage,
-		"anonymous":          q.Anonymous,
 		// gift_notified is the truth the operator panel reads: the order mail
 		// really went out. A zero time marshals as 0001-01-01…, which a
 		// truthiness check mistook for "sent", so the timestamp is only sent
