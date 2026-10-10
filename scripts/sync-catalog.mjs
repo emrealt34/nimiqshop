@@ -112,6 +112,109 @@ async function pool(items, worker, concurrency) {
   }));
 }
 
+/* ------------------------ stock verification ------------------------ */
+/*
+ * WHY THIS EXISTS
+ * /v2/brands and /v5/products are different supplier endpoints. A brand can
+ * be listed with is_out_of_stock=false while its product list is empty, so
+ * the storefront showed the card as available and the buyer hit "not
+ * available" the moment they clicked it. The backend already learns this on
+ * click (tombstones) but the static listing the home page reads never
+ * consulted those, so every new visitor was sent into the same dead end.
+ *
+ * WHAT IT DOES
+ * For every family listed as in stock, ask the product endpoint whether any
+ * products exist for that country. Only a definitive "200 and no products"
+ * (confirmed by a second read) marks the family out of stock; errors, 403/429,
+ * timeouts and malformed answers leave the flag exactly as the brand listing
+ * had it. The storefront hides out-of-stock cards by default, so the buyer
+ * never sees the dead card, and "show out of stock" stays truthful.
+ *
+ * BUDGET
+ * The pass is time-boxed and stops early after a run of unresolved answers,
+ * so a supplier rate limit can never stall or fail the deploy. Countries are
+ * verified in order (TR first, then by listing size); anything not reached in
+ * this run keeps its listing flags.
+ */
+const VERIFY_BUDGET_MS = Number(process.env.CATALOG_VERIFY_BUDGET_MS) || 20 * 60_000;
+const VERIFY_CONCURRENCY = 4;
+const VERIFY_MAX_UNRESOLVED_RUN = 25;
+
+async function productPresence(cc, family) {
+  const once = async () => {
+    const url = `${BASE}/v5/products/country/${encodeURIComponent(cc)}?family_name=${encodeURIComponent(family)}&lang=en`;
+    const res = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(20_000) });
+    if (res.status !== 200) return 'unknown';
+    let j;
+    try { j = JSON.parse(await res.text()); } catch { return 'unknown'; }
+    if (!Array.isArray(j)) return 'unknown';
+    return j.some((f) => Array.isArray(f?.products) && f.products.length > 0) ? 'ok' : 'empty';
+  };
+  try {
+    const first = await once();
+    if (first !== 'empty') return first;
+    // Hiding a card is the expensive mistake: confirm an empty answer once more.
+    await new Promise((r) => setTimeout(r, 1500));
+    return await once();
+  } catch {
+    return 'unknown';
+  }
+}
+
+async function verifyStock(plan) {
+  const jobs = [];
+  for (const { cc, data } of plan) {
+    const families = new Set();
+    for (const cat of data.categories) {
+      for (const b of cat.brands) if (!b.is_out_of_stock) families.add(b.family);
+    }
+    for (const family of families) jobs.push({ cc, family });
+  }
+  const stats = { families: jobs.length, checked: 0, ok: 0, empty: 0, unresolved: 0, skipped: 0, hidden: {} };
+  const deadline = Date.now() + VERIFY_BUDGET_MS;
+  const queue = [...jobs];
+  let unresolvedRun = 0;
+  let stop = false;
+  await Promise.all(Array.from({ length: VERIFY_CONCURRENCY }, async () => {
+    while (queue.length) {
+      if (stop || Date.now() > deadline) {
+        stats.skipped += queue.length;
+        queue.length = 0;
+        return;
+      }
+      const job = queue.shift();
+      const result = await productPresence(job.cc, job.family);
+      stats.checked += 1;
+      if (result === 'unknown') {
+        stats.unresolved += 1;
+        unresolvedRun += 1;
+        if (unresolvedRun >= VERIFY_MAX_UNRESOLVED_RUN) stop = true;
+        continue;
+      }
+      unresolvedRun = 0;
+      if (result === 'ok') {
+        stats.ok += 1;
+      } else {
+        stats.empty += 1;
+        (stats.hidden[job.cc] ||= new Set()).add(job.family);
+      }
+    }
+  }));
+  // Apply: flag every brand of an empty family in that country as out of stock.
+  for (const { cc, data } of plan) {
+    const emptyFamilies = stats.hidden[cc];
+    if (!emptyFamilies) continue;
+    for (const cat of data.categories) {
+      for (const b of cat.brands) if (emptyFamilies.has(b.family)) b.is_out_of_stock = true;
+    }
+  }
+  stats.hidden = Object.fromEntries(Object.entries(stats.hidden).map(([cc, set]) => [cc, [...set].sort()]));
+  stats.budget_ms = VERIFY_BUDGET_MS;
+  stats.aborted_on_errors = stop;
+  return stats;
+}
+
+const fetched = [];
 const started = Date.now();
 const countries = await countryList();
 const targets = ['_global', ...countries];
@@ -130,7 +233,9 @@ await pool(targets, async (cc) => {
       manifest.failed.push({ country: cc, reason: 'empty-listing-kept-previous' });
       return;
     }
-    await writeFile(join(OUT, `${cc}.json`), JSON.stringify({ ...data, generated_at: manifest.generated_at }));
+    // Written after the verification pass below, so a half-finished run
+    // never publishes a country whose stock flags were not yet checked.
+    fetched.push({ cc, data, brands });
     manifest.countries[cc] = brands;
     ok += 1;
   } catch (e) {
@@ -138,6 +243,16 @@ await pool(targets, async (cc) => {
   }
 }, 6);
 
+// `_global` has no country to probe, so it is published as listed.
+const plan = fetched
+  .filter((f) => f.cc !== '_global')
+  .sort((a, b) => (a.cc === 'TR' ? -1 : b.cc === 'TR' ? 1 : b.brands - a.brands));
+manifest.verified = await verifyStock(plan);
+const v = manifest.verified;
+console.log(`[sync-catalog] stock check: ${v.checked}/${v.families} families (ok ${v.ok}, hidden-empty ${v.empty}, unresolved ${v.unresolved}, skipped ${v.skipped})${v.aborted_on_errors ? ' — stopped early after repeated errors' : ''}`);
+for (const f of fetched) {
+  await writeFile(join(OUT, `${f.cc}.json`), JSON.stringify({ ...f.data, generated_at: manifest.generated_at }));
+}
 await writeFile(join(OUT, '..', 'manifest.json'), JSON.stringify(manifest, null, 1));
 const secs = ((Date.now() - started) / 1000).toFixed(1);
 console.log(`[sync-catalog] ${ok}/${targets.length} countries refreshed in ${secs}s; failed: ${manifest.failed.length}`);
