@@ -1,6 +1,7 @@
 import { supplierIssues } from '../../lib/supplierProblems';
 import { CashbackFeeNotice } from '../checkout/CashbackFeeNotice';
 import { productMoney } from '../../lib/productMoney';
+import { familyAvailability, usableProduct } from '../../lib/catalogAvailability';
 /**
  * ProductPage.tsx — React port of pages/product.js. Loads a product family by
  * id + country, renders the hero, denomination chooser (packages grid or range
@@ -177,7 +178,7 @@ function familyToProduct(family: any, fallbackId: string, countryParam: string):
   for (const p of products) {
     // by_account = utility/bill payments needing an account number the shop
     // never collects — cannot be fulfilled, so never offered.
-    if (String(p.delivery_type || '').toLowerCase() === 'by_account') continue;
+    if (!usableProduct(p)) continue;
     if (p.range) {
       range = { min: p.range.min, max: p.range.max, step: p.range.step_size || p.range.step || 1, currency: p.range.currency || 'USD' };
       currency = p.range.currency || currency;
@@ -239,7 +240,7 @@ function familyToProduct(family: any, fallbackId: string, countryParam: string):
     currency,
     packages: packages.length ? packages : null,
     range,
-    in_stock: !family.is_out_of_stock,
+    in_stock: familyAvailability(family) === 'available',
     is_e_money: String(family.category || '').toLowerCase() === 'e-money',
     logo_url: logo,
     images: logo ? { large: logo } : {},
@@ -255,7 +256,8 @@ function familiesToProduct(families: any[], fallbackId: string, countryParam: st
   const familyName = cleanName(base.family || base.brand || fallbackId);
   // Merge products across all families with same family name, tagging each product with its originating brand
   const allProducts: any[] = [];
-  for (const f of families) {
+  const availableFamilies = families.filter((f) => familyAvailability(f) === 'available');
+  for (const f of availableFamilies.length ? availableFamilies : families) {
     const prods = Array.isArray(f.products) ? f.products : [];
     for (const p of prods) {
       allProducts.push({
@@ -274,7 +276,7 @@ function familiesToProduct(families: any[], fallbackId: string, countryParam: st
     brand: base.brand || familyName,
     products: allProducts,
     // In stock if ANY variant is in stock
-    is_out_of_stock: families.every((f) => !!f.is_out_of_stock),
+    is_out_of_stock: familyAvailability(families) !== 'available',
     _families: families,
   };
   // Prefer richest description among variants

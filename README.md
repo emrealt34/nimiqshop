@@ -246,6 +246,34 @@ every CI check plus a blocking `govulncheck` first.
 - New workflows must pass `npm run check:workflows`, `actionlint` and
   `zizmor --persona=pedantic`.
 
+## Hourly catalog refresh
+
+**Hourly catalog refresh** (`.github/workflows/catalog-refresh.yml`) runs at
+minute 17 each hour on `main`, and can also be started manually in Actions.
+It commits refreshed brand listings, market snapshots and stock-check progress
+to the data-only `catalog-data` branch, so protected `main` stays untouched.
+The refresh does not depend on Cloudflare credentials. A successful run calls
+**Deploy to Cloudflare Pages**, which combines code from `main` with the saved
+JSON snapshots. Only JSON files are restored; data branches cannot supply code.
+GitHub may delay cron runs; check the actual timestamp and country failures in
+the refresh job summary and `public/data/catalog/manifest.json`.
+
+Brand directories and product inventory are different supplier endpoints.
+The stock pass checks purchasable products, family/SKU stock flags, supported
+delivery channels and ranges. It rotates oldest first within a paced 20-minute
+supplier budget, with one-hour stock freshness. This does not promise a complete
+inventory scan of every country each hour. Timeouts and malformed responses are
+unknown stock; they never prove that a product sold out. Failed country refreshes
+retain their previous file and original timestamp.
+
+The storefront reconciles visible-card prefetch results and search results with
+live product stock. Normal card clicks perform a fresh check before navigation.
+A sold-out card cannot lead the buyer into a known unavailable product page;
+checkout still checks current inventory because stock can change afterwards.
+Run `npm run test:unit` for the stock classifier, browser-memory rules and a
+mock-supplier run of the real sync script; `out-of-stock.spec.ts` covers the grid,
+search, navigation and mixed supplier variants in a real browser.
+
 ## License
 
 [MIT](LICENSE).

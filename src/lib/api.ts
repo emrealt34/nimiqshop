@@ -12,6 +12,7 @@ import { uuid as uuid2 } from './format';
 import { canonicalIntent, purchaseIntentPayload, loadOrCreateIntent, saveIntentQuote, releaseIntentForQuote } from './checkoutIntent';
 import { dailyLimitMessage, isDailyLimitError } from './dailyLimit';
 import { countryHint, COUNTRY_HINT_HEADER } from './edgeGeo';
+import { recordAvailability } from './catalogStock';
 
 export class ApiError extends Error {
   status: number;
@@ -514,7 +515,10 @@ export const getProduct = async (
       if (raw) {
         const j = JSON.parse(raw);
         if (j && j.fetched_at && now - j.fetched_at < PROD_CACHE_TTL_MS &&
-          (Array.isArray(j.data) || Array.isArray(j.data?.products))) return j.data;
+          (Array.isArray(j.data) || Array.isArray(j.data?.products))) {
+          recordAvailability(id, country || '', j.data);
+          return j.data;
+        }
       }
     } catch {
       /* corrupt cache, ignore */
@@ -522,6 +526,7 @@ export const getProduct = async (
   }
   try {
     const data = await api(fullPath);
+    recordAvailability(id, country || '', data);
     try {
       for (let i = sessionStorage.length - 1; i >= 0; i--) {
         const k = sessionStorage.key(i);
@@ -533,6 +538,7 @@ export const getProduct = async (
     }
     return data;
   } catch (err) {
+    if (err instanceof ApiError && err.status === 404) recordAvailability(id, country || '', null, true);
     if (!(err instanceof ApiError) || err.status !== 0) throw err;
     try {
       const raw = sessionStorage.getItem(key);

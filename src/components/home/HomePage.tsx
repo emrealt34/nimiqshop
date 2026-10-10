@@ -12,21 +12,23 @@ import { ComeBackBanner, ErrorDetail } from '../ui/uiKit';
 import { flattenBrands, markReportedOutOfStock, type Product } from '../../lib/catalog';
 import { UnifiedThumb } from '../ui/UnifiedThumb';
 import { orderedCountries } from '../../lib/countries';
-import { listGiftCards, listTopups, listEsims, listUnavailableFamilies, searchProducts, getProduct, getFXRates, cachedFX, onRatesChange } from '../../lib/api';
+import { listGiftCards, listTopups, listEsims, listUnavailableFamilies, searchProducts, getProduct, getFXRates, cachedFX, onRatesChange, friendlyApiMessage } from '../../lib/api';
 import {
   catalogHasItems,
   readCachedCatalog,
   writeCachedCatalog,
   type CatalogMap,
 } from '../../lib/catalogCache';
-import { countryName, parseCurrencyValue } from '../../lib/format';
+import { countryName, parseCurrencyValue, cleanFamilyName } from '../../lib/format';
 import { countryCandidates } from '../../lib/hostLang';
 import { useToast } from '../AppProviders';
 import { useInNimiqPay, openInNimiqPay } from '../../lib/miniapp';
 import { NimiqPayInstallDialog } from '../ui/NimiqPayInstallDialog';
 import { siteName } from '../../lib/config';
 import { getShelfSeed, shelfSeedFresh, type ShelfSeed } from '../../lib/shelfSeed';
-import { prefetchRoute } from '../../lib/router';
+import { prefetchRoute, useRouter } from '../../lib/router';
+import { familyAvailability } from '../../lib/catalogAvailability';
+import { applyObservedStock, observedAvailability, onStockChange } from '../../lib/catalogStock';
 
 /** Build-time shelf seed: SSR reads the module singleton (set by Base.astro),
  *  the client reads the inlined window.__SHELF_SEED — same bytes, so the
@@ -81,9 +83,16 @@ export function HomePage() {
   const inPay = useInNimiqPay();
   const { toast } = useToast();
   const [catalogs, setCatalogs] = useState<Record<string, Product[]>>(seedMaps);
+  const [stockRevision, setStockRevision] = useState(0);
+  useEffect(() => onStockChange(() => setStockRevision((n) => n + 1)), []);
   const [activeCat, setActiveCat] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<Product[] | null>(null);
+  const noteUnavailable = useCallback((family: string, cc: string) => {
+    const mark = (items: Product[]) => items.map((p) => p.country === cc ? markReportedOutOfStock([p], [family])[0] : p);
+    setCatalogs((maps) => Object.fromEntries(Object.entries(maps).map(([key, items]) => [key, mark(items)])));
+    setSearchResults((items) => items ? mark(items) : null);
+  }, []);
   const [country, setCountry] = useState('TR');
   const [sortKey, setSortKey] = useState('default');
   // The operator's global catalog rule decides whether out-of-stock products
@@ -171,8 +180,10 @@ export function HomePage() {
     setCatalogs(instant);
     if (catalogHasItems(instant)) setLoadedCountry(c);
     setBusy(true);
-    const results = await Promise.allSettled([listGiftCards(c, false), listTopups(c, false), listEsims(c, false)]);
-    const reported = await listUnavailableFamilies(c);
+    const [results, reported] = await Promise.all([
+      Promise.allSettled([listGiftCards(c, false), listTopups(c, false), listEsims(c, false)]),
+      listUnavailableFamilies(c),
+    ]);
     if (!current()) return;
     const keys = ['gift_card', 'phone_refill', 'esim'];
     const merged: CatalogMap = { gift_card: [], phone_refill: [], esim: [] };
@@ -182,7 +193,7 @@ export function HomePage() {
       if (result.status === 'fulfilled') merged[key] = markReportedOutOfStock(flattenBrands(result.value, c), reported);
       else {
         missing.push(key);
-        merged[key] = cached?.[key] || [];
+        merged[key] = markReportedOutOfStock(cached?.[key] || [], reported);
       }
     });
     if (!current()) return;
@@ -268,9 +279,16 @@ export function HomePage() {
   }, [searchTerm, country, catalogs]);
 
   const items = useMemo(() => {
+    // Prefetch observations live outside React; this revision invalidates the shelf.
+    void stockRevision;
     let list: Product[];
     if (searchTerm.trim() && searchResults) list = searchResults;
     else list = activeCat === 'all' ? [...catalogs.gift_card, ...catalogs.phone_refill, ...catalogs.esim] : catalogs[activeCat] || [];
+    // Search must reuse full catalog rows: the search API returns names, not
+    // stock, and normalizing those names used to manufacture in-stock cards.
+    const shelf = new Map(Object.values(catalogs).flat().map((p) => [p.id + '|' + p.country, p]));
+    list = list.map((p) => shelf.get(p.id + '|' + p.country) || p);
+    list = applyObservedStock(list);
     // Cards refused at checkout (reported_oos) are never hidden: they read "Out of stock".
     if (hideOutOfStock) list = list.filter((p) => p.in_stock !== false || p.reported_oos);
     list = list.filter((p) => !isMissingProduct(p.id, p.country));
@@ -289,7 +307,7 @@ export function HomePage() {
       list = [...list].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }));
     }
     return list;
-  }, [catalogs, activeCat, searchTerm, searchResults, hideOutOfStock, sortKey, fx]);
+  }, [catalogs, activeCat, searchTerm, searchResults, hideOutOfStock, sortKey, fx, stockRevision]);
 
   return (
     <>
@@ -476,7 +494,7 @@ export function HomePage() {
               }
             />
           ) : (
-            <ProductGrid products={items} onBuy={toast} allowWarm={!busy} />
+            <ProductGrid products={items} onBuy={toast} onUnavailable={noteUnavailable} allowWarm={!busy} />
           )}
         </div>
       </div>
@@ -633,8 +651,11 @@ function CountryPicker({ country, onChange }: { country: string; onChange: (code
   }
 }
 
-function ProductGrid({ products, onBuy, allowWarm }: { products: Product[]; onBuy: (msg: string, k?: 'info') => void; allowWarm: boolean }) {
+function ProductGrid({ products, onBuy, onUnavailable, allowWarm }: { products: Product[]; onBuy: (msg: string, k?: 'info') => void; onUnavailable: (family: string, country: string) => void; allowWarm: boolean }) {
   const { t } = useT();
+  const { navigate } = useRouter();
+  const [checking, setChecking] = useState('');
+  const pending = useRef(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   // Warm the family payload + route chunk for cards the shopper can already
   // see, so tapping one opens a product page whose data is in cache. Capped
@@ -665,6 +686,8 @@ function ProductGrid({ products, onBuy, allowWarm }: { products: Product[]; onBu
           // DS172411 (setTimeout): closure only, never a string — no untrusted data is evaluated.
           window.setTimeout(() => {
             if (cancelled) return;
+            // getProduct publishes observed stock, so warming a dead family
+            // updates this shelf instead of silently discarding the result.
             getProduct(id, cc || undefined).catch(() => {});
             prefetchRoute('/product');
           }, 0);
@@ -682,19 +705,46 @@ function ProductGrid({ products, onBuy, allowWarm }: { products: Product[]; onBu
           className="product-card"
           href={p.in_stock !== false ? pagePath(`/product?id=${encodeURIComponent(p.id)}&country=${encodeURIComponent(p.country)}`) : undefined}
           aria-label={t('home.viewProduct', { name: p.name })}
-          onMouseEnter={() => getProduct(p.id, p.country).catch(() => {})}
-          onFocus={() => getProduct(p.id, p.country).catch(() => {})}
+          aria-busy={checking === p.id + '|' + p.country || undefined}
+          onMouseEnter={() => { if (p.in_stock !== false) getProduct(p.id, p.country).catch(() => {}); }}
+          onFocus={() => { if (p.in_stock !== false) getProduct(p.id, p.country).catch(() => {}); }}
           onPointerDown={() => {
             // Touch devices never hover: the press is the first intent we
             // get, and it lands ~100-300 ms before the click navigation —
             // enough for the family payload and the route chunk to arrive.
-            getProduct(p.id, p.country).catch(() => {});
+            if (p.in_stock !== false) getProduct(p.id, p.country).catch(() => {});
             prefetchRoute('/product');
           }}
-          onClick={(e) => {
-            if (p.in_stock === false) {
+          onClick={async (e) => {
+            if (p.in_stock === false || observedAvailability(p.id, p.country) === 'unavailable') {
               e.preventDefault();
               onBuy(t('home.soldOutToast'), 'info');
+              return;
+            }
+            if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+            e.preventDefault();
+            if (pending.current) return;
+            const anchor = e.currentTarget;
+            const href = anchor.getAttribute('href');
+            pending.current = true;
+            setChecking(p.id + '|' + p.country);
+            try {
+              const [data, reported] = await Promise.all([
+                getProduct(p.id, p.country, { force: true }), listUnavailableFamilies(p.country),
+              ]);
+              const refused = reported.some((f) => cleanFamilyName(f).trim().toLowerCase() === cleanFamilyName(p.family || p.id).trim().toLowerCase());
+              if (refused) onUnavailable(p.family || p.id, p.country);
+              if (refused || familyAvailability(data) === 'unavailable') {
+                onBuy(t('home.soldOutToast'), 'info');
+              } else if (href && anchor.isConnected && anchor.getAttribute('href') === href) {
+                navigate(href);
+              }
+            } catch (err) {
+              onBuy(observedAvailability(p.id, p.country) === 'unavailable'
+                ? t('home.soldOutToast') : friendlyApiMessage(err, t('errors.loadProduct')), 'info');
+            } finally {
+              pending.current = false;
+              setChecking('');
             }
           }}
         >
@@ -711,7 +761,7 @@ function ProductGrid({ products, onBuy, allowWarm }: { products: Product[]; onBu
             title={productPriceText(p, t)}
             style={{ fontSize: '0.85rem', display: 'block', width: '100%', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', margin: '2px 0 8px' }}
           >
-            {productPriceText(p, t)}
+            {checking === p.id + '|' + p.country ? t('productPage.loadingProduct') : productPriceText(p, t)}
           </span>
           <div className="p-meta" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flexWrap: 'nowrap', width: '100%' }}>
             <span className="chip" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
