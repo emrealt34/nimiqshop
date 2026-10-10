@@ -136,29 +136,52 @@ async function pool(items, worker, concurrency) {
  * verified in order (TR first, then by listing size); anything not reached in
  * this run keeps its listing flags.
  */
-const VERIFY_BUDGET_MS = Number(process.env.CATALOG_VERIFY_BUDGET_MS) || 20 * 60_000;
-const VERIFY_CONCURRENCY = 4;
-const VERIFY_MAX_UNRESOLVED_RUN = 25;
+const VERIFY_BUDGET_MS = Number(process.env.CATALOG_VERIFY_BUDGET_MS) || 12 * 60_000;
+const VERIFY_CONCURRENCY = 3;
+const VERIFY_UNRESOLVED_BEFORE_COOLDOWN = 8;
+const VERIFY_COOLDOWN_MS = 45_000;
+const VERIFY_MAX_COOLDOWNS = 6;
 
-async function productPresence(cc, family) {
-  const once = async () => {
-    const url = `${BASE}/v5/products/country/${encodeURIComponent(cc)}?family_name=${encodeURIComponent(family)}&lang=en`;
-    const res = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(20_000) });
-    if (res.status !== 200) return 'unknown';
-    let j;
-    try { j = JSON.parse(await res.text()); } catch { return 'unknown'; }
-    if (!Array.isArray(j)) return 'unknown';
-    return j.some((f) => Array.isArray(f?.products) && f.products.length > 0) ? 'ok' : 'empty';
-  };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** One product-presence read: 'ok' | 'empty' | 'unknown' (+ the HTTP status seen). */
+async function probeOnce(cc, family) {
+  const url = `${BASE}/v5/products/country/${encodeURIComponent(cc)}?family_name=${encodeURIComponent(family)}&lang=en`;
   try {
-    const first = await once();
-    if (first !== 'empty') return first;
-    // Hiding a card is the expensive mistake: confirm an empty answer once more.
-    await new Promise((r) => setTimeout(r, 1500));
-    return await once();
-  } catch {
+    const res = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(20_000) });
+    if (res.status !== 200) return { state: 'unknown', status: res.status };
+    let j;
+    try { j = JSON.parse(await res.text()); } catch { return { state: 'unknown', status: 'bad-json' }; }
+    if (!Array.isArray(j)) return { state: 'unknown', status: 'bad-shape' };
+    const has = j.some((f) => Array.isArray(f?.products) && f.products.length > 0);
+    return { state: has ? 'ok' : 'empty', status: 200 };
+  } catch (e) {
+    return { state: 'unknown', status: e && e.name === 'TimeoutError' ? 'timeout' : 'network' };
+  }
+}
+
+/**
+ * Rate limits (403/429) and transient errors are retried with a growing
+ * pause; they never count as evidence that a product is missing.
+ */
+async function productPresence(cc, family, stats) {
+  const RETRY_DELAYS = [4_000, 12_000];
+  let r = await probeOnce(cc, family);
+  for (const delay of RETRY_DELAYS) {
+    if (r.state !== 'unknown') break;
+    stats.status[r.status] = (stats.status[r.status] || 0) + 1;
+    await sleep(delay);
+    r = await probeOnce(cc, family);
+  }
+  if (r.state === 'unknown') {
+    stats.status[r.status] = (stats.status[r.status] || 0) + 1;
     return 'unknown';
   }
+  if (r.state !== 'empty') return r.state;
+  // Hiding a card is the expensive mistake: confirm an empty answer once more.
+  await sleep(1500);
+  const again = await probeOnce(cc, family);
+  return again.state;
 }
 
 async function verifyStock(plan) {
@@ -170,11 +193,12 @@ async function verifyStock(plan) {
     }
     for (const family of families) jobs.push({ cc, family });
   }
-  const stats = { families: jobs.length, checked: 0, ok: 0, empty: 0, unresolved: 0, skipped: 0, hidden: {} };
+  const stats = { families: jobs.length, checked: 0, ok: 0, empty: 0, unresolved: 0, skipped: 0, cooldowns: 0, status: {}, hidden: {} };
   const deadline = Date.now() + VERIFY_BUDGET_MS;
   const queue = [...jobs];
   let unresolvedRun = 0;
   let stop = false;
+  let pausedUntil = 0;
   await Promise.all(Array.from({ length: VERIFY_CONCURRENCY }, async () => {
     while (queue.length) {
       if (stop || Date.now() > deadline) {
@@ -182,13 +206,20 @@ async function verifyStock(plan) {
         queue.length = 0;
         return;
       }
+      // The supplier is pushing back: every worker waits out the same cool-down.
+      if (Date.now() < pausedUntil) await sleep(pausedUntil - Date.now());
       const job = queue.shift();
-      const result = await productPresence(job.cc, job.family);
+      const result = await productPresence(job.cc, job.family, stats);
       stats.checked += 1;
       if (result === 'unknown') {
         stats.unresolved += 1;
         unresolvedRun += 1;
-        if (unresolvedRun >= VERIFY_MAX_UNRESOLVED_RUN) stop = true;
+        if (unresolvedRun >= VERIFY_UNRESOLVED_BEFORE_COOLDOWN) {
+          unresolvedRun = 0;
+          stats.cooldowns += 1;
+          if (stats.cooldowns > VERIFY_MAX_COOLDOWNS) stop = true;
+          pausedUntil = Date.now() + VERIFY_COOLDOWN_MS;
+        }
         continue;
       }
       unresolvedRun = 0;
@@ -249,7 +280,8 @@ const plan = fetched
   .sort((a, b) => (a.cc === 'TR' ? -1 : b.cc === 'TR' ? 1 : b.brands - a.brands));
 manifest.verified = await verifyStock(plan);
 const v = manifest.verified;
-console.log(`[sync-catalog] stock check: ${v.checked}/${v.families} families (ok ${v.ok}, hidden-empty ${v.empty}, unresolved ${v.unresolved}, skipped ${v.skipped})${v.aborted_on_errors ? ' — stopped early after repeated errors' : ''}`);
+console.log(`[sync-catalog] stock check: ${v.checked}/${v.families} families (ok ${v.ok}, hidden-empty ${v.empty}, unresolved ${v.unresolved}, skipped ${v.skipped}, cooldowns ${v.cooldowns}, http ${JSON.stringify(v.status)})${v.aborted_on_errors ? ' — stopped early: supplier kept refusing' : ''}`);
+for (const [cc, names] of Object.entries(v.hidden)) console.log(`[sync-catalog] hidden (no products) ${cc}: ${names.join(' | ')}`);
 for (const f of fetched) {
   await writeFile(join(OUT, `${f.cc}.json`), JSON.stringify({ ...f.data, generated_at: manifest.generated_at }));
 }
