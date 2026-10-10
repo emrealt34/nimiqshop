@@ -607,6 +607,13 @@ async function readBalance(force = false): Promise<WalletBalanceState> {
 export function refreshWalletBalance({ force = false }: { force?: boolean } = {}): Promise<WalletBalanceState> {
   const fresh = current.status === 'ready' && current.at && Date.now() - current.at < TTL_MS;
   if (!force && fresh) return Promise.resolve(current);
+  // Signed out in a plain browser: there is no session to read and no wallet
+  // host to ask, so there is nothing to read. Say so at once (the strip shows
+  // its sign-in nudge) instead of showing a loading state that never ends.
+  if (!isAuthed() && !inNimiqPay() && !getNimiqProvider()) {
+    if (inflight) return inflight;
+    return Promise.resolve(emit({ ...EMPTY }));
+  }
   if (inflight) return inflight;
 
   if (current.status === 'ready') emit({ ...current, stale: true });
