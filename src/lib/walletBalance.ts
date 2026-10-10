@@ -60,19 +60,27 @@ export const LUNA_PER_NIM = 100000;
 export const SPEND_MARGIN = 0.05;
 
 /**
- * SPEND_FLOOR_NIM — a fixed minimum cushion, in NIM, added on top of the
- * percentage. It is 0 for now: the Bitcoin network fee is a fixed cost per
- * payment, and Pay does not publish its size. Set this to the amount observed in
- * real refused payments once it is known.
- *
- * It is deliberately NOT a USD amount. NIM trades at a few hundredths of a cent,
- * so "$1" is thousands of NIM and would wrongly block ordinary purchases.
+ * SPEND_FLOOR_USD — a fixed minimum cushion, worth this many US dollars at the
+ * current NIM rate. A percentage alone is too small on cheap products (5% of
+ * 300 NIM is still a few NIM), so every payment keeps at least this much spare.
+ * It is written in USD on purpose: the NIM price moves, so a fixed NIM count
+ * would be a different real cushion every day. Owner decision (2026-10-10):
+ * $0.05 worth of NIM.
  */
-export const SPEND_FLOOR_NIM = 0;
+export const SPEND_FLOOR_USD = 0.05;
+
+/**
+ * The fixed cushion in NIM right now: SPEND_FLOOR_USD converted at the cached
+ * rate. Zero while no rate is known, so the percentage still applies.
+ */
+export function spendFloorNim(): number {
+  const rate = num(cachedNimRate()?.usd_per_nim);
+  return rate > 0 ? SPEND_FLOOR_USD / rate : 0;
+}
 
 /** The cushion in NIM: the larger of the percentage and the fixed floor. */
 function cushionNim(targetNim: number): number {
-  return Math.max(targetNim * SPEND_MARGIN, SPEND_FLOOR_NIM);
+  return Math.max(targetNim * SPEND_MARGIN, spendFloorNim());
 }
 
 /**
@@ -136,7 +144,7 @@ export function affordableUnits(availableNim: number, unitNim: number): number {
   const have = Number(availableNim || 0);
   if (!(unit > 0) || !(have > 0)) return 0;
   const byPercent = Math.floor(have / (unit * (1 + SPEND_MARGIN)));
-  const byFloor = Math.floor((have - SPEND_FLOOR_NIM) / unit);
+  const byFloor = Math.floor((have - spendFloorNim()) / unit);
   return Math.max(0, Math.min(byPercent, byFloor));
 }
 
