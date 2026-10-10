@@ -182,8 +182,9 @@ type Quote struct {
 	// beneficiary instead of re-deriving it (legacy rows without it fall
 	// back to phone-if-present, else email).
 	BeneficiaryAccount string `json:"beneficiary_account,omitempty"`
-	// Lang is the buyer's selected locale at quote creation time ("en",
-	// "es", "de", "fr", "pt", "tr"). Drives the language of the gift
+	// Lang is the language of mail to the buyer, fixed at quote creation: the
+	// purchase country first, then the site language ("en", "es", "de", "fr",
+	// "pt", "tr"). Drives the language of the gift
 	// notification email (see mailtrap.GiftNote.Lang) so retries/async
 	// fulfillment preserve the buyer's language. Empty means "unknown"
 	// (legacy rows / defaulted to English by the builder).

@@ -494,8 +494,9 @@ func (h *Handlers) createQuoteBatchInner(ctx *fasthttp.RequestCtx, userID string
 	// before the supplier request so Cryptorefills also sees the buyer locale.
 	quoteLang := i18n.ParseLangCtx(ctx)
 	i18n.SetCookieCtx(ctx, quoteLang)
+	mailLang := h.buyerMailLang(ctx) // see mail_lang.go
 
-	orderReq := &cryptorefills.CreateOrderRequest{Deliveries: validateReq.Deliveries, Payment: validateReq.Payment, User: validateReq.User, Lang: quoteLang, Acquisition: &cryptorefills.Acquisition{UTMSource: "nimshop"}}
+	orderReq := &cryptorefills.CreateOrderRequest{Deliveries: validateReq.Deliveries, Payment: validateReq.Payment, User: validateReq.User, Lang: mailLang, Acquisition: &cryptorefills.Acquisition{UTMSource: "nimshop"}}
 	supplierRequest, err := cryptorefills.MarshalCreateRequest(orderReq)
 	if err != nil {
 		writeError(ctx, 400, "invalid supplier request")
@@ -515,7 +516,7 @@ func (h *Handlers) createQuoteBatchInner(ctx *fasthttp.RequestCtx, userID string
 	q := db.Quote{
 		IsBatch: true, BatchItems: len(req.Items), FaceValueTotals: batchFaceTotals(faceByCurrency),
 		Lines: lines,
-		ID:    quoteIDNow(), UserID: userID, Lang: quoteLang,
+		ID:    quoteIDNow(), UserID: userID, Lang: mailLang,
 		// ProductID carries the joined brand list — it is exactly what the
 		// orders page renders as the row title. Country stays empty: a batch
 		// may mix countries, and a wrong single flag would render a wrong

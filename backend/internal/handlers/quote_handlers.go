@@ -383,8 +383,10 @@ func (h *Handlers) createQuoteInner(ctx *fasthttp.RequestCtx, userID string, req
 	// the buyer's locale.
 	quoteLang := i18n.ParseLangCtx(ctx)
 	i18n.SetCookieCtx(ctx, quoteLang) // refresh cookie so it survives the full year
+	// Mail and supplier language follow the buyer's purchase country (see mail_lang.go).
+	mailLang := h.buyerMailLang(ctx)
 
-	orderReq := &cryptorefills.CreateOrderRequest{Deliveries: validateReq.Deliveries, Payment: validateReq.Payment, User: validateReq.User, Lang: quoteLang, Acquisition: &cryptorefills.Acquisition{UTMSource: "nimshop"}}
+	orderReq := &cryptorefills.CreateOrderRequest{Deliveries: validateReq.Deliveries, Payment: validateReq.Payment, User: validateReq.User, Lang: mailLang, Acquisition: &cryptorefills.Acquisition{UTMSource: "nimshop"}}
 	supplierRequest, err := cryptorefills.MarshalCreateRequest(orderReq)
 	if err != nil {
 		writeError(ctx, 400, "invalid supplier request")
@@ -394,7 +396,7 @@ func (h *Handlers) createQuoteInner(ctx *fasthttp.RequestCtx, userID string, req
 	now := time.Now().UTC()
 
 	q := db.Quote{
-		ID: quoteIDNow(), UserID: userID, Lang: quoteLang,
+		ID: quoteIDNow(), UserID: userID, Lang: mailLang,
 		ProductID: req.ProductID, ProductCountry: req.Country,
 		Denomination: denomLabel, ProductValue: faceValue, ProductCurrency: faceCurrency, Quantity: req.Quantity,
 		// Single-item carts get the same delivery manifest the batch path

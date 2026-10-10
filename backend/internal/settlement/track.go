@@ -31,6 +31,7 @@ import (
 
 	"nimiqshop/internal/cryptorefills"
 	"nimiqshop/internal/db"
+	"nimiqshop/internal/i18n"
 	"nimiqshop/internal/safe"
 )
 
@@ -425,7 +426,7 @@ func (w *OrderTracker) redeliverCreation(ctx context.Context, q db.Quote) {
 			value := q.ProductValue
 			d.ProductValue = &value
 		}
-		req = cryptorefills.CreateOrderRequest{Payment: cryptorefills.OrderPayment{Type: "via", PaymentVia: "USER_WALLET", Coin: q.Coin, Network: q.Network}, Lang: "en", Acquisition: &cryptorefills.Acquisition{UTMSource: "nimshop"}}
+		req = cryptorefills.CreateOrderRequest{Payment: cryptorefills.OrderPayment{Type: "via", PaymentVia: "USER_WALLET", Coin: q.Coin, Network: q.Network}, Lang: string(i18n.SupplierLang(q.Lang)), Acquisition: &cryptorefills.Acquisition{UTMSource: "nimshop"}}
 		if q.CustomerEmail != "" {
 			req.User = &cryptorefills.OrderUser{Email: q.CustomerEmail}
 		}
