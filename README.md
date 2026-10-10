@@ -140,7 +140,7 @@ browser ──► static Astro/React bundle (dist/)         ──► /api ─�
 ```
 
 - **Backend** (`backend/`): Go 1.27, `fasthttp` + `fasthttp/router`, BadgerDB
-  (fsync per commit), Argon2id + BLAKE2b vendored from `x/crypto` v0.57.0
+  (fsync per commit), Argon2id + BLAKE2b vendored from `x/crypto` v0.58.0
   (`internal/xcrypto`, drift-checked in CI), no CGO.
 - **Frontend** (`src/`): Astro 7 + React 19 + TypeScript, six locales with
   build-time parity checks, strict CSP.

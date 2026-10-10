@@ -1,6 +1,6 @@
 # internal/xcrypto
 
-Verbatim copies of two packages from `golang.org/x/crypto` **v0.57.0**
+Verbatim copies of two packages from `golang.org/x/crypto` **v0.58.0**
 (commit `3f62bf119e84c6e35e8518a2958089ade622d1a3`), BSD-3-Clause — see
 [LICENSE](LICENSE):
 
