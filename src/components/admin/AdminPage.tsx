@@ -1030,7 +1030,20 @@ function OrdersPanel() {
       {shown.length ? (
         <div className="mt-1">
           {shown.map((q: any, i: number) => (
-            <CashbackRow key={from + i} cb={q.cashback} purchaseTx={q.lightning_payment_hash || ''} extraLeft={(q.test_mode ? '🧪 TEST · ' : '') + (q.product_id || 'item') + ' · ' + (q.status || '') + (q.id ? ' · ' + String(q.id).slice(0, 8) : '')} />
+            <div key={from + i}>
+              <CashbackRow cb={q.cashback} purchaseTx={q.lightning_payment_hash || ''} extraLeft={(q.test_mode ? '🧪 TEST · ' : '') + (q.product_id || 'item') + ' · ' + (q.status || '') + (q.id ? ' · ' + String(q.id).slice(0, 8) : '')} />
+              {/* Contact the buyer entered for this order (the same values the supplier request is built from). Admin-only view; never logged. */}
+              <div className="xs mt-1" style={{ paddingBottom: 8, display: 'flex', flexWrap: 'wrap', gap: 12 }} data-testid="order-contact">
+                <span>
+                  <span className="faint">Phone: </span>
+                  <span className="mono">{q.phone_number ? String(q.phone_number) : '—'}</span>
+                </span>
+                <span>
+                  <span className="faint">Email: </span>
+                  <span className="mono">{q.customer_email ? String(q.customer_email) : '—'}</span>
+                </span>
+              </div>
+            </div>
           ))}
         </div>
       ) : (
