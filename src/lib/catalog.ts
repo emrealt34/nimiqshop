@@ -16,6 +16,8 @@ export type Product = {
   currency: string;
   in_stock: boolean;
   is_out_of_stock: boolean;
+  /** Refused at checkout recently: shown as out of stock, never hidden. */
+  reported_oos?: boolean;
   logo_url: string;
   bg_color: string;
   min_raw: string;
@@ -98,6 +100,21 @@ function normalizeBrand(brand: any, country = 'US'): Product | null {
     product_type: brand.product_type || 'digital',
     is_e_money: String(brand.category || '').toLowerCase() === 'e-money',
   };
+}
+
+/**
+ * Marks cards the backend reports as sold out (a refused checkout). They read
+ * "Out of stock" and stay on the shelf, so the buyer sees the state instead of
+ * a dead card. Matching is case-insensitive on the family name.
+ */
+export function markReportedOutOfStock(products: Product[], families: string[]): Product[] {
+  if (!families.length) return products;
+  const set = new Set(families.map((f) => cleanFamilyName(f).trim().toLowerCase()));
+  return products.map((p) =>
+    set.has(String(p.family || '').trim().toLowerCase())
+      ? { ...p, in_stock: false, is_out_of_stock: true, reported_oos: true }
+      : p,
+  );
 }
 
 export function flattenBrands(data: any, country = 'US'): Product[] {

@@ -361,6 +361,7 @@ func (h *Handlers) createQuoteInner(ctx *fasthttp.RequestCtx, userID string, req
 	}
 	validateRes, err := h.CR.ValidateOrder(h.supplierContext(ctx), validateReq)
 	if err != nil {
+		noteSupplierOutOfStock(err, req.ProductID, req.Country)
 		h.supplierError(ctx, err, "order could not be validated")
 		return
 	}

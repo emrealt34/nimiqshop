@@ -453,6 +453,17 @@ export const listTopups = async (country?: string, test?: boolean) => {
   if (!test) { const s = await staticBrands(country); if (s) return filterKind(s, 'mobile_recharge'); }
   return api(catQS('mobile_recharge', country, test));
 };
+/** Families the backend has seen sold out for a country (refused at checkout). */
+export const listUnavailableFamilies = async (country: string): Promise<string[]> => {
+  const cc = String(country || '').toUpperCase().slice(0, 2);
+  if (cc.length !== 2) return [];
+  try {
+    const j = await api(`/api/catalog/unavailable?country=${encodeURIComponent(cc)}`);
+    return Array.isArray(j?.families) ? j.families.map((f: unknown) => String(f)) : [];
+  } catch {
+    return [];
+  }
+};
 export const listEsims = async (country?: string, test?: boolean) => {
   if (!test) { const s = await staticBrands(country); if (s) return filterKind(s, 'esim'); }
   return api(catQS('esim', country, test));

@@ -9,10 +9,10 @@ import { Icon } from '../ui/Icon';
 import { WalletBalance } from '../wallet/WalletBalance';
 import { FlagMark } from '../ui/FlagMark';
 import { ComeBackBanner, ErrorDetail } from '../ui/uiKit';
-import { flattenBrands, type Product } from '../../lib/catalog';
+import { flattenBrands, markReportedOutOfStock, type Product } from '../../lib/catalog';
 import { UnifiedThumb } from '../ui/UnifiedThumb';
 import { orderedCountries } from '../../lib/countries';
-import { listGiftCards, listTopups, listEsims, searchProducts, getProduct, getFXRates, cachedFX, onRatesChange } from '../../lib/api';
+import { listGiftCards, listTopups, listEsims, listUnavailableFamilies, searchProducts, getProduct, getFXRates, cachedFX, onRatesChange } from '../../lib/api';
 import {
   catalogHasItems,
   readCachedCatalog,
@@ -172,13 +172,14 @@ export function HomePage() {
     if (catalogHasItems(instant)) setLoadedCountry(c);
     setBusy(true);
     const results = await Promise.allSettled([listGiftCards(c, false), listTopups(c, false), listEsims(c, false)]);
+    const reported = await listUnavailableFamilies(c);
     if (!current()) return;
     const keys = ['gift_card', 'phone_refill', 'esim'];
     const merged: CatalogMap = { gift_card: [], phone_refill: [], esim: [] };
     const missing: string[] = [];
     results.forEach((result, index) => {
       const key = keys[index];
-      if (result.status === 'fulfilled') merged[key] = flattenBrands(result.value, c);
+      if (result.status === 'fulfilled') merged[key] = markReportedOutOfStock(flattenBrands(result.value, c), reported);
       else {
         missing.push(key);
         merged[key] = cached?.[key] || [];
@@ -270,7 +271,8 @@ export function HomePage() {
     let list: Product[];
     if (searchTerm.trim() && searchResults) list = searchResults;
     else list = activeCat === 'all' ? [...catalogs.gift_card, ...catalogs.phone_refill, ...catalogs.esim] : catalogs[activeCat] || [];
-    if (hideOutOfStock) list = list.filter((p) => p.in_stock !== false);
+    // Cards refused at checkout (reported_oos) are never hidden: they read "Out of stock".
+    if (hideOutOfStock) list = list.filter((p) => p.in_stock !== false || p.reported_oos);
     list = list.filter((p) => !isMissingProduct(p.id, p.country));
     if (sortKey === 'price-asc' || sortKey === 'price-desc') {
       const dir = sortKey === 'price-asc' ? 1 : -1;

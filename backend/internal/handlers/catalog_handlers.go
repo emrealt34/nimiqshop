@@ -5,6 +5,7 @@ import (
 	"log"
 	"math"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -117,7 +118,10 @@ func familyIsMissing(family, country string) bool {
 	return true
 }
 
-// dropMissingBrands removes tombstoned brands from a public listing copy.
+// dropMissingBrands flags tombstoned brands as out of stock in a public
+// listing copy. They stay on the shelf: a card the supplier refused must read
+// "Out of stock", not vanish, so a buyer is never told a product is gone when
+// it is only sold out for now.
 func dropMissingBrands(resp *cryptorefills.BrandsResponse, country string) *cryptorefills.BrandsResponse {
 	if resp == nil {
 		return resp
@@ -127,16 +131,66 @@ func dropMissingBrands(resp *cryptorefills.BrandsResponse, country string) *cryp
 	for _, cat := range resp.Categories {
 		brands := make([]cryptorefills.Brand, 0, len(cat.Brands))
 		for _, b := range cat.Brands {
-			if !familyIsMissing(b.Family, country) {
-				brands = append(brands, b)
+			if familyIsMissing(b.Family, country) {
+				b.OutOfStock = true
 			}
+			brands = append(brands, b)
 		}
-		if len(brands) > 0 {
-			cat.Brands = brands
-			out.Categories = append(out.Categories, cat)
-		}
+		cat.Brands = brands
+		out.Categories = append(out.Categories, cat)
 	}
 	return &out
+}
+
+// outOfStockProblem reports whether a supplier validation failure means the
+// product itself cannot be sold right now (sold out, or no longer offered).
+func outOfStockProblem(err error) bool {
+	var pe *cryptorefills.ProblemError
+	if !errors.As(err, &pe) || pe == nil {
+		return false
+	}
+	for _, p := range pe.Problems {
+		switch strings.ToUpper(strings.TrimSpace(p.Code)) {
+		case "OUT_OF_STOCK", "NOT_AVAILABLE_PRODUCT", "PRODUCT_NOT_AVAILABLE":
+			return true
+		}
+	}
+	return false
+}
+
+// noteSupplierOutOfStock records a family the supplier just refused as sold
+// out, so every listing shows it as out of stock for the tombstone TTL and the
+// next visitor is not sent into the same dead end. Any other error is left
+// alone: a rate limit or a timeout is not evidence the product is gone.
+func noteSupplierOutOfStock(err error, family, country string) {
+	if strings.TrimSpace(family) == "" || !outOfStockProblem(err) {
+		return
+	}
+	markFamilyMissing(family, country)
+}
+
+// UnavailableFamilies lists the families currently flagged out of stock for a
+// country, so the storefront can mark cards it loaded from the static listing.
+// GET /api/catalog/unavailable?country=XX  ->  {"country":"XX","families":[...]}
+func (h *Handlers) UnavailableFamilies(ctx *fasthttp.RequestCtx) {
+	country := strings.ToUpper(strings.TrimSpace(string(ctx.QueryArgs().Peek("country"))))
+	if len(country) != 2 {
+		writeError(ctx, fasthttp.StatusBadRequest, "country must be a 2-letter code")
+		return
+	}
+	suffix := "|" + country
+	now := time.Now()
+	families := []string{}
+	missingMu.RLock()
+	for k, until := range missingFamilies {
+		if strings.HasSuffix(k, suffix) && now.Before(until) {
+			families = append(families, strings.TrimSuffix(k, suffix))
+		}
+	}
+	missingMu.RUnlock()
+	sort.Strings(families)
+	ctx.Response.Header.Set("Cache-Control", "no-store")
+	writeJSON(ctx, fasthttp.StatusOK, map[string]any{"country": country, "families": families})
 }
 
 // rulesForRequest loads the live catalog rules (cheap: single Badger key)
