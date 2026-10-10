@@ -11,6 +11,7 @@ import { SystemPanel } from './AdminSystemPanel';
 import { MaintenancePanel } from './AdminMaintenancePanel';
 import { AdminRatingsPanel } from './AdminRatingsPanel';
 import { AdminQuizPanel } from './AdminQuizPanel';
+import { AdminTestCenterPanel } from './AdminTestCenterPanel';
 import { AppRoot } from '../AppRoot';
 import { useSheet, useToast } from '../AppProviders';
 import {
@@ -48,7 +49,7 @@ function badge(label: string, on: boolean, detail?: string) {
   );
 }
 
-type AdminSection = 'overview' | 'catalog' | 'orders' | 'cashback' | 'people' | 'ratings' | 'quiz' | 'email' | 'maintenance';
+type AdminSection = 'overview' | 'catalog' | 'orders' | 'cashback' | 'people' | 'ratings' | 'quiz' | 'email' | 'test' | 'maintenance';
 
 type RuleOption = { value: string; label: string };
 
@@ -100,6 +101,9 @@ const ADMIN_SECTIONS: Array<{ id: AdminSection; label: string; hint: string; ico
   { id: 'ratings', label: 'Ratings', hint: 'stars & comments', icon: 'star' },
   { id: 'quiz', label: 'Quiz', hint: 'questions & manual prizes', icon: 'star' },
   { id: 'email', label: 'Email', hint: 'Mailtrap tools', icon: 'send' },
+  // Real catalogue products, completed through the real pipeline: the genuine
+  // order email goes out, nothing is charged and nothing is fulfilled.
+  { id: 'test', label: 'Test', hint: 'order emails, no charge', icon: 'package' },
   // The only destructive surface in the console gets its own tab, so it can
   // never be clicked by accident while working on the page that is open daily.
   { id: 'maintenance', label: 'Maintenance', hint: 'memory & start over', icon: 'shield' },
@@ -1369,6 +1373,8 @@ export function AdminContent() {
         return <AdminQuizPanel />;
       case 'email':
         return <><StatusCard status={status} /><Composer status={status} /><TestEmailCard /></>;
+      case 'test':
+        return <AdminTestCenterPanel />;
       case 'maintenance':
         return <MaintenancePanel />;
       case 'overview':

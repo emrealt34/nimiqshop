@@ -624,8 +624,12 @@ func testQuoteView(store *db.Store, q db.Quote, applied []string) map[string]any
 		"gift_channel":       q.GiftChannel,
 		"gift_message":       q.GiftMessage,
 		"anonymous":          q.Anonymous,
-		"gift_notified_at":   q.GiftNotifiedAt,
-		"test_mode":          q.TestMode,
+		// gift_notified is the truth the operator panel reads: the order mail
+		// really went out. A zero time marshals as 0001-01-01…, which a
+		// truthiness check mistook for "sent", so the timestamp is only sent
+		// when it is set.
+		"gift_notified": !q.GiftNotifiedAt.IsZero(),
+		"test_mode":     q.TestMode,
 	}
 	if q.WalletAddress != "" && (q.CanPay(time.Now().UTC()) || q.Status == "awaiting_payment") {
 		out["wallet_address"] = q.WalletAddress
@@ -633,6 +637,9 @@ func testQuoteView(store *db.Store, q db.Quote, applied []string) map[string]any
 			out["lightning_invoice"] = q.WalletAddress
 			out["payment_uri"] = cryptorefills.LightningURI(q.WalletAddress)
 		}
+	}
+	if !q.GiftNotifiedAt.IsZero() {
+		out["gift_notified_at"] = q.GiftNotifiedAt
 	}
 	if len(q.Fulfillment) > 0 {
 		out["fulfillment"] = q.Fulfillment

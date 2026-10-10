@@ -980,6 +980,10 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 	// Operator sandbox: buy a real product on the simulated supplier, then
 	// fake-pay it through the real state machine (see admin_test_center.go).
 	r.POST("/api/admin/test-purchase", adminOnly(h.AdminTestPurchase))
+	// Operator test-pay: walks an admin test quote through the payment ladder,
+	// which fires the real order email. The handler existed but the route was
+	// missing, so the operator's pay step answered 404 on the live site.
+	r.POST("/api/admin/test-pay", adminOnly(h.AdminTestPay))
 	// The simulated-pay ENGINE stays for the e2e suite; every customer-facing
 	// button that called it is gone (owner, 2026-10-05).
 	r.POST("/api/quotes/{id}/test-pay", authedTiered(aCheckout, h.UserTestPay))

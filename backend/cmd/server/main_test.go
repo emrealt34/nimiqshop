@@ -593,6 +593,55 @@ func TestAdminConsole(t *testing.T) {
 	}
 }
 
+// TestAdminTestCenterPurchaseAndPay is the operator's sandbox round trip on the
+// real router: buy a catalogue product as admin, then drive it to fulfilled
+// with admin test-pay. Regression guard: test-pay was registered as a handler
+// but never routed, so the pay step 404'd and no test order could finish.
+func TestAdminTestCenterPurchaseAndPay(t *testing.T) {
+	s := bootStack(t, stackOptions{testMode: true})
+	admin := s.adminHeaders()
+
+	buy := s.do(http.MethodPost, "/api/admin/test-purchase", map[string]any{
+		"product_id": "test-steam", "country": "US", "quantity": 1,
+		"denomination": "50 USD", "product_value": 50, "email": "buyer@example.com",
+	}, admin)
+	if buy.status != 200 && buy.status != 201 {
+		t.Fatalf("admin test-purchase: %d %s", buy.status, truncate(buy.body))
+	}
+	quoteID := quoteIDFrom(t, buy)
+
+	pay := s.do(http.MethodPost, "/api/admin/test-pay", map[string]any{"quote_id": quoteID, "action": "auto"}, admin)
+	if pay.status == 404 {
+		t.Fatalf("admin test-pay is not routed: %d %s", pay.status, truncate(pay.body))
+	}
+	if pay.status != 200 {
+		t.Fatalf("admin test-pay: %d %s", pay.status, truncate(pay.body))
+	}
+	if st := quoteStatus(pay.json(t)); st != "fulfilled" {
+		t.Fatalf("admin test-pay should fulfil the test quote, got status %q: %s", st, truncate(pay.body))
+	}
+	// The order mail is not configured in this stack, so the quote must NOT
+	// report it sent. A zero timestamp must not leak as a "sent" time either.
+	if body := pay.json(t); body["gift_notified"] != false {
+		t.Errorf("gift_notified should be false without a mail transport, got %v", body["gift_notified"])
+	} else if _, has := body["gift_notified_at"]; has {
+		t.Errorf("gift_notified_at must be omitted until the mail really goes out: %s", truncate(pay.body))
+	}
+
+	// A test quote that has no admin test-pay state left answers 409, and a
+	// bogus action is refused rather than silently accepted.
+	if res := s.do(http.MethodPost, "/api/admin/test-pay", map[string]any{"quote_id": quoteID, "action": "auto"}, admin); res.status != 409 {
+		t.Errorf("second admin test-pay on a fulfilled quote: %d %s", res.status, truncate(res.body))
+	}
+	if res := s.do(http.MethodPost, "/api/admin/test-pay", map[string]any{"quote_id": quoteID, "action": "bogus"}, admin); res.status == 200 {
+		t.Errorf("bogus admin test action accepted: %s", truncate(res.body))
+	}
+	// Admin test-pay is operator-only.
+	if res := s.do(http.MethodPost, "/api/admin/test-pay", map[string]any{"quote_id": quoteID}, nil); res.status != 401 {
+		t.Errorf("anonymous admin test-pay must be 401, got %d", res.status)
+	}
+}
+
 func TestConcurrentHealth(t *testing.T) {
 	s := bootStack(t, stackOptions{testMode: true})
 	var wg sync.WaitGroup

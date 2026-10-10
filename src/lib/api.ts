@@ -951,6 +951,13 @@ export const adminStatus = () => api('/admin/notification/status');
 export const adminMe = () => api('/admin/auth/me');
 export const adminSend = (req: Record<string, unknown>) => api('/admin/notification/send', { method: 'POST', body: req });
 export const adminTestEmail = (req: Record<string, unknown>) => api('/admin/test-email', { method: 'POST', body: req });
+// Operator test center: a REAL catalogue product bought through the real
+// checkout pipeline on a simulated supplier. test-purchase books the order,
+// test-pay drives it to fulfilled (which sends the genuine order email).
+export const adminTestPurchase = (req: Record<string, unknown>) => api('/admin/test-purchase', { method: 'POST', body: req });
+export const adminTestPay = (quoteId: string, action: 'auto' | 'broadcast' | 'confirm' | 'deliver' = 'auto') =>
+  api('/admin/test-pay', { method: 'POST', body: { quote_id: quoteId, action } });
+export const adminTestQuote = (quoteId: string) => api(`/admin/test-quote/${encodeURIComponent(quoteId)}`);
 export const adminCatalogRules = (opts: { path?: string; method?: string; body?: unknown } = {}) =>
   api('/admin/catalog-rules' + (opts.path || ''), opts.method ? { method: opts.method, body: opts.body } : {});
 export const adminGetCashback = () => api('/admin/settings/cashback');
