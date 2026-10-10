@@ -41,7 +41,7 @@ func (s *Store) ListTestAccounts() ([]TestAccount, error) {
 func (s *Store) AddTestAccount(a TestAccount) ([]TestAccount, error) {
 	var out []TestAccount
 	err := s.Update(func(txn *badger.Txn) error {
-		var list []TestAccount
+		list := make([]TestAccount, 0, 1)
 		err := getJSON(txn, []byte(testAccountsKey), &list)
 		if err != nil && !errors.Is(err, ErrNotFound) {
 			return err

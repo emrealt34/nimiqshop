@@ -48,7 +48,7 @@ func LangForCountry(cc string) (Lang, bool) {
 func MailLang(ctx *fasthttp.RequestCtx, country string) Lang {
 	if ctx != nil {
 		if q := strings.ToLower(strings.TrimSpace(string(ctx.QueryArgs().Peek("lang")))); len(q) >= 2 && Valid(q[:2]) {
-			return Lang(q[:2])
+			return q[:2]
 		}
 	}
 	if l, ok := LangForCountry(country); ok {
@@ -60,7 +60,7 @@ func MailLang(ctx *fasthttp.RequestCtx, country string) Lang {
 // SupplierLang returns a supported language code for a stored quote, or EN.
 func SupplierLang(stored string) Lang {
 	if s := strings.ToLower(strings.TrimSpace(stored)); len(s) >= 2 && Valid(s[:2]) {
-		return Lang(s[:2])
+		return s[:2]
 	}
 	return EN
 }

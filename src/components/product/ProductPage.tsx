@@ -12,7 +12,7 @@ import { Icon } from '../ui/Icon';
 import { UnifiedThumb } from '../ui/UnifiedThumb';
 import { FlagMark } from '../ui/FlagMark';
 import { AppRoot } from '../AppRoot';
-import { friendlyApiMessage, getProduct, getNimRate, getFXRates, getProductPrice, onRatesChange } from '../../lib/api';
+import { friendlyApiMessage, getProduct, getNimRate, getFXRates, getProductPrice, listUnavailableFamilies, onRatesChange } from '../../lib/api';
 import { loadCashbackBps, cashbackEarnLine } from '../../lib/cashback';
 import { StakerCashbackLine } from '../staker/StakerCashback';
 import { WalletBalance } from '../wallet/WalletBalance';
@@ -34,7 +34,7 @@ import { mapKind, extractLogo } from '../../lib/catalog';
 import { openSingleBuyFlow } from '../checkout/CheckoutFlow';
 import { useWalletBalance } from '../wallet/WalletBalance';
 import { guardLowBalance } from '../wallet/LowBalanceSheet';
-import { safeRichHTML } from '../../lib/format';
+import { cleanFamilyName, safeRichHTML } from '../../lib/format';
 import { useRouter } from '../../lib/router';
 import { useT, t as i18nT } from '../../i18n';
 import { asset, pagePath } from '../../lib/asset';
@@ -337,6 +337,8 @@ export function ProductPage() {
   const countryParam = queryParam('country');
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [unavailable, setUnavailable] = useState(false);
+  // Families the backend saw sold out at checkout (45-minute window).
+  const [reportedOos, setReportedOos] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [nimUsd, setNimUsd] = useState<number | null>(null);
@@ -440,6 +442,11 @@ export function ProductPage() {
         setDenomination('range');
         setValue(detail.range.min);
       }
+      // A family refused as sold out at checkout must not offer a buy button
+      // that fails again. The mark is per family and expires after 45 min.
+      const reported = await listUnavailableFamilies(detail.country || countryParam);
+      const famKey = cleanFamilyName(String(detail.family || detail.name || id)).trim().toLowerCase();
+      setReportedOos(reported.some((f) => cleanFamilyName(f).trim().toLowerCase() === famKey));
       setProduct(detail);
     } catch (err) {
       const notFound = Number((err as { status?: number })?.status) === 404;
@@ -705,6 +712,8 @@ export function ProductPage() {
   }
 
   const dead = !hasPackages && !product.range;
+  const soldOut = reportedOos || product.in_stock === false;
+  const blocked = dead || soldOut;
 
   /**
    * The product page's own gate. Owner (2026-10-06): the shortfall must ask the
@@ -721,6 +730,7 @@ export function ProductPage() {
     });
 
   const doAddToCart = () => {
+    if (blocked) return;
     if (!cart) return;
     const ok = cart.addToCart(
       {
@@ -763,6 +773,7 @@ export function ProductPage() {
   const chips = chipKeys(effectiveType);
 
   const doBuy = async () => {
+    if (blocked) return;
     if (!(await askAffordable())) return;
     const selectedPkgForBuy = product.packages?.find((x) => x.package_id === pkg) as any;
     openSingleBuyFlow({
@@ -900,12 +911,15 @@ export function ProductPage() {
           <summary>{t('productPage.feesDetails')}</summary>
           <div style={{ marginTop: 8 }}><CashbackFeeNotice example="nim" /></div>
         </details>
+        {soldOut && (
+          <div role="status" className="oos-banner" style={{ marginTop: 12, padding: '10px 12px', borderRadius: 10, background: 'var(--scrim, rgba(20, 16, 12, 0.78))', color: 'var(--on-scrim, #FFF6E8)', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', textAlign: 'center', fontSize: 'var(--fs-sm)' }}>{t('shop.outOfStock')}</div>
+        )}
         <div className="mt-3 row" style={{ gap: '12px' }}>
-          <button className="btn btn-outline btn-block btn-lg" onClick={doAddToCart} disabled={dead} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', justifyContent: 'center', opacity: dead ? 0.5 : 1 }}>
+          <button className="btn btn-outline btn-block btn-lg" onClick={doAddToCart} disabled={blocked} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', justifyContent: 'center', opacity: blocked ? 0.5 : 1 }}>
             <Icon name="bag" size={14} />
             <span className="btn-label">{t('productPage.addToCart')}</span>
           </button>
-          <button className="btn btn-gold btn-block btn-lg" onClick={doBuy} disabled={dead} title={dead ? t('productPage.notPurchasableTitle', { country: product.country || t('productPage.whereThisCountry') }) : undefined} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', justifyContent: 'center', opacity: dead ? 0.5 : 1 }}>
+          <button className="btn btn-gold btn-block btn-lg" onClick={doBuy} disabled={blocked} title={dead ? t('productPage.notPurchasableTitle', { country: product.country || t('productPage.whereThisCountry') }) : soldOut ? t('shop.outOfStock') : undefined} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', justifyContent: 'center', opacity: blocked ? 0.5 : 1 }}>
             <img src={asset("/img/nimiq-hexagon.png?v=40")} draggable={false} alt="NIM" width={14} height={14} style={{ pointerEvents: "none", borderRadius: 3 }} />
             <span className="btn-label">{dead ? t('productPage.notAvailableHere') : buyLabel}</span>
           </button>

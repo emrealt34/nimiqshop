@@ -458,7 +458,7 @@ export const listUnavailableFamilies = async (country: string): Promise<string[]
   const cc = String(country || '').toUpperCase().slice(0, 2);
   if (cc.length !== 2) return [];
   try {
-    const j = await api(`/api/catalog/unavailable?country=${encodeURIComponent(cc)}`);
+    const j = await api(`/catalog/unavailable?country=${encodeURIComponent(cc)}`);
     return Array.isArray(j?.families) ? j.families.map((f: unknown) => String(f)) : [];
   } catch {
     return [];

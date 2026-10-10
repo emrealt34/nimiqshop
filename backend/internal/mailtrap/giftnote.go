@@ -489,7 +489,7 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 	font := emailFont
 	var b strings.Builder
 	b.WriteString("<!DOCTYPE html>\n")
-	b.WriteString(`<html lang="` + string(i18n.Clean(n.Lang)) + `" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">` + "\n")
+	b.WriteString(`<html lang="` + i18n.Clean(n.Lang) + `" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">` + "\n")
 	b.WriteString("<head>\n")
 	b.WriteString(`<meta charset="utf-8">` + "\n")
 	b.WriteString(`<meta name="viewport" content="width=device-width,initial-scale=1">` + "\n")

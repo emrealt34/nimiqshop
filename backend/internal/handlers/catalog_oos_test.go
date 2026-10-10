@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"testing"
@@ -101,5 +102,41 @@ func TestUnavailableFamiliesEndpointListsOneCountry(t *testing.T) {
 	}
 	if got.Country != "GB" || len(got.Families) != 2 || got.Families[0] != "asos" || got.Families[1] != "steam" {
 		t.Fatalf("unexpected payload: %+v", got)
+	}
+}
+
+// fakeBatchSupplier refuses any line whose product is in soldOut, as the real
+// dry-run does for one delivery at a time.
+type fakeBatchSupplier struct {
+	soldOut map[string]bool
+}
+
+func (f fakeBatchSupplier) ValidateOrder(_ context.Context, req *cryptorefills.CreateOrderRequest) (*cryptorefills.ValidationResult, error) {
+	if len(req.Deliveries) > 0 && f.soldOut[req.Deliveries[0].ProductID] {
+		return nil, problemErr("OUT_OF_STOCK")
+	}
+	return &cryptorefills.ValidationResult{}, nil
+}
+
+func TestBatchDiagnosisFlagsTheSoldOutLine(t *testing.T) {
+	resetMissing(t)
+	items := []batchQuoteItem{
+		{ProductID: "Asos", Country: "GB"},
+		{ProductID: "Netflix", Country: "GB"},
+	}
+	perItem := [][]cryptorefills.Delivery{
+		{{ProductID: "Asos"}},
+		{{ProductID: "Netflix"}},
+	}
+	sup := fakeBatchSupplier{soldOut: map[string]bool{"Asos": true}}
+	blocked := diagnoseBatch(context.Background(), sup, items, perItem, "", cryptorefills.OrderPayment{})
+	if len(blocked) != 1 || blocked[0].ProductID != "Asos" {
+		t.Fatalf("expected only Asos blocked, got %+v", blocked)
+	}
+	if !familyIsMissing("Asos", "GB") {
+		t.Fatal("the sold-out line must be flagged out of stock")
+	}
+	if familyIsMissing("Netflix", "GB") {
+		t.Fatal("a line the supplier accepts must not be flagged")
 	}
 }

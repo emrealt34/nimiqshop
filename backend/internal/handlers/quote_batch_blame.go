@@ -130,6 +130,9 @@ func diagnoseBatch(ctx context.Context, cr supplierValidator, items []batchQuote
 					return
 				}
 				reason := problemReason(err)
+				// A line the supplier reports sold out is flagged here too, so
+				// the storefront shows it as out of stock on the next load.
+				noteSupplierOutOfStock(err, items[i].ProductID, items[i].Country)
 				found[i] = &blockedItem{
 					Index:     i,
 					ProductID: items[i].ProductID,
