@@ -494,7 +494,7 @@ func (h *Handlers) createQuoteBatchInner(ctx *fasthttp.RequestCtx, userID string
 	// before the supplier request so Cryptorefills also sees the buyer locale.
 	quoteLang := i18n.ParseLangCtx(ctx)
 	i18n.SetCookieCtx(ctx, quoteLang)
-	mailLang := h.buyerMailLang(ctx) // see mail_lang.go
+	mailLang := h.buyerMailLang(ctx, commonItemCountry(batchItemCountries(req.Items)...)) // see mail_lang.go
 
 	orderReq := &cryptorefills.CreateOrderRequest{Deliveries: validateReq.Deliveries, Payment: validateReq.Payment, User: validateReq.User, Lang: mailLang, Acquisition: &cryptorefills.Acquisition{UTMSource: "nimshop"}}
 	supplierRequest, err := cryptorefills.MarshalCreateRequest(orderReq)

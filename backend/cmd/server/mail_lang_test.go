@@ -5,23 +5,23 @@ import (
 	"testing"
 )
 
-// The buyer's mail language follows the purchase country (edge hint), then the
-// site language. Each case uses a fresh wallet so checkouts never collide.
-func TestBuyerMailLanguageFollowsCountry(t *testing.T) {
+// The buyer's mail language follows the PRODUCT's market (its country), then
+// the site language. Each case uses a fresh wallet so checkouts never collide.
+func TestBuyerMailLanguageFollowsProductCountry(t *testing.T) {
 	s := bootStack(t, stackOptions{})
 
-	quoteLang := func(headers map[string]string) string {
+	quoteLang := func(productCountry string, headers map[string]string) string {
 		t.Helper()
 		auth, _ := s.signIn()
 		for k, v := range headers {
 			auth[k] = v
 		}
 		res := s.do(http.MethodPost, "/api/quotes", map[string]any{
-			"product_id": "test-steam", "country": "US", "quantity": 1,
+			"product_id": "test-steam", "country": productCountry, "quantity": 1,
 			"denomination": "50 USD", "product_value": 50, "email": "buyer@example.com",
 		}, auth)
 		if res.status >= 300 {
-			t.Fatalf("quote: %d %s", res.status, truncate(res.body))
+			t.Fatalf("quote (%s): %d %s", productCountry, res.status, truncate(res.body))
 		}
 		get := s.do(http.MethodGet, "/api/quotes/"+quoteIDFrom(t, res), nil, auth)
 		q, _ := get.json(t)["quote"].(map[string]any)
@@ -29,18 +29,20 @@ func TestBuyerMailLanguageFollowsCountry(t *testing.T) {
 		return lang
 	}
 
+	// The test catalog only carries US products, so the end-to-end check is
+	// that an English product stays English whatever the buyer's language
+	// signals say. The other markets are covered by the unit tests.
 	cases := []struct {
 		name    string
 		headers map[string]string
 		want    string
 	}{
-		{"Turkish buyer, English browser", map[string]string{"X-Nimshop-Country-Hint": "TR", "Accept-Language": "en-US,en;q=0.9"}, "tr"},
-		{"German buyer", map[string]string{"X-Nimshop-Country-Hint": "DE", "Accept-Language": "tr"}, "de"},
-		{"unmapped country uses browser language", map[string]string{"X-Nimshop-Country-Hint": "US", "Accept-Language": "fr-FR"}, "fr"},
-		{"no country, no language: English", map[string]string{}, "en"},
+		{"US product, Turkish browser: English", map[string]string{"Accept-Language": "tr-TR,tr;q=0.9"}, "en"},
+		{"US product, Turkish site cookie: English", map[string]string{"Cookie": "nimshop-lang=tr"}, "en"},
+		{"US product, no signals: English", map[string]string{}, "en"},
 	}
 	for _, c := range cases {
-		if got := quoteLang(c.headers); got != c.want {
+		if got := quoteLang("US", c.headers); got != c.want {
 			t.Errorf("%s: mail language %q, want %q", c.name, got, c.want)
 		}
 	}

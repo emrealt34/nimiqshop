@@ -383,8 +383,8 @@ func (h *Handlers) createQuoteInner(ctx *fasthttp.RequestCtx, userID string, req
 	// the buyer's locale.
 	quoteLang := i18n.ParseLangCtx(ctx)
 	i18n.SetCookieCtx(ctx, quoteLang) // refresh cookie so it survives the full year
-	// Mail and supplier language follow the buyer's purchase country (see mail_lang.go).
-	mailLang := h.buyerMailLang(ctx)
+	// Mail and supplier language follow the product's market (see mail_lang.go).
+	mailLang := h.buyerMailLang(ctx, req.Country)
 
 	orderReq := &cryptorefills.CreateOrderRequest{Deliveries: validateReq.Deliveries, Payment: validateReq.Payment, User: validateReq.User, Lang: mailLang, Acquisition: &cryptorefills.Acquisition{UTMSource: "nimshop"}}
 	supplierRequest, err := cryptorefills.MarshalCreateRequest(orderReq)

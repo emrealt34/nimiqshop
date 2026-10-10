@@ -12,17 +12,19 @@ import (
 // written in ONE language, chosen at checkout in this order:
 //
 //  1. an explicit ?lang= on the checkout request,
-//  2. the buyer's purchase country (the edge's country for the visit), when it
-//     maps to a supported language,
+//  2. the market the product belongs to (the product's catalog country), when
+//     that country maps to a language. A US product is English, a TR product
+//     is Turkish, whatever the buyer's location or browser language,
 //  3. the site language the buyer already has (cookie, then Accept-Language),
 //  4. English.
 //
-// The site-language cookie is NOT written from step 2, so a buyer in Turkey
-// who reads the shop in English does not get the shop switched to Turkish.
+// The site-language cookie is NOT written from step 2, so buying a Turkish
+// product in English does not switch the shop to Turkish.
 
-// countryLang maps an ISO 3166-1 alpha-2 country to the language of its
-// market. Countries with several official languages take the dominant one
-// (CH → de, BE → fr, CA is absent and falls through to the site language).
+// countryLang maps an ISO 3166-1 alpha-2 country (a product's market) to the
+// language of that market. Countries with several official languages take the
+// dominant one (CH → de, BE → fr, CA is absent and falls through to the site
+// language).
 var countryLang = map[string]Lang{
 	"TR": TR,
 	"DE": DE, "AT": DE, "CH": DE, "LI": DE,
@@ -31,6 +33,7 @@ var countryLang = map[string]Lang{
 	"SV": ES, "DO": ES, "PR": ES, "CU": ES,
 	"FR": FR, "BE": FR, "LU": FR, "MC": FR, "SN": FR, "CI": FR,
 	"PT": PT, "BR": PT, "AO": PT, "MZ": PT,
+	"US": EN, "GB": EN, "IE": EN, "AU": EN, "NZ": EN,
 }
 
 // LangForCountry returns the language for a country code, or ok=false when the
@@ -41,7 +44,7 @@ func LangForCountry(cc string) (Lang, bool) {
 }
 
 // MailLang picks the language of mail to the buyer of this request. country is
-// the buyer's purchase country ("" when unknown).
+// the product's market country ("" when unknown or mixed).
 func MailLang(ctx *fasthttp.RequestCtx, country string) Lang {
 	if ctx != nil {
 		if q := strings.ToLower(strings.TrimSpace(string(ctx.QueryArgs().Peek("lang")))); len(q) >= 2 && Valid(q[:2]) {
