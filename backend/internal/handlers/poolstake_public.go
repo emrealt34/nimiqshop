@@ -70,8 +70,12 @@ func (h *Handlers) stakeProgramEnabled() bool {
 
 const poolCallTimeout = 8 * time.Second
 
-func poolContext(ctx context.Context) (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.WithoutCancel(ctx), poolCallTimeout)
+// poolContext deliberately does NOT derive from the caller's context: even
+// WithoutCancel keeps the parent's Value lookups, and for a *fasthttp.RequestCtx
+// those read the pooled, recycled request. The pool and chain clients read no
+// context values, so a detached, bounded context is all they need.
+func poolContext(_ context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), poolCallTimeout)
 }
 
 // poolStake is the detached wrapper for every pool Status call in this file.
