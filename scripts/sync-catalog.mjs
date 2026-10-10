@@ -136,7 +136,7 @@ async function pool(items, worker, concurrency) {
  * verified in order (TR first, then by listing size); anything not reached in
  * this run keeps its listing flags.
  */
-const VERIFY_BUDGET_MS = Number(process.env.CATALOG_VERIFY_BUDGET_MS) || 10 * 60_000;
+const VERIFY_BUDGET_MS = Number(process.env.CATALOG_VERIFY_BUDGET_MS) || 20 * 60_000;
 const VERIFY_CONCURRENCY = 2;
 // The supplier answers a steady ~1 request/second without refusing; bursts
 // of parallel product reads from one runner get 403 for minutes at a time.
@@ -195,17 +195,56 @@ async function productPresence(cc, family, stats) {
   return again.state;
 }
 
-async function verifyStock(plan) {
+// Stock state survives between runs. Each product-presence answer is stored
+// as { state, at } under "CC|family"; the committed seed and the runner's
+// cache file are merged (newer answer wins). A pair is re-read once its record
+// is older than RECHECK_AFTER_MS, so a full pass over every country builds up
+// across hourly runs instead of being redone from scratch each time. An
+// "empty" answer keeps hiding the card for EMPTY_TRUSTED_MS.
+const STOCK_STATE_SEED = join(ROOT, 'scripts', 'data', 'stock-state.json');
+const STOCK_STATE_FILE = process.env.CATALOG_STOCK_STATE || join(ROOT, '.catalog-stock-state.json');
+const RECHECK_AFTER_MS = 24 * 3600_000;
+const EMPTY_TRUSTED_MS = 7 * 24 * 3600_000;
+
+async function readStateFile(path) {
+  try { return JSON.parse(await readFile(path, 'utf8')); } catch { return {}; }
+}
+
+async function loadStockState() {
+  const merged = {};
+  for (const src of [await readStateFile(STOCK_STATE_SEED), await readStateFile(STOCK_STATE_FILE)]) {
+    for (const [key, rec] of Object.entries(src || {})) {
+      if (rec && rec.state && (!merged[key] || rec.at > merged[key].at)) merged[key] = rec;
+    }
+  }
+  return merged;
+}
+
+async function saveStockState(state) {
+  const cutoff = Date.now() - EMPTY_TRUSTED_MS;
+  const kept = {};
+  for (const [key, rec] of Object.entries(state)) if (rec.at >= cutoff) kept[key] = rec;
+  await writeFile(STOCK_STATE_FILE, JSON.stringify(kept));
+  return Object.keys(kept).length;
+}
+
+async function verifyStock(plan, state) {
+  const now = Date.now();
   const jobs = [];
+  let fresh = 0;
   for (const { cc, data } of plan) {
     const families = new Set();
     for (const cat of data.categories) {
       for (const b of cat.brands) if (!b.is_out_of_stock) families.add(b.family);
     }
-    for (const family of families) jobs.push({ cc, family });
+    for (const family of families) {
+      const rec = state[`${cc}|${family}`];
+      if (rec && now - rec.at < RECHECK_AFTER_MS) fresh += 1;
+      else jobs.push({ cc, family });
+    }
   }
-  const stats = { families: jobs.length, checked: 0, ok: 0, empty: 0, unresolved: 0, skipped: 0, cooldowns: 0, status: {}, hidden: {} };
-  const deadline = Date.now() + VERIFY_BUDGET_MS;
+  const stats = { families: jobs.length + fresh, fresh, checked: 0, ok: 0, empty: 0, unresolved: 0, skipped: 0, cooldowns: 0, status: {}, hidden: {} };
+  const deadline = now + VERIFY_BUDGET_MS;
   const queue = [...jobs];
   let unresolvedRun = 0;
   let stop = false;
@@ -234,20 +273,23 @@ async function verifyStock(plan) {
         continue;
       }
       unresolvedRun = 0;
-      if (result === 'ok') {
-        stats.ok += 1;
-      } else {
-        stats.empty += 1;
-        (stats.hidden[job.cc] ||= new Set()).add(job.family);
-      }
+      state[`${job.cc}|${job.family}`] = { state: result, at: Date.now() };
+      if (result === 'ok') stats.ok += 1;
+      else stats.empty += 1;
     }
   }));
-  // Apply: flag every brand of an empty family in that country as out of stock.
+  // Apply to every plan entry: a family whose latest trusted answer is "empty"
+  // is out of stock, whether it was read in this run or an earlier one.
+  const trustedAfter = Date.now() - EMPTY_TRUSTED_MS;
   for (const { cc, data } of plan) {
-    const emptyFamilies = stats.hidden[cc];
-    if (!emptyFamilies) continue;
     for (const cat of data.categories) {
-      for (const b of cat.brands) if (emptyFamilies.has(b.family)) b.is_out_of_stock = true;
+      for (const b of cat.brands) {
+        const rec = state[`${cc}|${b.family}`];
+        if (!b.is_out_of_stock && rec && rec.state === 'empty' && rec.at >= trustedAfter) {
+          b.is_out_of_stock = true;
+          (stats.hidden[cc] ||= new Set()).add(b.family);
+        }
+      }
     }
   }
   stats.hidden = Object.fromEntries(Object.entries(stats.hidden).map(([cc, set]) => [cc, [...set].sort()]));
@@ -289,9 +331,11 @@ await pool(targets, async (cc) => {
 const plan = fetched
   .filter((f) => f.cc !== '_global')
   .sort((a, b) => (a.cc === 'TR' ? -1 : b.cc === 'TR' ? 1 : b.brands - a.brands));
-manifest.verified = await verifyStock(plan);
+const stockState = await loadStockState();
+manifest.verified = await verifyStock(plan, stockState);
+manifest.verified.state_records = await saveStockState(stockState);
 const v = manifest.verified;
-console.log(`[sync-catalog] stock check: ${v.checked}/${v.families} families (ok ${v.ok}, hidden-empty ${v.empty}, unresolved ${v.unresolved}, skipped ${v.skipped}, cooldowns ${v.cooldowns}, http ${JSON.stringify(v.status)})${v.aborted_on_errors ? ' — stopped early: supplier kept refusing' : ''}`);
+console.log(`[sync-catalog] stock check: ${v.checked}/${v.families} families (fresh ${v.fresh}, ok ${v.ok}, hidden-empty ${v.empty}, unresolved ${v.unresolved}, skipped ${v.skipped}, cooldowns ${v.cooldowns}, http ${JSON.stringify(v.status)})${v.aborted_on_errors ? ' — stopped early: supplier kept refusing' : ''}`);
 for (const [cc, names] of Object.entries(v.hidden)) console.log(`[sync-catalog] hidden (no products) ${cc}: ${names.join(' | ')}`);
 for (const f of fetched) {
   await writeFile(join(OUT, `${f.cc}.json`), JSON.stringify({ ...f.data, generated_at: manifest.generated_at }));

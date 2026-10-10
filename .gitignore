@@ -51,3 +51,6 @@ __pycache__/
 /go-benchmarks.txt
 !public/data/
 !public/data/**
+.catalog-stock-state.json
+!scripts/data/
+!scripts/data/stock-state.json

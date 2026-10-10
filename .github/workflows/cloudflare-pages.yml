@@ -70,7 +70,7 @@ jobs:
     needs: gate
     if: needs.gate.outputs.configured == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     permissions:
       contents: read
     environment:
@@ -95,11 +95,28 @@ jobs:
       # grids nor the NIM/BTC price may depend on the Go backend at page-load
       # time. Each script keeps the previous file when its sources fail, and
       # a fully-down supplier/backend must not stop the deploy.
+      # The stock check covers every country over several hourly runs: its
+      # answers are carried from one run to the next in this cache.
+      - name: Restore stock-check state
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .catalog-stock-state.json
+          key: catalog-stock-state-${{ github.run_id }}
+          restore-keys: |
+            catalog-stock-state-
+
       - name: Refresh static catalog + market snapshots
         continue-on-error: true
         run: |
           node scripts/sync-catalog.mjs || echo "::warning::catalog sync failed — keeping committed snapshot"
           node scripts/sync-market.mjs || echo "::warning::market sync failed — keeping committed snapshot"
+
+      - name: Save stock-check state
+        if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .catalog-stock-state.json
+          key: catalog-stock-state-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Test same-origin API proxy
         run: npm run test:pages-proxy
