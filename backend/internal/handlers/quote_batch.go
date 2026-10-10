@@ -106,24 +106,17 @@ func (h *Handlers) CreateQuoteBatch(ctx *fasthttp.RequestCtx) {
 	req.Email = strings.TrimSpace(req.Email)
 	req.CashbackCode = strings.TrimSpace(req.CashbackCode)
 	req.PaymentMethod = strings.ToLower(strings.TrimSpace(req.PaymentMethod))
-	// Default payment rail: Nimiq Pay (BTC Lightning). USDT on Polygon
-	// (Matic) is always available as the second rail — no env switch. An
-	// unknown method id is a hard 400, never a silent rail switch.
+	// The only payment rail: Nimiq Pay (BTC Lightning). An unknown method id
+	// is a hard 400, never a silent switch.
 	if req.PaymentMethod == "" {
 		req.PaymentMethod = PaymentMethodNIM
 	}
-	if req.PaymentMethod != PaymentMethodNIM && req.PaymentMethod != PaymentMethodUSDT {
-		writeError(ctx, fasthttp.StatusBadRequest, "payment_method must be nimiq_pay or usdt_polygon")
+	if req.PaymentMethod != PaymentMethodNIM {
+		writeError(ctx, fasthttp.StatusBadRequest, "payment_method must be nimiq_pay")
 		return
 	}
-	if IsStablecoinMethod(req.PaymentMethod) {
-		req.Coin = PaymentCoinUSDT
-		req.Network = PaymentNetworkStable
-	} else {
-		req.PaymentMethod = PaymentMethodNIM
-		req.Coin = PaymentCoinNIM
-		req.Network = PaymentNetworkNIM
-	}
+	req.Coin = PaymentCoinNIM
+	req.Network = PaymentNetworkNIM
 	dest := strings.ToLower(strings.TrimSpace(req.CashbackDestination))
 	if dest != db.CashbackDestBurn {
 		dest = db.CashbackDestWallet

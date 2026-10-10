@@ -102,7 +102,7 @@ export function buildOrderRequest(
 export type DeliveryInfo = {
   email: string;
   phones: Map<unknown, string>;
-  paymentMethod?: 'nimiq_pay' | 'usdt_polygon';
+  paymentMethod?: 'nimiq_pay';
   cashbackDestination?: 'cashback' | 'burn';
   anonymous?: boolean;
 };

@@ -32,7 +32,6 @@ import { LightningPayBlock, useNimiqPayMissingDialog } from './LightningPayBlock
 import { LightningRailPills } from './payRailKit';
 import { NimiqPayPayButton } from './NimiqPayPayButton';
 import { inNimiqPay, detectMobilePlatform } from '../../lib/miniapp';
-import { UsdtPayBlock } from './UsdtPayBlock';
 import { PaymentCountdown } from './PaymentCountdown';
 import { lightningPaymentURI, rememberLightningPayment } from '../../lib/hub';
 import { PAID_STATUSES, quoteBolt11, quoteIdOf, isQuotePayable, launchLightningUri } from '../../lib/pay';
@@ -54,7 +53,7 @@ import {
 } from '../../lib/dailyLimit';
 import { isAuthed } from '../../lib/session';
 import { loginWithHub, loginWithNimiqPay, friendlyHubError } from '../../lib/hub';
-import { deliverySummary, payRail, payActionLine , coinAmountLabel, coinAmountLabelFor } from '../../lib/deliveryCopy';
+import { deliverySummary, payRail, payActionLine , coinAmountLabelFor } from '../../lib/deliveryCopy';
 import { asset, pagePath } from '../../lib/asset';
 import { normalizePath } from '../../lib/router';
 
@@ -918,8 +917,6 @@ export function PayScreen({
 
   usePaymentPoll(quote, finish, setLiveQuote);
 
-  const usdtRail = payRail(current);
-  const isUsdt = usdtRail.isUsdt;
   const insidePay = inNimiqPay();
   const notifyHeroMissing = useNimiqPayMissingDialog();
   // AutoRenewOnce fires once per MOUNT. A renewal that hands back the same
@@ -943,55 +940,6 @@ export function PayScreen({
     };
   }, [quote, liveQuote]);
 
-
-  if (isUsdt) {
-    // The stablecoin sheet must answer the SAME questions as the NIM one: what
-    // am I buying, on which rail, and where does it get delivered. It used to
-    // show only the wallet block, so a mixed cart never learned that one line
-    // goes to a phone number.
-    const usdtDest = deliveryLine(current);
-    const usdtLocal = (() => { try { const { label } = quoteFaceValue(current); return label || ""; } catch { return ""; } })();
-    const usdtYouGet = youGetLabel || youGetText(quote);
-    return (
-      <div>
-        {stepNote && <div className="xs faint mb-1">{stepNote}</div>}
-        <div className="center mt-1">
-          <PaymentCountdown
-            expiresAt={current.payment_expires_at || current.payment_expiry}
-            onExpire={() => setExpired(true)}
-          />
-        </div>
-        <div className="pay-hero mt-2">
-          <div className="pay-hero-label">{t('checkout.flowUsdtDirect')}</div>
-          <div className="pay-hero-amt">
-            <img className="pay-nim-ico" src={asset("/img/usdt.png")} alt="USDT" draggable={false} width={22} height={22} style={{ pointerEvents: "none", borderRadius: 5 }} />
-            <span className="big-nim">{coinAmountLabel(current) || t('checkout.flowAmountShownBelow')}</span>
-          </div>
-          <div className="pay-hero-youget">
-            <span className="xs faint">{t('checkout.flowYouGet')}</span>
-            <span className="strong pay-you-get">{usdtYouGet || t('checkout.instantDelivery')}</span>
-          </div>
-          {usdtDest && (
-            <div className="pay-hero-del small">
-              <Icon name={usdtDest.icon as any} size={14} /> {usdtDest.text}
-            </div>
-          )}
-          {usdtLocal && <div className="small muted" style={{ marginTop: 6, fontWeight: 700 }}>{usdtLocal}</div>}
-        </div>
-        <details className="checkout-details-min"><summary>{t('checkout.flowDetailsNetwork')}</summary><div style={{ marginTop: 8 }}><CashbackFeeNotice example="usdt" /><div className="small muted mt-1">{payActionLine(current)}</div><div className="small muted mt-1" style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}><span style={{ flex: 1, minWidth: 0 }}>{t('checkout.flowUsdtChainNote')}</span></div></div></details>
-        {note}
-        <UsdtPayBlock
-          quote={current}
-          expired={expired}
-         
-          onLaunchRequested={() => {
-            // Stablecoin payments are self-wallet sends; keep polling.
-          }}
-        />
-
-      </div>
-    );
-  }
 
   if (!invoice || expired || !isQuotePayable(current)) {
     // This screen has FOUR very different reasons to exist, and lumping them

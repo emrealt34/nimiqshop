@@ -2796,23 +2796,17 @@ html { overflow-x: clip; }
 .checkout-switch.is-on > span { transform: translateX(17px); background: var(--white-card); }
 
 /* Cashback is the decision the payment picker must make obvious: NIM pays the
-   full rate, USDT pays a fraction, and a stake unlocks the buyer's best rate. */
+   full rate, and a stake unlocks the buyer's best rate. */
 .checkout-cashback-choice.is-active {
   border-style: solid;
   border-color: var(--green, #3e6b4f);
   background: var(--wash-good);
   box-shadow: 3px 3px 0 rgba(62, 107, 79, .15);
 }
-.checkout-cashback-choice-usdt.is-active {
-  border-color: var(--stamp, #c7481d);
-  background: var(--wash-bad);
-  box-shadow: 3px 3px 0 rgba(199, 72, 29, .13);
-}
 .checkout-cashback-choice.is-active .checkout-cashback-check {
   color: #fff;
   background: var(--green, #3e6b4f);
 }
-.checkout-cashback-choice-usdt.is-active .checkout-cashback-check { background: var(--stamp, #c7481d); }
 .checkout-cashback-stake.is-active { background: var(--wash-good-strong); }
 
 /* Keep the rail name readable: the Lightning qualifier must not be clipped

@@ -3,7 +3,7 @@
  *
  * Rendered in the pay-now card ONLY when the shop is running inside Nimiq Pay and
  * the quote carries a Lightning invoice. Tapping it hands the invoice to Nimiq
- * Pay via the Mini App SDK; Nimiq Pay lets the buyer choose NIM or USDT, shows
+ * Pay via the Mini App SDK; Nimiq Pay pays the NIM invoice and shows
  * the swap amount + fees, and asks for final approval.
  *
  * A submitted payment does NOT mean the merchant has been paid in BTC yet, so
@@ -66,7 +66,7 @@ const DEFAULT_LABELS: NimiqPayPayLabels = {
   network: 'Nimiq Pay reported a network problem and nothing was charged. Check your connection and try again.',
   noProvider: 'Could not reach Nimiq Pay. Close and reopen the app, then try again — nothing was charged.',
   invalid: 'This payment request is invalid or expired. Refresh the order and try again.',
-  unavailable: 'Open this shop inside Nimiq Pay to pay with NIM or USDT.',
+  unavailable: 'Open this shop inside Nimiq Pay to pay with NIM.',
   error: 'The payment could not be started.',
   waiting: 'Keep this page open — your order updates automatically once the merchant is paid.',
   insufficient: 'The wallet refused this payment: not enough NIM for the amount plus the network fee.',

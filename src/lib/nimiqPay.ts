@@ -140,7 +140,7 @@ export async function payLightningInvoice(invoice: string): Promise<PayLightning
   const inv = (invoice || '').trim();
   if (!inv) return { status: 'invalid', message: 'No Lightning invoice to pay yet.' };
   if (!isInNimiqPay()) {
-    return { status: 'unavailable', message: 'Open this shop inside Nimiq Pay to pay with NIM or USDT.' };
+    return { status: 'unavailable', message: 'Open this shop inside Nimiq Pay to pay with NIM.' };
   }
   if (inFlight.has(inv)) {
     return { status: 'unknown', message: 'This invoice is already being submitted — check payment status before retrying.' };

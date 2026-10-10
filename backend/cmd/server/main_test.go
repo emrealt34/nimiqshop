@@ -341,6 +341,15 @@ func TestShopperFlowTestMode(t *testing.T) {
 		t.Errorf("quote without email should be rejected: %s", res.body)
 	}
 
+	// The USDT-on-Polygon rail was removed: creation must refuse it outright.
+	if res := s.do(http.MethodPost, "/api/quotes", map[string]any{
+		"product_id": "test-steam", "country": "US", "quantity": 1,
+		"denomination": "50 USD", "product_value": 50, "email": "buyer@example.com",
+		"payment_method": "usdt_polygon",
+	}, auth); res.status != 400 {
+		t.Errorf("usdt_polygon quote must be rejected with 400, got %d %s", res.status, res.body)
+	}
+
 	// A real quote for the fixed-price mock product.
 	q := s.do(http.MethodPost, "/api/quotes", map[string]any{
 		"product_id": "test-steam", "country": "US", "quantity": 1,
@@ -609,6 +618,15 @@ func TestAdminTestCenterPurchaseAndPay(t *testing.T) {
 		t.Fatalf("admin test-purchase: %d %s", buy.status, truncate(buy.body))
 	}
 	quoteID := quoteIDFrom(t, buy)
+
+	// The admin test center offers only the Nimiq Pay rail now.
+	if res := s.do(http.MethodPost, "/api/admin/test-purchase", map[string]any{
+		"product_id": "test-steam", "country": "US", "quantity": 1,
+		"denomination": "50 USD", "product_value": 50, "email": "buyer@example.com",
+		"payment_method": "usdt_polygon",
+	}, admin); res.status != 400 {
+		t.Errorf("admin test-purchase with usdt_polygon must be rejected with 400, got %d %s", res.status, res.body)
+	}
 
 	pay := s.do(http.MethodPost, "/api/admin/test-pay", map[string]any{"quote_id": quoteID, "action": "auto"}, admin)
 	if pay.status == 404 {

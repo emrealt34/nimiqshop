@@ -256,10 +256,8 @@ func main() {
 		pc := st.EffectiveStakeCashback()
 		log.Printf("cashback: programme caps day=$%.0f month=$%.0f (stored_row=%v)", pc.DailyCapUSD, pc.MonthlyCapUSD, st.StakeCashback != nil)
 	}
-	// Wire cashback runtime enrichment: burn wallet address. Both payment
-	// rails (Nimiq Pay and USDT Polygon) pay the same cashback rate.
+	// Wire cashback runtime enrichment: burn wallet address.
 	store.SetCashbackEnrichment(cfg.BurnNimAddress)
-	log.Printf("usdt: Polygon rail enabled — same cashback rate as Nimiq Pay")
 	defer func() {
 		// Closing Badger flushes pending writes; skipping it can leave
 		// recent commits to be recovered from the WAL on next boot.

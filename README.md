@@ -1,7 +1,7 @@
 # nimiqshop.io
 
 Gift cards, eSIMs and mobile top-ups, paid with **NIM** (Nimiq Pay / BTC
-Lightning) or **USDT on Polygon**. A Go API with an embedded BadgerDB store
+Lightning). A Go API with an embedded BadgerDB store
 and a static Astro + React storefront, shipped as one binary, one container
 image or a one-line installer.
 

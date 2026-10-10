@@ -146,15 +146,6 @@ type Config struct {
 	// copy, emails, cashback memos, Hub login messages, and /api/site.
 	SiteHost string
 
-	// --- Payment rails ---
-	// The USDT-on-Polygon payment option is ALWAYS on — there is no env
-	// switch and no env-chosen network. The frontend always shows the
-	// payment-method picker (Nimiq Pay / USDT Polygon) and the network is
-	// fixed to "Polygon (Matic)" in code (handlers.PaymentNetworkStable).
-	// Both payment rails pay the SAME cashback rate — there is no
-	// stablecoin reduction. BTC Lightning (Nimiq Pay) remains the default.
-	USDTCoin string // "USDT"
-
 	// --- Cashback burn destination ---
 	// When a buyer selects "Burn" as their cashback destination, the cashback
 	// NIM is sent directly to the Nimiq burn wallet instead of their wallet.
@@ -782,10 +773,6 @@ func Load() Config {
 		NotifyWalletSeed:    notifyWalletSeed(),
 		NotifyWalletNetwork: strings.ToLower(env("NOTIFY_WALLET_NETWORK", env("CASHBACK_NETWORK", "mainnet"))),
 		NotifyWalletFeeLuna: envInt("NOTIFY_WALLET_FEE_LUNA", 1),
-
-		// USDT (Polygon) payment rail — always enabled; network fixed to
-		// Polygon (Matic) in handlers (no ENABLE_USDT_PAYMENT / USDT_NETWORK env).
-		USDTCoin: env("USDT_COIN", "USDT"),
 
 		// Cashback burn wallet destination
 		BurnNimAddress: strings.TrimSpace(env("BURN_NIM_ADDRESS", "NQ07 0000 0000 0000 0000 0000 0000 0000 0000")),

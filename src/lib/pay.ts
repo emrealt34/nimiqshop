@@ -298,13 +298,10 @@ export function isQuotePayable(q: any, now = Date.now()): boolean {
   if (!q || q.can_pay !== true || !isPayableStatus(q.status) || q.payment_observed || q.payment_blocked) return false;
   const expiry = Date.parse(q.payment_expiry || q.payment_expires_at || q.expires_at || '');
   if (!Number.isFinite(expiry) || expiry <= now) return false;
-  // Lightning/Nimiq Pay needs a BOLT11 invoice; USDT on Polygon needs a
-  // wallet address + coin amount (no Lightning invoice is generated for the
-  // stablecoin rail).
+  // Legacy USDT-on-Polygon quotes (created before that rail was removed on
+  // 2026-10-10) have no pay screen any more: they are never payable here.
   const method = String(q.payment_method || '').toLowerCase();
   const coin = String(q.coin || '').toUpperCase();
-  if (method === 'usdt_polygon' || coin === 'USDT') {
-    return !!q.wallet_address && !!q.coin_amount;
-  }
+  if (method === 'usdt_polygon' || coin === 'USDT') return false;
   return !!quoteBolt11(q);
 }

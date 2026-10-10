@@ -26,7 +26,7 @@ func TestSimulatedCoinAmountPrefersSupplierPrice(t *testing.T) {
 	// where a validated amount exists, this test fails loudly.
 	guessed := 0.00001198
 
-	for _, method := range []string{PaymentMethodNIM, PaymentMethodUSDT, "btc_lightning"} {
+	for _, method := range []string{PaymentMethodNIM, "btc_lightning"} {
 		got := simulatedCoinAmount(guessed, method, supplier)
 		if got != supplier {
 			t.Fatalf("method %q: expected the supplier amount %q, got %q", method, supplier, got)
@@ -37,9 +37,6 @@ func TestSimulatedCoinAmountPrefersSupplierPrice(t *testing.T) {
 	// stays available so the sandbox never becomes unusable.
 	if got := simulatedCoinAmount(guessed, "btc_lightning", ""); got == "" {
 		t.Fatal("expected the face-value fallback when no validated amount exists")
-	}
-	if got := simulatedCoinAmount(12.34, PaymentMethodUSDT, ""); got != "12.34" {
-		t.Fatalf("stablecoin fallback must stay at face value, got %q", got)
 	}
 }
 

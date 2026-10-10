@@ -26,7 +26,7 @@ var Tr = map[string]string{
 	"email.reference":         "Referans:",
 	"email.builtOnNim":        "NIM üzerine inşa edildi. Ağı güvenli tutmaya yardımcı olmak için NIM'ini Nimiq Pay içindeki doğrulayıcımıza stake et:",
 	"email.cta":               "{{site}} üzerinden bir hediye gönder →",
-	"email.ctaSub":            "Hediye kartları, eSIM ve mobil kontör — NIM veya USDT ile öde.",
+	"email.ctaSub":            "Hediye kartları, eSIM ve mobil kontör — NIM ile öde.",
 	"email.contactSupport":    "Bir şey ulaşmadı mı? Desteğe yaz",
 	"email.disclaimer":        "Bu e-posta birisinin sana gönderdiği hediyeyi bildirir. {{item}}, {{site}} iş ortağı CryptoRefills tarafından ayrı olarak teslim edilir ve hiçbir zaman bu e-postaya dahil edilmez.",
 	"email.footerTagline":     "Hediye kartları, eSIM ve mobil kontör için Nimiq tabanlı mağaza",

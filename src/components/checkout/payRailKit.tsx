@@ -1,7 +1,7 @@
 /**
  * payRailKit.tsx — the shared skeleton of BOTH pay-now rails.
  *
- * Nimiq Pay Lightning and USDT-on-Polygon must feel like ONE product: the
+ * Nimiq Pay Lightning is the only payment rail.
  * pay-now sheet renders the same sections in the same order on both rails —
  * status line, rail pills, explainer, primary action, copy action, QR
  * toggle, QR frame, warning note. Only the WORDS and the QR payload differ;
@@ -15,7 +15,7 @@ import { useT } from '../../i18n';
 import { asset } from '../../lib/asset';
 import { useToast } from '../AppProviders';
 
-/** Rail chip (NIM hexagon-blue / USDT teal / network purple…). The mark
+/** Rail chip (NIM hexagon-blue, network purple…). The mark
  * slot shows a REAL icon when `img` is given — no invented glyphs. */
 export function RailPill({ bg, mark, img, children }: { bg: string; mark?: string; img?: string; children: ReactNode }) {
   return (
@@ -79,7 +79,7 @@ export function LightningRailPills() {
   return (
     <RailPills
       pills={[
-        { bg: '#0582CA', img: asset('/img/nimiq-hexagon.png?v=40'), label: t('checkout.lpPayWithNimOrUsdt') },
+        { bg: '#0582CA', img: asset('/img/nimiq-hexagon.png?v=40'), label: t('checkout.lpPayWithNim') },
         
       ]}
     />

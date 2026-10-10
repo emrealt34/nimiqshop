@@ -16,9 +16,8 @@ import en from '../../i18n/locales/en';
 export const CASHBACK_FEE_TITLE = en.cashbackFee.title;
 export const CASHBACK_FEE_RULE = en.cashbackFee.rule;
 export const CASHBACK_FEE_NIM_EXAMPLE = en.cashbackFee.nimExample;
-export const CASHBACK_FEE_USDT_EXAMPLE = en.cashbackFee.usdtExample;
 
-export function CashbackFeeNotice({ example = false }: { example?: 'nim' | 'usdt' | false }) {
+export function CashbackFeeNotice({ example = false }: { example?: 'nim' | false }) {
   const { t } = useT();
   return (
     <aside className="cashback-fee-notice mt-1" role="note" aria-label={t('cashbackFee.aria')}>
@@ -26,7 +25,7 @@ export function CashbackFeeNotice({ example = false }: { example?: 'nim' | 'usdt
       <p>{t('cashbackFee.rule')}</p>
       {example && (
         <p className="cashback-fee-notice-example">
-          {example === 'usdt' ? t('cashbackFee.usdtExample') : t('cashbackFee.nimExample')}
+          {t('cashbackFee.nimExample')}
         </p>
       )}
     </aside>

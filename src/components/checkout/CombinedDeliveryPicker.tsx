@@ -37,8 +37,6 @@ export function CombinedDeliveryPicker({
 }: {
   /** The cart lines being bought — decides which contact fields are shown. */
   items?: CartItem[];
-  /** Site config: which rails are on (`enable_usdt`) and the USDT cashback
-   *  rate shown on its card. */
   onDone: (info: DeliveryInfo) => void;
   onBack: () => void;
 }) {
@@ -75,17 +73,9 @@ export function CombinedDeliveryPicker({
     setPhones2((prev) => prev.map((p, idx) => (idx === i ? v : p)));
     setPhone2Err((prev) => prev.map((p, idx) => (idx === i ? '' : p)));
   };
-  // TWO visible choices on purpose. A buyer whose coins are USDT should be able
-  // to say so up front and settle from wherever that USDT lives — any Polygon
-  // wallet, an exchange, or one tap inside Nimiq Pay — instead of being pushed
-  // through a single rail. NIM runs through Nimiq Pay's Bitcoin Lightning
-  // payment (`payLightningInvoice`, see "Bitcoin Lightning Payments in Mini
-  // Apps"); USDT-on-Polygon is the shop's own rail with its own one-time
-  // address. Both rails pay the SAME cashback rate, so both cards carry the
-  // same cashback line.
-  // Single payment rail: Nimiq Pay (Nimiq Pay or any Lightning wallet).
-  // The USDT option was removed by owner decision; legacy USDT quotes keep
-  // their pay screen in CheckoutFlow, but no new USDT quote can be created.
+  // Single payment rail: NIM through Nimiq Pay's Bitcoin Lightning payment
+  // (`payLightningInvoice`, see "Bitcoin Lightning Payments in Mini Apps").
+  // The USDT-on-Polygon option was removed by owner decision (2026-10-10).
 
   const submit = async () => {
     setSelfError('');

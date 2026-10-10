@@ -51,10 +51,8 @@ type RunRow = {
   error?: string;
 };
 
-const METHODS = [
-  { id: 'nimiq_pay', label: 'Nimiq Pay (BTC Lightning)' },
-  { id: 'usdt_polygon', label: 'USDT (Polygon)' },
-];
+// The only payment rail: Nimiq Pay (BTC Lightning). USDT-on-Polygon was removed.
+const PAYMENT_METHOD = 'nimiq_pay';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -117,7 +115,6 @@ export function AdminTestCenterPanel() {
   const [phone, setPhone] = useState('');
   const [giftMessage, setGiftMessage] = useState('');
   const [anonymous, setAnonymous] = useState(false);
-  const [method, setMethod] = useState('nimiq_pay');
 
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [running, setRunning] = useState(false);
@@ -267,7 +264,7 @@ export function AdminTestCenterPanel() {
           phone_number: phone.trim() || undefined,
           gift_message: giftMessage.trim() || undefined,
           anonymous,
-          payment_method: method,
+          payment_method: PAYMENT_METHOD,
           cashback_destination: 'cashback',
         });
         const quoteId = String(buy.quote_id || buy.id || '');
@@ -434,9 +431,7 @@ export function AdminTestCenterPanel() {
       </div>
       <div className="field">
         <label>Payment rail</label>
-        <select className="input" value={method} onChange={(e) => setMethod(e.target.value)}>
-          {METHODS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-        </select>
+        <div className="small muted">Nimiq Pay (BTC Lightning)</div>
       </div>
 
       {err ? <AlertBox type="error">{err}</AlertBox> : null}

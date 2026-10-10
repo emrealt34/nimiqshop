@@ -5,7 +5,7 @@ import { t as tr } from '../i18n';
  * answering differently:
  *
  *   1. "How does this order reach the buyer?"  (email / phone / email & phone)
- *   2. "Which rail is being paid?"             (Pay with Nimiq Pay / USDT · Polygon)
+ *   2. "Which rail is being paid?"             (Pay with Nimiq Pay; legacy USDT orders are labelled)
  *
  * WHY THIS FILE EXISTS
  * --------------------
@@ -308,7 +308,8 @@ export type PayRail = {
 
 /**
  * Which rail does this quote/order use? One detector for every screen.
- * The stablecoin rail is USDT on Polygon — nothing else.
+ * New orders are always Nimiq Pay. The USDT branch only labels legacy orders
+ * that were created before the USDT rail was removed (2026-10-10).
  */
 export function payRail(q: any): PayRail {
   const method = String(q?.payment_method || q?.quote?.payment_method || '').toLowerCase();

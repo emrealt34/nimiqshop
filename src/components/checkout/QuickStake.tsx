@@ -1,9 +1,8 @@
 /**
  * QuickStake — the one-tap "stake right here, right now" widget.
  *
- * The buyer meets it at the two moments the shop has their full attention
- * and the USDT discount is on the table: the USDT cashback popup at the
- * payment picker, and the USDT pay screen. Inside Nimiq Pay the provider
+ * The buyer meets it at the moment the shop has their full attention: the
+ * cashback popup at the payment picker. Inside Nimiq Pay the provider
  * signs with a single confirmation dialog, so the whole flow is: tap a
  * preset → tap Stake. The widget handles the same walls the Cashback page
  * already knows about:

@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"math"
 	"strconv"
@@ -42,9 +40,8 @@ import (
  * pipeline simulated. The only real side effects are the gift email through
  * Mailtrap and local records — that is the point of the test.
  *
- * RAILS: every payment flow the shop exposes — Nimiq Pay (BTC Lightning
- * invoice) and USDT (Polygon) — gets the same simulated auto-pay; only the
- * fake wallet's shape differs (checksum-valid lnbc… vs 0x…).
+ * RAILS: the only payment flow is Nimiq Pay (BTC Lightning invoice); it gets
+ * the simulated auto-pay with a checksum-valid lnbc… fake invoice.
  *
  * Guard: admin session required, and only TestMode quotes (supplier ids
  * TESTSIM-*) can ever be driven by test-pay.
@@ -70,7 +67,7 @@ type adminTestPurchaseRequest struct {
 	GiftMessage         string  `json:"gift_message,omitempty"`
 	Anonymous           bool    `json:"anonymous,omitempty"`
 	GifterIdenticon     string  `json:"gifter_identicon,omitempty"`
-	PaymentMethod       string  `json:"payment_method,omitempty"` // nimiq_pay | usdt_polygon
+	PaymentMethod       string  `json:"payment_method,omitempty"` // nimiq_pay
 	CashbackDestination string  `json:"cashback_destination,omitempty"`
 	CashbackCode        string  `json:"cashback_code,omitempty"`
 }
@@ -105,20 +102,16 @@ func (h *Handlers) AdminTestPurchase(ctx *fasthttp.RequestCtx) {
 		writeError(ctx, fasthttp.StatusBadRequest, "invalid quantity")
 		return
 	}
-	// Same rail rules as the real checkout: default Nimiq Pay (BTC
-	// Lightning), or USDT on Polygon. Unknown ids are a hard 400.
+	// Same rail rule as the real checkout: Nimiq Pay (BTC Lightning) only.
 	method := strings.ToLower(strings.TrimSpace(req.PaymentMethod))
 	if method == "" {
 		method = PaymentMethodNIM
 	}
-	if method != PaymentMethodNIM && method != PaymentMethodUSDT {
-		writeError(ctx, fasthttp.StatusBadRequest, "payment_method must be nimiq_pay or usdt_polygon")
+	if method != PaymentMethodNIM {
+		writeError(ctx, fasthttp.StatusBadRequest, "payment_method must be nimiq_pay")
 		return
 	}
 	coin, network := PaymentCoinNIM, PaymentNetworkNIM
-	if method == PaymentMethodUSDT {
-		coin, network = PaymentCoinUSDT, PaymentNetworkStable
-	}
 	dest := strings.ToLower(strings.TrimSpace(req.CashbackDestination))
 	if dest != db.CashbackDestBurn {
 		dest = db.CashbackDestWallet
@@ -352,13 +345,9 @@ func giftChannelFor(message string) string {
 	return "email"
 }
 
-// simulatedWallet builds the rail-correct fake destination: a checksum-valid
-// BOLT11 Lightning invoice for Nimiq Pay, a 0x… address for USDT on Polygon.
+// simulatedWallet builds the fake destination: a checksum-valid BOLT11
+// Lightning invoice for Nimiq Pay.
 func simulatedWallet(method, quoteID, coin string) string {
-	if method == PaymentMethodUSDT {
-		sum := sha256.Sum256([]byte("test-center-usdt:" + quoteID))
-		return "0x" + hex.EncodeToString(sum[:])[:40]
-	}
 	// A real checksum-valid lnbc invoice (bech32), amount-prefixed like the
 	// supplier's — wallets and the QR/lightning: URI path treat it exactly
 	// like a real one. Nobody can ever pay it: the test-pay endpoint is the
@@ -366,10 +355,7 @@ func simulatedWallet(method, quoteID, coin string) string {
 	return testutil.Invoice("0.00001", "test-center:"+quoteID, time.Now().UTC())
 }
 
-// simulatedCoinAmount prices the cart on the chosen rail: USDT at face value,
-// BTC via the always-warm oracle rate (the same snapshot the shop's own
-// estimates use).
-// simulatedCoinAmount prices the cart on the chosen rail. The FIRST choice
+// simulatedCoinAmount prices the cart on the Nimiq Pay (BTC) rail. The FIRST choice
 // is the supplier's own validated amount for this exact cart — the real
 // price the buyer would be invoiced (fee and live rate included, straight
 // from the same validation that gates checkout). Only when no validated
@@ -378,12 +364,8 @@ func simulatedWallet(method, quoteID, coin string) string {
 // A fabricated 1:1 rate is never served while a real price is known.
 func simulatedCoinAmount(faceUSD float64, method string, validated string) string {
 	if v, err := strconv.ParseFloat(strings.TrimSpace(validated), 64); err == nil && v > 0 && !math.IsInf(v, 0) && !math.IsNaN(v) {
-		// Preserve the supplier decimal exactly. Rounding USDT to cents can
-		// turn a valid small invoice into zero and desynchronise cashback.
+		// Preserve the supplier decimal exactly.
 		return strings.TrimSpace(validated)
-	}
-	if method == PaymentMethodUSDT {
-		return strconv.FormatFloat(faceUSD, 'f', 2, 64)
 	}
 	snap := currentRates()
 	if snap.btcUSD <= 0 {

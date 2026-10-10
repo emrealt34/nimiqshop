@@ -30,7 +30,7 @@ var En = map[string]string{
 	"email.reference":         "Reference:",
 	"email.builtOnNim":        "Built on NIM. To help secure the network, stake NIM to our validator inside Nimiq Pay:",
 	"email.cta":               "Give a gift back at {{site}} →",
-	"email.ctaSub":            "Gift cards, eSIMs and phone top-ups — pay with NIM or USDT.",
+	"email.ctaSub":            "Gift cards, eSIMs and phone top-ups — pay with NIM.",
 	"email.contactSupport":    "Something did not arrive? Contact support",
 	"email.disclaimer":        "This email tells you about a gift someone sent. The {{item}} is delivered separately by {{site}}'s partner CryptoRefills and is never included in this email.",
 	"email.footerTagline":     "Nimiq-native shop for gift cards, eSIMs & top-ups",

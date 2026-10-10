@@ -61,7 +61,6 @@ import {
 } from '../ui/uiKit';
 import { LightningPayBlock } from '../checkout/LightningPayBlock';
 import { NimiqPayPayButton } from '../checkout/NimiqPayPayButton';
-import { UsdtPayBlock } from '../checkout/UsdtPayBlock';
 import { PaymentCountdown } from '../checkout/PaymentCountdown';
 import { deliverySummary, payRail, payActionLine, linesOf , coinAmountLabel, coinAmountLabelFor } from '../../lib/deliveryCopy';
 import { hasLockedNim, nimAmountText } from '../../lib/nim';
@@ -667,7 +666,17 @@ function PayNowCard({ q }: { q: any }) {
       </div>
     );
   }
-  if (!rail.isUsdt && !invoice) return null;
+  // Legacy USDT-on-Polygon order (the rail was removed on 2026-10-10): no pay
+  // screen any more. The order itself stays visible below and in the tracker.
+  if (rail.isUsdt) {
+    return (
+      <div className="card">
+        <div className="card-title"><Icon name="bolt" size={16} /> {t('orderPage.usdtClosedTitle')}</div>
+        <div className="small muted">{t('orderPage.usdtClosedBody')}</div>
+      </div>
+    );
+  }
+  if (!invoice) return null;
   let payURI = '';
   try {
     if (invoice) payURI = lightningPaymentURI(invoice);
@@ -694,12 +703,11 @@ function PayNowCard({ q }: { q: any }) {
         <span>{t('checkout.flowWaiting')}</span>
       </div>
 
-      {!rail.isUsdt && <LightningRailPills />}      <div className="pay-hero mt-2">
+      <LightningRailPills />
+      <div className="pay-hero mt-2">
         <div className="pay-hero-label">{t('checkout.flowDirect')}</div>
         <div className="pay-hero-amt">
-          {rail.isUsdt ? (
-            <span className="big-nim">{coinAmountLabel(q) || t('orderPage.amountShownBelow')}</span>
-          ) : nimBase ? (
+          {nimBase ? (
             <>
               <img className="pay-nim-ico" src={asset("/img/nimiq-hexagon.png?v=40")} draggable={false} alt="NIM" width={22} height={22} style={{ pointerEvents: "none", borderRadius: 5 }} />
               <span className="big-nim">{t('checkout.flowFeeSuffix', { amount: nimBase })}</span>
@@ -728,17 +736,13 @@ function PayNowCard({ q }: { q: any }) {
             <div>
               <dt>{t('orderPage.youPay')}</dt>
               <dd>
-                {rail.isUsdt ? (
-                  coinAmountLabel(q) || t('orderPage.amountShownBelow')
-                ) : (
-                  <NimAmount q={q} fallback={t('orderPage.amountInNimiqPay')} />
-                )}
+                <NimAmount q={q} fallback={t('orderPage.amountInNimiqPay')} />
               </dd>
             </div>
-            <div><dt>{t('orderPage.paymentMethod')}</dt><dd>{rail.isUsdt ? rail.label : t('orderPage.payBtcLightning')}</dd></div>
+            <div><dt>{t('orderPage.paymentMethod')}</dt><dd>{t('orderPage.payBtcLightning')}</dd></div>
             <div>
               <dt>{t('orderPage.finalTotal')}</dt>
-              <dd>{rail.isUsdt ? t('orderPage.finalTotalUsdt', { coin: rail.short }) : (coinAmountLabelFor(q, 'BTC') || t('orderPage.amountNote'))}</dd>
+              <dd>{coinAmountLabelFor(q, 'BTC') || t('orderPage.amountNote')}</dd>
             </div>
             {String(q.lightning_payment_hash || '') ? (
               <div><dt>{t('orderPage.rowTx')}</dt><dd className="mono small" style={{ wordBreak: 'break-all' }}>{String(q.lightning_payment_hash)}</dd></div>
@@ -752,7 +756,7 @@ function PayNowCard({ q }: { q: any }) {
             <div><dt>{t('orderPage.nextStep')}</dt><dd>{payActionLine(q, del)}</dd></div>
           </dl>
           <div className="small muted mt-1">{t('checkout.flowNimEstimateNote')}</div>
-          <CashbackFeeNotice example={rail.isUsdt ? 'usdt' : 'nim'} />
+          <CashbackFeeNotice example="nim" />
           <StakerCashbackLine quote={q} />
           <div className="alert info mt-1" style={{ marginBottom: 0, display: 'flex', gap: '8px', alignItems: 'center' }}>
             <Icon name="bolt" size={18} />
@@ -760,11 +764,9 @@ function PayNowCard({ q }: { q: any }) {
           </div>
         </div>
       </details>
-      {rail.isUsdt ? (
-        <UsdtPayBlock quote={q} expired={expired} />
-      ) : payURI ? (
+      {payURI ? (
         <>
-          {/* Inside Nimiq Pay: one-tap native payment (choose NIM/USDT, approve).
+          {/* Inside Nimiq Pay: one-tap native payment (approve in the wallet).
               Outside it: the QR / wallet hand-off below stays the way to pay. */}
           <LightningPayBlock
             quoteId={String(q.id || q.quote_id)}

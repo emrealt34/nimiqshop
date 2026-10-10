@@ -47,14 +47,10 @@ type createQuoteRequest struct {
 	Quantity     int     `json:"quantity"`
 	Email        string  `json:"email"`
 	PhoneNumber  string  `json:"phone_number,omitempty"`
-	// Coin/Network are ACCEPTED for backwards compatibility.
-	// When payment_method = "usdt_polygon" the coin is overridden to USDT on
-	// Polygon (direct wallet pay, reduced cashback). When empty/"nimiq_pay"
-	// we fall back to BTC Lightning through Nimiq Pay.
+	// Coin/Network are ignored: every order is BTC Lightning through Nimiq Pay.
 	Coin    string `json:"coin,omitempty"`
 	Network string `json:"network,omitempty"`
-	// PaymentMethod: "nimiq_pay" (default, BTC Lightning → Nimiq Pay) or
-	// "usdt_polygon" (direct USDT on Polygon; same cashback rate as Nimiq Pay).
+	// PaymentMethod: only "nimiq_pay" (the default) is accepted.
 	PaymentMethod string `json:"payment_method,omitempty"`
 	// CashbackDestination: buyer's choice "cashback" (default) or "burn".
 	CashbackDestination string `json:"cashback_destination,omitempty"`
@@ -77,30 +73,32 @@ type createQuoteRequest struct {
 	CashbackCode    string `json:"cashback_code,omitempty"`
 }
 
-// Default payment rail: BTC Lightning through Nimiq Pay.
+// The only payment rail: BTC Lightning through Nimiq Pay.
 //
-// The stablecoin rail is USDT on Polygon — the shop has never run anything
-// else in this build; there is no legacy USDC id to accept.
+// The USDT-on-Polygon rail was removed (owner decision, 2026-10-10). Quotes
+// that were created before the removal keep their stored fields and are
+// tracked as they are; no code path creates a new one.
 const (
-	PaymentCoinNIM       = "BTC"
-	PaymentNetworkNIM    = "Lightning"
-	PaymentCoinUSDT      = "USDT"
-	PaymentNetworkStable = "Polygon (Matic)"
+	PaymentCoinNIM    = "BTC"
+	PaymentNetworkNIM = "Lightning"
 
-	PaymentMethodNIM  = "nimiq_pay"
-	PaymentMethodUSDT = "usdt_polygon"
+	PaymentMethodNIM = "nimiq_pay"
 )
 
-// IsStablecoinMethod reports whether a payment-method string is the
-// stablecoin-on-Polygon rail (usdt_polygon).
-func IsStablecoinMethod(m string) bool {
-	return m == PaymentMethodUSDT
-}
+// Legacy identifiers for quotes created before the USDT rail was removed.
+// They are only ever READ (tracking, cashback classification, pricing of the
+// stored record). Nothing in the request path can produce them any more.
+const (
+	PaymentCoinUSDT      = "USDT"
+	PaymentNetworkStable = "Polygon (Matic)"
+	PaymentMethodUSDT    = "usdt_polygon"
+)
 
-// IsStablecoinCoin reports whether a coin is the stablecoin rail's coin (USDT).
-func IsStablecoinCoin(coin string) bool {
-	return strings.EqualFold(coin, PaymentCoinUSDT)
-}
+// IsStablecoinMethod reports whether a stored quote used the legacy USDT rail.
+func IsStablecoinMethod(m string) bool { return m == PaymentMethodUSDT }
+
+// IsStablecoinCoin reports whether a stored quote's coin is the legacy USDT.
+func IsStablecoinCoin(coin string) bool { return strings.EqualFold(coin, PaymentCoinUSDT) }
 
 // CreateQuote is the only purchase path:
 //
@@ -147,30 +145,21 @@ func (h *Handlers) createQuoteInner(ctx *fasthttp.RequestCtx, userID string, req
 	}
 	unlock := lockCreateQuote(userID)
 	defer unlock()
-	// PAYMENT RAIL: default BTC Lightning (Nimiq Pay). If client selected the
-	// stablecoin rail (usdt_polygon), switch to USDT on Polygon (Matic) —
-	// always available, no env switch. Stablecoin orders get reduced cashback
-	// (enforced in enqueueCashbackOnFulfill). An unknown method id is a hard
-	// 400, never a silent rail switch.
+	// PAYMENT RAIL: BTC Lightning through Nimiq Pay, the only rail. An unknown
+	// method id is a hard 400, never a silent switch.
 	method := strings.ToLower(strings.TrimSpace(req.PaymentMethod))
 	if method == "" {
 		method = PaymentMethodNIM
 	}
-	if method != PaymentMethodNIM && method != PaymentMethodUSDT {
-		writeError(ctx, fasthttp.StatusBadRequest, "payment_method must be nimiq_pay or usdt_polygon")
+	if method != PaymentMethodNIM {
+		writeError(ctx, fasthttp.StatusBadRequest, "payment_method must be nimiq_pay")
 		return
 	}
-	if IsStablecoinMethod(method) {
-		req.Coin = PaymentCoinUSDT
-		req.Network = PaymentNetworkStable
-		req.PaymentMethod = PaymentMethodUSDT
-	} else {
-		req.Coin = PaymentCoinNIM
-		req.Network = PaymentNetworkNIM
-		req.PaymentMethod = PaymentMethodNIM
-	}
-	// Cashback destination is locked per quote. "burn" is valid on both
-	// Nimiq Pay and USDT orders; anything else defaults to the buyer wallet.
+	req.Coin = PaymentCoinNIM
+	req.Network = PaymentNetworkNIM
+	req.PaymentMethod = PaymentMethodNIM
+	// Cashback destination is locked per quote. Anything but "burn" defaults
+	// to the buyer wallet.
 	dest := strings.ToLower(strings.TrimSpace(req.CashbackDestination))
 	if dest != db.CashbackDestBurn {
 		dest = db.CashbackDestWallet

@@ -9,7 +9,7 @@
  *
  * Renders the SHARED pay-now skeleton from payRailKit (status line → rail
  * pills → explainer → primary action → copy action → QR toggle → QR frame
- * → warning note), exactly like UsdtPayBlock: same sections, same
+ * → warning note), same sections, same
  * order — only the words and the QR payload are rail-specific.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';

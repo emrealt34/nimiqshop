@@ -26,7 +26,7 @@ var Fr = map[string]string{
 	"email.reference":         "Référence :",
 	"email.builtOnNim":        "Construit sur NIM. Pour aider à sécuriser le réseau, staker vos NIM vers notre validateur dans Nimiq Pay :",
 	"email.cta":               "Renvoyez un cadeau sur {{site}} →",
-	"email.ctaSub":            "Cartes cadeaux, eSIM et recharges mobiles — payez avec NIM ou USDT.",
+	"email.ctaSub":            "Cartes cadeaux, eSIM et recharges mobiles — payez avec NIM.",
 	"email.contactSupport":    "Quelque chose n'est pas arrivé ? Contacter le support",
 	"email.disclaimer":        "Cet e-mail vous annonce qu'un cadeau vous a été envoyé. {{item}} est livré séparément par le partenaire de {{site}}, CryptoRefills, et n'est jamais inclus dans cet e-mail.",
 	"email.footerTagline":     "Boutique native Nimiq pour cartes cadeaux, eSIM & recharges mobiles",
