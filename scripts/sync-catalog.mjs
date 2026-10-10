@@ -136,8 +136,18 @@ async function pool(items, worker, concurrency) {
  * verified in order (TR first, then by listing size); anything not reached in
  * this run keeps its listing flags.
  */
-const VERIFY_BUDGET_MS = Number(process.env.CATALOG_VERIFY_BUDGET_MS) || 12 * 60_000;
-const VERIFY_CONCURRENCY = 3;
+const VERIFY_BUDGET_MS = Number(process.env.CATALOG_VERIFY_BUDGET_MS) || 15 * 60_000;
+const VERIFY_CONCURRENCY = 2;
+// The supplier answers a steady ~1 request/second without refusing; bursts
+// of parallel product reads from one runner get 403 for minutes at a time.
+const VERIFY_INTERVAL_MS = Number(process.env.CATALOG_VERIFY_INTERVAL_MS) || 1000;
+let verifyNextSlot = 0;
+async function paceVerify() {
+  const now = Date.now();
+  const at = Math.max(now, verifyNextSlot);
+  verifyNextSlot = at + VERIFY_INTERVAL_MS;
+  if (at > now) await sleep(at - now);
+}
 const VERIFY_UNRESOLVED_BEFORE_COOLDOWN = 8;
 const VERIFY_COOLDOWN_MS = 45_000;
 const VERIFY_MAX_COOLDOWNS = 6;
@@ -146,6 +156,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** One product-presence read: 'ok' | 'empty' | 'unknown' (+ the HTTP status seen). */
 async function probeOnce(cc, family) {
+  await paceVerify();
   const url = `${BASE}/v5/products/country/${encodeURIComponent(cc)}?family_name=${encodeURIComponent(family)}&lang=en`;
   try {
     const res = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(20_000) });
