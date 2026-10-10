@@ -366,88 +366,71 @@ func (n GiftNote) itemEmoji() string {
 	}
 }
 
-// deliveryLine is the "where is my gift?" paragraph. It is route-specific on
-// purpose: telling a top-up recipient to look for a code in their inbox — or
-// telling them a code is "never shown in the app" when there is no code at all
-// — is exactly the mismatch the rest of the shop works to avoid.
-func (n GiftNote) deliveryLine() string {
-	switch n.deliveryKind() {
-	case DeliveryTopUp:
-		return "The credit is applied to your phone number directly by our partner CryptoRefills. " +
-			"There is no code to enter and nothing to redeem — if it is not on the number yet, " +
-			"support can chase it with the operator."
-	case DeliveryEsim:
-		return "The eSIM QR is sent to this address separately by our partner CryptoRefills; it may sit in " +
-			"the spam folder. For your security the QR is never shown on the shop's website and never " +
-			"included in this email."
-	default:
-		return "The code is sent to this address separately by our partner CryptoRefills; it may sit in the " +
-			"spam folder. For your security it is never shown on the shop's website and never included in " +
-			"this email."
-	}
-}
-
 // textBody is the plain-text fallback. A recipient with images/HTML blocked
 // still gets every fact: who, what, the donation, where it is, and a way back.
 func (n GiftNote) textBody(site, product, message string) string {
+	tl := n.tr()
 	var b strings.Builder
 	if n.Self {
-		b.WriteString("Your purchase was paid and is on its way.\n\n")
+		b.WriteString(tl("mailtext.selfLine") + "\n\n")
 	} else {
-		b.WriteString("You received a gift.\n\n")
+		b.WriteString(tl("email.youGotAGift") + "\n\n")
 	}
 	if !n.Self {
 		if n.Anonymous {
 			// Nothing that could identify the sender — and say WHY, so the
 			// missing name reads as a choice, not a bug.
-			b.WriteString("Someone sent you this" + viaSite(site) + " — the sender chose to stay anonymous.\n")
+			b.WriteString(tl("email.anonymousLine", map[string]string{"site": site}) + "\n")
 		} else {
 			// No name anywhere: the sender is "someone", and the wallet below is
 			// the honest identity of a named gift.
-			b.WriteString("Someone sent you this" + viaSite(site) + ".\n")
+			b.WriteString(tl("email.namedLine", map[string]string{"site": site}) + "\n")
 			if n.GifterNimiqAddress != "" {
-				b.WriteString("\nThe sender's Nimiq wallet:\n")
+				b.WriteString("\n" + tl("email.sendersWallet") + "\n")
 				b.WriteString("  " + groupAddress(n.GifterNimiqAddress) + "\n")
 			}
 		}
 	}
 	if n.Self && n.GifterNimiqAddress != "" && !n.Anonymous {
-		b.WriteString("\nPaid from the Nimiq wallet:\n")
+		b.WriteString("\n" + tl("mailtext.paidFromWallet") + "\n")
 		b.WriteString("  " + groupAddress(n.GifterNimiqAddress) + "\n")
 	}
+	sentLine := func() {
+		if !n.PurchasedAt.IsZero() {
+			b.WriteString(tl("email.sent") + ": " + n.PurchasedAt.UTC().Format("2 Jan 2006") + "\n")
+		}
+	}
 	if len(n.Items) > 0 {
-		b.WriteString("\nItems:\n" + itemsText(n.Items, n.itemsMore))
-		if !n.PurchasedAt.IsZero() {
-			b.WriteString("Sent: " + n.PurchasedAt.UTC().Format("2 Jan 2006") + "\n")
-		}
+		b.WriteString("\n" + tl("mailtext.itemsLabel") + "\n" + itemsText(tl, n.Items, n.itemsMore))
+		sentLine()
 	} else if product != "" {
-		b.WriteString("\nItem: " + product + "\n")
-		if !n.PurchasedAt.IsZero() {
-			b.WriteString("Sent: " + n.PurchasedAt.UTC().Format("2 Jan 2006") + "\n")
-		}
+		b.WriteString("\n" + tl("mailtext.itemLabel") + " " + product + "\n")
+		sentLine()
 	}
 	if !n.Self {
 		if message != "" {
-			b.WriteString("\nTheir message:\n" + indent(message) + "\n")
+			b.WriteString("\n" + tl("email.theirMessage") + "\n" + indent(message) + "\n")
 		} else {
-			b.WriteString("\nNo personal message was left with the gift.\n")
+			b.WriteString("\n" + tl("email.noMessage") + "\n")
 		}
 	}
-	b.WriteString("\nWhere is " + n.itemWord() + "?\n")
-	b.WriteString(wrap(n.deliveryLine(), 76) + "\n")
-	b.WriteString("\nIt arrives from noreply@cryptorefills.com.\nOpen that sender's mail: " + cryptorefillsInboxURL + "\nOr search your inbox for: from:noreply@cryptorefills.com (and check the spam folder).\n")
+	b.WriteString("\n" + tl("email.whereIs", map[string]string{"item": n.itemWordT(tl)}) + "\n")
+	b.WriteString(wrap(n.deliveryLineT(tl), 76) + "\n")
+	b.WriteString("\n" + tl("mailtext.arrivesFrom", map[string]string{"sender": "noreply@cryptorefills.com"}) + "\n")
+	b.WriteString(tl("mailtext.openSenderMail") + " " + cryptorefillsInboxURL + "\n")
+	b.WriteString(tl("mailtext.searchInbox", map[string]string{"query": "from:noreply@cryptorefills.com"}) + "\n")
 	if u := safeURL(n.ShopURL); u != "" {
-		b.WriteString("\nWant to give back? Browse gifts and top-ups:\n")
+		b.WriteString("\n" + tl("email.giveBack") + "\n")
 		b.WriteString("  " + u + "\n")
 	}
 	if u := safeURL(n.SupportURL); u != "" {
-		b.WriteString("\nAnything missing? " + u + "\n")
+		b.WriteString("\n" + tl("email.anythingMissing", map[string]string{"url": u}) + "\n")
 	}
 	if ref := strings.TrimSpace(n.OrderID); ref != "" {
-		b.WriteString("\nReference: " + ref + "\n")
+		b.WriteString("\n" + tl("email.reference") + " " + ref + "\n")
 	}
 	if sa := strings.TrimSpace(n.StakeValidatorAddress); sa != "" {
-		b.WriteString("\nBuilt on NIM. To help secure the network, stake NIM to our validator inside Nimiq Pay:\n")
+		b.WriteString("\n" + tl("email.builtOnNim") + "\n")
 		b.WriteString("  " + groupAddress(sa) + "\n")
 	}
 	return strings.TrimRight(b.String(), "\n") + "\n"
@@ -465,22 +448,19 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 	}
 	para := strings.Join(lines, "<br>")
 
-	// No name anywhere, not even the inbox snippet: the preheader says
-	// "someone", and the wallet in the body is the named gift's identity.
-	preWho := "Someone"
+	// No name anywhere, not even the inbox snippet: "someone" for named and
+	// anonymous gifts alike, the wallet in the body is the named gift's identity.
+	pre := tl("email.preheader.named", map[string]string{"site": site})
 	if n.Anonymous {
-		preWho = "Someone (anonymous)"
+		pre = tl("email.preheader.anon", map[string]string{"site": site})
 	}
-
-	// ---- preheader (inbox snippet) ---------------------------------------
-	pre := preWho + " sent you a gift via " + site
 	if n.Self {
-		pre = "Your order via " + site
+		pre = tl("mailtext.preSelf", map[string]string{"site": site})
 	}
 	if product != "" {
-		pre += " — " + product
+		pre += tl("email.preheader.product", map[string]string{"product": product})
 	}
-	pre += ". Here is what arrived and where to find it."
+	pre += tl("email.preheader.end")
 	// spacer entities pad the snippet so trailing UI text never shows
 	pad := strings.Repeat("&#847;&zwnj;&nbsp;", 8)
 
@@ -536,7 +516,7 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 	b.WriteString("      <tr>\n")
 	b.WriteString(`        <td style="padding:0 2px 12px 2px;font-family:` + font + `">` + "\n")
 	b.WriteString(`          <span style="font-size:16px;font-weight:800;color:` + mailInk + `;letter-spacing:-.01em">` + wordmark(site) + `</span>` + "\n")
-	b.WriteString(`          <span style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:` + mailInkFaint + `">&nbsp;&nbsp;` + giftWord(n.Self) + ` note</span>` + "\n")
+	b.WriteString(`          <span style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:` + mailInkFaint + `">&nbsp;&nbsp;` + esc(tl(badgeKey(n.Self))) + `</span>` + "\n")
 	b.WriteString("        </td>\n")
 	b.WriteString("      </tr>\n")
 
@@ -574,7 +554,7 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 			_, withIcon := identiconImage(n.GifterIdenticonDataURI)
 			b.WriteString(identityCard(esc(groupAddress(n.GifterNimiqAddress)), withIcon, n.Self, tl))
 		} else {
-			b.WriteString(plainSenderCard())
+			b.WriteString(plainSenderCard(tl))
 		}
 		b.WriteString("              </td>\n")
 		b.WriteString("            </tr>\n")
@@ -594,7 +574,7 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 		}
 		b.WriteString(`                <div class="item-line" style="font-size:17px;font-weight:700;color:` + mailInk + `;font-family:` + font + `;text-align:center">` + item + `</div>` + "\n")
 	} else {
-		b.WriteString(`                ` + itemsBlock(font, n.Items, n.itemsMore) + "\n")
+		b.WriteString(`                ` + itemsBlock(font, n.Items, n.itemsMore, tl) + "\n")
 	}
 	sentLine := "just now"
 	if !n.PurchasedAt.IsZero() {
@@ -627,7 +607,7 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 	b.WriteString(`                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:` + mailPanel + `;border:1px dashed ` + mailDash + `;border-radius:12px">` + "\n")
 	b.WriteString(`                  <tr><td style="padding:13px 15px;font-size:13px;line-height:1.6;color:` + mailInkDim + `;font-family:` + font + `">` + "\n")
 	b.WriteString(`                    <strong style="color:` + mailInk + `">` + esc(tl("email.whereIs", map[string]string{"item": n.itemWordT(tl)})) + `</strong><br>` + "\n")
-	b.WriteString(`                    ` + esc(n.deliveryLineT(tl)) + ` It arrives from <a href="` + cryptorefillsInboxURL + `" style="color:` + mailInk + `;font-weight:700;text-decoration:underline">noreply@cryptorefills.com</a>. Tap it to open that sender's mail, or search your inbox for <strong style="color:` + mailInk + `">from:noreply@cryptorefills.com</strong>. Check the spam folder too.` + "\n")
+	b.WriteString(`                    ` + esc(n.deliveryLineT(tl)) + ` ` + tl("mailtext.arrivesFromHTML", map[string]string{"sender": `<a href="` + cryptorefillsInboxURL + `" style="color:` + mailInk + `;font-weight:700;text-decoration:underline">noreply@cryptorefills.com</a>`, "query": `<strong style="color:` + mailInk + `">from:noreply@cryptorefills.com</strong>`}) + "\n")
 	b.WriteString("                  </td></tr>\n")
 	b.WriteString("                </table>\n")
 	b.WriteString("              </td>\n")
@@ -656,7 +636,7 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 		b.WriteString(`              <td class="px-card" style="padding:0 26px 22px 26px">` + "\n")
 		b.WriteString(`                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px dashed ` + mailDash + `">` + "\n")
 		b.WriteString(`                  <tr><td class="foot" style="padding:16px 2px 0 2px;font-size:12px;line-height:1.6;color:` + mailInkFaint + `;font-family:` + font + `">` + "\n")
-		b.WriteString(`                    <strong style="color:` + mailGreen + `">Built on NIM.</strong> ` + esc(site) + ` is a Nimiq-native shop — pay in NIM and stake to help secure the network.<br>` + "\n")
+		b.WriteString(`                    <strong style="color:` + mailGreen + `">` + esc(tl("mailtext.builtOnNimLabel")) + `</strong> ` + esc(tl("mailtext.nativeShop", map[string]string{"site": site})) + `<br>` + "\n")
 		b.WriteString(`                    <span style="font-family:` + emailMono + `;font-size:11.5px;color:` + mailInkDim + `">` + esc(groupAddress(sa)) + `</span>` + "\n")
 		b.WriteString("                  </td></tr>\n")
 		b.WriteString("                </table>\n")
@@ -673,7 +653,11 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 	if ref := strings.TrimSpace(n.OrderID); ref != "" {
 		b.WriteString(`                <div style="padding-top:8px;color:` + mailInkFaint + `;font-size:11px;font-family:` + emailMono + `">` + esc(tl("email.reference")) + ` ` + esc(ref) + `</div>` + "\n")
 	}
-	b.WriteString(`                <div style="padding-top:8px;font-size:11px;color:` + mailInkFaint + `">This email tells you about ` + esc(articleFor(giftWord(n.Self))) + ` ` + esc(giftWord(n.Self)) + `. ` + esc(capFirst(n.itemWord())) + ` is delivered separately by ` + esc(site) + `&rsquo;s partner CryptoRefills and is never included in this email.</div>` + "\n")
+	disclaimerKey := "email.disclaimer"
+	if n.Self {
+		disclaimerKey = "mailtext.disclaimerOrder"
+	}
+	b.WriteString(`                <div style="padding-top:8px;font-size:11px;color:` + mailInkFaint + `">` + esc(tl(disclaimerKey, map[string]string{"site": site})) + `</div>` + "\n")
 	b.WriteString("              </td>\n")
 	b.WriteString("            </tr>\n")
 	b.WriteString("          </table>\n")
@@ -683,7 +667,7 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 	// below the card: the same footer line the site carries
 	b.WriteString("      <tr>\n")
 	b.WriteString(`        <td class="foot" style="padding:12px 4px 0 4px;color:` + mailInkFaint + `;font-size:11px;line-height:1.6;text-align:center;font-family:` + font + `">` + "\n")
-	b.WriteString(`          ` + esc(site) + ` · Nimiq-native shop for gift cards, eSIMs &amp; top-ups` + "\n")
+	b.WriteString(`          ` + esc(site) + ` · ` + esc(tl("email.footerTagline")) + "\n")
 	b.WriteString("        </td>\n")
 	b.WriteString("      </tr>\n")
 	b.WriteString("      </table>\n")
@@ -700,30 +684,6 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 // cryptorefillsInboxURL opens Gmail filtered to mail from the CryptoRefills
 // sender, so the buyer lands on the delivery mail with one tap.
 const cryptorefillsInboxURL = "https://mail.google.com/mail/u/0/#search/from%3Anoreply%40cryptorefills.com"
-
-// articleFor returns "an" before a vowel sound and "a" otherwise, so the copy
-// reads "an order" and "a gift" without a hard-coded article.
-func articleFor(word string) string {
-	if w := strings.ToLower(word); w != "" && strings.ContainsRune("aeiou", rune(w[0])) {
-		return "an"
-	}
-	return "a"
-}
-
-// capFirst upper-cases the first letter of a sentence fragment.
-func capFirst(s string) string {
-	if s == "" {
-		return s
-	}
-	return strings.ToUpper(s[:1]) + s[1:]
-}
-
-func giftWord(self bool) string {
-	if self {
-		return "order"
-	}
-	return "gift"
-}
 
 // itemLabelFor is the eyebrow above the product list: singular for one line,
 // plural when the order has several.
@@ -762,18 +722,26 @@ func paidOrFrom(self bool, tl i18n.T) string {
 	return tl("mailcard.from")
 }
 
-func identityFootnote(self bool) string {
+// badgeKey is the header badge label for the note's kind.
+func badgeKey(self bool) string {
 	if self {
-		return "This is the wallet that paid for your order."
+		return "mailtext.badgeOrder"
 	}
-	return "Their wallet is the signature — the note carries no name."
+	return "mailtext.badgeGift"
+}
+
+func identityFootnote(tl i18n.T, self bool) string {
+	if self {
+		return tl("mailtext.identitySelf")
+	}
+	return tl("mailtext.identityGift")
 }
 
 // plainSenderCard is the gift-without-a-wallet case: the note still says a gift
 // arrived, it just has no on-chain identity to show.
-func plainSenderCard() string {
+func plainSenderCard(tl i18n.T) string {
 	font := emailFont
-	inner := `<div style="font-size:13px;line-height:1.6;color:` + mailInkDim + `">A gift card was bought for you at the shop. The buyer did not attach a wallet address, so this note carries no sender identity.</div>`
+	inner := `<div style="font-size:13px;line-height:1.6;color:` + mailInkDim + `">` + esc(tl("mailtext.plainSender")) + `</div>`
 	return panel(font, inner)
 }
 
@@ -799,8 +767,8 @@ func anonymousCard(tl i18n.T) string {
 		`</td>` +
 		`<td style="padding-left:14px;vertical-align:middle">` +
 		eyebrow(font, tl("mailcard.from")) +
-		`<div style="font-size:13px;line-height:1.55;color:` + mailInk + `"><strong>The sender chose to stay anonymous.</strong></div>` +
-		`<div style="font-size:11.5px;color:` + mailInkFaint + `;padding-top:2px">No name, no wallet — that is intentional, not a rendering mistake.</div>` +
+		`<div style="font-size:13px;line-height:1.55;color:` + mailInk + `"><strong>` + esc(tl("email.anonSender")) + `</strong></div>` +
+		`<div style="font-size:11.5px;color:` + mailInkFaint + `;padding-top:2px">` + esc(tl("email.anonSenderBody")) + `</div>` +
 		`</td></tr></table>`
 	return panel(font, inner)
 }
@@ -870,7 +838,7 @@ func itemTileCID(tile []byte) string {
 // itemsBlock renders the product list as a two-column grid, like the storefront's
 // product tiles. Each cell is the brand tile, the name with its quantity, and the
 // face value underneath. Rows hold at most two items.
-func itemsBlock(font string, items []GiftItem, more int) string {
+func itemsBlock(font string, items []GiftItem, more int, tl i18n.T) string {
 	var b strings.Builder
 	b.WriteString(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:6px">`)
 	for i := 0; i < len(items); i += 2 {
@@ -884,7 +852,7 @@ func itemsBlock(font string, items []GiftItem, more int) string {
 		b.WriteString("</tr>")
 	}
 	if more > 0 {
-		b.WriteString(`<tr><td colspan="2" style="padding:4px 0 10px 0;font-size:13px;color:` + mailInkFaint + `;font-family:` + font + `">+ ` + strconv.Itoa(more) + ` more in this order</td></tr>`)
+		b.WriteString(`<tr><td colspan="2" style="padding:4px 0 10px 0;font-size:13px;color:` + mailInkFaint + `;font-family:` + font + `">` + esc(tl("mailtext.moreInOrder", map[string]string{"n": strconv.Itoa(more)})) + `</td></tr>`)
 	}
 	b.WriteString("</table>")
 	return b.String()
@@ -911,7 +879,7 @@ func itemCell(font string, it GiftItem, left bool) string {
 }
 
 // itemsText is the plain-text twin of itemsBlock.
-func itemsText(items []GiftItem, more int) string {
+func itemsText(tl i18n.T, items []GiftItem, more int) string {
 	var b strings.Builder
 	for _, it := range items {
 		line := "  - " + strings.TrimSpace(it.Name)
@@ -924,7 +892,7 @@ func itemsText(items []GiftItem, more int) string {
 		b.WriteString(line + "\n")
 	}
 	if more > 0 {
-		b.WriteString("  + " + strconv.Itoa(more) + " more in this order\n")
+		b.WriteString("  " + tl("mailtext.moreInOrder", map[string]string{"n": strconv.Itoa(more)}) + "\n")
 	}
 	return b.String()
 }
@@ -996,7 +964,7 @@ func identityCard(addr string, withIcon bool, self bool, tl i18n.T) string {
 	info := `<td class="donor-info" style="vertical-align:middle;padding-left:` + gap + `">` +
 		eyebrow(font, paidOrFrom(self, tl)) +
 		addrCell +
-		`<div style="font-size:11.5px;line-height:1.5;color:` + mailInkFaint + `;padding-top:4px">` + identityFootnote(self) + `</div>` +
+		`<div style="font-size:11.5px;line-height:1.5;color:` + mailInkFaint + `;padding-top:4px">` + esc(identityFootnote(tl, self)) + `</div>` +
 		`</td>`
 	inner := `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>` + avatar + info + `</tr></table>`
 	return panel(font, inner)

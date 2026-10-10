@@ -939,7 +939,7 @@ const tr = {
     cta: '{{site}} üzerinden bir hediye gönder →',
     ctaSub: 'Hediye kartları, eSIM ve mobil kontör — NIM ile öde.',
     contactSupport: 'Bir şey ulaşmadı mı? Desteğe yaz',
-    disclaimer: 'Bu e-posta birisinin sana gönderdiği hediyeyi bildirir. {{item}}, {{site}} iş ortağı CryptoRefills tarafından ayrı olarak teslim edilir ve hiçbir zaman bu e-postaya dahil edilmez.',
+    disclaimer: 'Bu e-posta birisinin sana gönderdiği bir hediyeyi bildirir. Teslimatın kendisi {{site}} iş ortağı CryptoRefills tarafından ayrıca yapılır ve bu e-postaya asla dahil edilmez.',
     footerTagline: 'Hediye kartları, eSIM ve mobil kontör için Nimiq tabanlı mağaza',
     anonSender: 'Anonim bir gönderici',
     anonSenderBody: 'Gönderen anonim kalmayı seçti — isim veya cüzdan gösterilmiyor.',

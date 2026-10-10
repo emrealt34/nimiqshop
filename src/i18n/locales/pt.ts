@@ -938,7 +938,7 @@ const pt = {
     cta: 'Dê um presente em {{site}} →',
     ctaSub: 'Cartões-presente, eSIM e recargas móveis — pague com NIM.',
     contactSupport: 'Algo não chegou? Contatar o suporte',
-    disclaimer: 'Este e-mail avisa sobre um presente que alguém enviou. {{item}} é entregue separadamente pelo parceiro da {{site}}, CryptoRefills, e nunca é incluído neste e-mail.',
+    disclaimer: 'Este e-mail avisa sobre um presente que alguém enviou. A entrega em si é feita separadamente pelo parceiro da {{site}}, a CryptoRefills, e nunca é incluída neste e-mail.',
     footerTagline: 'Loja nativa Nimiq para cartões-presente, eSIM e recargas móveis',
     anonSender: 'Um remetente anônimo',
     anonSenderBody: 'O remetente escolheu permanecer anônimo — nenhum nome ou carteira é mostrado.',

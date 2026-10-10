@@ -947,7 +947,7 @@ const en = {
     cta: 'Give a gift back at {{site}} →',
     ctaSub: 'Gift cards, eSIMs and phone top-ups — pay with Nimiq Pay.',
     contactSupport: 'Something did not arrive? Contact support',
-    disclaimer: 'This email tells you about a gift someone sent. The {{item}} is delivered separately by {{site}}\'s partner CryptoRefills and is never included in this email.',
+    disclaimer: 'This email tells you about a gift someone sent. The delivery itself is handled separately by {{site}}’s partner CryptoRefills and is never included in this email.',
     footerTagline: 'Nimiq-native shop for gift cards, eSIMs & top-ups',
     anonSender: 'An anonymous sender',
     anonSenderBody: 'The sender chose to stay anonymous — no name or wallet is shown.',

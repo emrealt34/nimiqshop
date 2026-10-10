@@ -342,9 +342,11 @@ func TestFooterGrammar(t *testing.T) {
 				t.Fatalf("self=%v: bad copy %q", self, bad)
 			}
 		}
-		want := "about a gift"
+		// The disclaimer is localised (mailtext.disclaimer*); the default
+		// language here is English, so check its English copy.
+		want := "about a gift someone sent"
 		if self {
-			want = "about an order"
+			want = "about your order"
 		}
 		if !strings.Contains(msg.HTML, want) {
 			t.Fatalf("self=%v: footer missing %q", self, want)

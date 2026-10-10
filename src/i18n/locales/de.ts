@@ -938,7 +938,7 @@ const de = {
     cta: 'Schenke etwas zurück auf {{site}} →',
     ctaSub: 'Geschenkkarten, eSIM und Handy-Aufladungen — mit NIM bezahlen.',
     contactSupport: 'Etwas ist nicht angekommen? Support kontaktieren',
-    disclaimer: 'Diese E-Mail informiert dich über ein Geschenk, das dir jemand geschickt hat. {{item}} wird separat von CryptoRefills, dem Partner von {{site}}, zugestellt und ist nicht in dieser E-Mail enthalten.',
+    disclaimer: 'Diese E-Mail informiert dich über ein Geschenk, das dir jemand geschickt hat. Die eigentliche Lieferung übernimmt separat CryptoRefills, der Partner von {{site}}, und sie ist nie Teil dieser E-Mail.',
     footerTagline: 'Nimiq-nativer Shop für Geschenkkarten, eSIM & Handy-Aufladungen',
     anonSender: 'Ein anonymer Absender',
     anonSenderBody: 'Der Absender möchte anonym bleiben — Name und Wallet werden nicht angezeigt.',
