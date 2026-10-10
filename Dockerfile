@@ -25,7 +25,7 @@ COPY . .
 RUN npm run build
 
 # ---------- 2. backend binary -----------------------------------------------
-FROM --platform=$BUILDPLATFORM golang:1.27.1-bookworm@sha256:69a7b9788769bec032d238959b61854e9ae87f57be9029ec04e9885fabf99195 AS backend
+FROM --platform=$BUILDPLATFORM golang:1.27.2-bookworm@sha256:5cf287a799e6b94384bad13d16b14904c531f51ba65792237e122ce42b392f61 AS backend
 WORKDIR /src/backend
 ENV CGO_ENABLED=0 \
     GOFLAGS=-mod=readonly

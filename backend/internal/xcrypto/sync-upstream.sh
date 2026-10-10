@@ -42,7 +42,8 @@ cp "$dir"/blake2b/{blake2b.go,blake2b_generic.go,blake2b_ref.go} "$stage/blake2b
 cp "$dir"/argon2/{argon2.go,blake2b.go,blamka_generic.go,blamka_ref.go} "$stage/argon2/"
 chmod u+w "$stage"/*/*.go
 # 1. the *_ref.go build constraint (generic code is the only implementation here)
-sed -i '/^\/\/go:build !amd64 || purego || !gc$/,+1d' "$stage"/*/*_ref.go
+# (matched by prefix: upstream rewrites the constraint text between releases)
+sed -i '/^\/\/go:build /,+1d' "$stage"/*/*_ref.go
 # 2. argon2 hashes with the sibling blake2b copy
 sed -i 's#"golang.org/x/crypto/blake2b"#"nimiqshop/internal/xcrypto/blake2b"#' "$stage"/argon2/*.go
 cp "$dir/LICENSE" "$stage/LICENSE"
