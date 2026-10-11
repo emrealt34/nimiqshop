@@ -200,7 +200,7 @@ type Quote struct {
 	// TestMode marks an ADMIN TEST CENTER purchase: created through the same
 	// checkout pipeline, but against the simulated supplier (no Cryptorefills
 	// call, no real money anywhere). Test quotes drive the REAL state
-	// machine, feed, gift mail and admin views — and are excluded from
+	// machine, gift mail and admin views. Public activity excludes them, as does
 	// everything that would move real money: the cashback payout queue, the
 	// 1-Luna wallet memo, the settlement tracker's supplier polls, the
 	// active-checkout hold and the daily-order budget.

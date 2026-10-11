@@ -28,7 +28,7 @@ import (
  * payment attach) — but against a SIMULATED supplier, then drive the payment
  * through the SAME state machine the real tracker/webhook path uses
  * (ApplySupplierOrder → publishToFeed → settlement.NotifyFulfilled), so the
- * gift email, the activity feed and the admin order views are byte-for-byte
+ * gift email and admin order views are byte-for-byte
  * what a real buyer's order produces.
  *
  * WHAT IT NEVER DOES: touch the real Cryptorefills API, move real money,

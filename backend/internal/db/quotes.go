@@ -9,6 +9,7 @@ import (
 
 	"github.com/dgraph-io/badger/v4"
 
+	"nimiqshop/internal/activityvisibility"
 	"nimiqshop/internal/cryptorefills"
 	"nimiqshop/internal/money"
 	"nimiqshop/internal/stakeledger"
@@ -896,16 +897,19 @@ func (s *Store) SweepExpiredQuotes(now time.Time, limit int) (int, error) {
 func (s *Store) ListFeedQuotes(limit int) ([]Quote, error) {
 	var out []Quote
 	err := s.View(func(tx *badger.Txn) error {
-		return scanIndex(tx, feedQuoteIndexPrefix(), limit, func(id string) error {
+		return scanPublicFeed(tx, feedQuoteIndexPrefix(), limit, func(id string) (bool, error) {
 			var q Quote
 			if err := getJSON(tx, quoteKey(id), &q); err != nil {
 				if errors.Is(err, ErrNotFound) {
-					return nil
+					return false, nil
 				}
-				return err
+				return false, err
+			}
+			if !activityvisibility.Visible(q.ID, q.TestMode) {
+				return false, nil
 			}
 			out = append(out, q)
-			return nil
+			return true, nil
 		})
 	})
 	return out, err
@@ -937,7 +941,7 @@ func (s *Store) MarkGiftNotified(id string) error {
 // are indexed too; the public handler publishes the product/status summary but
 // omits the buyer identity and payment transaction details.
 func publishToFeed(tx *badger.Txn, q *Quote) error {
-	if q.Status != "fulfilled" {
+	if q.Status != "fulfilled" || !activityvisibility.Visible(q.ID, q.TestMode) {
 		return nil
 	}
 	return tx.Set(feedQuoteIndexKey(q.UpdatedAt.UnixNano(), q.ID), []byte(q.ID))

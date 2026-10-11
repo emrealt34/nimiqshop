@@ -7,6 +7,7 @@ import (
 
 	"github.com/dgraph-io/badger/v4"
 
+	"nimiqshop/internal/activityvisibility"
 	"nimiqshop/internal/money"
 )
 
@@ -245,7 +246,7 @@ func writeOrderStatus(txn *badger.Txn, o *Order, status string) error {
 		// Anonymous orders are published as privacy-preserving rows: the feed
 		// handler omits the buyer identity and any payment transaction details.
 		feedNow := (isDeliveredStatus(status) && !isDeliveredStatus(prev)) || (status == "refunded" && prev != "refunded")
-		if feedNow {
+		if feedNow && activityvisibility.Visible(o.ID, false) {
 			if err := txn.Set(feedOrderIndexKey(o.UpdatedAt.UnixNano(), o.ID), []byte(o.ID)); err != nil {
 				return err
 			}
@@ -295,16 +296,19 @@ func (s *Store) GetOrderByIdempotencyKey(userID, key string) (Order, error) {
 func (s *Store) ListFeedOrders(limit int) ([]Order, error) {
 	var out []Order
 	err := s.View(func(txn *badger.Txn) error {
-		return scanIndex(txn, feedOrderIndexPrefix(), limit, func(id string) error {
+		return scanPublicFeed(txn, feedOrderIndexPrefix(), limit, func(id string) (bool, error) {
 			var o Order
 			if e := getJSON(txn, orderKey(id), &o); e != nil {
 				if errors.Is(e, ErrNotFound) {
-					return nil
+					return false, nil
 				}
-				return e
+				return false, e
+			}
+			if !activityvisibility.Visible(o.ID, false) {
+				return false, nil
 			}
 			out = append(out, o)
-			return nil
+			return true, nil
 		})
 	})
 	return out, err

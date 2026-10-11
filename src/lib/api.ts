@@ -15,6 +15,7 @@ import { countryHint, COUNTRY_HINT_HEADER } from './edgeGeo';
 import { recordAvailability } from './catalogStock';
 import { ratingStars } from './ratingStars';
 import { filterPublicCatalog, filterPublicFamilies } from './catalogVisibility';
+import { publicActivityItems } from './activityVisibility';
 
 export class ApiError extends Error {
   status: number;
@@ -734,7 +735,13 @@ export const adminUpdateSupportTicketStatus = (ticketId: string, status: string)
   api(`/admin/support/tickets/${encodeURIComponent(ticketId)}/status`, { method: 'POST', body: { status } });
 
 /* ---------------- Market / misc ---------------- */
-export const getActivity = (limit = 50) => api(`/activity?limit=${limit}`);
+export const getActivity = async (limit = 50) => {
+  const result = await api(`/activity?limit=${limit}`);
+  if (Array.isArray(result)) return publicActivityItems(result);
+  if (Array.isArray(result?.items)) return { ...result, items: publicActivityItems(result.items) };
+  if (Array.isArray(result?.activity)) return { ...result, activity: publicActivityItems(result.activity) };
+  return result;
+};
 export const trackOrder = (id: string) => api(`/track/${encodeURIComponent(id)}`);
 /* ---- On-chain star ratings (buyer signs and pays 1 Luna + fee) ----------
  * intent → the memo the buyer's wallet signs; rate → the shop verifies the

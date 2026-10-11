@@ -23,5 +23,23 @@ for (const lang of ['en', 'tr'] as const) {
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
       });
     }
+
+    test('legacy API rows cannot show the two fake Amazon purchases or inflate real volume', async ({ page }) => {
+      const fakeIds = ['29760a02-9a43-40a2-8d5c-71277624df94', '0ac3ca80-a9cd-4524-a1fd-0c2fc95c583b'];
+      const common = { type: 'cryptorefills_purchase', status: 'fulfilled', time: new Date().toISOString(), anonymous: true };
+      await page.route('**/api/activity?*', route => route.fulfill({ json: { items: [
+        ...fakeIds.map(id => ({ ...common, id, title: 'Amazon', nim: 19000, country: 'TR' })),
+        { ...common, id: 'future-test', title: 'Amazon', test_mode: true, nim: 5000 },
+        { ...common, id: 'real-carrefour', title: 'Carrefour', country: 'FR', nim: 100 },
+        { ...common, id: 'real-amazon', title: 'Amazon', country: 'TR', nim: 50 },
+      ], summary: {} } }));
+      await open(page, path('/activity'));
+      await expect(page.locator('.feed-item')).toHaveCount(2);
+      await expect(page.locator('.feed-item[href*="real-carrefour"]')).toContainText('Carrefour');
+      await expect(page.locator('.feed-item[href*="real-amazon"]')).toContainText('Amazon');
+      for (const id of [...fakeIds, 'future-test']) await expect(page.locator(`.feed-item[href*="${id}"]`)).toHaveCount(0);
+      await expect(page.locator('.act-tile-num').first()).toHaveText('2');
+      await expect(page.locator('.act-tile').filter({ has: page.locator('.act-tile-nim-mark') }).locator('.act-tile-num')).toHaveText('150 NIM');
+    });
   });
 }

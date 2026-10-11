@@ -156,10 +156,10 @@ export function ActivityView() {
   const load = useCallback(async () => {
     try {
       const res = await getActivity(50);
-      const raw = res.items || res.activity || res || [];
+      const raw = Array.isArray(res) ? res : res.items || res.activity || [];
       const items = (Array.isArray(raw) ? raw : []).map(normItem).sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
       setAllItems(items);
-      renderSummary(res.summary || {}, items);
+      renderSummary(Array.isArray(res) ? {} : res.summary || {}, items);
       setErr('');
       setErrDetail('');
     } catch (e) {
