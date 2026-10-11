@@ -141,6 +141,24 @@ func TestRatingIntentReturnsTheMemoToSign(t *testing.T) {
 	}
 }
 
+func TestRatingFormStringWorksForIntentAndVerifiedSubmission(t *testing.T) {
+	e := newRatingEnv(t)
+	status, out := call(t, e.h.RatingIntentOrder, "buyer", "o1", map[string]interface{}{"stars": "5", "comment": "fast delivery"})
+	if status != 200 || out["memo"] != "5 fast delivery" {
+		t.Fatalf("string stars intent: %d %v", status, out)
+	}
+	const hash = "aa11bb22cc33dd44ee55ff66aa11bb22cc33dd44ee55ff66aa11bb22cc33dd44"
+	e.chain.txs[hash] = tx(hash, testBuyer, testShop, 1, "5 fast delivery", true)
+	status, out = call(t, e.h.RateOrder, "buyer", "o1", map[string]interface{}{"stars": "5", "comment": "fast delivery", "tx_hash": hash})
+	if status != 200 || out["rating"] != float64(5) {
+		t.Fatalf("string stars submission: %d %v", status, out)
+	}
+	st, _ := e.store.GetRatingState(db.RatingKindOrder, "o1", "buyer")
+	if !st.Rated || st.Stars != 5 || st.RatingTx != hash {
+		t.Fatalf("string rating was not verified and stored: %+v", st)
+	}
+}
+
 func TestIntentRefusesBadInput(t *testing.T) {
 	e := newRatingEnv(t)
 	cases := []struct {

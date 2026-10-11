@@ -5,7 +5,7 @@
 //   - the last good snapshot is loaded from the store at boot, so a restart
 //     never falls back to the embedded baseline while the network is cold;
 //   - the first fetch runs at boot (in the background), then every
-//     FX_REFRESH_INTERVAL (default 6h — fiat moves slowly, and the feed
+//     FX_REFRESH_INTERVAL (default 1h — the feed
 //     itself refreshes daily);
 //   - a failed fetch KEEPS the previous snapshot (stale beats wrong), so a
 //     flaky feed can never blank the table;
@@ -60,16 +60,16 @@ var (
 	fxRefreshLock sync.Mutex // single-flight: a slow feed cannot stack fetches
 )
 
-// FXRefreshInterval returns the configured refresh cadence (default 6h).
+// FXRefreshInterval returns the configured refresh cadence (default 1h).
 func FXRefreshInterval() time.Duration {
 	raw := strings.TrimSpace(fxEnv("FX_REFRESH_INTERVAL"))
 	if raw == "" {
-		return 6 * time.Hour
+		return time.Hour
 	}
 	d, err := time.ParseDuration(raw)
 	if err != nil || d < time.Minute {
-		log.Printf("fx: FX_REFRESH_INTERVAL=%q is not a usable duration; using 6h", raw)
-		return 6 * time.Hour
+		log.Printf("fx: FX_REFRESH_INTERVAL=%q is not a usable duration; using 1h", raw)
+		return time.Hour
 	}
 	return d
 }

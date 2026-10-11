@@ -21,14 +21,19 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-  # Hourly catalog refresh: sync-catalog.mjs pulls /v2/brands for every shop
-  # country straight from CryptoRefills (partner-header auth, no secret) and
-  # the build below bakes it into the static site, so the storefront's brand
-  # grids never depend on the Go backend being alive. A failed sync keeps the
-  # committed snapshot (continue-on-error) — a supplier wobble must neither
-  # blank the shop nor stop a deploy.
-  schedule:
-    - cron: "17 * * * *"
+  # The hourly workflow calls this after persisting data, without relying
+  # on another push event (GITHUB_TOKEN pushes cannot trigger workflows).
+  workflow_call:
+    inputs:
+      skip_refresh:
+        description: Catalog was already refreshed by the caller
+        type: boolean
+        default: false
+    secrets:
+      CLOUDFLARE_API_TOKEN:
+        required: false
+      CLOUDFLARE_ACCOUNT_ID:
+        required: false
 
 permissions: {}
 
@@ -80,6 +85,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: main
+
+      - name: Record deployed source
+        id: source
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore hourly catalog data
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/catalog-data.mjs restore
 
       # No dependency cache: this job publishes what it builds, and a poisoned
       # cache entry must never be able to reach the live site (same rule as
@@ -95,28 +110,15 @@ jobs:
       # grids nor the NIM/BTC price may depend on the Go backend at page-load
       # time. Each script keeps the previous file when its sources fail, and
       # a fully-down supplier/backend must not stop the deploy.
-      # The stock check covers every country over several hourly runs: its
-      # answers are carried from one run to the next in this cache.
-      - name: Restore stock-check state
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: .catalog-stock-state.json
-          key: catalog-stock-state-${{ github.run_id }}
-          restore-keys: |
-            catalog-stock-state-
-
-      - name: Refresh static catalog + market snapshots
+      - name: Refresh static catalog snapshots
+        if: inputs.skip_refresh != true
         continue-on-error: true
-        run: |
-          node scripts/sync-catalog.mjs || echo "::warning::catalog sync failed — keeping committed snapshot"
-          node scripts/sync-market.mjs || echo "::warning::market sync failed — keeping committed snapshot"
+        run: node scripts/sync-catalog.mjs
 
-      - name: Save stock-check state
-        if: always()
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: .catalog-stock-state.json
-          key: catalog-stock-state-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Refresh static market snapshots
+        if: inputs.skip_refresh != true
+        continue-on-error: true
+        run: node scripts/sync-market.mjs
 
       - name: Test same-origin API proxy
         run: npm run test:pages-proxy
@@ -190,5 +192,5 @@ jobs:
             pages deploy dist
             --project-name=${{ steps.project.outputs.name }}
             --branch=main
-            --commit-hash=${{ github.sha }}
+            --commit-hash=${{ steps.source.outputs.sha }}
             --commit-dirty=false

@@ -22,10 +22,10 @@
  *   3. otherwise the previous file is kept untouched (stale beats empty,
  *      the same rule the Go refresher follows) and the run reports it.
  *
- * The FX table is not fetched anywhere: backend/internal/catalog/fx.go holds
- * a curated code→USD map that changes only with code. This script PARSES
- * that map out of the Go source and re-emits it as fx.json, so the static
- * copy can never drift from the server's own table.
+ * FX comes from the same USD-based feed as the live backend, with aligned
+ * inversion and validation. The Go table fills only currencies the feed
+ * does not cover; it is never relabeled as a fresh live snapshot. Provider
+ * observation timestamps are retained (the free fiat feed updates daily).
  *
  * Response shapes are byte-compatible with what the two endpoints return
  * (/market/nim-rate and /market/fx), plus generated_at/sync markers; the
@@ -43,9 +43,11 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { providerFX, backendFX, fxSnapshot } from './market-fx.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const OUT = join(ROOT, 'public', 'data', 'market');
+const OUT = process.env.MARKET_OUT_DIR || join(ROOT, 'public', 'data', 'market');
+const FX_URL = process.env.FX_RATES_URL || 'https://open.er-api.com/v6/latest/USD';
 
 const MIN_SOURCES = Number(process.env.ORACLE_MIN_SOURCES || 2);
 const MAX_SPREAD_BPS = Number(process.env.ORACLE_MAX_SPREAD_BPS || 250);
@@ -123,6 +125,10 @@ async function fxTableFromGo() {
 await mkdir(OUT, { recursive: true });
 const generatedAt = new Date().toISOString();
 const report = { generated_at: generatedAt, nim: null, btc: null, fx: null, fallbacks: [] };
+async function previousFile(name) {
+  try { return JSON.parse(await readFile(join(OUT, name), 'utf8')); }
+  catch { return null; }
+}
 
 // ---- NIM + BTC, in parallel ------------------------------------------------
 const [nimRes, btcRes] = await Promise.allSettled([aggregate('nim'), aggregate('btc')]);
@@ -136,11 +142,15 @@ if (!nim || !btc) {
   try {
     const snap = await getJson(`${BACKUP_BACKEND}/api/market/nim-rate`, 15_000);
     if (!nim && num(snap?.usd_per_nim)) {
-      nim = { median: snap.usd_per_nim, sources: snap.sources || 0, spread: null, values: {}, via: 'shopapi' };
+      const at = Date.parse(snap.observed_at);
+      if (!Number.isFinite(at) || at > Date.now() + 5 * 60_000) throw new Error('backend NIM timestamp missing or invalid');
+      nim = { median: snap.usd_per_nim, sources: snap.sources || 0, spread: null, values: {}, via: 'shopapi', at: new Date(at).toISOString() };
       report.fallbacks.push('nim from shopapi /market/nim-rate');
     }
     if (!btc && num(snap?.usd_per_btc)) {
-      btc = { median: snap.usd_per_btc, sources: snap.btc_sources || 0, spread: null, values: {}, via: 'shopapi' };
+      const at = Date.parse(snap.btc_observed_at);
+      if (!Number.isFinite(at) || at > Date.now() + 5 * 60_000) throw new Error('backend BTC timestamp missing or invalid');
+      btc = { median: snap.usd_per_btc, sources: snap.btc_sources || 0, spread: null, values: {}, via: 'shopapi', at: new Date(at).toISOString() };
       report.fallbacks.push('btc from shopapi /market/nim-rate');
     }
   } catch (e) {
@@ -150,39 +160,55 @@ if (!nim || !btc) {
 
 // ---- write nim-rate.json (keep previous on total failure) ------------------
 let wroteRate = false;
-if (nim && nim.median > 0) {
+const previousRate = await previousFile('nim-rate.json');
+if (nim || (btc && num(previousRate?.usd_per_nim))) {
   const body = {
-    usd_per_nim: nim.median,
-    observed_at: generatedAt,
-    sources: nim.sources,
+    ...(num(previousRate?.usd_per_nim) ? previousRate : {}),
     cached: true,
-    age_seconds: 0,
     generated_at: generatedAt,
     sync: 'static-hourly',
   };
+  if (nim) {
+    body.usd_per_nim = nim.median;
+    body.observed_at = nim.at || generatedAt;
+    body.sources = nim.sources;
+  }
+  body.age_seconds = Math.max(0, Math.floor((Date.parse(generatedAt) - Date.parse(body.observed_at)) / 1000));
   if (btc && btc.median > 0) {
     body.usd_per_btc = btc.median;
-    body.btc_observed_at = generatedAt;
+    body.btc_observed_at = btc.at || generatedAt;
     body.btc_sources = btc.sources;
   }
   await writeFile(join(OUT, 'nim-rate.json'), JSON.stringify(body));
   wroteRate = true;
-  report.nim = { usd_per_nim: nim.median, sources: nim.sources, spread_bps: nim.spread, via: nim.via || 'oracle' };
-  if (btc) report.btc = { usd_per_btc: btc.median, sources: btc.sources, spread_bps: btc.spread, via: btc.via || 'oracle' };
-} else {
-  report.nim = 'kept-previous-file';
 }
+report.nim = nim ? { usd_per_nim: nim.median, observed_at: nim.at || generatedAt, sources: nim.sources, spread_bps: nim.spread, via: nim.via || 'oracle' } : 'kept-previous-file';
+report.btc = btc ? { usd_per_btc: btc.median, observed_at: btc.at || generatedAt, sources: btc.sources, spread_bps: btc.spread, via: btc.via || 'oracle' } : 'kept-previous-file';
 
-// ---- fx.json from the Go table (never fetched, never drifted) --------------
+// ---- independent FX refresh; a crypto outage must not prevent this --------
+let wroteFX = false;
 try {
-  const table = await fxTableFromGo();
-  await writeFile(join(OUT, 'fx.json'), JSON.stringify({ base: 'USD', usd_per_unit: table, generated_at: generatedAt, sync: 'static-hourly' }));
-  report.fx = `${Object.keys(table).length} currencies from backend/internal/catalog/fx.go`;
+  const baseline = await fxTableFromGo();
+  const previous = await previousFile('fx.json');
+  let live;
+  let snapshot;
+  try {
+    live = providerFX(await getJson(FX_URL), Date.parse(generatedAt), new URL(FX_URL).hostname);
+    snapshot = fxSnapshot(live, baseline, previous, generatedAt);
+  } catch (err) {
+    report.fallbacks.push(`fx feed: ${err.message}`);
+    live = backendFX(await getJson(`${BACKUP_BACKEND}/api/market/fx`, 15_000), Date.parse(generatedAt));
+    snapshot = fxSnapshot(live, baseline, previous, generatedAt);
+  }
+  await writeFile(join(OUT, 'fx.json'), JSON.stringify(snapshot));
+  wroteFX = true;
+  report.fx = { currencies: snapshot.live_currencies, observed_at: live.at, source: live.source, via: live.via, fallback_currencies: snapshot.fallback_currencies };
 } catch (e) {
-  report.fx = `kept-previous (${String(e.message || e).slice(0, 80)})`;
+  report.fx = 'kept-previous-file';
+  report.fallbacks.push(`fx: ${String(e.message || e).slice(0, 120)}`);
 }
 
 await writeFile(join(OUT, 'manifest.json'), JSON.stringify(report, null, 1));
-console.log(`[sync-market] nim=${report.nim && report.nim.usd_per_nim ? report.nim.usd_per_nim.toFixed(6) : report.nim} btc=${report.btc && report.btc.usd_per_btc ? report.btc.usd_per_btc.toFixed(2) : report.btc} fx=${report.fx}`);
+console.log(`[sync-market] nim=${report.nim && report.nim.usd_per_nim ? report.nim.usd_per_nim.toFixed(6) : report.nim} btc=${report.btc && report.btc.usd_per_btc ? report.btc.usd_per_btc.toFixed(2) : report.btc} fx=${JSON.stringify(report.fx)}`);
 if (report.fallbacks.length) console.log('[sync-market] notes:', report.fallbacks.join(' | '));
-process.exit(wroteRate ? 0 : 1);
+process.exit(wroteRate || wroteFX ? 0 : 1);

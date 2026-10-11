@@ -100,6 +100,12 @@
 /fallback-catalog/*
   Cache-Control: public, max-age=86400, stale-while-revalidate=3600
 
+# These URLs are reused every hour; always revalidate with the current deploy.
+/data/catalog/*
+  Cache-Control: public, max-age=0, must-revalidate
+/data/market/*
+  Cache-Control: public, max-age=0, must-revalidate
+
 # Legacy paths, kept so a deployment that still emits them does not regress
 # into "cache a bundle that is not hashed". Harmless no-ops on this build.
 /js/*

@@ -12,6 +12,8 @@ import { uuid as uuid2 } from './format';
 import { canonicalIntent, purchaseIntentPayload, loadOrCreateIntent, saveIntentQuote, releaseIntentForQuote } from './checkoutIntent';
 import { dailyLimitMessage, isDailyLimitError } from './dailyLimit';
 import { countryHint, COUNTRY_HINT_HEADER } from './edgeGeo';
+import { recordAvailability } from './catalogStock';
+import { ratingStars } from './ratingStars';
 
 export class ApiError extends Error {
   status: number;
@@ -514,7 +516,10 @@ export const getProduct = async (
       if (raw) {
         const j = JSON.parse(raw);
         if (j && j.fetched_at && now - j.fetched_at < PROD_CACHE_TTL_MS &&
-          (Array.isArray(j.data) || Array.isArray(j.data?.products))) return j.data;
+          (Array.isArray(j.data) || Array.isArray(j.data?.products))) {
+          recordAvailability(id, country || '', j.data);
+          return j.data;
+        }
       }
     } catch {
       /* corrupt cache, ignore */
@@ -522,6 +527,7 @@ export const getProduct = async (
   }
   try {
     const data = await api(fullPath);
+    recordAvailability(id, country || '', data);
     try {
       for (let i = sessionStorage.length - 1; i >= 0; i--) {
         const k = sessionStorage.key(i);
@@ -533,6 +539,7 @@ export const getProduct = async (
     }
     return data;
   } catch (err) {
+    if (err instanceof ApiError && err.status === 404) recordAvailability(id, country || '', null, true);
     if (!(err instanceof ApiError) || err.status !== 0) throw err;
     try {
       const raw = sessionStorage.getItem(key);
@@ -737,10 +744,15 @@ export interface RatingBody { stars: number; comment?: string; tx_hash?: string 
 const ratingBase = (kind: RatingKind, id: string) => `/${kind === 'quote' ? 'quotes' : 'orders'}/${encodeURIComponent(id)}`;
 export const getRatingConfig = () => api('/ratings/config');
 export const getRatingComments = () => api('/ratings/comments');
-export const ratingIntent = (kind: RatingKind, id: string, body: RatingBody) =>
-  api(`${ratingBase(kind, id)}/rating/intent`, { method: 'POST', body, auth: true });
-export const submitRating = (kind: RatingKind, id: string, body: RatingBody) =>
-  api(`${ratingBase(kind, id)}/rate`, { method: 'POST', body, auth: true });
+function validatedRatingBody(body: RatingBody): RatingBody {
+  const stars = ratingStars(body?.stars);
+  if (stars === null) throw new ApiError(400, 'rating must be an integer from 1 to 5', 'INVALID_RATING_STARS');
+  return { ...body, stars };
+}
+export const ratingIntent = async (kind: RatingKind, id: string, body: RatingBody) =>
+  api(`${ratingBase(kind, id)}/rating/intent`, { method: 'POST', body: validatedRatingBody(body), auth: true });
+export const submitRating = async (kind: RatingKind, id: string, body: RatingBody) =>
+  api(`${ratingBase(kind, id)}/rate`, { method: 'POST', body: validatedRatingBody(body), auth: true });
 export const rateOrder = (id: string, body: RatingBody) => submitRating('order', id, body);
 export const rateQuote = (id: string, body: RatingBody) => submitRating('quote', id, body);
 export const getAccountLimits = () => api('/account/limits', { auth: true });

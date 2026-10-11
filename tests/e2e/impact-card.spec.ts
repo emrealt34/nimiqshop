@@ -31,7 +31,8 @@ for (const preference of ['cashback', 'burn'] as const) {
           const right = edges.find((e) => e.s === '.pt-actions')!.right;
           for (const e of edges.filter((x) => x.s !== '.pt-impact-share-head')) expect(Math.abs(e.right - right), `${e.s} right edge`).toBeLessThanOrEqual(1);
           const heights = await page.locator(`${CARD} .pt-actions .btn`).evaluateAll((bs) => bs.map((b) => b.getBoundingClientRect().height));
-          expect(heights.length).toBe(5);
+          // The card exposes PNG download and the native share action.
+          expect(heights.length).toBe(2);
           for (const h of heights) expect(h, 'tap target height').toBeGreaterThanOrEqual(36);
         });
       });

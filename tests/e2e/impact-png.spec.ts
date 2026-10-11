@@ -13,7 +13,7 @@ const PAPER = { left: 54 + 20, right: 1026 - 20, top: 54, bottom: 1296 - 20 };
 
 async function instrument(page: Page) {
   await page.addInitScript(() => {
-    const w = window as any; w.__drawn = []; w.__strokes = 0;
+    const w = window as any; w.__drawn = []; w.__strokes = 0; w.__images = [];
     const proto = CanvasRenderingContext2D.prototype;
     const fillText = proto.fillText;
     proto.fillText = function (this: CanvasRenderingContext2D, text: string, x: number, y: number, mw?: number) {
@@ -27,6 +27,13 @@ async function instrument(page: Page) {
     };
     const stroke = proto.stroke;
     proto.stroke = function (this: CanvasRenderingContext2D, ...a: any[]) { if (this.canvas.width === 1080 && a[0] instanceof Path2D) w.__strokes++; return (stroke as any).apply(this, a); };
+    const drawImage = proto.drawImage;
+    proto.drawImage = function (this: CanvasRenderingContext2D, image: CanvasImageSource, ...args: number[]) {
+      if (this.canvas.width === 1080 && this.canvas.height === 1350 && image instanceof HTMLImageElement) {
+        w.__images.push({ src: image.src, width: image.naturalWidth, height: image.naturalHeight });
+      }
+      return (drawImage as any).call(this, image, ...args);
+    };
   });
 }
 
@@ -64,7 +71,16 @@ for (const lang of LANGS) {
         expect(drawn.map((d) => d.text).join(' | ')).not.toMatch(/NİMİQ|İ\.COM/);
         expect(drawn.some((d) => d.font.includes('FrauncesLocal'))).toBe(true);
         expect(drawn.some((d) => d.font.includes('NunitoLocal'))).toBe(true);
-        expect(await page.evaluate(() => (window as any).__strokes)).toBeGreaterThanOrEqual(8);
+        // The current receipt uses the site's bitmap logo and Nimiq mark;
+        // vector stroke count varies with the design and image fallbacks.
+        const images: { src: string; width: number; height: number }[] = await page.evaluate(() => (window as any).__images);
+        expect(images.some((i) => new URL(i.src).pathname.endsWith('/img/brand-icon-96.png'))).toBe(true);
+        expect(images.filter((i) => new URL(i.src).pathname.endsWith('/img/nimiq-hexagon.png')).length).toBeGreaterThanOrEqual(2);
+        for (const image of images) {
+          expect(image.width, 'drawn image decoded').toBeGreaterThan(0);
+          expect(image.height, 'drawn image decoded').toBeGreaterThan(0);
+        }
+        expect(await page.evaluate(() => (window as any).__strokes), 'wallet icon rendered').toBeGreaterThan(0);
         const png = await img.evaluate((i: HTMLImageElement) => { const c = document.createElement('canvas'); c.width = i.naturalWidth; c.height = i.naturalHeight; c.getContext('2d')!.drawImage(i, 0, 0); return c.toDataURL('image/png'); });
         await test.info().attach(`cashback-${lang}-${preference}.png`, { body: Buffer.from(png.split(',')[1], 'base64'), contentType: 'image/png' });
       });

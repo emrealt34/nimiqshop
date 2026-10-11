@@ -1,14 +1,12 @@
 /**
  * Instant shelf: last-good live catalog in localStorage so a revisit paints
- * immediately while the API refreshes. There is no static JSON catalog.
+ * immediately while the hourly snapshot/API refreshes.
  */
 import type { Product } from './catalog';
 
-// v2: cached maps are normalized Product objects; v1 entries predate the
-// is_e_money flag, so bump the key to make badges appear without waiting
-// for the 24 h TTL (refetch is the cheap static snapshot anyway).
-const PREFIX = 'nimshop_cat_v2:';
-const MAX_AGE_MS = 24 * 60 * 60 * 1000;
+// v3 invalidates old daily stock flags; the shelf now expires hourly.
+const PREFIX = 'nimshop_cat_v3:';
+const MAX_AGE_MS = 60 * 60 * 1000;
 
 export type CatalogMap = Record<string, Product[]>;
 

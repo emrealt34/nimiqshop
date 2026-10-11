@@ -20,6 +20,7 @@ import {
 } from '../../lib/ratingPay';
 import { cleanComment, commentProblem, MAX_COMMENT, memoPreview } from '../../lib/ratingComment';
 import { StarPicker, StarsDisplay } from '../ui/uiKit';
+import { ratingStars } from '../../lib/ratingStars';
 
 export interface RatingCurrent {
   rated: boolean;
@@ -66,7 +67,7 @@ export function RatingFlow({
 }) {
   const { t } = useT();
   const [cfg, setCfg] = useState<RatingConfig | null>(null);
-  const [stars, setStars] = useState(current.stars || 0);
+  const [stars, setStars] = useState(ratingStars(current.stars) ?? 0);
   const [comment, setComment] = useState(current.comment || '');
   const [phase, setPhase] = useState<'idle' | 'signing' | 'waiting' | 'saved'>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -113,7 +114,7 @@ export function RatingFlow({
 
   async function submit() {
     setError(null);
-    if (stars < 1) return setError(t('rating.pickStars'));
+    if (ratingStars(stars) === null) return setError(t('rating.pickStars'));
     if (problem === 'chars') return setError(t('rating.commentChars'));
     if (problem === 'long') return setError(t('rating.commentLong', { max: cfg?.max_comment || MAX_COMMENT }));
     if (commentsBlocked) return setError(t('rating.commentsOff'));
@@ -169,8 +170,7 @@ export function RatingFlow({
     <div className="rating-flow">
       <div className="small muted mb-1">{t('rating.intro')}</div>
       <div className="row" style={{ gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-        <StarPicker size={26} value={stars} onSelect={(n) => { setStars(n); setError(null); }} />
-        {stars > 0 ? <StarsDisplay rating={stars} size={16} /> : null}
+        <StarPicker size={26} value={stars} disabled={busy} onSelect={(n) => { setStars(n); setError(null); }} />
       </div>
 
       <label className="small strong mt-2" htmlFor={`rating-comment-${id}`} style={{ display: 'block' }}>
@@ -209,7 +209,7 @@ export function RatingFlow({
       <button
         className="btn btn-gold btn-block mt-2"
         type="button"
-        disabled={busy || stars < 1 || !!hint || unchanged || limitReached || !cfg?.enabled}
+        disabled={busy || ratingStars(stars) === null || !!hint || unchanged || limitReached || !cfg?.enabled}
         onClick={submit}
       >
         <span className="btn-label">
@@ -234,6 +234,7 @@ function messageFor(err: unknown, t: Translator): string {
   }
   if (err instanceof ApiError) {
     const msg = err.message || '';
+    if (err.code === 'INVALID_RATING_STARS' || /(?:stars?|rating) must be.*(?:integer|1.*5)/i.test(msg)) return t('rating.pickStars');
     if (err.status === 401 || /sign in/i.test(msg)) return t('rating.notSignedIn');
     if (/already saved/i.test(msg)) return t('rating.alreadySaved');
     if (/maximum number/i.test(msg)) return t('rating.limit');

@@ -246,6 +246,73 @@ every CI check plus a blocking `govulncheck` first.
 - New workflows must pass `npm run check:workflows`, `actionlint` and
   `zizmor --persona=pedantic`.
 
+## Hourly catalog refresh
+
+**Hourly catalog refresh** (`.github/workflows/catalog-refresh.yml`) runs at
+minute 17 each hour on `main`, and can also be started manually in Actions.
+It commits refreshed brand listings, market snapshots and stock-check progress
+to the data-only `catalog-data` branch, so protected `main` stays untouched.
+The refresh does not depend on Cloudflare credentials. A successful run calls
+**Deploy to Cloudflare Pages**, which combines code from `main` with the saved
+JSON snapshots. Only JSON files are restored; data branches cannot supply code.
+GitHub may delay cron runs; check the actual timestamp and country failures in
+the refresh job summary and `public/data/catalog/manifest.json`.
+
+Brand directories and product inventory are different supplier endpoints.
+The stock pass checks purchasable products, family/SKU stock flags, supported
+delivery channels and ranges. It rotates oldest first within a paced 20-minute
+supplier budget, with one-hour stock freshness. This does not promise a complete
+inventory scan of every country each hour. Timeouts and malformed responses are
+unknown stock; they never prove that a product sold out. Failed country refreshes
+retain their previous file and original timestamp.
+
+The same run refreshes NIM, BTC and fiat FX rates, then persists the catalog
+and market files in one `catalog-data` commit and deploys them together.
+Fiat FX is fetched from the same USD-based provider as the backend, with
+the feed's currency-per-USD quotes inverted once into USD-per-unit. The
+provider's observation time is kept separately from the hourly check time;
+the free feed publishes daily, so unchanged hourly observations are expected.
+Malformed, partial or older FX responses cannot replace a newer snapshot.
+Each failed market leg retains its prior value and observation time. A failed
+source does not prevent successful catalog or market updates being persisted;
+the Actions summary reports these failures and actual provider timestamps.
+The backend also polls hourly by default (`FX_REFRESH_INTERVAL=1h`); a
+production environment override takes precedence. `npm run test:unit`
+includes mocked runs of the actual market sync script covering rate inversion,
+partial crypto failures, complete source outages and unchanged fallback files.
+
+The storefront reconciles visible-card prefetch results and search results with
+live product stock. Normal card clicks perform a fresh check before navigation.
+A sold-out card cannot lead the buyer into a known unavailable product page;
+checkout still checks current inventory because stock can change afterwards.
+Run `npm run test:unit` for the stock classifier, browser-memory rules and a
+mock-supplier run of the real sync script; `out-of-stock.spec.ts` covers the grid,
+search, navigation and mixed supplier variants in a real browser.
+
+## Receipt images and sender branding
+
+Order receipts attach the website logo, product tiles and the non-anonymous
+buyer's wallet identicon as inline PNGs with matching Content-ID references.
+Checkout waits briefly for the current wallet image before creating either a
+single or batch quote. Wallet addresses are uppercase in groups of four, and
+an unpaired product occupies a centered full-width row.
+
+The inbox sender icon is controlled by the email provider, separately from
+the HTML logo. The default sender display name is `nimiqshop.io`; an existing
+`MAILTRAP_FROM_NAME` environment override also needs to use the current brand.
+The verified sender email remains independently configurable. Gmail domain
+branding through [BIMI setup](https://knowledge.workspace.google.com/admin/security/set-up-bimi)
+requires enforced DMARC and a VMC or CMC issued by a certificate authority.
+Mailtrap's personal account avatar does not configure this inbox sender logo.
+The existing website logo has a vector SVG Tiny P/S version at
+`public/bimi/logo.svg`; see [the BIMI deployment instructions](docs/bimi.md).
+Changing
+the receipt template cannot replace that inbox letter avatar.
+
+Preview without sending mail: from `backend`, run
+`go run ./cmd/giftmail-preview -out /tmp/giftmail-preview`. The command renders
+the real templates for single, paired, odd-count and anonymous orders.
+
 ## License
 
 [MIT](LICENSE).

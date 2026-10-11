@@ -117,6 +117,7 @@ export function SiteShell({ activeKey }: { activeKey: ShellKey }) {
 /* ---------------- Brand ---------------- */
 
 function Brand() {
+  const { t } = useT();
   /* The navbar wordmark is the product brand ("nimiqshop.io"), not the live
      hostname (owner, 2026-10-05). The host still drives titles, share links
      and copy via siteName(). */
@@ -129,7 +130,7 @@ function Brand() {
   const before = i > 0 && i < name.length - 1 ? name.slice(0, i) : null;
   const after = before !== null ? name.slice(i + 1) : null;
   return (
-    <a className="brand" href={homeHref()} aria-label={name + ' home'}>
+    <a className="brand" href={homeHref()} aria-label={`${name} — ${t('stat.backToShop')}`}>
       {logoFailed ? (
         <span className="brand-mono" aria-hidden="true">{monogramLetter(name)}</span>
       ) : (

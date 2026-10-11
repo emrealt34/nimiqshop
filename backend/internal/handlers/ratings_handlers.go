@@ -30,16 +30,6 @@ import (
 	"nimiqshop/internal/ratings"
 )
 
-// ratingRequest is the body of the intent and rate endpoints. TxHash is set
-// when the wallet reports a hash (Hub does); otherwise the shop looks for the
-// buyer's transaction in the buyer's recent history (Nimiq Pay returns the
-// serialized transaction only).
-type ratingRequest struct {
-	Stars   int    `json:"stars"`
-	Comment string `json:"comment"`
-	TxHash  string `json:"tx_hash,omitempty"`
-}
-
 const ratingChainTimeout = 12 * time.Second
 
 func (h *Handlers) ratingWired() bool {
@@ -147,9 +137,9 @@ func (h *Handlers) RatingIntentQuote(ctx *fasthttp.RequestCtx) {
 func (h *Handlers) ratingIntent(ctx *fasthttp.RequestCtx, kind string) {
 	id, _ := ctx.UserValue("id").(string)
 	userID := middleware.UserID(ctx)
-	var req ratingRequest
-	if err := readJSON(ctx, &req); err != nil {
-		writeError(ctx, fasthttp.StatusBadRequest, "rating must be an integer from 1 to 5")
+	req, err := decodeRatingRequest(ctx.PostBody())
+	if err != nil {
+		writeError(ctx, fasthttp.StatusBadRequest, err.Error())
 		return
 	}
 	memo, _, _, ok := h.prepareRating(ctx, kind, id, userID, req)
@@ -176,9 +166,9 @@ func (h *Handlers) RateQuote(ctx *fasthttp.RequestCtx) {
 func (h *Handlers) submitRating(ctx *fasthttp.RequestCtx, kind string) {
 	id, _ := ctx.UserValue("id").(string)
 	userID := middleware.UserID(ctx)
-	var req ratingRequest
-	if err := readJSON(ctx, &req); err != nil {
-		writeError(ctx, fasthttp.StatusBadRequest, "rating must be an integer from 1 to 5")
+	req, err := decodeRatingRequest(ctx.PostBody())
+	if err != nil {
+		writeError(ctx, fasthttp.StatusBadRequest, err.Error())
 		return
 	}
 	memo, st, buyer, ok := h.prepareRating(ctx, kind, id, userID, req)

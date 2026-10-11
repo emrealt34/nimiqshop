@@ -11,6 +11,7 @@ import (
 	"math/rand"
 	"nimiqshop/internal/i18n"
 	"nimiqshop/internal/itemtile"
+	"os"
 
 	"nimiqshop/internal/sampleassets"
 	"strings"
@@ -355,8 +356,12 @@ func TestFooterGrammar(t *testing.T) {
 }
 
 // The purchase mail shows the shop logo (inline PNG), never the old tick emoji;
-// gift mail keeps its gift icon and carries no logo.
+// gift mail carries the same shop logo.
 func TestOrderMailShowsShopLogoNotTick(t *testing.T) {
+	websiteLogo, err := os.ReadFile("../../../public/img/brand-icon.png")
+	if err != nil || !bytes.Equal(websiteLogo, shopLogoPNG) {
+		t.Fatalf("email logo must match the website logo: %v", err)
+	}
 	order := GiftNote{Recipient: Address{Email: "buyer@example.com"}, Self: true, ProductLabel: "Steam · 50 USD", SiteName: "nimiqshop.io", OrderID: "Q-20"}
 	msg, err := order.Build(Config{})
 	if err != nil {
@@ -387,6 +392,39 @@ func TestOrderMailShowsShopLogoNotTick(t *testing.T) {
 	// The hero badge is the shop logo on gifts too, never the 🎁 emoji.
 	if strings.Contains(gm.HTML, ">🎁</td>") || !strings.Contains(gm.HTML, "cid:"+shopLogoContentID) {
 		t.Fatal("gift mail must show the shop logo, not the gift emoji")
+	}
+}
+
+func TestCompactWalletAddressInBothMailParts(t *testing.T) {
+	const want = "NQ07 XQ4T R7EL A5A6 2L0X SD59 4RNE 3Y4L 0S8M"
+	for _, input := range []string{strings.ToLower(strings.ReplaceAll(want, " ", "")), strings.ReplaceAll(want, " ", "-"), "  " + want + "\r\n"} {
+		if got := groupAddress(input); got != want {
+			t.Fatalf("groupAddress(%q) = %q", input, got)
+		}
+		msg, err := (GiftNote{Recipient: Address{Email: "buyer@example.com"}, Self: true, GifterNimiqAddress: input}).Build(Config{})
+		if err != nil || !strings.Contains(msg.HTML, want) || !strings.Contains(msg.Text, want) {
+			t.Fatalf("compact wallet must be grouped in HTML and text: %v", err)
+		}
+	}
+}
+
+func TestProductRowsCenterSingleAndOddItems(t *testing.T) {
+	for _, count := range []int{1, 2, 3, 5} {
+		items := make([]GiftItem, count)
+		for i := range items {
+			items[i] = GiftItem{Name: "Product", Qty: 1}
+		}
+		clean, more := sanitizeItems(items)
+		html := itemsBlock(emailFont, clean, more, i18n.For(i18n.EN))
+		if got := strings.Count(html, `<td width="50%"`); got != count-count%2 {
+			t.Fatalf("%d items: expected paired half-width cells, got %d", count, got)
+		}
+		if got := strings.Count(html, `<td width="100%" colspan="2"`); got != count%2 {
+			t.Fatalf("%d items: expected a full-width final item, got %d", count, got)
+		}
+		if strings.Contains(html, `<td width="50%" style="width:50%"></td>`) || strings.Count(html, `align="center"`) != count {
+			t.Fatal("products must be centered without an empty neighbor")
+		}
 	}
 }
 

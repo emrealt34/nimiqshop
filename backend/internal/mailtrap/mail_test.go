@@ -1,25 +1,86 @@
 package mailtrap
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image/png"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	mailtrapsdk "github.com/mailtrap/mailtrap-go"
+	"nimiqshop/internal/sampleassets"
 )
+
+// Exercise the real Build -> SDK -> HTTP payload without sending an email.
+func TestReceiptInlineImagesReachMailtrap(t *testing.T) {
+	msg, err := (GiftNote{Recipient: Address{Email: "buyer@example.com"}, Self: true,
+		GifterNimiqAddress: "nq07xq4tr7ela5a62l0xsd594rne3y4l0s8m", GifterIdenticonDataURI: sampleassets.IdenticonDataURI(),
+		Items: []GiftItem{{Name: "Steam", Qty: 1}}, ProductLabel: "Steam", SiteName: "nimiqshop.io"}).Build(Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			HTML        string `json:"html"`
+			Attachments []struct {
+				Content     string `json:"content"`
+				ContentID   string `json:"content_id"`
+				Disposition string `json:"disposition"`
+				Type        string `json:"type"`
+			} `json:"attachments"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Error(err)
+		}
+		images := make(map[string][]byte)
+		for _, att := range payload.Attachments {
+			raw, err := base64.StdEncoding.DecodeString(att.Content)
+			if err != nil || att.Type != "image/png" || att.Disposition != "inline" || att.ContentID == "" {
+				t.Error("inline PNG attachment contract broken")
+			}
+			if _, err := png.DecodeConfig(bytes.NewReader(raw)); err != nil {
+				t.Errorf("invalid PNG: %v", err)
+			}
+			images[att.ContentID] = raw
+		}
+		if len(images) != 3 || !bytes.Equal(images[shopLogoContentID], shopLogoPNG) || len(images[identiconContentID]) == 0 {
+			t.Error("receipt must carry the site logo, buyer avatar and product tile")
+		}
+		for _, ref := range regexp.MustCompile(`src="cid:([^"\s]+)"`).FindAllStringSubmatch(payload.HTML, -1) {
+			if len(images[ref[1]]) == 0 {
+				t.Errorf("missing attachment for %s", ref[1])
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true,"message_ids":["preview-only"]}`))
+	}))
+	defer server.Close()
+	client, err := New(Config{APIToken: "fixture-token", FromEmail: "sender@example.com", APIEndpoint: server.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.Send(context.Background(), msg); err != nil {
+		t.Fatal(err)
+	}
+}
 
 func TestConfigEnvironmentAndValidation(t *testing.T) {
 	for _, key := range []string{EnvAPIToken, EnvFromEmail, EnvFromName, EnvReplyTo, EnvCategory, EnvUseSandbox, EnvSandboxID, EnvTimeout, EnvAPIEndpoint} {
 		t.Setenv(key, "")
 	}
 	c := ConfigFromEnv()
+	if c.FromName != "nimiqshop.io" {
+		t.Fatal("default sender name must match the current website brand")
+	}
 	if c.Enabled() || c.FromEmail != DefaultFromEmail || c.FromName != DefaultFromName || c.Category != DefaultCategory || c.Timeout != DefaultTimeout {
 		t.Fatalf("defaults: %+v", c)
 	}

@@ -272,12 +272,7 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
           // simply unpainted (background colour, no artwork): the CSS-only
           // loader that used to pulse here was removed at the owner's request
           // once the dictionary cache made this path rare. Safety nets: a hard
-          // timeout below, and the hold is skipped entirely for English and for
-          // any language whose dictionary is already cached.
-          // A returning visitor already has the dictionary in localStorage
-          // (written by src/i18n after the first load), so there is nothing to
-          // hide: no hold, no loader, the first paint is translated. The key
-          // and its meaning are documented in src/i18n/index.tsx.
+          // timeout below, and the hold is skipped entirely for English.
           // EVERY non-English load is held, not only first visits: the static
           // HTML is always English and the translation lands with the first
           // React commit, so without the hold a returning visitor (dictionary
@@ -570,6 +565,9 @@ const assetBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
             </svg>
           </a>
         </span>
+      </div>
+      <div style="text-align:center;font-size:11px;margin-top:8px">
+        <a href="https://www.exchangerate-api.com" target="_blank" rel="noopener noreferrer" translate="no">ExchangeRate-API</a>
       </div>
     </footer>
     <!-- Let native scroll anchoring handle viewport changes. Mobile browser chrome

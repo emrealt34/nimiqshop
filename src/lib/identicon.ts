@@ -114,13 +114,9 @@ export function identiconPlaceholder(address?: string | null): string {
 }
 
 /**
- * The buyer's identicon as a PNG data URI — for the gift email. The email
- * cannot carry an <img data:…> (Gmail blocks data: images), so the backend
- * re-draws the avatar as bgcolor table cells from a PNG. This rasterizes the
- * EXACT face the site shows (same @nimiq/identicons module, same address) via
- * a canvas at the SVG's native 160px, which is also the sampling sweet spot
- * for the 32x32 email mosaic. Returns '' when anything fails — the note then
- * falls back to its placeholder avatar, never to an error.
+ * Rasterize the site's wallet avatar for the order email. The backend attaches
+ * the PNG inline and references it by Content-ID instead of a data: image.
+ * Returns '' on failure; an optional avatar must never prevent a purchase.
  */
 const pngCache = new Map<string, string>();
 
@@ -159,3 +155,17 @@ export async function identiconPngDataUrl(address?: string | null, size = 160): 
 }
 
 export { canonicalIdenticonInput };
+
+/** Wait for the current wallet's PNG without indefinitely holding checkout. */
+export async function prepareBuyerIdenticon(address?: string | null, timeoutMs = 4000): Promise<string> {
+  if (!address) return '';
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      identiconPngDataUrl(address),
+      new Promise<string>((resolve) => { timer = setTimeout(() => resolve(''), timeoutMs); }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}

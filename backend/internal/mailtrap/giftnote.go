@@ -56,7 +56,7 @@ type GiftNote struct {
 	// Recipient is who gets the note. Required.
 	Recipient Address
 	// Self marks a plain (non-gift) purchase: the buyer IS the recipient, so
-	// the note drops the donor identity and the "someone sent you" framing
+	// the note shows the buyer's wallet and drops the "someone sent you" framing
 	// and reads as an order confirmation instead (owner, 2026-10-05).
 	Self bool
 	// Anonymous mirrors the checkout's anonymous flag. When true, NOTHING that
@@ -69,11 +69,8 @@ type GiftNote struct {
 	GifterNimiqAddress string
 	// GifterIdenticonDataURI is the buyer's REAL Nimiq identicon as a
 	// data:image/png;base64,… URI, rendered by the frontend's identicon tooling
-	// and passed in. Gmail blocks data: image sources (and CID inline
-	// attachments are unreliable in webmail), so the PNG is decoded here and
-	// re-drawn as a bgcolor-cell mosaic — see identiconTable. Only data: URIs
-	// are admitted; anything else is dropped so config cannot turn the email
-	// into a tracking beacon. Optional.
+	// and passed in. The PNG is validated and attached inline by Content-ID;
+	// the HTML never embeds the data URI or a remote tracking URL. Optional.
 	GifterIdenticonDataURI string
 	// SiteName renders "from your friend at shop.nimiqbase.com". Optional.
 	SiteName string
@@ -181,8 +178,6 @@ const emailCSS = `  :root{color-scheme:light;supported-color-schemes:light}
   a{padding:0}
   .ExternalClass{width:100%}
   .ExternalClass,.ExternalClass p,.ExternalClass span,.ExternalClass td,.ExternalClass div{line-height:inherit}
-  /* The donor mosaic is a table of 1x1px cells: without these resets some
-     clients give the cells a minimum height from the inherited line box. */
   @media only screen and (max-width:620px){
     .email-container{width:100%!important;max-width:100%!important}
     .px-outer{padding-left:10px!important;padding-right:10px!important}
@@ -510,7 +505,7 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 	b.WriteString("  <tr>\n")
 	b.WriteString(`    <td align="center" valign="top" class="px-outer" style="padding:24px 12px 28px 12px">` + "\n")
 	b.WriteString(`      <!--[if mso]><table role="presentation" width="600" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->` + "\n")
-	b.WriteString(`      <table role="presentation" width="600" class="email-container" style="width:100%;max-width:600px" cellpadding="0" cellspacing="0" border="0">` + "\n")
+	b.WriteString(`      <table role="presentation" width="600" class="email-container" style="width:100%;max-width:600px;table-layout:fixed;overflow-wrap:anywhere;word-break:break-word" cellpadding="0" cellspacing="0" border="0">` + "\n")
 
 	// ---- brand line: the shop's own wordmark, same gold dot as the navbar --
 	b.WriteString("      <tr>\n")
@@ -773,9 +768,6 @@ func anonymousCard(tl i18n.T) string {
 	return panel(font, inner)
 }
 
-// identityCard is the donor block: their REAL Nimiq identicon (as a mosaic,
-// see identiconTable) and their wallet address — never a name. On phones the
-// two stack, centred, inside the same panel.
 // esc escapes text for HTML content and attribute values.
 func esc(v string) string { return html.EscapeString(strings.TrimSpace(v)) }
 
@@ -840,14 +832,14 @@ func itemTileCID(tile []byte) string {
 // face value underneath. Rows hold at most two items.
 func itemsBlock(font string, items []GiftItem, more int, tl i18n.T) string {
 	var b strings.Builder
-	b.WriteString(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:6px">`)
+	b.WriteString(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:6px;table-layout:fixed">`)
 	for i := 0; i < len(items); i += 2 {
 		b.WriteString("<tr>")
-		b.WriteString(itemCell(font, items[i], true))
 		if i+1 < len(items) {
+			b.WriteString(itemCell(font, items[i], false))
 			b.WriteString(itemCell(font, items[i+1], false))
 		} else {
-			b.WriteString(`<td width="50%" style="width:50%"></td>`)
+			b.WriteString(itemCell(font, items[i], true))
 		}
 		b.WriteString("</tr>")
 	}
@@ -861,10 +853,14 @@ func itemsBlock(font string, items []GiftItem, more int, tl i18n.T) string {
 // itemCell is one product in the grid. The tile is 137px wide, the storefront's
 // product tile size on a phone (136.5px), drawn from the 2x PNG; it shrinks on
 // narrow screens.
-func itemCell(font string, it GiftItem, left bool) string {
+func itemCell(font string, it GiftItem, fullRow bool) string {
 	// Both columns get equal side padding and centred content, so the grid
 	// sits in the middle of the panel rather than hugging the left edge.
 	pad := "0 8px 16px 8px"
+	width, span := "50%", ""
+	if fullRow {
+		width, span = "100%", ` colspan="2"`
+	}
 	label := strings.TrimSpace(it.Name)
 	if it.Qty > 1 {
 		label += " ×" + strconv.Itoa(it.Qty)
@@ -874,7 +870,7 @@ func itemCell(font string, it GiftItem, left bool) string {
 		detail = `<div style="font-size:13px;line-height:1.4;color:` + mailInkDim + `;font-family:` + font + `;text-align:center">` + esc(d) + `</div>`
 	}
 	img := `<img src="cid:` + itemTileCID(it.tile) + `" width="137" height="86" alt="` + esc(it.Name) + `" style="display:block;margin:0 auto;width:137px;max-width:100%;height:auto;border:0;outline:none">`
-	return `<td width="50%" valign="top" align="center" style="width:50%;padding:` + pad + `;text-align:center">` + img +
+	return `<td width="` + width + `"` + span + ` valign="top" align="center" style="width:` + width + `;padding:` + pad + `;text-align:center">` + img +
 		`<div style="font-size:14px;font-weight:700;line-height:1.3;color:` + mailInk + `;font-family:` + font + `;padding-top:8px;text-align:center">` + esc(label) + `</div>` + detail + `</td>`
 }
 
@@ -949,7 +945,7 @@ func identiconImage(dataURI string) ([]byte, bool) {
 // says whether the identicon attachment is part of the message.
 func identityCard(addr string, withIcon bool, self bool, tl i18n.T) string {
 	font := emailFont
-	addrCell := `<div class="addr" style="font-family:` + emailMono + `;font-size:12px;line-height:1.5;color:` + mailInk + `;word-break:break-all">` + addr + `</div>`
+	addrCell := `<div class="addr" dir="ltr" style="font-family:` + emailMono + `;font-size:12px;line-height:1.5;color:` + mailInk + `;word-break:normal">` + addr + `</div>`
 	avatar := ""
 	gap := "0"
 	if withIcon {
@@ -1025,8 +1021,8 @@ func fallback(v, other string) string {
 	return strings.TrimSpace(v)
 }
 
-// groupAddress canonicalizes an address's spacing: uppercase and collapse runs
-// of whitespace/hyphens to single spaces, so however the order stored it, the
+// groupAddress canonicalizes compact or spaced Nimiq addresses into uppercase
+// groups of four, so however the order stored it, the
 // email shows one cleanly spaced, copy-pasteable string (e.g.
 // "NQ49 N8MB XYCR XBUP 404C KXKK L49M A7BT F082").
 func groupAddress(v string) string {
@@ -1034,6 +1030,14 @@ func groupAddress(v string) string {
 	fields := strings.FieldsFunc(strings.ToUpper(strings.TrimSpace(v)), split)
 	if len(fields) == 0 {
 		return ""
+	}
+	compact := strings.Join(fields, "")
+	if len(compact) == 36 && strings.HasPrefix(compact, "NQ") {
+		groups := make([]string, 0, 9)
+		for i := 0; i < len(compact); i += 4 {
+			groups = append(groups, compact[i:i+4])
+		}
+		return strings.Join(groups, " ")
 	}
 	return strings.Join(fields, " ")
 }

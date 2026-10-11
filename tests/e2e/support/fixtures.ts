@@ -181,6 +181,10 @@ export async function mockApi(ctx: BrowserContext, opts: Partial<ApiOptions>, re
   };
   await ctx.route(`${API_ORIGIN}/**`, handler);
   await ctx.route(/^http:\/\/127\.0\.0\.1:\d+\/api\//, handler);
+  // Cloudflare serves this edge endpoint outside the deployment base. The
+  // Pages-like local server has no edge, so model its response explicitly.
+  await ctx.route(/^http:\/\/127\.0\.0\.1:\d+\/cdn-cgi\/trace(?:\?.*)?$/, (route) =>
+    route.fulfill({ status: 200, contentType: 'text/plain', body: 'loc=TR\n' }));
   // Other third parties (social share targets, analytics…) stay offline.
   await ctx.route(/^https?:\/\/(?!127\.0\.0\.1|shopapi\.nimiqbase\.com)/, (route) => {
     requests.push('EXTERNAL ' + route.request().url());

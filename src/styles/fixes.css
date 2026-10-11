@@ -2144,15 +2144,14 @@ label.oos-toggle > span {
   min-width: 0;
   gap: clamp(6px, 1.4vw, 14px);
 }
-/* Both labels opt into the runtime re-fit (src/lib/fitText.ts): the nowrap
-   above is the *shape* we want, and the runtime shrinks the type to keep it —
-   with data-fit="wrap" as the escape hatch when a translation is longer than
-   the rail can shrink to (it then wraps instead of ending in an ellipsis). */
+/* CSS wraps the sentence on the first paint and after late staking content
+   arrives. Runtime fitting left German copy clipped at tablet widths. */
 .come-back-txt {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .come-back-cta {
   /* The pill is NEVER squeezed: it keeps its intrinsic width at every width and

@@ -9,8 +9,8 @@
  * orders, payments, FX guards. It also proxied the supplier catalog — which
  * meant a down backend showed an EMPTY shop even though the catalog is
  * public, cacheable data that changes a few times a day. The Cloudflare
- * Pages deploy workflow now runs this script hourly (schedule in
- * .github/workflows/cloudflare-pages.yml) before building, and the committed
+ * catalog refresh workflow runs this script hourly (schedule in
+ * .github/workflows/catalog-refresh.yml) before deployment, and the committed
  * copy of its output is the seed/fallback when a sync run cannot reach the
  * supplier. The frontend reads the static files first (src/lib/api.ts) and
  * only falls back to /api for what genuinely needs the server.
@@ -35,12 +35,13 @@
  * FAILURE MODE
  * A country that fails keeps its previous file (the committed seed or the
  * last hourly sync), so a supplier wobble can never blank the shop. The run
- * exits 0 as long as at least one country refreshed; the workflow step is
- * continue-on-error anyway — a fully-down supplier must not stop a deploy.
+ * exits 0 as long as at least one country refreshed. An hourly refresh fails
+ * when every country fails; ordinary code deploys can retain previous data.
  */
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { stockState as classifyStock, validStockRecord, applyStockState, RECHECK_AFTER_MS, STOCK_VERSION } from './catalog-stock.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'public', 'data', 'catalog', 'brands');
@@ -85,6 +86,7 @@ async function fetchBrands(cc) {
       }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const j = await res.json();
+      if (!Array.isArray(j?.categories)) throw new Error('malformed brand listing');
       const cats = Array.isArray(j?.categories)
         ? j.categories.map((c) => ({
             kind: c?.kind ?? '',
@@ -123,18 +125,18 @@ async function pool(items, worker, concurrency) {
  * consulted those, so every new visitor was sent into the same dead end.
  *
  * WHAT IT DOES
- * For every family listed as in stock, ask the product endpoint whether any
- * products exist for that country. Only a definitive "200 and no products"
- * (confirmed by a second read) marks the family out of stock; errors, 403/429,
- * timeouts and malformed answers leave the flag exactly as the brand listing
- * had it. The storefront hides out-of-stock cards by default, so the buyer
+ * Check the product endpoint for every family, including sold-out families
+ * that may have recovered. An empty, sold-out, or unsupported-only payload
+ * (confirmed by a second read) marks the family out of stock. Errors, 403/429,
+ * timeouts and malformed answers leave the directory flags unchanged.
+ * The storefront hides out-of-stock cards by default, so the buyer
  * never sees the dead card, and "show out of stock" stays truthful.
  *
  * BUDGET
  * The pass is time-boxed and stops early after a run of unresolved answers,
  * so a supplier rate limit can never stall or fail the deploy. Countries are
- * verified in order (TR first, then by listing size); anything not reached in
- * this run keeps its listing flags.
+ * verified oldest first across runs; anything not reached retains its
+ * directory flags until a storefront prefetch checks the live products.
  */
 const VERIFY_BUDGET_MS = Number(process.env.CATALOG_VERIFY_BUDGET_MS) || 20 * 60_000;
 const VERIFY_CONCURRENCY = 2;
@@ -157,15 +159,14 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /** One product-presence read: 'ok' | 'empty' | 'unknown' (+ the HTTP status seen). */
 async function probeOnce(cc, family) {
   await paceVerify();
-  const url = `${BASE}/v5/products/country/${encodeURIComponent(cc)}?family_name=${encodeURIComponent(family)}&lang=en`;
+  const url = `${BASE}/v5/products/country/${encodeURIComponent(cc)}?family_name=${encodeURIComponent(family)}&lang=en&coin=BTC`;
   try {
     const res = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(20_000) });
     if (res.status !== 200) return { state: 'unknown', status: res.status };
     let j;
     try { j = JSON.parse(await res.text()); } catch { return { state: 'unknown', status: 'bad-json' }; }
     if (!Array.isArray(j)) return { state: 'unknown', status: 'bad-shape' };
-    const has = j.some((f) => Array.isArray(f?.products) && f.products.length > 0);
-    return { state: has ? 'ok' : 'empty', status: 200 };
+    return { state: classifyStock(j), status: 200 };
   } catch (e) {
     return { state: 'unknown', status: e && e.name === 'TimeoutError' ? 'timeout' : 'network' };
   }
@@ -199,12 +200,11 @@ async function productPresence(cc, family, stats) {
 // as { state, at } under "CC|family"; the committed seed and the runner's
 // cache file are merged (newer answer wins). A pair is re-read once its record
 // is older than RECHECK_AFTER_MS, so a full pass over every country builds up
-// across hourly runs instead of being redone from scratch each time. An
-// "empty" answer keeps hiding the card for EMPTY_TRUSTED_MS.
+// across hourly runs instead of being redone from scratch each time. Stock
+// flags are trusted for one hour; older records only retain scan progress.
 const STOCK_STATE_SEED = join(ROOT, 'scripts', 'data', 'stock-state.json');
 const STOCK_STATE_FILE = process.env.CATALOG_STOCK_STATE || join(ROOT, '.catalog-stock-state.json');
-const RECHECK_AFTER_MS = 24 * 3600_000;
-const EMPTY_TRUSTED_MS = 7 * 24 * 3600_000;
+const STATE_RETENTION_MS = 7 * 24 * 3600_000;
 
 async function readStateFile(path) {
   try { return JSON.parse(await readFile(path, 'utf8')); } catch { return {}; }
@@ -214,14 +214,14 @@ async function loadStockState() {
   const merged = {};
   for (const src of [await readStateFile(STOCK_STATE_SEED), await readStateFile(STOCK_STATE_FILE)]) {
     for (const [key, rec] of Object.entries(src || {})) {
-      if (rec && rec.state && (!merged[key] || rec.at > merged[key].at)) merged[key] = rec;
+      if (validStockRecord(rec) && (!merged[key] || rec.at > merged[key].at)) merged[key] = rec;
     }
   }
   return merged;
 }
 
 async function saveStockState(state) {
-  const cutoff = Date.now() - EMPTY_TRUSTED_MS;
+  const cutoff = Date.now() - STATE_RETENTION_MS;
   const kept = {};
   for (const [key, rec] of Object.entries(state)) if (rec.at >= cutoff) kept[key] = rec;
   await writeFile(STOCK_STATE_FILE, JSON.stringify(kept));
@@ -235,7 +235,7 @@ async function verifyStock(plan, state) {
   for (const { cc, data } of plan) {
     const families = new Set();
     for (const cat of data.categories) {
-      for (const b of cat.brands) if (!b.is_out_of_stock) families.add(b.family);
+      for (const b of cat.brands) if (b.family) families.add(b.family);
     }
     for (const family of families) {
       const rec = state[`${cc}|${family}`];
@@ -243,6 +243,10 @@ async function verifyStock(plan, state) {
       else jobs.push({ cc, family });
     }
   }
+  // Oldest first: daily TR-first scans starved smaller countries indefinitely.
+  // The pacing budget cannot recheck 7,000 families in one hour, so carry
+  // progress forward and give every country a turn rather than restart it.
+  jobs.sort((a, b) => (state[`${a.cc}|${a.family}`]?.at || 0) - (state[`${b.cc}|${b.family}`]?.at || 0));
   const stats = { families: jobs.length + fresh, fresh, checked: 0, ok: 0, empty: 0, unresolved: 0, skipped: 0, cooldowns: 0, status: {}, hidden: {} };
   const deadline = now + VERIFY_BUDGET_MS;
   const queue = [...jobs];
@@ -259,6 +263,7 @@ async function verifyStock(plan, state) {
       // The supplier is pushing back: every worker waits out the same cool-down.
       if (Date.now() < pausedUntil) await sleep(pausedUntil - Date.now());
       const job = queue.shift();
+      if (!job) return;
       const result = await productPresence(job.cc, job.family, stats);
       stats.checked += 1;
       if (result === 'unknown') {
@@ -273,20 +278,19 @@ async function verifyStock(plan, state) {
         continue;
       }
       unresolvedRun = 0;
-      state[`${job.cc}|${job.family}`] = { state: result, at: Date.now() };
+      state[`${job.cc}|${job.family}`] = { state: result, at: Date.now(), version: STOCK_VERSION };
       if (result === 'ok') stats.ok += 1;
       else stats.empty += 1;
     }
   }));
   // Apply to every plan entry: a family whose latest trusted answer is "empty"
   // is out of stock, whether it was read in this run or an earlier one.
-  const trustedAfter = Date.now() - EMPTY_TRUSTED_MS;
   for (const { cc, data } of plan) {
+    applyStockState(data, cc, state);
     for (const cat of data.categories) {
       for (const b of cat.brands) {
         const rec = state[`${cc}|${b.family}`];
-        if (!b.is_out_of_stock && rec && rec.state === 'empty' && rec.at >= trustedAfter) {
-          b.is_out_of_stock = true;
+        if (rec && rec.state === 'empty' && Date.now() - rec.at < RECHECK_AFTER_MS) {
           (stats.hidden[cc] ||= new Set()).add(b.family);
         }
       }
@@ -327,12 +331,16 @@ await pool(targets, async (cc) => {
   }
 }, 6);
 
-// `_global` has no country to probe, so it is published as listed.
+// Global listings often resolve to TR; apply that country's verified stock
+// rather than publishing an unchecked duplicate of the directory.
 const plan = fetched
   .filter((f) => f.cc !== '_global')
   .sort((a, b) => (a.cc === 'TR' ? -1 : b.cc === 'TR' ? 1 : b.brands - a.brands));
 const stockState = await loadStockState();
 manifest.verified = await verifyStock(plan, stockState);
+for (const f of fetched.filter((f) => f.cc === '_global')) {
+  applyStockState(f.data, f.data.country_code || 'TR', stockState);
+}
 manifest.verified.state_records = await saveStockState(stockState);
 const v = manifest.verified;
 console.log(`[sync-catalog] stock check: ${v.checked}/${v.families} families (fresh ${v.fresh}, ok ${v.ok}, hidden-empty ${v.empty}, unresolved ${v.unresolved}, skipped ${v.skipped}, cooldowns ${v.cooldowns}, http ${JSON.stringify(v.status)})${v.aborted_on_errors ? ' — stopped early: supplier kept refusing' : ''}`);

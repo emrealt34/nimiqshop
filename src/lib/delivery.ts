@@ -58,7 +58,7 @@ export async function collectPhoneValue(raw: unknown, country?: string): Promise
 /** Build the /api/quotes request for ONE item from shared delivery info. */
 export function buildOrderRequest(
   item: any,
-  { email, phone, gift = false, paymentMethod, cashbackDestination, anonymous = false }: { email?: string; phone?: string; gift?: boolean; paymentMethod?: string; cashbackDestination?: string; anonymous?: boolean } = {}
+  { email, phone, gift = false, paymentMethod, cashbackDestination, anonymous = false, identicon }: { email?: string; phone?: string; gift?: boolean; paymentMethod?: string; cashbackDestination?: string; anonymous?: boolean; identicon?: string } = {}
 ): Record<string, unknown> {
   const isTopUp = needsPhone(item);
   const ch = memGiftChannel;
@@ -86,7 +86,8 @@ export function buildOrderRequest(
   }
   // The buyer's identicon for the order mail: gift or plain purchase alike.
   // Never sent on an anonymous order (the mail must not identify the buyer).
-  const avatar = memGiftIdenticon || buyerIdenticon;
+  // An explicit empty value also suppresses any cached avatar from a previous wallet.
+  const avatar = identicon ?? (memGiftIdenticon || buyerIdenticon);
   if (avatar && !anonymous) req.gifter_identicon = avatar;
   if (isTopUp) {
     req.phone_number = phone || '';
