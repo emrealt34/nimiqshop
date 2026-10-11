@@ -3,7 +3,34 @@
  * Plural: eins (n===1) / andere.
  */
 const de = {
+  refreshStatus: {
+    "title": "Aktualisierungsstatus",
+    "intro": "Diese Zeitstempel gelten für die derzeit auf dieser Website angezeigten Daten.",
+    "error": "Der Aktualisierungsstatus konnte nicht geladen werden.",
+    "loading": "Aktualisierungsstatus wird geladen…",
+    "fresh": "Katalog- und Kursprüfungen sind aktuell.",
+    "stale": "Die Katalog- oder Kursprüfung ist über 90 Minuten alt.",
+    "catalog": "Katalog geprüft",
+    "market": "Kurse geprüft",
+    "countries": "Aktualisierte Länder",
+    "retained": "Vorherige Listen beibehalten",
+    "stock": "Produktbestand",
+    "stockCounts": "{{checked}} in diesem Lauf geprüft · {{pending}} ausstehend",
+    "fiat": "Datenstand des Devisenanbieters",
+    "explanation": "Katalog und Kurse werden gemeinsam veröffentlicht. Bestandsprüfungen rotieren innerhalb des Anbieterlimits. Devisendaten erscheinen täglich; Prüfzeit und Datenstand unterscheiden sich.",
+    "actions": "GitHub-Aktualisierung ansehen"
+},
   lightningReceipt: {
+    chainVerified: "Der Blockchain-Beleg wurde im Browser mit dem Rechnungshash abgeglichen.",
+    fundingOnly: "Die Nimiq-Swap-Einzahlung ist bestätigt. Der Lightning-Zahlungsnachweis ist noch nicht verfügbar.",
+    chainLoading: "Passender Nimiq-Beleg wird gesucht…",
+    chainUnavailable: "Der Blockchain-Beleg ist derzeit nicht abrufbar.",
+    chainMissing: "Kein passender Blockchain-Beleg gespeichert. Der Rechnungshash allein beweist keine Zahlung.",
+    fundingExplorer: "Nimiq-Einzahlung",
+    settlementExplorer: "Nimiq-Zahlungsnachweis",
+    copyPreimage: "Öffentliches Zahlungs-Preimage kopieren",
+    offchain: "Lightning-Zahlungen erfolgen außerhalb der Blockchain; es gibt keine einzelne Bitcoin-Transaktion im BTC-Explorer. Diese Links zeigen den passenden Nimiq-Swap.",
+
     title: "Lightning-Zahlung",
     hash: "Zahlungs-Hash",
     copyHash: "Zahlungs-Hash kopieren",

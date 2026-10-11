@@ -44,7 +44,7 @@
     "lint:ts": "oxlint",
     "verify": "npm run check && npm run check:e2e && npm run check:i18n && npm run check:fonts && npm run check:keys && npm run check:i18n:deep && npm run check:api && npm run check:workflows && npm run check:config && npm run lint",
     "test:pages-proxy": "node --test scripts/test-pages-proxy.mjs",
-    "test:unit": "node --test scripts/test-friendly-api-message.mjs scripts/test-confirm-match.mjs scripts/test-renew-rules.mjs scripts/test-catalog-stock.mjs scripts/test-catalog-visibility.mjs scripts/test-rating-input.mjs scripts/test-checkout-avatar.mjs scripts/test-market-sync.mjs scripts/test-activity-volume.mjs scripts/test-lightning-receipt.mjs scripts/test-catalog-refresh-due.mjs",
+    "test:unit": "node --test scripts/test-friendly-api-message.mjs scripts/test-confirm-match.mjs scripts/test-renew-rules.mjs scripts/test-catalog-stock.mjs scripts/test-catalog-visibility.mjs scripts/test-rating-input.mjs scripts/test-checkout-avatar.mjs scripts/test-market-sync.mjs scripts/test-activity-volume.mjs scripts/test-lightning-receipt.mjs scripts/test-catalog-refresh-due.mjs scripts/test-catalog-watchdog.mjs",
     "css:capture": "node scripts/critical-css.mjs --capture"
   },
   "dependencies": {

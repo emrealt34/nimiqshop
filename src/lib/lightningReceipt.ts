@@ -2,21 +2,26 @@
 export const LIGHTNING_VERIFIER_URL = 'https://dev.blink.sv/decode';
 
 export type LightningReceiptData = {
+  quote_id?: string;
+  chain_proof?: LightningChainProof;
   payment_hash: string;
   amount_btc?: string;
   confirmed: boolean;
   confirmed_at?: string;
 };
+export type LightningChainProof = { funding_tx: string; contract: string; settlement_tx?: string; preimage?: string };
 
 export function lightningReceiptOf(value: any, publicView = false): LightningReceiptData | null {
   if (!value || value.test_mode || (publicView && value.anonymous)) return null;
   const receipt = value.lightning_receipt;
-  const hash = paymentHash(receipt?.payment_hash || value.lightning_payment_hash || value.tx);
+  const hash = paymentHash(receipt?.payment_hash || value.lightning_payment_hash);
   const lightning = receipt || (/lightning/i.test(String(value.network || '')) && /btc/i.test(String(value.coin || value.paid || 'BTC')));
   if (!hash || !lightning) return null;
   const timestamp = receipt?.confirmed_at || value.paid_at;
   const confirmedAt = typeof timestamp === 'string' && Number.isFinite(Date.parse(timestamp)) ? timestamp : undefined;
   return {
+    quote_id: value.id,
+    chain_proof: receipt?.chain_proof || value.lightning_chain_proof,
     payment_hash: hash,
     amount_btc: receipt?.amount_btc || value.coin_amount || (String(value.paid || '').match(/^([\d.]+)\s+BTC$/i)?.[1]),
     confirmed: receipt?.confirmed === true || value.payment_observed === true || !!confirmedAt || ['fulfilled', 'completed', 'delivered'].includes(value.status),

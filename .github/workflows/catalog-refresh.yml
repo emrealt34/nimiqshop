@@ -5,6 +5,12 @@ on:
     # Off-hour retry checks recover missed schedules; the guard avoids redundant scans.
     - cron: "17,37,57 * * * *"
   workflow_dispatch:
+    inputs:
+      source:
+        description: Refresh trigger
+        type: choice
+        options: [manual, railway-watchdog]
+        default: manual
 
 permissions: {}
 
@@ -36,6 +42,7 @@ jobs:
         id: guard
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REFRESH_SOURCE: ${{ inputs.source }}
         run: node scripts/catalog-refresh-due.mjs
 
   refresh:
@@ -83,6 +90,8 @@ jobs:
         run: node scripts/sync-market.mjs
       - name: Publish refresh summary
         if: always()
+        env:
+          REFRESH_SOURCE: ${{ inputs.source || github.event_name }}
         run: node scripts/catalog-refresh-summary.mjs
       - name: Stage refreshed snapshots
         run: node scripts/catalog-data.mjs stage

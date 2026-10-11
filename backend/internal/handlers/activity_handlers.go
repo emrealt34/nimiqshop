@@ -357,11 +357,6 @@ func (h *Handlers) ListActivity(ctx *fasthttp.RequestCtx) {
 			if q.Network != "" {
 				e["network"] = q.Network
 			}
-			// Owner (2026-10-05): the purchase's Lightning payment hash rides
-			// on the public feed row — the tx of what you bought, in the open.
-			if q.LightningPaymentHash != "" {
-				e["tx"] = q.LightningPaymentHash
-			}
 		}
 		if receipt := publicLightningReceipt(q); receipt != nil {
 			e["lightning_receipt"] = receipt
@@ -668,11 +663,6 @@ func (h *Handlers) TrackStatus(ctx *fasthttp.RequestCtx) {
 			"payment_method":   q.PaymentMethod,
 			"coin":             q.Coin,
 			"lines":            publicLines(q),
-		}
-		// Owner (2026-10-05): the purchase tx IS public summary content â
-		// the old "no payment-network details here" policy is superseded.
-		if !q.Anonymous && q.LightningPaymentHash != "" {
-			resp["tx"] = q.LightningPaymentHash
 		}
 		if receipt := publicLightningReceipt(q); receipt != nil {
 			resp["lightning_receipt"] = receipt

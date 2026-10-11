@@ -22,6 +22,7 @@ import { useT } from '../../i18n';
 import { useInNimiqPay, detectMobilePlatform } from '../../lib/miniapp';
 import { launchLightningUri, isQuotePayable, quoteBolt11 } from '../../lib/pay';
 import { payLightningInvoice, isTerminalOutcome } from '../../lib/nimiqPay';
+import { saveLightningFunding } from '../../lib/api';
 import { ApiError, authorizePaymentLaunch, getQuote, friendlyApiMessage, cachedNimRate } from '../../lib/api';
 import { nimAmountFor } from '../../lib/nim';
 import { siteName } from '../../lib/config';
@@ -137,6 +138,7 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, hidePayButt
       if (action === 'pay' && insidePay) {
         const res = await payLightningInvoice(invoice);
         if (isTerminalOutcome(res)) {
+          if ('hash' in res && res.hash) void saveLightningFunding(quoteId, res.hash).catch(() => {});
           setPayLocked(true);
           toast(
             res.status === 'submitted'

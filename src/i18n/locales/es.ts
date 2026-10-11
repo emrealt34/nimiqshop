@@ -3,7 +3,34 @@
  * Plural en español: uno (n===1) / otros.
  */
 const es = {
+  refreshStatus: {
+    "title": "Estado de actualización",
+    "intro": "Estas fechas corresponden a los datos que muestra actualmente este sitio.",
+    "error": "No se pudo cargar el estado.",
+    "loading": "Cargando actualizaciones…",
+    "fresh": "Las comprobaciones del catálogo y las cotizaciones son recientes.",
+    "stale": "La comprobación del catálogo o las cotizaciones tiene más de 90 minutos.",
+    "catalog": "Catálogo comprobado",
+    "market": "Cotizaciones comprobadas",
+    "countries": "Países actualizados",
+    "retained": "Listas anteriores conservadas",
+    "stock": "Existencias",
+    "stockCounts": "{{checked}} comprobados en esta ejecución · {{pending}} pendientes",
+    "fiat": "Fecha del proveedor de divisas",
+    "explanation": "El catálogo y las cotizaciones se publican juntos. Las existencias se comprueban por turnos según los límites del proveedor. Las divisas se publican a diario; la fecha de comprobación difiere de la de los datos.",
+    "actions": "Ver actualización en GitHub"
+},
   lightningReceipt: {
+    chainVerified: "El recibo de la cadena se verificó con el hash de la factura en tu navegador.",
+    fundingOnly: "La financiación del swap Nimiq está confirmada. La prueba de pago Lightning aún no está disponible.",
+    chainLoading: "Buscando el recibo Nimiq correspondiente…",
+    chainUnavailable: "La consulta del recibo no está disponible.",
+    chainMissing: "No hay un recibo de cadena coincidente registrado. El hash de la factura solo no demuestra el pago.",
+    fundingExplorer: "Transacción de financiación Nimiq",
+    settlementExplorer: "Transacción de prueba Nimiq",
+    copyPreimage: "Copiar la preimagen pública del pago",
+    offchain: "Los pagos Lightning son fuera de la cadena; no hay una transacción Bitcoin individual en un explorador BTC. Estos enlaces muestran el swap Nimiq correspondiente.",
+
     title: "Pago Lightning",
     hash: "Hash del pago",
     copyHash: "Copiar hash del pago",

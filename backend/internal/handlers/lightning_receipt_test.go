@@ -66,6 +66,10 @@ func TestActivityAndTrackPublishOnlySafeLightningMetadata(t *testing.T) {
 		if err := json.Unmarshal(ctx.Response.Body(), &item); err != nil {
 			t.Fatal(err)
 		}
+		if item["tx"] != nil {
+			t.Fatal("invoice hash mislabeled as chain transaction")
+		}
+
 		if anonymous {
 			if item["lightning_receipt"] != nil {
 				t.Fatal("anonymous track leaked receipt")
@@ -92,8 +96,33 @@ func TestActivityAndTrackPublishOnlySafeLightningMetadata(t *testing.T) {
 		t.Fatalf("missing real purchases: %s", ctx.Response.Body())
 	}
 	for _, item := range body.Items {
+		if item["tx"] != nil {
+			t.Fatal("invoice hash mislabeled as feed transaction")
+		}
 		if (item["lightning_receipt"] != nil) != (item["id"] == "public-lightning") {
 			t.Fatalf("receipt privacy: %#v", item)
+		}
+	}
+}
+
+func TestPublicChainProofNeverLeaksAnonymousOrSimulatedSavedReceipts(t *testing.T) {
+	store, err := db.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	h := &Handlers{Store: store}
+	for _, mode := range []string{"anonymous", "test"} {
+		q := db.Quote{ID: mode, UserID: "buyer", Coin: "BTC", Network: "Lightning", Anonymous: mode == "anonymous", TestMode: mode == "test", LightningChainProof: &db.LightningChainProof{FundingTx: strings.Repeat("a", 64), SettlementTx: strings.Repeat("b", 64), Preimage: strings.Repeat("0", 64)}}
+		if err := store.CreateQuoteWithDailyLimits(q, 0, 0, time.Now()); err != nil {
+			t.Fatal(err)
+		}
+		var ctx fasthttp.RequestCtx
+		ctx.Request.SetRequestURI("/api/track/" + mode + "/lightning-proof")
+		ctx.SetUserValue("id", mode)
+		h.LightningProof(&ctx)
+		if ctx.Response.StatusCode() != 404 || strings.Contains(string(ctx.Response.Body()), strings.Repeat("b", 64)) {
+			t.Fatal("private saved chain receipt disclosed")
 		}
 	}
 }

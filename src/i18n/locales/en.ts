@@ -9,7 +9,34 @@
  * in the other five locales.
  */
 const en = {
+  refreshStatus: {
+    "title": "Refresh status",
+    "intro": "These timestamps describe the data currently served by this site.",
+    "error": "Refresh status could not be loaded.",
+    "loading": "Loading refresh status…",
+    "fresh": "Catalog and rate checks are recent.",
+    "stale": "The catalog or rate check is more than 90 minutes old.",
+    "catalog": "Catalog checked",
+    "market": "Rates checked",
+    "countries": "Countries refreshed",
+    "retained": "Previous listings retained",
+    "stock": "Product stock",
+    "stockCounts": "{{checked}} checked this run · {{pending}} pending rotation",
+    "fiat": "Fiat provider observation",
+    "explanation": "Catalog and rates publish together. Stock checks rotate within the supplier budget. Fiat feeds publish daily; the check time and provider observation time differ.",
+    "actions": "View GitHub refresh run"
+},
   lightningReceipt: {
+    chainVerified: "Chain receipt verified against the invoice hash in your browser.",
+    fundingOnly: "Nimiq swap funding is confirmed. Lightning settlement proof is not yet available.",
+    chainLoading: "Looking for the matching Nimiq chain receipt…",
+    chainUnavailable: "The chain receipt lookup is unavailable.",
+    chainMissing: "No matching chain receipt is recorded. The invoice hash alone does not prove payment.",
+    fundingExplorer: "Nimiq funding transaction",
+    settlementExplorer: "Nimiq settlement transaction",
+    copyPreimage: "Copy public payment preimage",
+    offchain: "Lightning payments are off-chain; there is no individual Bitcoin transaction to open in a BTC explorer. These explorer links show the matching Nimiq swap.",
+
     title: "Lightning payment",
     hash: "Payment hash",
     copyHash: "Copy payment hash",

@@ -55,6 +55,7 @@ export function stripBase(pathname: string): string {
 /** Each entry points at the page's CONTENT component (not the AppRoot wrapper —
  *  the shell + providers must stay mounted across navigations). */
 const imports: Record<string, () => Promise<unknown>> = {
+  '/status': () => import('../components/status/StatusPage'),
   '/': () => import('../components/home/HomePage'),
   '/cart': () => import('../components/cart/CartPage'),
   '/product': () => import('../components/product/ProductPage'),
@@ -70,6 +71,7 @@ const imports: Record<string, () => Promise<unknown>> = {
 };
 
 const PAGES: Record<string, ComponentType> = {
+  '/status': lazy(() => imports['/status']().then((m: any) => ({ default: m.StatusView }))),
   '/': lazy(() => imports['/']().then((m: any) => ({ default: m.HomePage }))),
   '/cart': lazy(() => imports['/cart']().then((m: any) => ({ default: m.CartView }))),
   '/product': lazy(() => imports['/product']().then((m: any) => ({ default: m.ProductPage }))),
@@ -92,6 +94,7 @@ export type Route = { path: string; key: ShellKey; titleKey: string; comp: Compo
 const SITE = siteName(); // brand from config.js (default shop.nimiqbase.com)
 
 export const ROUTES: Route[] = [
+  { path: '/status', key: 'none', titleKey: 'refreshStatus.title', comp: PAGES['/status'] },
   { path: '/', key: 'shop', titleKey: 'pageTitle.shop', comp: PAGES['/'] },
   { path: '/cart', key: 'shop', titleKey: 'pageTitle.cart', comp: PAGES['/cart'] },
   { path: '/product', key: 'product', titleKey: 'pageTitle.product', comp: PAGES['/product'] },

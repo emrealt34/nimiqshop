@@ -3940,3 +3940,4 @@ body { padding-bottom: 0; }
   .quiz-entry { flex-direction:column; }
   .quiz-entry > div:last-child { flex-direction:row; align-items:center; }
 }
+.refresh-status-list{display:grid;grid-template-columns:minmax(120px,1fr) minmax(0,2fr);gap:12px}.refresh-status-list dd{margin:0;overflow-wrap:anywhere}.refresh-status-list dt{font-weight:600}@media(max-width:480px){.refresh-status-list{grid-template-columns:1fr;gap:6px}.refresh-status-list dd{margin-bottom:14px}}

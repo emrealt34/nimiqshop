@@ -968,3 +968,39 @@ func (s *Store) SetQuoteNIMSnapshot(id string, nimUsdRate, estimatedNIM float64)
 		return putQuoteTx(tx, &q)
 	})
 }
+
+// SaveLightningChainProof preserves payment/delivery state and timestamps.
+// A failed lookup or a delayed funding observation cannot erase settled proof.
+func (s *Store) SaveLightningChainProof(id, paymentHash string, proof LightningChainProof) error {
+	return s.Update(func(tx *badger.Txn) error {
+		var q Quote
+		if err := getJSON(tx, quoteKey(id), &q); err != nil {
+			return err
+		}
+		if q.LightningPaymentHash != paymentHash {
+			return ErrConflict
+		}
+		if q.LightningChainProof != nil && q.LightningChainProof.SettlementTx != "" {
+			return nil
+		}
+		q.LightningChainProof = &proof
+		return putQuoteTx(tx, &q)
+	})
+}
+
+func (s *Store) SaveLightningFundingHint(id, userID, hash string) error {
+	return s.Update(func(tx *badger.Txn) error {
+		var q Quote
+		if err := getJSON(tx, quoteKey(id), &q); err != nil {
+			return err
+		}
+		if q.UserID != userID {
+			return ErrNotFound
+		}
+		if q.LightningChainProof != nil {
+			return nil
+		}
+		q.LightningFundingHint = hash
+		return putQuoteTx(tx, &q)
+	})
+}

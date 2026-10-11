@@ -2,8 +2,8 @@
 import { appendFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
-export async function refreshDue({ event, runId, now = Date.now(), get }) {
-  if (event === 'workflow_dispatch') return { due: true, reason: 'Manual refresh requested.' };
+export async function refreshDue({ event, source, runId, now = Date.now(), get }) {
+  if (event === 'workflow_dispatch' && source !== 'railway-watchdog') return { due: true, reason: 'Manual refresh requested.' };
   const freshnessMs = 55 * 60_000;
   const runs = await get('/actions/workflows/catalog-refresh.yml/runs?branch=main&per_page=100');
   for (const run of runs.workflow_runs || []) {
@@ -37,7 +37,7 @@ async function main() {
     return response.json();
   };
   let result;
-  try { result = await refreshDue({ event: process.env.GITHUB_EVENT_NAME, runId: process.env.GITHUB_RUN_ID, get }); }
+  try { result = await refreshDue({ event: process.env.GITHUB_EVENT_NAME, source: process.env.REFRESH_SOURCE, runId: process.env.GITHUB_RUN_ID, get }); }
   catch { result = { due: true, reason: 'Freshness lookup unavailable; attempt refresh rather than silently keep stale data.' }; }
   console.log(result.reason);
   if (process.env.GITHUB_OUTPUT) await appendFile(process.env.GITHUB_OUTPUT, `due=${result.due}\n`);

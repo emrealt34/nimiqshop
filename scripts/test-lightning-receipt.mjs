@@ -14,6 +14,7 @@ test('invoice hash is not evidence of payment; malformed times do not confirm it
 });
 
 test('public privacy, simulation exclusions, network and hash validation', () => {
+  assert.equal(lightningReceiptOf({ coin: 'BTC', network: 'Lightning', tx: hash }), null);
   assert.equal(lightningReceiptOf({ ...quote, anonymous: true }, true), null);
   assert.equal(lightningReceiptOf({ ...quote, anonymous: true }, false).payment_hash, hash);
   assert.equal(lightningReceiptOf({ ...quote, test_mode: true }), null);

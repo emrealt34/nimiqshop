@@ -28,11 +28,11 @@ for (const width of [320, 1280]) {
       await expect(verify).toBeDisabled();
       await input.fill('01'.repeat(32));
       await verify.click();
-      await expect(details.getByRole('status')).toHaveText('Receipt does not match this payment hash.');
+      await expect(details.locator('form').getByRole('status')).toHaveText('Receipt does not match this payment hash.');
       const before = requests.length;
       await input.fill('00'.repeat(32));
       await verify.click();
-      await expect(details.getByRole('status')).toHaveText('Receipt matches this payment hash.');
+      await expect(details.locator('form').getByRole('status')).toHaveText('Receipt matches this payment hash.');
       expect(requests.length).toBe(before);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
       expect(await page.locator('a a, a button').count()).toBe(0);
@@ -55,6 +55,23 @@ for (const width of [320, 1280]) {
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
       });
     }
+
+    test('matching public chain proof supplies real explorers and verifies without typed secrets', async ({ page }) => {
+      await page.route('**/api/track/lightning-test', route => route.fulfill({ json: { ...purchase, lightning_receipt: receipt } }));
+      await page.route('**/api/track/lightning-test/lightning-proof', route => route.fulfill({ json: { chain_proof: { funding_tx: 'a'.repeat(64), settlement_tx: 'b'.repeat(64), contract: 'NQ24 2XCD PK1C 7DR5 25U5 3PER U64V USR2 LPRK', preimage: '00'.repeat(32) } } }));
+      await open(page, path('/track?order=lightning-test'));
+      await expect(page.getByRole('link', { name: 'Nimiq funding transaction' })).toHaveAttribute('href', `https://nimiq.watch/#${'a'.repeat(64)}`);
+      await expect(page.getByRole('link', { name: 'Nimiq settlement transaction' })).toHaveAttribute('href', `https://nimiq.watch/#${'b'.repeat(64)}`);
+      await expect(page.locator('.lightning-chain-proof')).toContainText('Chain receipt verified against the invoice hash in your browser.');
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    });
+    test('wrong preimage never shows settlement as verified', async ({ page }) => {
+      await page.route('**/api/track/lightning-test', route => route.fulfill({ json: { ...purchase, lightning_receipt: receipt } }));
+      await page.route('**/api/track/lightning-test/lightning-proof', route => route.fulfill({ json: { chain_proof: { funding_tx: 'a'.repeat(64), settlement_tx: 'b'.repeat(64), preimage: '01'.repeat(32) } } }));
+      await open(page, path('/track?order=lightning-test'));
+      await expect(page.locator('.lightning-chain-proof')).toContainText('Lightning settlement proof is not yet available.');
+      await expect(page.getByRole('link', { name: 'Nimiq settlement transaction' })).toHaveCount(0);
+    });
   });
 }
 

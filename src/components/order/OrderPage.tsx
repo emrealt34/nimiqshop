@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../ui/Icon';
 import { LightningReceipt } from './LightningReceipt';
 import { lightningReceiptOf } from '../../lib/lightningReceipt';
+import { saveLightningFunding } from '../../lib/api';
 import { UnifiedThumb, BrandThumbStack } from '../ui/UnifiedThumb';
 import { FlagMark } from '../ui/FlagMark';
 import { AppRoot } from '../AppRoot';
@@ -1355,7 +1356,10 @@ function QuoteContent({ q, refund, fulfillment, onChanged }: { q: any; refund?: 
             {inNimiqPay() && !isQuotePayable(q) && quoteBolt11(q) ? (
               <NimiqPayPayButton
                 invoice={quoteBolt11(q)}
-                onSubmitted={() => rememberLightningPayment(quoteBolt11(q), { kind: 'quote', ref: q.id })}
+                onSubmitted={outcome => {
+                  rememberLightningPayment(quoteBolt11(q), { kind: 'quote', ref: q.id });
+                  if ('hash' in outcome && outcome.hash) void saveLightningFunding(q.id, outcome.hash).catch(() => {});
+                }}
               />
             ) : null}
           </div>

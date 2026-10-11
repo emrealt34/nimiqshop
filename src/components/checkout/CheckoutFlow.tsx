@@ -32,6 +32,7 @@ import { LightningPayBlock, useNimiqPayMissingDialog } from './LightningPayBlock
 import { TestPayButton } from './TestPayButton';
 import { LightningRailPills } from './payRailKit';
 import { NimiqPayPayButton } from './NimiqPayPayButton';
+import { saveLightningFunding } from '../../lib/api';
 import { inNimiqPay, detectMobilePlatform } from '../../lib/miniapp';
 import { PaymentCountdown } from './PaymentCountdown';
 import { lightningPaymentURI, rememberLightningPayment } from '../../lib/hub';
@@ -1073,6 +1074,10 @@ export function PayScreen({
           <div style={{ marginTop: 12 }}>
             <NimiqPayPayButton
               invoice={invoice}
+              onSubmitted={outcome => {
+                rememberLightningPayment(invoice, { kind: 'quote', ref: quoteIdOf(current) });
+                if ('hash' in outcome && outcome.hash) void saveLightningFunding(quoteIdOf(current), outcome.hash).catch(() => {});
+              }}
               amountNim={Number(nimAmountFor(current, cachedNimRate())) || 0}
               className="btn btn-gold btn-block btn-lg"
             />

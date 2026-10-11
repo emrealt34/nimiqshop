@@ -3,7 +3,34 @@
  * Pluriel : un (n===1) / autre.
  */
 const fr = {
+  refreshStatus: {
+    "title": "État des mises à jour",
+    "intro": "Ces dates correspondent aux données actuellement servies par ce site.",
+    "error": "Impossible de charger l’état des mises à jour.",
+    "loading": "Chargement des mises à jour…",
+    "fresh": "Les vérifications du catalogue et des cours sont récentes.",
+    "stale": "La vérification du catalogue ou des cours date de plus de 90 minutes.",
+    "catalog": "Catalogue vérifié",
+    "market": "Cours vérifiés",
+    "countries": "Pays actualisés",
+    "retained": "Listes précédentes conservées",
+    "stock": "Stock des produits",
+    "stockCounts": "{{checked}} vérifiés lors de cette exécution · {{pending}} en attente",
+    "fiat": "Date des données du fournisseur de devises",
+    "explanation": "Le catalogue et les cours sont publiés ensemble. Les stocks sont vérifiés à tour de rôle selon les limites du fournisseur. Les devises sont publiées quotidiennement ; la date de vérification diffère de celle des données.",
+    "actions": "Voir l’exécution GitHub"
+},
   lightningReceipt: {
+    chainVerified: "Le reçu blockchain a été vérifié avec le hash de la facture dans votre navigateur.",
+    fundingOnly: "Le financement du swap Nimiq est confirmé. La preuve du paiement Lightning n’est pas encore disponible.",
+    chainLoading: "Recherche du reçu Nimiq correspondant…",
+    chainUnavailable: "La recherche du reçu blockchain est indisponible.",
+    chainMissing: "Aucun reçu blockchain correspondant enregistré. Le hash de la facture seul ne prouve pas le paiement.",
+    fundingExplorer: "Transaction de financement Nimiq",
+    settlementExplorer: "Transaction de preuve Nimiq",
+    copyPreimage: "Copier la préimage publique du paiement",
+    offchain: "Les paiements Lightning sont hors chaîne ; il n’existe pas de transaction Bitcoin individuelle dans un explorateur BTC. Ces liens montrent le swap Nimiq correspondant.",
+
     title: "Paiement Lightning",
     hash: "Hash du paiement",
     copyHash: "Copier le hash du paiement",

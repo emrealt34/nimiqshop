@@ -3,7 +3,34 @@
  * Türkçe'de çoğul: sayı 1 ise tekil, diğer hallerde çoğul.
  */
 const tr = {
+  refreshStatus: {
+    "title": "Güncelleme durumu",
+    "intro": "Bu tarihler sitede şu anda sunulan verilere aittir.",
+    "error": "Güncelleme durumu yüklenemedi.",
+    "loading": "Güncelleme durumu yükleniyor…",
+    "fresh": "Katalog ve kur kontrolleri güncel.",
+    "stale": "Katalog veya kur kontrolü 90 dakikadan eski.",
+    "catalog": "Katalog kontrolü",
+    "market": "Kur kontrolü",
+    "countries": "Yenilenen ülkeler",
+    "retained": "Önceki liste korundu",
+    "stock": "Ürün stoku",
+    "stockCounts": "Bu çalışmada {{checked}} kontrol · sırada {{pending}}",
+    "fiat": "Döviz sağlayıcısının veri tarihi",
+    "explanation": "Katalog ve kurlar birlikte yayınlanır. Stok kontrolleri sağlayıcı sınırları içinde sırayla yapılır. Döviz kaynağı günlük veri yayınlar; kontrol tarihiyle kaynağın veri tarihi farklıdır.",
+    "actions": "GitHub güncelleme çalışmasını gör"
+},
   lightningReceipt: {
+    chainVerified: "Zincir makbuzu, fatura hash’iyle tarayıcında doğrulandı.",
+    fundingOnly: "Nimiq takas yatırma işlemi onaylandı. Lightning ödeme kanıtı henüz bulunamadı.",
+    chainLoading: "Faturayla eşleşen Nimiq zincir makbuzu aranıyor…",
+    chainUnavailable: "Zincir makbuzu sorgusu şu anda kullanılamıyor.",
+    chainMissing: "Eşleşen zincir makbuzu kayıtlı değil. Fatura hash’i tek başına ödendiğini kanıtlamaz.",
+    fundingExplorer: "Nimiq yatırma işlemi",
+    settlementExplorer: "Nimiq ödeme kanıtı işlemi",
+    copyPreimage: "Herkese açık ödeme preimage’ini kopyala",
+    offchain: "Lightning ödemeleri zincir dışında gerçekleşir; BTC explorer’da açılacak ayrı bir Bitcoin işlemi yoktur. Bu explorer bağlantıları faturayla eşleşen Nimiq takasını gösterir.",
+
     title: "Lightning ödemesi",
     hash: "Ödeme hash’i",
     copyHash: "Ödeme hash’ini kopyala",

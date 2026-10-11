@@ -30,5 +30,8 @@ func publicLightningReceipt(q db.Quote) map[string]any {
 	if q.PaidAt != nil {
 		out["confirmed_at"] = q.PaidAt
 	}
+	if q.LightningChainProof != nil {
+		out["chain_proof"] = q.LightningChainProof
+	}
 	return out
 }

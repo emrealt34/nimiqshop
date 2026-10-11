@@ -3,7 +3,34 @@
  * Plural: um (n===1) / outro.
  */
 const pt = {
+  refreshStatus: {
+    "title": "Estado da atualização",
+    "intro": "Estas datas correspondem aos dados apresentados atualmente neste site.",
+    "error": "Não foi possível carregar o estado.",
+    "loading": "A carregar atualizações…",
+    "fresh": "As verificações do catálogo e das cotações são recentes.",
+    "stale": "A verificação do catálogo ou das cotações tem mais de 90 minutos.",
+    "catalog": "Catálogo verificado",
+    "market": "Cotações verificadas",
+    "countries": "Países atualizados",
+    "retained": "Listas anteriores mantidas",
+    "stock": "Stock dos produtos",
+    "stockCounts": "{{checked}} verificados nesta execução · {{pending}} pendentes",
+    "fiat": "Data do fornecedor de câmbio",
+    "explanation": "O catálogo e as cotações são publicados juntos. O stock é verificado por turnos dentro dos limites do fornecedor. O câmbio é publicado diariamente; a data de verificação difere da data dos dados.",
+    "actions": "Ver atualização no GitHub"
+},
   lightningReceipt: {
+    chainVerified: "O recibo da blockchain foi verificado com o hash da fatura no seu navegador.",
+    fundingOnly: "O financiamento do swap Nimiq está confirmado. A prova do pagamento Lightning ainda não está disponível.",
+    chainLoading: "A procurar o recibo Nimiq correspondente…",
+    chainUnavailable: "A consulta do recibo está indisponível.",
+    chainMissing: "Não existe um recibo correspondente registado. O hash da fatura sozinho não comprova o pagamento.",
+    fundingExplorer: "Transação de financiamento Nimiq",
+    settlementExplorer: "Transação de prova Nimiq",
+    copyPreimage: "Copiar a pré-imagem pública do pagamento",
+    offchain: "Os pagamentos Lightning são fora da blockchain; não existe uma transação Bitcoin individual num explorador BTC. Estes links mostram o swap Nimiq correspondente.",
+
     title: "Pagamento Lightning",
     hash: "Hash do pagamento",
     copyHash: "Copiar hash do pagamento",

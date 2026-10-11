@@ -1,0 +1,7 @@
+---
+import BaseLayout from '../layouts/Base.astro';
+import { StatusPage } from '../components/status/StatusPage';
+---
+<BaseLayout title="Refresh status" titleKey="refreshStatus.title" activeKey="none">
+  <StatusPage client:load />
+</BaseLayout>

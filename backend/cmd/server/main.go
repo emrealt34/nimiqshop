@@ -1072,6 +1072,7 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 	// serve one buyer's delivery stage to whoever guesses the id next, and
 	// freeze the anti-fraud transparency view.
 	r.GET("/api/track/{id}", wrap(pinPrivate(h.TrackStatus)))
+	r.GET("/api/track/{id}/lightning-proof", tiered(tRefresh, pinPrivate(h.LightningProof)))
 	// Client IP / country, resolved server-side. No third-party geo API call:
 	// with Cloudflare in front it uses CF-Connecting-IP + CF-IPCountry; in
 	// direct mode it returns the TCP peer. Same-origin, so the frontend never
@@ -1122,6 +1123,7 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 	// DEV-only free test products; not a customer payment rail.
 	r.POST("/api/test/buy", authedTiered(aCheckout, h.TestBuy))
 	r.POST("/api/quotes/{id}/payment-launch", authedTiered(aWrite, h.PaymentLaunch))
+	r.POST("/api/quotes/{id}/lightning-proof", authedTiered(aWrite, h.LightningProof))
 	// TEST MODE: the customer's simulated "pay" button — drives the quote
 	// through the real state machine without any on-chain payment.
 	r.POST("/api/quotes/{id}/refresh", authedTiered(aRefresh, h.RefreshQuote))

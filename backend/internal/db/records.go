@@ -132,9 +132,13 @@ type QuoteLine struct {
 }
 
 type Quote struct {
-	IsBatch         bool     `json:"is_batch,omitempty"`
-	BatchItems      int      `json:"batch_items,omitempty"`
-	FaceValueTotals []string `json:"face_value_totals,omitempty"`
+	// Untrusted owner-provided identifier, kept for confirmation retries. It
+	// is never published as an explorer link or a settlement observation.
+	LightningFundingHint string               `json:"lightning_funding_hint,omitempty"`
+	LightningChainProof  *LightningChainProof `json:"lightning_chain_proof,omitempty"`
+	IsBatch              bool                 `json:"is_batch,omitempty"`
+	BatchItems           int                  `json:"batch_items,omitempty"`
+	FaceValueTotals      []string             `json:"face_value_totals,omitempty"`
 	// Lines is the per-item delivery manifest (see QuoteLine). Present for
 	// batch AND single quotes so every surface can render one honest
 	// "delivered by email / by phone / email & phone" sentence.
@@ -291,6 +295,14 @@ type Quote struct {
 	// actually saw, not a later oracle tick. Zero means "unknown — skip".
 	NimUsdRate   float64 `json:"nim_usd_rate,omitempty"`
 	EstimatedNIM float64 `json:"estimated_nim,omitempty"`
+}
+
+// Only chain-verified data is stored here; invoice hashes are not transaction IDs.
+type LightningChainProof struct {
+	FundingTx    string `json:"funding_tx"`
+	Contract     string `json:"contract"`
+	SettlementTx string `json:"settlement_tx,omitempty"`
+	Preimage     string `json:"preimage,omitempty"`
 }
 
 // Cashback is a one-shot NIM payout from the shop wallet to the buyer,

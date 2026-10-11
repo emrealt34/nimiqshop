@@ -1,10 +1,21 @@
-import { readFile, appendFile } from 'node:fs/promises';
+import { readFile, appendFile, writeFile } from 'node:fs/promises';
 
 const manifest = JSON.parse(await readFile(new URL('../public/data/catalog/manifest.json', import.meta.url), 'utf8'));
 const v = manifest.verified || {};
 let market;
 try { market = JSON.parse(await readFile(new URL('../public/data/market/manifest.json', import.meta.url), 'utf8')); }
 catch { market = null; }
+// This report travels with the exact snapshot served by the deployment. A
+// successful workflow alone must never make old served data look fresh.
+await writeFile(new URL('../public/data/market/refresh.json', import.meta.url), JSON.stringify({
+  checked_at: new Date().toISOString(),
+  run_id: /^\d+$/.test(process.env.GITHUB_RUN_ID || '') ? process.env.GITHUB_RUN_ID : null,
+  source: process.env.REFRESH_SOURCE || process.env.GITHUB_EVENT_NAME || 'local',
+  commit: process.env.GITHUB_SHA || null,
+  catalog: { generated_at: manifest.generated_at, countries: Object.keys(manifest.countries || {}).length,
+    retained_countries: (manifest.failed || []).map(f => f.country), stock: v },
+  market,
+}, null, 2) + '\n');
 const marketLines = market ? [
   '### Market refresh', '',
   `Checked at: ${market.generated_at}`,
