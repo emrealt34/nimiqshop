@@ -13,6 +13,7 @@ import { canonicalIntent, purchaseIntentPayload, loadOrCreateIntent, saveIntentQ
 import { dailyLimitMessage, isDailyLimitError } from './dailyLimit';
 import { countryHint, COUNTRY_HINT_HEADER } from './edgeGeo';
 import { recordAvailability } from './catalogStock';
+import { ratingStars } from './ratingStars';
 
 export class ApiError extends Error {
   status: number;
@@ -743,10 +744,15 @@ export interface RatingBody { stars: number; comment?: string; tx_hash?: string 
 const ratingBase = (kind: RatingKind, id: string) => `/${kind === 'quote' ? 'quotes' : 'orders'}/${encodeURIComponent(id)}`;
 export const getRatingConfig = () => api('/ratings/config');
 export const getRatingComments = () => api('/ratings/comments');
-export const ratingIntent = (kind: RatingKind, id: string, body: RatingBody) =>
-  api(`${ratingBase(kind, id)}/rating/intent`, { method: 'POST', body, auth: true });
-export const submitRating = (kind: RatingKind, id: string, body: RatingBody) =>
-  api(`${ratingBase(kind, id)}/rate`, { method: 'POST', body, auth: true });
+function validatedRatingBody(body: RatingBody): RatingBody {
+  const stars = ratingStars(body?.stars);
+  if (stars === null) throw new ApiError(400, 'rating must be an integer from 1 to 5', 'INVALID_RATING_STARS');
+  return { ...body, stars };
+}
+export const ratingIntent = async (kind: RatingKind, id: string, body: RatingBody) =>
+  api(`${ratingBase(kind, id)}/rating/intent`, { method: 'POST', body: validatedRatingBody(body), auth: true });
+export const submitRating = async (kind: RatingKind, id: string, body: RatingBody) =>
+  api(`${ratingBase(kind, id)}/rate`, { method: 'POST', body: validatedRatingBody(body), auth: true });
 export const rateOrder = (id: string, body: RatingBody) => submitRating('order', id, body);
 export const rateQuote = (id: string, body: RatingBody) => submitRating('quote', id, body);
 export const getAccountLimits = () => api('/account/limits', { auth: true });

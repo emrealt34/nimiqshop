@@ -11,6 +11,7 @@ import { ApiError, submitRating, type RatingBody, type RatingKind } from './api'
 import { inNimiqPay, initNimiqMiniApp } from './miniapp';
 import { sendRatingWithHub } from './hub';
 import { classifyWalletError } from './walletErrors';
+import { ratingStars } from './ratingStars';
 
 export class RatingError extends Error {
   /** 'cancelled' | 'unavailable' | 'failed' | 'pending' | 'refused' */
@@ -41,8 +42,10 @@ export interface PendingRating {
 }
 
 export function rememberPendingRating(p: Omit<PendingRating, 'ts'>): void {
+  const stars = ratingStars(p.stars);
+  if (stars === null) throw new RatingError('refused', 'rating must be an integer from 1 to 5');
   try {
-    sessionStorage.setItem(PENDING_KEY, JSON.stringify({ ...p, ts: Date.now() }));
+    sessionStorage.setItem(PENDING_KEY, JSON.stringify({ ...p, stars, ts: Date.now() }));
   } catch {
     /* private mode: the flow still works, it just cannot resume */
   }
@@ -53,9 +56,17 @@ export function readPendingRating(kind: RatingKind, id: string): PendingRating |
     const raw = sessionStorage.getItem(PENDING_KEY);
     if (!raw) return null;
     const p = JSON.parse(raw) as PendingRating;
-    if (!p || p.kind !== kind || p.id !== id || Date.now() - p.ts > PENDING_MAX_MS) return null;
-    return p;
+    const stars = ratingStars(p?.stars);
+    if (!p || !['order', 'quote'].includes(p.kind) || typeof p.id !== 'string' || !p.id
+      || stars === null || typeof p.comment !== 'string' || !Number.isFinite(p.ts)
+      || p.ts <= 0 || p.ts > Date.now() + 60_000 || Date.now() - p.ts > PENDING_MAX_MS) {
+      clearPendingRating();
+      return null;
+    }
+    if (p.kind !== kind || p.id !== id) return null;
+    return { ...p, stars };
   } catch {
+    clearPendingRating();
     return null;
   }
 }

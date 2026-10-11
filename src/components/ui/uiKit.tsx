@@ -561,7 +561,7 @@ export function StarsDisplay({ rating, size = 16, label = '' }: { rating: number
   );
 }
 
-export function StarPicker({ onSelect, size = 34, value: controlled }: { onSelect?: (r: number) => void; size?: number; value?: number }) {
+export function StarPicker({ onSelect, size = 34, value: controlled, disabled = false }: { onSelect?: (r: number) => void; size?: number; value?: number; disabled?: boolean }) {
   const { t } = useT();
   const [inner, setInner] = useState(0);
   const [hover, setHover] = useState(0);
@@ -575,6 +575,7 @@ export function StarPicker({ onSelect, size = 34, value: controlled }: { onSelec
           className="star-btn"
           type="button"
           aria-label={t('ui.starAria', { count: i })}
+          disabled={disabled}
           onMouseEnter={() => setHover(i)}
           onMouseLeave={() => setHover(0)}
           onClick={() => {
