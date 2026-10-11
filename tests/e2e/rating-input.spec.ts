@@ -25,6 +25,8 @@ for (const kind of ['order', 'quote'] as const) {
       await expect(submit).toBeDisabled();
       for (let stars = 1; stars <= 5; stars++) {
         await form.locator('.star-btn').nth(stars - 1).click();
+        await expect(form.locator('.stars.picker')).toHaveCount(1);
+        await expect(form.locator('.stars:not(.picker)')).toHaveCount(0);
         await expect(submit).toBeEnabled();
         await submit.click();
         await expect.poll(() => received.length).toBe(stars);

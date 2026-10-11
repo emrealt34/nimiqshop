@@ -20,7 +20,7 @@ import { useToast } from '../AppProviders';
 import { createQuote, createQuoteBatch, forgetQuote, getQuote, friendlyApiMessage, authorizePaymentLaunch, cachedNimRate, errorDetailLine } from '../../lib/api';
 import { canRenewQuote, paymentInFlight } from '../../lib/pay';
 import { buildOrderRequest, getGiftExtras, setBuyerIdenticon, type DeliveryInfo } from '../../lib/delivery';
-import { identiconPngDataUrl } from '../../lib/identicon';
+import { identiconPngDataUrl, prepareBuyerIdenticon } from '../../lib/identicon';
 import { getAddress } from '../../lib/session';
 import { isValidEmail } from '../../lib/validate';
 import { giftRowFields } from '../../lib/giftNote';
@@ -132,7 +132,8 @@ function batchReqFor(
   email = '',
   paymentMethod = 'nimiq_pay',
   cashbackDestination = 'cashback',
-  anonymous = false
+  anonymous = false,
+  identicon = ''
 ): Record<string, unknown>[] {
   // Gift extras ride along on EVERY row of the cart that collected them: the
   // note is chosen once, per cart, in the delivery step — and every step that
@@ -168,7 +169,8 @@ function batchReqFor(
     // the step — it is never reused as a note address. The identicon PNG rides
     // on the FIRST row only (~18KB): the API hoists the note off the first
     // row that carries it, and N rows × 18KB would be a needlessly fat POST.
-    Object.assign(row, giftRowFields(idx === 0 ? g : { channel: g.channel, message: g.message }));
+    Object.assign(row, giftRowFields({ channel: g.channel, message: g.message }));
+    if (idx === 0 && identicon && !anonymous) row.gifter_identicon = identicon;
     return row;
   });
 }
@@ -356,6 +358,10 @@ export function CheckoutFlow({
       let items: CartItem[] = initialItems;
       const pm = info.paymentMethod || 'nimiq_pay';
       const cd = info.cashbackDestination || 'cashback';
+      setPhase({ kind: 'preparing', label: t('checkout.flowPreparing', { n: items.length }) });
+      // Resolve the current wallet before creating either a single or batch quote.
+      // A bounded wait keeps an unavailable image service from blocking payment.
+      const identicon = info.anonymous ? '' : await prepareBuyerIdenticon(getAddress());
       const buildReq = (it: CartItem) =>
         buildOrderRequest(it, {
           email: info.email,
@@ -364,6 +370,7 @@ export function CheckoutFlow({
           paymentMethod: pm,
           cashbackDestination: cd,
           anonymous: !!info.anonymous,
+          identicon,
         });
 
       // BATCH-FIRST for multi-item carts
@@ -389,7 +396,7 @@ export function CheckoutFlow({
             if (cards.length > 0 && !isValidEmail(info.email)) {
               throw new Error(t('checkout.flowNeedEmail'));
             }
-            batch = await createQuoteBatch(batchReqFor(items, info.phones, info.email, pm, cd, !!info.anonymous), info.email.trim(), uuid(), currentCashbackCode(), pm, cd, !!info.anonymous, ackRef.current);
+            batch = await createQuoteBatch(batchReqFor(items, info.phones, info.email, pm, cd, !!info.anonymous, identicon), info.email.trim(), uuid(), currentCashbackCode(), pm, cd, !!info.anonymous, ackRef.current);
           } catch (e) {
             batchIssues = supplierIssues(e);
             batchLimit = dailyLimitFromError(e);

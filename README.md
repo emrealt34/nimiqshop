@@ -274,6 +274,26 @@ Run `npm run test:unit` for the stock classifier, browser-memory rules and a
 mock-supplier run of the real sync script; `out-of-stock.spec.ts` covers the grid,
 search, navigation and mixed supplier variants in a real browser.
 
+## Receipt images and sender branding
+
+Order receipts attach the website logo, product tiles and the non-anonymous
+buyer's wallet identicon as inline PNGs with matching Content-ID references.
+Checkout waits briefly for the current wallet image before creating either a
+single or batch quote. Wallet addresses are uppercase in groups of four, and
+an unpaired product occupies a centered full-width row.
+
+The inbox sender icon is controlled by the email provider, separately from
+the HTML logo. The default sender display name is `nimiqshop.io`; an existing
+`MAILTRAP_FROM_NAME` environment override also needs to use the current brand.
+The verified sender email remains independently configurable. Gmail domain branding requires sender profile configuration or
+[BIMI setup](https://knowledge.workspace.google.com/admin/security/set-up-bimi),
+including the applicable domain authentication and logo certificate. Changing
+the receipt template cannot replace that inbox letter avatar.
+
+Preview without sending mail: from `backend`, run
+`go run ./cmd/giftmail-preview -out /tmp/giftmail-preview`. The command renders
+the real templates for single, paired, odd-count and anonymous orders.
+
 ## License
 
 [MIT](LICENSE).

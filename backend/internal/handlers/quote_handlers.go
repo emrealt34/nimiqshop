@@ -635,16 +635,15 @@ func normalizeGiftNoteShape(channel, message string) (giftNote, error) {
 }
 
 // normalizeGifterIdenticon keeps (or drops) the buyer's identicon for the
-// gift email. The rules:
-//   - an anonymous gift NEVER carries it — the avatar is as identifying as
+// order or gift email. The rules:
+//   - an anonymous order NEVER carries it — the avatar is as identifying as
 //     the name, and the anonymous seal at Build() is the second wall anyway;
-//   - only a channel that actually sends a note ("email") needs one;
+//   - normal purchase receipts need it too, even with no gift channel;
 //   - it must be a decodable PNG data URI of a sane size — the email pipeline
-//     re-draws it as bgcolor cells (Gmail blocks data: images), so anything
-//     exotic is dropped to the note's placeholder avatar rather than refused:
+//     attaches it inline, so anything exotic is dropped rather than refused:
 //     a gift must not fail because an avatar did not rasterize.
-func normalizeGifterIdenticon(uri string, anonymous bool, channel string) string {
-	if uri == "" || anonymous || channel != "email" {
+func normalizeGifterIdenticon(uri string, anonymous bool, _ string) string {
+	if uri == "" || anonymous {
 		return ""
 	}
 	const prefix = "data:image/png;base64,"

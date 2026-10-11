@@ -171,7 +171,6 @@ export function RatingFlow({
       <div className="small muted mb-1">{t('rating.intro')}</div>
       <div className="row" style={{ gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
         <StarPicker size={26} value={stars} disabled={busy} onSelect={(n) => { setStars(n); setError(null); }} />
-        {stars > 0 ? <StarsDisplay rating={stars} size={16} /> : null}
       </div>
 
       <label className="small strong mt-2" htmlFor={`rating-comment-${id}`} style={{ display: 'block' }}>

@@ -8,8 +8,8 @@
 //	go run ./cmd/giftmail-preview -out /tmp/preview
 //
 // Writes named.html (wallet identified, no name — names are not part of the
-// note) and anonymous.html (anonymous card). Both carry a generated Nimiq-style
-// identicon mosaic PNG so the avatar path runs for real.
+// note), anonymous.html, and one/two/three-product purchase receipts. Named
+// receipts carry a real Nimiq identicon as an inline PNG.
 package main
 
 import (
@@ -35,6 +35,7 @@ func identiconPNG() string {
 
 func main() {
 	outDir := flag.String("out", "/tmp/giftmail-preview", "output directory for the HTML files")
+	lang := flag.String("lang", "en", "email language")
 	flag.Parse()
 	if err := os.MkdirAll(*outDir, 0o755); err != nil {
 		fmt.Println("OUT ERROR:", err)
@@ -45,8 +46,9 @@ func main() {
 	const validator = "NQ49 N8MB XYCR XBUP 404C KXKK L49M A7BT F082"
 
 	base := mailtrap.GiftNote{
-		Recipient:              mailtrap.Address{Email: "friend@mail.com", Name: "Friend"},
-		GifterNimiqAddress:     wallet,
+		Lang:                   *lang,
+		Recipient:              mailtrap.Address{Email: "friend@example.com", Name: "Friend"},
+		GifterNimiqAddress:     strings.ToLower(strings.ReplaceAll(wallet, " ", "")),
 		GifterIdenticonDataURI: identiconPNG(),
 		SiteName:               "nimiqshop.io",
 		ProductLabel:           "Steam · 50 USD",
@@ -61,6 +63,7 @@ func main() {
 	// Sample brand tiles: the shop logo stands in for a brand logo, so the
 	// preview shows the real tile layout. Production logos come from brandlogo.
 	logo, _ := os.ReadFile("../public/img/brand-icon.png")
+	base.Items = []mailtrap.GiftItem{{Name: "Steam", Detail: "50 USD", Qty: 1, BgColor: "#1b2838", Logo: logo}}
 	multi := base
 	multi.Self = true
 	multi.ProductLabel = "Steam + Amazon + Netflix"
@@ -79,6 +82,16 @@ func main() {
 	}{
 		{"named", base},
 		{"order-multi", multi},
+		{"purchase-pair", func() mailtrap.GiftNote {
+			n := multi
+			n.Items = n.Items[:2]
+			return n
+		}()},
+		{"purchase-odd", func() mailtrap.GiftNote {
+			n := multi
+			n.Items = n.Items[:3]
+			return n
+		}()},
 		{"anonymous", func() mailtrap.GiftNote {
 			n := base
 			n.Anonymous = true
@@ -89,7 +102,7 @@ func main() {
 		{"purchase", func() mailtrap.GiftNote {
 			n := base
 			n.Self = true
-			n.Recipient = mailtrap.Address{Email: "clientanti1s@gmail.com"}
+			n.Recipient = mailtrap.Address{Email: "buyer@example.com"}
 			n.Message = ""
 			return n
 		}()},
