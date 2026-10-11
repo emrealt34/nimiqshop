@@ -3,6 +3,23 @@
  * Türkçe'de çoğul: sayı 1 ise tekil, diğer hallerde çoğul.
  */
 const tr = {
+  lightningReceipt: {
+    title: "Lightning ödemesi",
+    hash: "Ödeme hash’i",
+    copyHash: "Ödeme hash’ini kopyala",
+    details: "Ödeme ayrıntıları",
+    external: "Harici doğrulayıcı",
+    confirmed: "Tedarikçi ödemeyi onayladı",
+    pending: "Ödeme henüz onaylanmadı",
+    hint: "Ödeme hash’i tek başına ödeme kanıtı değildir. Ödeyenin cüzdanından alınan preimage ile doğrulayabilirsin; Blink orijinal faturayı da çözümler. Yerel doğrulama tarayıcında kalır.",
+    preimage: "Ödeme preimage’i",
+    preimagePlaceholder: "Cüzdan makbuzundaki 64 onaltılık karakter",
+    verify: "Bu tarayıcıda doğrula",
+    valid: "Makbuz bu ödeme hash’iyle eşleşiyor.",
+    invalid: "Makbuz bu ödeme hash’iyle eşleşmiyor.",
+    error: "Bu tarayıcıda doğrulanamadı. Harici doğrulayıcıyı deneyebilirsin.",
+  },
+
   /* ---- app ---- */
   app: {
     updateReady: 'Yeni sürüm — yenilemek için dokun',

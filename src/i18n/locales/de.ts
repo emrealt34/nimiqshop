@@ -3,6 +3,23 @@
  * Plural: eins (n===1) / andere.
  */
 const de = {
+  lightningReceipt: {
+    title: "Lightning-Zahlung",
+    hash: "Zahlungs-Hash",
+    copyHash: "Zahlungs-Hash kopieren",
+    details: "Zahlungsdetails",
+    external: "Externe Prüfung",
+    confirmed: "Zahlung vom Anbieter bestätigt",
+    pending: "Zahlung noch nicht bestätigt",
+    hint: "Ein Zahlungs-Hash allein beweist keine Zahlung. Prüfe mit dem Preimage aus der Wallet des Zahlenden; Blink kann auch die Originalrechnung dekodieren. Die lokale Prüfung bleibt in deinem Browser.",
+    preimage: "Zahlungs-Preimage",
+    preimagePlaceholder: "64 Hexadezimalzeichen aus dem Wallet-Beleg",
+    verify: "In diesem Browser prüfen",
+    valid: "Der Beleg passt zu diesem Zahlungs-Hash.",
+    invalid: "Der Beleg passt nicht zu diesem Zahlungs-Hash.",
+    error: "Prüfung in diesem Browser nicht möglich. Versuche die externe Prüfung.",
+  },
+
   /* ---- app ---- */
   app: {
     updateReady: 'Neue Version — zum Aktualisieren tippen',

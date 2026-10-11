@@ -21,6 +21,8 @@ import { KvSkeleton } from '../ui/uiKit';
 import { StatusBadge, StageTimeline, EmptyState, ErrorState, AlertBox, CopyButton, KvCard } from '../ui/uiKit';
 import { useT } from '../../i18n';
 import { pagePath } from '../../lib/asset';
+import { LightningReceipt } from '../order/LightningReceipt';
+import { lightningReceiptOf } from '../../lib/lightningReceipt';
 
 type TrackData = any;
 
@@ -183,10 +185,10 @@ export function TrackView() {
     ]);
   if (trk.quantity && trk.quantity > 1) rows.push([t('trackPage.rowQuantity'), '×' + trk.quantity]);
   if (trk.created_at) rows.push([t('trackPage.rowCreated'), fmtDate(trk.created_at)]);
-  if (trk.tx)
+  if (lightningReceiptOf(trk, true))
     rows.push([
-      t('trackPage.rowTx'),
-      <span key="tx" className="mono small" style={{ wordBreak: 'break-all' }}>{String(trk.tx)}</span>,
+      t('lightningReceipt.hash'),
+      <LightningReceipt key="tx" receipt={lightningReceiptOf(trk, true)} />,
     ]);
   if (trk.updated_at) rows.push([t('trackPage.rowUpdated'), fmtDate(trk.updated_at)]);
 

@@ -712,6 +712,19 @@ html.in-nimiq-pay #main.page {
 .admin-cashback-wallet-address { overflow-wrap:anywhere; margin:6px 0; user-select:text; }
 .admin-cashback-wallet .astat-value { overflow-wrap:anywhere; }
 
+.feed-item, .order-card { position:relative; }
+.card-main-link { color:inherit; text-decoration:none; }
+.card-main-link::after { content:''; position:absolute; inset:0; z-index:1; border-radius:inherit; }
+.card-main-link:focus-visible::after { outline:2px solid var(--ink); outline-offset:2px; }
+.feed-item button, .order-card button, .feed-item a:not(.card-main-link), .order-card a:not(.card-main-link) { position:relative; z-index:2; }
+.lightning-receipt { display:flex; flex-direction:column; align-items:flex-start; gap:8px; min-width:0; text-align:left; }
+.lightning-receipt-hash { display:block; overflow-wrap:anywhere; font-size:.72rem; user-select:text; max-width:100%; }
+.lightning-receipt-details { display:flex; flex-direction:column; gap:10px; min-width:0; }
+.lightning-receipt-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.lightning-receipt-verify { display:flex; flex-direction:column; gap:10px; align-items:flex-start; }
+.lightning-receipt-verify .field { width:100%; min-width:0; }
+.lightning-receipt-chip { display:inline-flex; align-items:center; gap:4px; cursor:pointer; font:inherit; }
+
 /* Server + countries cards (AdminSystemPanel.tsx). The meter is the one
    addition to the .astat mini card: a percentage nobody can feel without a
    bar. Tones follow the same ink/stamp/red scale the rest of the console

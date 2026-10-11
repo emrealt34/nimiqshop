@@ -35,9 +35,9 @@ for (const lang of ['en', 'tr'] as const) {
       ], summary: {} } }));
       await open(page, path('/activity'));
       await expect(page.locator('.feed-item')).toHaveCount(2);
-      await expect(page.locator('.feed-item[href*="real-carrefour"]')).toContainText('Carrefour');
-      await expect(page.locator('.feed-item[href*="real-amazon"]')).toContainText('Amazon');
-      for (const id of [...fakeIds, 'future-test']) await expect(page.locator(`.feed-item[href*="${id}"]`)).toHaveCount(0);
+      await expect(page.locator('.feed-item[data-order-id="real-carrefour"]')).toContainText('Carrefour');
+      await expect(page.locator('.feed-item[data-order-id="real-amazon"]')).toContainText('Amazon');
+      for (const id of [...fakeIds, 'future-test']) await expect(page.locator(`.feed-item[data-order-id="${id}"]`)).toHaveCount(0);
       await expect(page.locator('.act-tile-num').first()).toHaveText('2');
       await expect(page.locator('.act-tile').filter({ has: page.locator('.act-tile-nim-mark') }).locator('.act-tile-num')).toHaveText('150 NIM');
     });

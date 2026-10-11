@@ -20,7 +20,7 @@ async function findSnapshot() {
     if (!response.ok) throw new Error(`Snapshot API HTTP ${response.status}`);
     return response.json();
   };
-  const runs = await get('/actions/workflows/catalog-refresh.yml/runs?branch=main&per_page=20');
+  const runs = await get('/actions/workflows/catalog-refresh.yml/runs?branch=main&per_page=100');
   for (const run of runs.workflow_runs || []) {
     if (run.head_branch !== 'main' || !['schedule', 'workflow_dispatch'].includes(run.event)) continue;
     const result = await get(`/actions/runs/${run.id}/artifacts?per_page=100`);

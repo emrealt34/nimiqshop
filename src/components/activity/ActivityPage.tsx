@@ -21,6 +21,8 @@ import { Pager } from '../ui/Pager';
 import { RecentRatingComments } from '../rating/RatingFlow';
 import { useT, t as i18nT } from '../../i18n';
 import { pagePath } from '../../lib/asset';
+import { LightningReceipt } from '../order/LightningReceipt';
+import { lightningReceiptOf } from '../../lib/lightningReceipt';
 
 /** Rows per page in the live feed (the site's default pagination). */
 const FEED_PER_PAGE = 10;
@@ -423,7 +425,7 @@ function FeedItem({ it }: { it: any }) {
   if (local && it.nim > 0) chips.push('≈ ' + compactNIM(it.nim) + ' NIM');
 
   return (
-    <a className="feed-item" href={pagePath('/track?order=' + encodeURIComponent(it.id))}>
+    <article className="feed-item" data-order-id={it.id}>
       {it.batch_summary_items?.length > 1 ? <FeedBatchThumb titles={it.batch_summary_items} country={it.country} /> : <FeedThumb title={it.title} country={it.country} />}
       <div className="feed-main">
         <div className="feed-row-1">
@@ -431,7 +433,7 @@ function FeedItem({ it }: { it: any }) {
             <span className="feed-flag" title={it.country ? countryName(it.country) : ''}>
               {it.country ? <FlagMark country={it.country} size={16} /> : '🌐'}
             </span>
-            <span className="strong truncate feed-title">{it.title}</span>
+            <a className="strong truncate feed-title card-main-link" href={pagePath('/track?order=' + encodeURIComponent(it.id))}>{it.title}</a>
           </div>
           <div className="feed-side">
             {it.status ? <StatusBadge status={it.status} /> : null}
@@ -441,11 +443,7 @@ function FeedItem({ it }: { it: any }) {
         <div className="feed-row-2">
           <div className="feed-amounts">
             {main ? <span className="feed-amt-main">{main}</span> : <span className="feed-amt-main muted">{t('activityPage.amountInWallet')}</span>}
-            {it.tx ? (
-              <span className="xs mono faint" title={String(it.tx)} style={{ wordBreak: 'break-all' }}>
-                {String(it.tx).slice(0, 10)}…{String(it.tx).slice(-8)}
-              </span>
-            ) : null}
+            <LightningReceipt receipt={lightningReceiptOf(it, true)} compact />
             {chips.length ? (
               <span className="feed-amt-chips">
                 {chips.map((c, i) => (
@@ -496,7 +494,7 @@ function FeedItem({ it }: { it: any }) {
           ) : null}
         </div>
       </div>
-    </a>
+    </article>
   );
 }
 

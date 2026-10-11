@@ -1,0 +1,40 @@
+/** A payment hash identifies an invoice; only a matching preimage is a receipt. */
+export const LIGHTNING_VERIFIER_URL = 'https://dev.blink.sv/decode';
+
+export type LightningReceiptData = {
+  payment_hash: string;
+  amount_btc?: string;
+  confirmed: boolean;
+  confirmed_at?: string;
+};
+
+export function lightningReceiptOf(value: any, publicView = false): LightningReceiptData | null {
+  if (!value || value.test_mode || (publicView && value.anonymous)) return null;
+  const receipt = value.lightning_receipt;
+  const hash = paymentHash(receipt?.payment_hash || value.lightning_payment_hash || value.tx);
+  const lightning = receipt || (/lightning/i.test(String(value.network || '')) && /btc/i.test(String(value.coin || value.paid || 'BTC')));
+  if (!hash || !lightning) return null;
+  const timestamp = receipt?.confirmed_at || value.paid_at;
+  const confirmedAt = typeof timestamp === 'string' && Number.isFinite(Date.parse(timestamp)) ? timestamp : undefined;
+  return {
+    payment_hash: hash,
+    amount_btc: receipt?.amount_btc || value.coin_amount || (String(value.paid || '').match(/^([\d.]+)\s+BTC$/i)?.[1]),
+    confirmed: receipt?.confirmed === true || value.payment_observed === true || !!confirmedAt || ['fulfilled', 'completed', 'delivered'].includes(value.status),
+    confirmed_at: confirmedAt,
+  };
+}
+
+export function paymentHash(value: unknown): string {
+  const hash = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  return /^[0-9a-f]{64}$/.test(hash) ? hash : '';
+}
+
+export async function verifyLightningPreimage(hash: unknown, preimage: unknown): Promise<boolean> {
+  const expected = paymentHash(hash);
+  const secret = paymentHash(preimage);
+  if (!expected || !secret) return false;
+  const bytes = Uint8Array.from(secret.match(/../g)!, byte => parseInt(byte, 16));
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  const actual = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+  return actual === expected;
+}

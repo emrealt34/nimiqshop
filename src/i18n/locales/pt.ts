@@ -3,6 +3,23 @@
  * Plural: um (n===1) / outro.
  */
 const pt = {
+  lightningReceipt: {
+    title: "Pagamento Lightning",
+    hash: "Hash do pagamento",
+    copyHash: "Copiar hash do pagamento",
+    details: "Detalhes do pagamento",
+    external: "Verificador externo",
+    confirmed: "Pagamento confirmado pelo fornecedor",
+    pending: "Pagamento ainda não confirmado",
+    hint: "O hash sozinho não prova o pagamento. Verifica com a pré-imagem da carteira do pagador; o Blink também pode decodificar a fatura original. A verificação local permanece no teu navegador.",
+    preimage: "Pré-imagem do pagamento",
+    preimagePlaceholder: "64 caracteres hexadecimais do recibo da carteira",
+    verify: "Verificar neste navegador",
+    valid: "O recibo corresponde a este hash do pagamento.",
+    invalid: "O recibo não corresponde a este hash do pagamento.",
+    error: "Não foi possível verificar neste navegador. Experimenta o verificador externo.",
+  },
+
   /* ---- app ---- */
   app: {
     updateReady: 'Nova versão — toque para atualizar',

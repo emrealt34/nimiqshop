@@ -2,7 +2,8 @@ name: Hourly catalog refresh
 
 on:
   schedule:
-    - cron: "17 * * * *"
+    # Off-hour retry checks recover missed schedules; the guard avoids redundant scans.
+    - cron: "17,37,57 * * * *"
   workflow_dispatch:
 
 permissions: {}
@@ -12,9 +13,35 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  freshness:
+    name: Check whether catalog refresh is due
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read # checkout the freshness guard from main
+      actions: read # inspect recent successful catalog snapshots and deployments
+    outputs:
+      due: ${{ steps.guard.outputs.due }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - name: Avoid refreshing a recently published snapshot twice
+        id: guard
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/catalog-refresh-due.mjs
+
   refresh:
     name: Refresh and persist catalog snapshots
-    if: github.ref == 'refs/heads/main'
+    needs: freshness
+    if: needs.freshness.outputs.due == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:

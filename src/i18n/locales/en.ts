@@ -9,6 +9,23 @@
  * in the other five locales.
  */
 const en = {
+  lightningReceipt: {
+    title: "Lightning payment",
+    hash: "Payment hash",
+    copyHash: "Copy payment hash",
+    details: "Payment details",
+    external: "External verifier",
+    confirmed: "Payment confirmed by the supplier",
+    pending: "Payment not yet confirmed",
+    hint: "A payment hash alone does not prove payment. Verify with the preimage from the payer’s wallet; Blink can also decode the original invoice. Local verification stays in your browser.",
+    preimage: "Payment preimage",
+    preimagePlaceholder: "64 hexadecimal characters from the wallet receipt",
+    verify: "Verify in this browser",
+    valid: "Receipt matches this payment hash.",
+    invalid: "Receipt does not match this payment hash.",
+    error: "Could not verify in this browser. Try the external verifier.",
+  },
+
   /* ---- app ---- */
   app: {
     updateReady: 'New version — tap to refresh',

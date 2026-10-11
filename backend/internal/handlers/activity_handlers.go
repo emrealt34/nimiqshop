@@ -363,6 +363,9 @@ func (h *Handlers) ListActivity(ctx *fasthttp.RequestCtx) {
 				e["tx"] = q.LightningPaymentHash
 			}
 		}
+		if receipt := publicLightningReceipt(q); receipt != nil {
+			e["lightning_receipt"] = receipt
+		}
 		r := q.Rating
 		e["rating"] = &r
 		if q.RatedAt != nil {
@@ -670,6 +673,9 @@ func (h *Handlers) TrackStatus(ctx *fasthttp.RequestCtx) {
 		// the old "no payment-network details here" policy is superseded.
 		if !q.Anonymous && q.LightningPaymentHash != "" {
 			resp["tx"] = q.LightningPaymentHash
+		}
+		if receipt := publicLightningReceipt(q); receipt != nil {
+			resp["lightning_receipt"] = receipt
 		}
 		writeJSON(ctx, fasthttp.StatusOK, resp)
 		return

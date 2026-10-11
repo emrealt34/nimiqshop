@@ -23,6 +23,8 @@ import { StatusBadge, MiniProgress, StarsDisplay, EmptyState, ErrorState, Locked
 import { Pager } from '../ui/Pager';
 import { useT, t as i18nT } from '../../i18n';
 import { pagePath } from '../../lib/asset';
+import { LightningReceipt } from '../order/LightningReceipt';
+import { lightningReceiptOf } from '../../lib/lightningReceipt';
 
 /** Rows per page in the order list. */
 const ORDERS_PER_PAGE = 5;
@@ -222,6 +224,7 @@ export function OrdersView() {
           current_stage: stages.findIndex((s) => s.status === 'in_progress'),
           rating: q.rating || 0,
           ratingTx: q.rating_tx || '',
+          lightningReceipt: lightningReceiptOf(q),
           hasTicket: false,
           image: meta.logo,
           bgColor: meta.bg,
@@ -467,7 +470,7 @@ function OrderRow({ r }: { r: any }) {
   const distinctTitles = Array.from(new Set((r.batchSummaryItems || []) as string[]));
 
   return (
-    <a className="order-card" href={href}>
+    <article className="order-card">
       <div className="o-thumb">
         {distinctTitles.length > 1 ? (
           <BrandThumbStack titles={distinctTitles} country={r.country} />
@@ -491,7 +494,7 @@ function OrderRow({ r }: { r: any }) {
                 <FlagMark country={r.country} size={16} />
               </span>
             ) : null}
-            <span className="strong truncate o-name">{r.name || r.id}</span>
+            <a className="strong truncate o-name card-main-link" href={href}>{r.name || r.id}</a>
           </span>
           <span className="o-side">
             <StatusBadge status={r.status} />
@@ -507,6 +510,7 @@ function OrderRow({ r }: { r: any }) {
               <span className="xs faint">{[r.paidUnit, r.usdLabel].filter(Boolean).join(' · ')}</span>
             ) : null}
             <span className="o-chips">
+              <LightningReceipt receipt={r.lightningReceipt} compact />
               <span className="chip xs">{fmtDate(r.created_at)}</span>
               {r.batchItems > 1 ? <span className="chip xs">{t('ordersPage.itemsCount', { count: r.batchItems })}</span> : r.qty > 1 ? <span className="chip xs">× {r.qty}</span> : null}
               {r.country ? (
@@ -540,7 +544,7 @@ function OrderRow({ r }: { r: any }) {
           {ratingNode ? <span className="o-rate">{ratingNode}</span> : null}
         </div>
       </div>
-    </a>
+    </article>
   );
 }
 

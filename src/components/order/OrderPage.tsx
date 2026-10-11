@@ -8,6 +8,8 @@ import { productMoney } from '../../lib/productMoney';
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../ui/Icon';
+import { LightningReceipt } from './LightningReceipt';
+import { lightningReceiptOf } from '../../lib/lightningReceipt';
 import { UnifiedThumb, BrandThumbStack } from '../ui/UnifiedThumb';
 import { FlagMark } from '../ui/FlagMark';
 import { AppRoot } from '../AppRoot';
@@ -746,8 +748,8 @@ function PayNowCard({ q }: { q: any }) {
               <dt>{t('orderPage.finalTotal')}</dt>
               <dd>{coinAmountLabelFor(q, 'BTC') || t('orderPage.amountNote')}</dd>
             </div>
-            {String(q.lightning_payment_hash || '') ? (
-              <div><dt>{t('orderPage.rowTx')}</dt><dd className="mono small" style={{ wordBreak: 'break-all' }}>{String(q.lightning_payment_hash)}</dd></div>
+            {lightningReceiptOf(q) ? (
+              <div><dt>{t('lightningReceipt.hash')}</dt><dd><LightningReceipt receipt={lightningReceiptOf(q)} /></dd></div>
             ) : null}
             <div><dt>{t('orderPage.rowTo')}</dt><dd>{t('orderPage.toSupplier')}</dd></div>
             <div><dt>{t('orderPage.youGet')}</dt><dd>{selectedAmountLabel(q) || cleanProductLabel(q.product_id) || t('orderPage.instantDelivery')}</dd></div>
@@ -1435,8 +1437,8 @@ function QuoteContent({ q, refund, fulfillment, onChanged }: { q: any; refund?: 
       ? [t('orderPage.topupNumber'), <span key="tp" className="mono small">{qDel.creditPhones.join(', ')}</span>]
       : null,
     qGiftMessage ? [t('orderPage.giftMessage'), t('orderPage.giftMessagePresent')] : null,
-    String(q.lightning_payment_hash || '')
-      ? [t('orderPage.rowTx'), <span key="tx" className="mono small" style={{ wordBreak: 'break-all' }}>{String(q.lightning_payment_hash)}</span>]
+    lightningReceiptOf(q)
+      ? [t('lightningReceipt.hash'), <LightningReceipt key="tx" receipt={lightningReceiptOf(q)} />]
       : null,
     [t('orderPage.rowTotal'), qRail.isUsdt && coinAmountLabel(q) ? coinAmountLabel(q) : <NimAmount key="t" q={q} fallback="—" />],
     [t('orderPage.orderId'), copyIdNode(q.id || '')],

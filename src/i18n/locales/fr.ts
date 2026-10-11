@@ -3,6 +3,23 @@
  * Pluriel : un (n===1) / autre.
  */
 const fr = {
+  lightningReceipt: {
+    title: "Paiement Lightning",
+    hash: "Hash du paiement",
+    copyHash: "Copier le hash du paiement",
+    details: "Détails du paiement",
+    external: "Vérificateur externe",
+    confirmed: "Paiement confirmé par le fournisseur",
+    pending: "Paiement pas encore confirmé",
+    hint: "Le hash seul ne prouve pas le paiement. Vérifie avec la préimage du portefeuille du payeur ; Blink peut aussi décoder la facture originale. La vérification locale reste dans ton navigateur.",
+    preimage: "Préimage du paiement",
+    preimagePlaceholder: "64 caractères hexadécimaux du reçu du portefeuille",
+    verify: "Vérifier dans ce navigateur",
+    valid: "Le reçu correspond à ce hash du paiement.",
+    invalid: "Le reçu ne correspond pas à ce hash du paiement.",
+    error: "Impossible de vérifier dans ce navigateur. Essaie le vérificateur externe.",
+  },
+
   /* ---- app ---- */
   app: {
     updateReady: 'Nouvelle version — touchez pour actualiser',

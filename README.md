@@ -249,7 +249,11 @@ every CI check plus a blocking `govulncheck` first.
 ## Hourly catalog refresh
 
 **Hourly catalog refresh** (`.github/workflows/catalog-refresh.yml`) runs at
-minute 17 each hour on `main`, and can also be started manually in Actions.
+minutes 17, 37 and 57 each hour on `main`. These are retry checks: if a
+successful refresh and deployment with a saved snapshot started less than
+55 minutes ago, the supplier scan and deployment are skipped. Manual starts
+always refresh. Extra checks reduce missed-hour gaps, but GitHub cron is not
+a guaranteed clock-hour scheduler.
 It saves refreshed brand listings, market snapshots and stock-check progress
 in one `catalog-snapshots` Actions artifact from `main`; it never creates a branch.
 The refresh does not depend on Cloudflare credentials. A successful run calls
@@ -340,3 +344,21 @@ compares exact counts without rounding up or excluding production files.
 Run **Go 100% coverage audit** in Actions for the strict target check: it
 fails until every instrumented statement is exercised. The README badge
 continues to publish the measured result, never a hard-coded 100%.
+
+## Lightning payment receipts
+
+Orders, order summaries and public Activity/Track show the full validated
+Lightning payment hash, with payment details, copy and Blink verifier controls.
+Anonymous purchases keep this metadata private; simulated purchases are excluded.
+An invoice hash exists before payment and must never be labelled proof on its
+own. Supplier confirmation and its recorded observation time are separate from
+cryptographic verification; old fulfilled rows do not invent a paid timestamp.
+
+A payer can paste the wallet receipt's 32-byte hexadecimal preimage to verify
+SHA-256 against the hash entirely in the browser. No preimage is transmitted or
+saved. The external link opens the official Blink decoder without order data,
+which can verify the original signed invoice and preimage supplied by the payer.
+The current Nimiq Pay SDK returns a submitted transaction hash and swap ID, not
+a Lightning preimage, so existing orders cannot automatically provide independent
+public cryptographic proof. Raw invoices may include supplier references and are
+not exposed publicly.
