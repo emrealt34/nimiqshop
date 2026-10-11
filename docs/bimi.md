@@ -81,6 +81,7 @@ DNS publication does not guarantee an immediate avatar change.
    that logo appearance can take up to 48 hours after correct publication.
 
 Sources:
+
 - [Google: Set up BIMI](https://knowledge.workspace.google.com/admin/security/set-up-bimi)
 - [BIMI Group: SVG schema validation](https://bimigroup.org/using-the-rnc-schema-to-validate-bimi-svg-images/)
 - [Mailtrap: Sending domain setup](https://docs.mailtrap.io/email-api-smtp/setup/sending-domain)
