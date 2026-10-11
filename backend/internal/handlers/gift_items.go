@@ -12,12 +12,12 @@ package handlers
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"sync"
 	"time"
 
 	"nimiqshop/internal/brandlogo"
+	"nimiqshop/internal/catalog"
 	"nimiqshop/internal/cryptorefills"
 	"nimiqshop/internal/db"
 	"nimiqshop/internal/mailtrap"
@@ -68,11 +68,12 @@ func giftLinesFor(q db.Quote) []db.QuoteLine {
 		return q.Lines
 	}
 	return []db.QuoteLine{{
-		ProductID:    q.ProductID,
-		ProductValue: q.ProductValue,
-		Denomination: q.Denomination,
-		Country:      q.ProductCountry,
-		Quantity:     1,
+		ProductID:       q.ProductID,
+		ProductValue:    q.ProductValue,
+		ProductCurrency: q.ProductCurrency,
+		Denomination:    q.Denomination,
+		Country:         q.ProductCountry,
+		Quantity:        q.Quantity,
 	}}
 }
 
@@ -110,20 +111,17 @@ func giftItemsFrom(lines []db.QuoteLine, idx map[string]brandRef) ([]mailtrap.Gi
 // giftFaceDetail is the face value shown under the name: the supplier's label
 // when it is a fixed value, otherwise the denomination, otherwise the amount.
 func giftFaceDetail(l db.QuoteLine) string {
+	currency := l.ProductCurrency
+	if strings.TrimSpace(currency) == "" {
+		_, currency = catalog.ParseDenominationLabel(l.Denomination)
+	}
 	if fl := strings.TrimSpace(l.FaceLabel); fl != "" && fl != "range" {
-		return fl
+		return catalog.DisplayFaceLabel(fl, l.ProductValue, currency, l.Country)
 	}
 	if d := strings.TrimSpace(l.Denomination); d != "" && d != "range" {
-		return d
+		return catalog.DisplayFaceLabel(d, l.ProductValue, currency, l.Country)
 	}
-	if l.ProductValue > 0 {
-		cur := strings.TrimSpace(l.ProductCurrency)
-		if cur == "" {
-			cur = adminExtractCurrency(l.Denomination, l.Country)
-		}
-		return fmt.Sprintf("%g %s", l.ProductValue, cur)
-	}
-	return ""
+	return catalog.DisplayFaceLabel("", l.ProductValue, currency, l.Country)
 }
 
 // giftItemsFor is the product list for a quote's note. Network failures only

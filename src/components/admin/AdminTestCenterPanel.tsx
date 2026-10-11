@@ -20,6 +20,7 @@ import {
   searchProducts,
 } from '../../lib/api';
 import { productMoney, positiveAmount } from '../../lib/productMoney';
+import { productFaceLabel } from '../../lib/format';
 
 type Pkg = { key: string; denomination: string; label: string; value: number; currency: string };
 type RangeOpt = { min: number; max: number; step: number; currency: string };
@@ -84,7 +85,8 @@ function normalizeDetail(raw: any): Detail {
       packages.push({
         key: `${p?.product_id || denomination}`,
         denomination,
-        label: String(p?.localized_denomination || denomination),
+        label: productFaceLabel({ denomination: String(p?.localized_denomination || denomination),
+          product_value: money.value, product_currency: money.currency }),
         value: money.value,
         currency: money.currency || String(fam?.currency || 'USD').toUpperCase(),
       });

@@ -218,6 +218,8 @@ export const COUNTRY_CCY: Record<string, string> = {
   NL: 'EUR', CA: 'CAD', BR: 'BRL', IN: 'INR', AU: 'AUD', JP: 'JPY', PL: 'PLN',
   MX: 'MXN', CH: 'CHF', CN: 'CNY', KR: 'KRW', NZ: 'NZD', SE: 'SEK', NO: 'NOK',
   DK: 'DKK', AE: 'AED', SA: 'SAR', ZA: 'ZAR', SG: 'SGD', AR: 'ARS',
+  AT: 'EUR', BE: 'EUR', CY: 'EUR', EE: 'EUR', FI: 'EUR', GR: 'EUR', HR: 'EUR',
+  IE: 'EUR', LT: 'EUR', LU: 'EUR', LV: 'EUR', MT: 'EUR', PT: 'EUR', SI: 'EUR', SK: 'EUR',
 };
 
 /** Currency for wallet equivalents: prefer the visitor's browser region, then
@@ -290,16 +292,39 @@ export function parseCurrencyValue(str: unknown): { currency: string; value: num
   return { currency: value > 0 ? currency : '', value, raw };
 }
 
-/** The local-currency face value a quote/order carries. */
+type FaceValueSource = {
+  face_label?: unknown; denomination?: unknown; product_currency?: unknown; currency?: unknown;
+  _currency?: unknown; product_value?: unknown; value?: unknown; product_country?: unknown; country?: unknown;
+};
+const faceCurrencies = typeof Intl.supportedValuesOf === 'function' ? new Set(Intl.supportedValuesOf('currency')) : null;
+
+/** Display only: add a missing monetary unit without rewriting supplier SKUs
+ * or replacing eSIM/data/point descriptions with their purchase price. */
+export function productFaceLabel(source: FaceValueSource | null | undefined): string {
+  if (!source) return '';
+  const useful = (v: unknown) => typeof v === 'string' && v.trim() && v.trim().toLowerCase() !== 'range' ? v.trim() : '';
+  const label = useful(source.face_label) || useful(source.denomination);
+  const parsed = parseCurrencyValue(label);
+  if (label && (parsed.value <= 0 || parsed.currency)) return label;
+  const currency = String(source.product_currency || source.currency || source._currency
+    || parseCurrencyValue(source.denomination).currency
+    || COUNTRY_CCY[String(source.product_country || source.country || '').toUpperCase()] || '').trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(currency) || (faceCurrencies && !faceCurrencies.has(currency))) return label;
+  const value = positiveAmount(source.product_value ?? source.value) || parsed.value;
+  return value > 0 ? `${fmtNum(value)} ${currency === 'EUR' ? '€' : currency}` : label;
+}
+
+/** The local-currency face value a quote/order carries. Amounts stay structured;
+ * the display label alone can use a legacy country fallback. */
 export function quoteFaceValue(
-  q: { denomination?: unknown; product_currency?: unknown; _currency?: unknown; product_value?: unknown; product_country?: unknown; country?: unknown } | null | undefined,
+  q: FaceValueSource | null | undefined,
   _opts: { country?: string } = {}
 ): { value: number; currency: string; label: string } {
   if (!q) return { value: 0, currency: '', label: '' };
   // Denomination is a display/SKU label, not an amount (e.g. 50 GB 90 days).
   const ccy = String(q.product_currency || q._currency || '').toUpperCase();
   const value = positiveAmount(q.product_value);
-  const label = q.denomination && q.denomination !== 'range' ? String(q.denomination) : '';
+  const label = productFaceLabel(q);
   return { value, currency: ccy, label };
 }
 

@@ -1485,38 +1485,6 @@ func (h *Handlers) AdminSendQuoteEmail(ctx *fasthttp.RequestCtx) {
 	writeJSON(ctx, fasthttp.StatusOK, out)
 }
 
-// adminQuoteRenderFields is the admin-handler twin of the main.go helper so
-// the gift email body uses the same face-value + currency rendering as the
-// auto-fired tracker.
-func adminQuoteRenderFields(q db.Quote) (faceValue string, currency string, product string) {
-	currency = adminExtractCurrency(q.Denomination, q.ProductCountry)
-	faceValue = strconv.FormatFloat(q.ProductValue, 'f', 0, 64)
-	if q.ProductValue == float64(int64(q.ProductValue)) {
-		faceValue = strconv.FormatInt(int64(q.ProductValue), 10)
-	}
-	product = q.ProductID
-	return
-}
-
-func adminExtractCurrency(denom, country string) string {
-	d := strings.ToUpper(strings.TrimSpace(denom))
-	for _, code := range []string{"USD", "EUR", "GBP", "TRY", "JPY", "CNY", "CAD", "AUD", "CHF", "INR", "BRL", "MXN"} {
-		if strings.Contains(d, code) {
-			return code
-		}
-	}
-	c := strings.ToUpper(strings.TrimSpace(country))
-	switch c {
-	case "TR":
-		return "TRY"
-	case "GB", "UK":
-		return "GBP"
-	case "DE", "FR", "IT", "ES", "NL", "BE", "AT", "PT", "IE", "FI", "GR":
-		return "EUR"
-	}
-	return "USD"
-}
-
 // AdminSendTestEmail sends a realistic gift/purchase email to an operator-
 // supplied address, built by the SAME GiftNote builder + Mailtrap transport the
 // fulfillment chain uses. It is a demo/testing surface: the note uses sample

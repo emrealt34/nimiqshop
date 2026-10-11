@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v4"
+	"nimiqshop/internal/catalog"
 )
 
 /*
@@ -516,7 +517,7 @@ func (s *Store) UserActivity(userID string, limit int) ([]ActivityEvent, error) 
 		if q.ProductCountry != "" {
 			product += " (" + q.ProductCountry + ")"
 		}
-		face := q.Denomination
+		face := catalog.DisplayFaceLabel(q.Denomination, q.ProductValue, q.ProductCurrency, q.ProductCountry)
 		events = append(events, ActivityEvent{
 			At: q.CreatedAt, Kind: "order_created", Label: "Started a purchase",
 			Detail: joinNonEmpty(product, face), Ref: q.ID, Status: q.Status,

@@ -41,6 +41,8 @@ import {
   cleanSupplierTerms,
   stripCryptoCopy,
   quoteFaceValue,
+  productFaceLabel,
+  parseCurrencyValue,
   safeRichHTML,
   MAX_QTY,
 } from '../../lib/format';
@@ -269,8 +271,11 @@ function detailBatchTitles(record: any, fallback: string): string[] {
 function selectedAmountLabel(q: any) {
   const qty = Number(q.quantity) || 1;
   const { value: perUnit, currency: ccy } = quoteFaceValue(q);
-  if (!(perUnit > 0) || !ccy) return '';
-  return qty > 1 ? `${fmtNum(perUnit * qty)} ${ccy} (${fmtNum(perUnit)} × ${qty})` : `${fmtNum(perUnit)} ${ccy}`;
+  const label = productFaceLabel(q);
+  if (!(perUnit > 0) || !ccy || (label && !parseCurrencyValue(label).currency)) return qty > 1 && label ? `${label} ×${qty}` : label;
+  return qty > 1
+    ? `${productFaceLabel({ product_value: perUnit * qty, product_currency: ccy })} (${label} ×${qty})`
+    : label;
 }
 
 function copyIdNode(text: string) {
@@ -555,7 +560,7 @@ function QuoteItemsCard({ q }: { q: any }) {
                 {Number(l.quantity) > 1 ? ` ×${l.quantity}` : ''}
               </div>
               <div className="xs faint">
-                {l.face_label && l.face_label !== 'range' ? l.face_label : l.denomination || ''}
+                {productFaceLabel(l)}
               </div>
             </div>
             <div className="xs" style={{ textAlign: 'right', maxWidth: '55%' }}>

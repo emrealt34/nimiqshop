@@ -116,6 +116,8 @@ export function linesOf(source: any): QuoteLine[] {
       kind: clean(it?.type) === 'phone_refill' ? 'topup' : clean(it?.type) || 'gift_card',
       delivery_channel: clean(it?.type) === 'phone_refill' ? 'phone' : 'email',
       denomination: clean(it?.denomination),
+      product_value: Number(it?.value) || 0,
+      product_currency: clean(it?.currency),
     }));
   }
   // Public tracking payload: no per-line manifest and no targets, only the
@@ -153,6 +155,8 @@ export function linesOf(source: any): QuoteLine[] {
       delivery_channel: topUp ? 'phone' : 'email',
       delivery_target: topUp ? phone : email,
       denomination: clean(source.denomination),
+      product_value: Number(source.product_value || source.payload?.value) || 0,
+      product_currency: clean(source.product_currency || source.payload?.currency),
     },
   ];
 }
@@ -391,6 +395,6 @@ export function deliveryLine(quote: any): { icon: string; text: string } | null 
 export function youGetText(quote: any): string {
   const batchTotals = Array.isArray(quote.face_value_totals) ? quote.face_value_totals.filter(Boolean) : [];
   if (batchTotals.length) return batchTotals.join(' + ');
-  const { value: selVal, currency: selCcy } = quoteFaceValue(quote);
-  return selVal > 0 && selCcy ? `${selVal} ${selCcy}` : '';
+  const { label } = quoteFaceValue(quote);
+  return label;
 }

@@ -5,7 +5,7 @@
  * checkoutFlow.ts; this store owns the cart state and the cart sheet UI.
  */
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { COUNTRY_CCY, MAX_QTY, fmtMoney, fmtNIM, countryName } from './format';
+import { COUNTRY_CCY, MAX_QTY, fmtMoney, fmtNIM, countryName, productFaceLabel } from './format';
 import { cachedNimRate, cachedFX, getAccountLimits } from './api';
 import { isAuthed } from './session';
 
@@ -222,7 +222,7 @@ export function cartPriceLabel(it: CartItem, cartCcy = ''): string {
 export function cartSubtitle(it: CartItem): string {
   const denom = String(it.denomination || '').trim();
   const useful = denom && !/^package$/i.test(denom);
-  const label = useful ? denom : it.value > 0 ? fmtMoney(it.value, it.currency) : '';
+  const label = productFaceLabel({ ...it, denomination: useful ? denom : '' });
   const country = countryName(it.country) || it.country || '';
   return [country || '', label || 'Package'].filter(Boolean).join(' ');
 }

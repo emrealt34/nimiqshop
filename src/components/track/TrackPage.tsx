@@ -12,7 +12,7 @@ import { AppRoot } from '../AppRoot';
 import { openLoginSheet } from '../shell/SiteShell';
 import { friendlyApiMessage, trackOrder, errorDetailLine } from '../../lib/api';
 import { useSession } from '../../lib/useSession';
-import { cleanProductLabel, cleanBatchProductLabels, fmtUSD, fmtNIM, fmtDate, queryParam, countryName, shortAddr } from '../../lib/format';
+import { cleanProductLabel, cleanBatchProductLabels, fmtUSD, fmtNIM, fmtDate, queryParam, countryName, shortAddr, productFaceLabel } from '../../lib/format';
 import { useInterval } from '../../lib/useInterval';
 import { useRouter } from '../../lib/router';
 import { useSheet, useToast } from '../AppProviders';
@@ -173,6 +173,8 @@ export function TrackView() {
     [t('trackPage.rowType'), quoteTracking ? (tRail.isUsdt ? t('trackPage.usdtPurchase') : t('trackPage.btcLightningPurchase')) : t('common.purchase')],
     [t('trackPage.rowAmount'), Number(trk.usd) > 0 ? fmtUSD(trk.usd) : '—'],
   ];
+  const faceLabel = productFaceLabel(trk) || (Array.isArray(trk.lines) && trk.lines.length === 1 ? productFaceLabel(trk.lines[0]) : '');
+  if (faceLabel) rows.push([t('orderPage.youGet'), faceLabel]);
   if (tDel.label && tDel.label !== '—') rows.push([t('trackPage.rowDelivery'), tDel.label]);
   if (trk.nim > 0 && !tRail.isUsdt) rows.push([t('trackPage.rowNimEstimate'), '≈ ' + fmtNIM(Math.round(Number(trk.nim)||0), 0) + ' NIM']);
   if (tRail.isUsdt) rows.push([t('trackPage.rowNetwork'), t('trackPage.polygonChain')]);
@@ -264,7 +266,7 @@ function PublicItemsCard({ lines }: { lines: any[] }) {
         const channel = String(line.delivery_channel || '').toLowerCase();
         const isPhone = channel === 'phone';
         const isEsim = String(line.kind || '').toLowerCase() === 'esim';
-        const face = String(line.face_label || line.denomination || '').trim();
+        const face = productFaceLabel(line);
         return (
           <div
             key={String(line.product_id) + ':' + index}

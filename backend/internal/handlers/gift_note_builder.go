@@ -31,12 +31,15 @@ const stakeValidatorAddress = "NQ49 N8MB XYCR XBUP 404C KXKK L49M A7BT F082"
 // buyer's language at purchase time so retries and async fulfillment keep
 // the language that was active when they checked out.
 func (h *Handlers) BuildGiftNoteFromQuote(q db.Quote, lang string) mailtrap.GiftNote {
-	faceValue, currency, product := adminQuoteRenderFields(q)
+	product := q.ProductID
+	if detail := giftFaceDetail(giftLinesFor(q)[0]); detail != "" {
+		product += " · " + detail
+	}
 	note := mailtrap.GiftNote{
 		Recipient:    mailtrap.Address{Email: strings.TrimSpace(q.CustomerEmail)},
 		Anonymous:    q.Anonymous,
 		SiteName:     h.Cfg.SiteName(),
-		ProductLabel: product + " · " + faceValue + " " + currency,
+		ProductLabel: product,
 		Message:      q.GiftMessage,
 		OrderID:      q.ID,
 		PurchasedAt:  q.CreatedAt,

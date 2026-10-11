@@ -159,7 +159,7 @@ export function OrdersView() {
     const micros = Number(q.product_usd);
     const usd = isFinite(micros) && micros > 0 ? micros / 1e6 : 0;
     const { value: localVal, currency: ccy, label } = quoteFaceValue(q);
-    const local = localVal > 0 && ccy ? `${fmtNum(localVal)} ${ccy}` : label || '';
+    const local = label || (localVal > 0 && ccy ? `${fmtNum(localVal)} ${ccy}` : '');
     const paidUnit = ccy && local ? local : null;
     // no "$" conversion on the cards — the NIM amount is the price, the face
     // value is the product's own denomination (5 USD stays "5 USD", that IS

@@ -325,6 +325,12 @@ func (h *Handlers) ListActivity(ctx *fasthttp.RequestCtx) {
 			"local_amount":   formatLocal(q.ProductValue),
 			"local_currency": localCurrency(q.Denomination, quoteCountry),
 		}
+		if q.ProductCurrency != "" {
+			e["local_currency"] = q.ProductCurrency
+		}
+		if !isBatch {
+			e["face_label"] = giftFaceDetail(giftLinesFor(q)[0])
+		}
 		if !q.Anonymous {
 			e["address"] = addrs[q.UserID]
 		}
@@ -664,6 +670,10 @@ func (h *Handlers) TrackStatus(ctx *fasthttp.RequestCtx) {
 			"coin":             q.Coin,
 			"lines":            publicLines(q),
 		}
+		if !q.IsBatch && len(q.Lines) <= 1 {
+			resp["face_label"] = giftFaceDetail(giftLinesFor(q)[0])
+			resp["quantity"] = q.Quantity
+		}
 		if receipt := publicLightningReceipt(q); receipt != nil {
 			resp["lightning_receipt"] = receipt
 		}
@@ -710,7 +720,7 @@ func publicLines(q db.Quote) []map[string]interface{} {
 	for _, ln := range q.Lines {
 		out = append(out, map[string]interface{}{
 			"product_id":       ln.ProductID,
-			"face_label":       ln.FaceLabel,
+			"face_label":       giftFaceDetail(ln),
 			"quantity":         ln.Quantity,
 			"kind":             ln.Kind,
 			"delivery_channel": ln.DeliveryChannel,

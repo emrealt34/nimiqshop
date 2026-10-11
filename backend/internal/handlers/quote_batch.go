@@ -410,6 +410,7 @@ func (h *Handlers) createQuoteBatchInner(ctx *fasthttp.RequestCtx, userID string
 		if strings.EqualFold(it.Denomination, "range") {
 			unitLabel = fmt.Sprintf("%g", it.ProductValue)
 		}
+		unitLabel = catalog.DisplayFaceLabel(unitLabel, faceValue, faceCurrency, it.Country)
 		if it.Quantity > 1 {
 			brands = append(brands, fmt.Sprintf("%s ×%d", it.ProductID, it.Quantity))
 			labels = append(labels, fmt.Sprintf("%s (%s ×%d)", it.ProductID, unitLabel, it.Quantity))

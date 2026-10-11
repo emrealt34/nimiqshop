@@ -696,6 +696,7 @@ func singleQuoteLine(req createQuoteRequest, meta familyMeta, denomLabel, benefi
 		faceLabel = strconv.FormatFloat(req.ProductValue, 'g', -1, 64)
 	}
 	faceValue, _, faceCurrency, _ := meta.resolveSelection(req.Denomination, req.ProductValue)
+	faceLabel = catalog.DisplayFaceLabel(faceLabel, faceValue, faceCurrency, req.Country)
 	return db.QuoteLine{
 		ProductValue: faceValue, ProductCurrency: faceCurrency,
 		ProductID: req.ProductID, Country: req.Country, Denomination: denomLabel,

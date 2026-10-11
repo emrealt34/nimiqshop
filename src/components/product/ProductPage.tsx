@@ -25,6 +25,7 @@ import {
   countryName,
   fmtNIM,
   fmtMoney,
+  productFaceLabel,
   queryParam,
   cleanSupplierTerms,
   stripCryptoCopy,
@@ -976,7 +977,8 @@ function PackageChooser({
         const isActive = k.package_id === pkg;
         const usdValue = k.value || 0;
         const nimPrice = (k.coin_amount ? nimPriceFromBTC(k.coin_amount) : '') || nimPriceFromUSD(localToUSD(usdValue, k.currency || product.currency));
-        const faceLabel = prettyFace(k.denomination, k.localized_denomination) || (usdValue ? `$${usdValue}` : t('productPage.packageFallback'));
+        const faceLabel = productFaceLabel({ denomination: prettyFace(k.denomination, k.localized_denomination),
+          product_value: k.value, product_currency: k.currency || product.currency, country: product.country }) || t('productPage.packageFallback');
         return (
           <button
             key={k.package_id}

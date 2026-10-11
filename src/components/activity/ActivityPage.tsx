@@ -12,7 +12,7 @@ import { Identicon } from '../ui/Identicon';
 import { AppRoot } from '../AppRoot';
 import { getActivity, getNimRate, onRatesChange, friendlyApiMessage, errorDetailLine } from '../../lib/api';
 import { activityVolumeNIM } from '../../lib/activityVolume';
-import { cleanProductLabel, cleanBatchProductLabels, fmtNIM, countryName, shortAddr, fmtDuration } from '../../lib/format';
+import { cleanProductLabel, cleanBatchProductLabels, fmtNIM, countryName, shortAddr, fmtDuration, productFaceLabel } from '../../lib/format';
 import { Clipboard } from '../../lib/clipboard';
 import { useInterval } from '../../lib/useInterval';
 import { useToast } from '../AppProviders';
@@ -414,7 +414,8 @@ function FeedItem({ it }: { it: any }) {
     it.batch_items > 1 ? t('ordersPage.itemsCount', { count: it.batch_items }) : it.quantity && it.quantity > 1 ? `×${it.quantity}` : null,
     it.country ? countryName(it.country) : null,
   ].filter(Boolean).join(' · ');
-  const local = it.local_amount && it.local_currency ? `${it.local_amount} ${it.local_currency}` : '';
+  const local = productFaceLabel({ face_label: it.face_label, product_value: it.local_amount,
+    product_currency: it.local_currency, country: it.country });
   // Batch rows carry no local_amount/nim, which left the feed showing the
   // placeholder "amount in wallet" for real, delivered orders. USD is known.
   const main =
