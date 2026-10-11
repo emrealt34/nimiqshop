@@ -285,9 +285,13 @@ an unpaired product occupies a centered full-width row.
 The inbox sender icon is controlled by the email provider, separately from
 the HTML logo. The default sender display name is `nimiqshop.io`; an existing
 `MAILTRAP_FROM_NAME` environment override also needs to use the current brand.
-The verified sender email remains independently configurable. Gmail domain branding requires sender profile configuration or
-[BIMI setup](https://knowledge.workspace.google.com/admin/security/set-up-bimi),
-including the applicable domain authentication and logo certificate. Changing
+The verified sender email remains independently configurable. Gmail domain
+branding through [BIMI setup](https://knowledge.workspace.google.com/admin/security/set-up-bimi)
+requires enforced DMARC and a VMC or CMC issued by a certificate authority.
+Mailtrap's personal account avatar does not configure this inbox sender logo.
+The existing website logo has a vector SVG Tiny P/S version at
+`public/bimi/logo.svg`; see [the BIMI deployment instructions](docs/bimi.md).
+Changing
 the receipt template cannot replace that inbox letter avatar.
 
 Preview without sending mail: from `backend`, run
