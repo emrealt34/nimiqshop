@@ -20,12 +20,17 @@ async function findSnapshot() {
     if (!response.ok) throw new Error(`Snapshot API HTTP ${response.status}`);
     return response.json();
   };
-  const runs = await get('/actions/workflows/catalog-refresh.yml/runs?branch=main&status=success&per_page=20');
+  const runs = await get('/actions/workflows/catalog-refresh.yml/runs?branch=main&per_page=20');
   for (const run of runs.workflow_runs || []) {
-    if (run.head_branch !== 'main' || run.status !== 'completed' || run.conclusion !== 'success'
-      || !['schedule', 'workflow_dispatch'].includes(run.event)) continue;
+    if (run.head_branch !== 'main' || !['schedule', 'workflow_dispatch'].includes(run.event)) continue;
     const result = await get(`/actions/runs/${run.id}/artifacts?per_page=100`);
-    if ((result.artifacts || []).some(a => a.name === 'catalog-snapshots' && !a.expired)) return run.id;
+    if (!(result.artifacts || []).some(a => a.name === 'catalog-snapshots' && !a.expired)) continue;
+    // A code push can replace a queued deployment after data was saved.
+    // Judge the refresh job itself, so that complete data is not discarded
+    // while its deployment waits, fails, or is superseded by newer code.
+    const jobs = await get(`/actions/runs/${run.id}/jobs?per_page=100`);
+    if ((jobs.jobs || []).some(job => job.name === 'Refresh and persist catalog snapshots'
+      && job.status === 'completed' && job.conclusion === 'success')) return run.id;
   }
   return 0;
 }

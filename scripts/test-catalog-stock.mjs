@@ -179,19 +179,26 @@ test('hourly artifacts restore JSON without changing code or creating a branch',
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
-test('artifact lookup only selects a successful main hourly run with an unexpired snapshot', async () => {
+test('artifact lookup requires successful main refresh data even when deployment is pending or superseded', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'catalog-artifact-lookup-'));
   const exec = promisify(execFile);
   try {
     const loader = join(dir, 'fetch.mjs');
     const output = join(dir, 'output');
-    await writeFile(loader, `globalThis.fetch = async (url) => new Response(JSON.stringify(
-      String(url).includes('/artifacts?') ? {artifacts: [{name:'catalog-snapshots', expired:String(url).includes('/3/')}]} :
-      {workflow_runs:[{id:1,head_branch:'feature',event:'workflow_dispatch'},{id:2,head_branch:'main',event:'pull_request'},{id:3,head_branch:'main',event:'schedule'},{id:5,head_branch:'main',event:'schedule',conclusion:'failure'},{id:4,head_branch:'main',event:'workflow_dispatch'}].map(run => ({status:'completed',conclusion:'success',...run}))}
-    ));`);
-    await exec(process.execPath, ['--import', loader, new URL('./catalog-data.mjs', import.meta.url).pathname, 'find'], {
-      cwd: dir, env: { ...process.env, GITHUB_REPOSITORY: 'test/repository', GITHUB_TOKEN: 'test-token', GITHUB_OUTPUT: output },
-    });
-    assert.equal(await readFile(output, 'utf8'), 'run_id=4\n');
+    for (const status of ['in_progress', 'completed']) {
+      await writeFile(loader, `globalThis.fetch = async (url) => {
+        const path = String(url);
+        if (path.includes('status=success')) throw new Error('Deployment status must not hide completed data');
+        const data = path.includes('/artifacts?') ? {artifacts: [{name:'catalog-snapshots', expired:path.includes('/3/')}]} :
+          path.includes('/jobs?') ? {jobs:[{name:'Refresh and persist catalog snapshots',status:'completed',conclusion:path.includes('/5/')?'failure':'success'}]} :
+          {workflow_runs:[{id:1,head_branch:'feature',event:'workflow_dispatch'},{id:2,head_branch:'main',event:'pull_request'},{id:3,head_branch:'main',event:'schedule'},{id:5,head_branch:'main',event:'schedule'},{id:4,head_branch:'main',event:'workflow_dispatch'}].map(run => ({status:${JSON.stringify(status)},conclusion:'cancelled',...run}))};
+        return new Response(JSON.stringify(data));
+      };`);
+      await writeFile(output, '');
+      await exec(process.execPath, ['--import', loader, new URL('./catalog-data.mjs', import.meta.url).pathname, 'find'], {
+        cwd: dir, env: { ...process.env, GITHUB_REPOSITORY: 'test/repository', GITHUB_TOKEN: 'test-token', GITHUB_OUTPUT: output },
+      });
+      assert.equal(await readFile(output, 'utf8'), 'run_id=4\n');
+    }
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
