@@ -50,10 +50,16 @@ export function LightningReceipt({ receipt, compact = false }: { receipt?: Light
   const { openSheet } = useSheet();
   if (!receipt || !paymentHash(receipt.payment_hash)) return null;
   if (!compact) return <div className="lightning-receipt" data-payment-hash={paymentHash(receipt.payment_hash)}>
+    <span className="xs strong"><Icon name="bolt" size={12} /> BTC Lightning</span>
     <code className="lightning-receipt-hash">{paymentHash(receipt.payment_hash)}</code>
-    <button type="button" className="btn btn-outline btn-sm" onClick={() => openSheet({ title: t('lightningReceipt.title'), render: () => <ReceiptDetails receipt={receipt} /> })}>
-      <Icon name="bolt" size={14} /> {t('lightningReceipt.details')}
-    </button>
+    <div className="lightning-receipt-actions">
+      <button type="button" className="btn btn-outline btn-sm" onClick={() => openSheet({ title: t('lightningReceipt.title'), render: () => <ReceiptDetails receipt={receipt} /> })}>
+        <Icon name="bolt" size={14} /> {t('lightningReceipt.details')}
+      </button>
+      <a className="btn btn-outline btn-sm" href={LIGHTNING_VERIFIER_URL} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">
+        <Icon name="external" size={14} /> {t('lightningReceipt.external')}
+      </a>
+    </div>
   </div>;
   return <button type="button" className="lightning-receipt-chip chip xs" title={paymentHash(receipt.payment_hash)} onClick={() => openSheet({ title: t('lightningReceipt.title'), render: () => <ReceiptDetails receipt={receipt} /> })}>
     <Icon name="bolt" size={12} /> BTC Lightning · {paymentHash(receipt.payment_hash).slice(0, 8)}…
