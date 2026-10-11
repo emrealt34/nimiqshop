@@ -412,6 +412,10 @@ func (s *Store) transitionQuote(id, to string, mutate func(*Quote, *badger.Txn) 
 		}
 		q.Status = to
 		q.UpdatedAt = time.Now().UTC()
+		if to == "fulfilled" && q.DeliveredAt == nil {
+			t := q.UpdatedAt
+			q.DeliveredAt = &t
+		}
 		err := putQuoteTx(tx, &q)
 		if err != nil {
 			return err

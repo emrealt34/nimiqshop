@@ -224,8 +224,22 @@ func (s *Store) ListOrders(userID string, limit int) ([]Order, error) {
 // status index buckets and bumping updated_at.
 func writeOrderStatus(txn *badger.Txn, o *Order, status string) error {
 	prev := o.Status
+	// Preserve a historical completion before a duplicate bumps updated_at.
+	if o.DeliveredAt == nil && isDeliveredStatus(prev) {
+		if delivered := o.DeliveryTime(); !delivered.IsZero() {
+			o.DeliveredAt = &delivered
+		}
+	}
 	o.Status = status
 	o.UpdatedAt = time.Now().UTC()
+	if o.PaidAt == nil && !isDeliveredStatus(prev) && (status == "processing" || status == "delivering" || isDeliveredStatus(status)) {
+		t := o.UpdatedAt
+		o.PaidAt = &t
+	}
+	if o.DeliveredAt == nil && !isDeliveredStatus(prev) && isDeliveredStatus(status) {
+		t := o.UpdatedAt
+		o.DeliveredAt = &t
+	}
 
 	blob, err := marshal(*o)
 	if err != nil {

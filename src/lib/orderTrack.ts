@@ -1,3 +1,4 @@
+import { deliveryTimestamp } from './deliveryTiming';
 /**
  * orderTrack.ts — ONE source of truth for quote/order lifecycle stages.
  * Ported from order-track.js. quoteStages maps every backend status to the
@@ -32,6 +33,9 @@ export function quoteStages(q: any): Stage[] {
   else if (st === 'manual_review') { s3 = { ...s3, status: 'failed' }; s4 = { ...s4, status: 'failed' }; }
   else if (st === 'failed') { s2 = { ...s2, status: 'failed' }; s3 = { ...s3, status: 'failed' }; s4 = { ...s4, status: 'failed' }; }
 
+  if (s2.status === 'completed') s2.timestamp = q.paid_at || q.lightning_receipt?.confirmed_at || null;
+  if (s3.status === 'completed' || s3.status === 'in_progress') s3.timestamp = null;
+  if (s4.status === 'completed') s4.timestamp = deliveryTimestamp(q);
   return [s1, s2, s3, s4];
 }
 
@@ -75,7 +79,7 @@ export function shouldAskRating(
   if (!isDeliveredStatus(row?.status)) return false;
   if (Number(row?.rating) > 0) return false;
   if (opts.isDismissed?.(ratingDismissedKey(kind, id))) return false;
-  const updated = Date.parse(row?.updated_at || row?.created_at || '');
+  const updated = Date.parse(deliveryTimestamp(row) || '');
   if (!Number.isFinite(updated)) return false;
   return (opts.now ?? Date.now()) - updated <= RATE_POPUP_FRESH_MS;
 }

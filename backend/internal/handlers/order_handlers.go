@@ -122,6 +122,21 @@ func buildOrderStages(o db.Order, siteName string) ([]StageInfo, int) {
 		currentStage = 1
 	}
 
+	if stages[1].Status == "completed" {
+		stages[1].Timestamp = ""
+		if o.PaidAt != nil && !o.PaidAt.IsZero() {
+			stages[1].Timestamp = o.PaidAt.Format(time.RFC3339Nano)
+		}
+	}
+	if stages[2].Status == "completed" || stages[2].Status == "in_progress" {
+		stages[2].Timestamp = ""
+	}
+	if isDelivered := o.Status == "delivered" || o.Status == "fulfilled" || o.Status == "complete"; isDelivered {
+		stages[3].Timestamp = ""
+		if delivered := o.DeliveryTime(); !delivered.IsZero() {
+			stages[3].Timestamp = delivered.Format(time.RFC3339Nano)
+		}
+	}
 	return stages, currentStage
 }
 
@@ -152,6 +167,8 @@ func (h *Handlers) ListOrders(ctx *fasthttp.RequestCtx) {
 		TicketStatus      string          `json:"ticket_status,omitempty"`
 		CreatedAt         time.Time       `json:"created_at"`
 		UpdatedAt         time.Time       `json:"updated_at"`
+		PaidAt            *time.Time      `json:"paid_at,omitempty"`
+		DeliveredAt       *time.Time      `json:"delivered_at,omitempty"`
 		Stages            []StageInfo     `json:"stages"`
 		CurrentStage      int             `json:"current_stage"`
 		Payload           json.RawMessage `json:"payload,omitempty"`
@@ -191,6 +208,8 @@ func (h *Handlers) ListOrders(ctx *fasthttp.RequestCtx) {
 			TicketStatus:      ticketStatus,
 			CreatedAt:         o.CreatedAt,
 			UpdatedAt:         o.UpdatedAt,
+			PaidAt:            o.PaidAt,
+			DeliveredAt:       deliveryTimePointer(o.DeliveryTime()),
 			Stages:            stages,
 			CurrentStage:      currStage,
 			Payload:           storedJSON(o.Payload),

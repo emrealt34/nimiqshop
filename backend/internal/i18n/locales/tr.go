@@ -52,6 +52,7 @@ var Tr = map[string]string{
 	"mailcard.from":            "Gönderen",
 	"mailcard.paidFrom":        "Ödeme yapılan cüzdan",
 	"email.contactSupport":     "Bir şey ulaşmadı mı? Desteğe yaz",
+	"email.giftSupportNotice":  "Hediye kodu veya eSIM QR’ı çalışmazsa CryptoRefills, inceleme için alıcının teslimat e-postasını, bulunduğu ülke veya bölgeyi, sipariş numarasını ve hata ayrıntılarını isteyebilir. Bu bilgileri saklayın; alıcı destekle kodun gönderildiği e-posta adresinden iletişime geçsin.",
 	"email.disclaimer":         "Bu e-posta birisinin sana gönderdiği bir hediyeyi bildirir. Teslimatın kendisi {{site}} iş ortağı CryptoRefills tarafından ayrıca yapılır ve bu e-postaya asla dahil edilmez.",
 	"mailtext.disclaimerOrder": "Bu e-posta siparişini bildirir. Teslimatın kendisi {{site}} iş ortağı CryptoRefills tarafından ayrıca yapılır ve bu e-postaya asla dahil edilmez.",
 	"mailtext.badgeGift":       "hediye notu",

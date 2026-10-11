@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Icon } from '../ui/Icon';
 import { isValidEmail, confirmMatches } from '../../lib/validate';
 import { clearGiftExtras, setGiftExtras, setGiftIdenticon, collectPhoneValue } from '../../lib/delivery';
 import { needsPhone } from '../../lib/catalog';
@@ -241,6 +242,7 @@ export function CombinedDeliveryPicker({
 
       {gift ? (
         <div style={{ display: 'grid', gap: 10, marginBottom: 14 }}>
+          {hasEmail && <div className="note-box info gift-support-notice"><Icon name="info" size={15} /><span>{t('email.giftSupportNotice')}</span></div>}
           {hasEmail ? (
             <div className="field">
               <label style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink-dim)' }}>{t('delivery.cdpRecipientCode')}</label>

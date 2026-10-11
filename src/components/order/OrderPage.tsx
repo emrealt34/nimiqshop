@@ -29,7 +29,6 @@ import { buildOrderRequest } from '../../lib/delivery';
 import { uuid } from '../../lib/format';
 import { inNimiqPay } from '../../lib/miniapp';
 import {
-  fmtNum,
   fmtDate,
   queryParam,
   shortAddr,
@@ -42,7 +41,7 @@ import {
   stripCryptoCopy,
   quoteFaceValue,
   productFaceLabel,
-  parseCurrencyValue,
+  purchaseFaceLabel,
   safeRichHTML,
   MAX_QTY,
 } from '../../lib/format';
@@ -269,13 +268,7 @@ function detailBatchTitles(record: any, fallback: string): string[] {
 }
 
 function selectedAmountLabel(q: any) {
-  const qty = Number(q.quantity) || 1;
-  const { value: perUnit, currency: ccy } = quoteFaceValue(q);
-  const label = productFaceLabel(q);
-  if (!(perUnit > 0) || !ccy || (label && !parseCurrencyValue(label).currency)) return qty > 1 && label ? `${label} ×${qty}` : label;
-  return qty > 1
-    ? `${productFaceLabel({ product_value: perUnit * qty, product_currency: ccy })} (${label} ×${qty})`
-    : label;
+  return purchaseFaceLabel(q);
 }
 
 function copyIdNode(text: string) {
@@ -474,8 +467,10 @@ function QuoteDeliveryCard({ q, fulfillment }: { q: any; fulfillment: any }) {
     const brand = cleanProductLabel(f.brand_name || f.family || q.product_id) || t('orderPage.itemFallback');
     const denom = String(f.denomination || '');
     const key = brand + '|' + denom;
-    const match = lines.find((l) => String(l.product_id || '').toLowerCase() === brand.toLowerCase());
-    const title = brand;
+    const candidates = lines.filter((l) => cleanProductLabel(l.product_id).toLowerCase() === brand.toLowerCase());
+    const match = candidates.find((l) => l.denomination === denom) || (candidates.length === 1 ? candidates[0] : undefined);
+    const face = productFaceLabel(match || { denomination: denom, product_currency: f.currency, product_value: f.value });
+    const title = [brand, face].filter(Boolean).join(' · ');
     if (!groups.has(key)) groups.set(key, { title, kind: String(match?.kind || f.kind || 'gift_card'), count: 0 });
     groups.get(key)!.count += 1;
   }
@@ -1129,8 +1124,8 @@ function OrderContent({ o, onChanged }: { o: any; onChanged: () => void }) {
 
   const summaryRows: Array<[string, any]> = [
     [t('orderPage.rowProduct'), productTitle],
-    Number(payload.value) > 0 && payload.currency
-      ? [t('orderPage.selectedAmount'), <span key="sa" className="strong">{`${fmtNum(Number(payload.value) * (Number(o.quantity) || 1))} ${payload.currency}`}</span>]
+    purchaseFaceLabel(o)
+      ? [t('orderPage.selectedAmount'), <span key="sa" className="strong">{purchaseFaceLabel(o)}</span>]
       : null,
     [t('orderPage.rowType'), t(meta.labelKey)],
     payload.country

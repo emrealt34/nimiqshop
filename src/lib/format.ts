@@ -66,7 +66,7 @@ export function fmtDate(iso: string | Date, withTime = true): string {
   if (isNaN(d as unknown as number)) return '—';
   const date = d.toLocaleDateString(localeTag(), { month: 'short', day: 'numeric', year: 'numeric' });
   if (!withTime) return date;
-  return date + ', ' + d.toLocaleTimeString(localeTag(), { hour: '2-digit', minute: '2-digit' });
+  return date + ', ' + d.toLocaleTimeString(localeTag(), { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
 /**
@@ -295,6 +295,7 @@ export function parseCurrencyValue(str: unknown): { currency: string; value: num
 type FaceValueSource = {
   face_label?: unknown; denomination?: unknown; product_currency?: unknown; currency?: unknown;
   _currency?: unknown; product_value?: unknown; value?: unknown; product_country?: unknown; country?: unknown;
+  payload?: FaceValueSource; quantity?: unknown; qty?: unknown;
 };
 const faceCurrencies = typeof Intl.supportedValuesOf === 'function' ? new Set(Intl.supportedValuesOf('currency')) : null;
 
@@ -302,6 +303,7 @@ const faceCurrencies = typeof Intl.supportedValuesOf === 'function' ? new Set(In
  * or replacing eSIM/data/point descriptions with their purchase price. */
 export function productFaceLabel(source: FaceValueSource | null | undefined): string {
   if (!source) return '';
+  source = { ...source.payload, ...source };
   const useful = (v: unknown) => typeof v === 'string' && v.trim() && v.trim().toLowerCase() !== 'range' ? v.trim() : '';
   const label = useful(source.face_label) || useful(source.denomination);
   const parsed = parseCurrencyValue(label);
@@ -312,6 +314,20 @@ export function productFaceLabel(source: FaceValueSource | null | undefined): st
   if (!/^[A-Z]{3}$/.test(currency) || (faceCurrencies && !faceCurrencies.has(currency))) return label;
   const value = positiveAmount(source.product_value ?? source.value) || parsed.value;
   return value > 0 ? `${fmtNum(value)} ${currency === 'EUR' ? '€' : currency}` : label;
+}
+
+/** Per-unit label plus an explicit total/quantity, shared by every purchase recap. */
+export function purchaseFaceLabel(source: FaceValueSource | null | undefined): string {
+  if (!source) return '';
+  const label = productFaceLabel(source);
+  const quantity = Number(source.quantity ?? source.qty) || 1;
+  if (!label || !Number.isInteger(quantity) || quantity <= 1) return label;
+  const parsed = parseCurrencyValue(label);
+  if (parsed.currency && parsed.value > 0) {
+    const total = productFaceLabel({ product_value: parsed.value * quantity, product_currency: parsed.currency });
+    return `${total} (${label} ×${quantity})`;
+  }
+  return `${label} ×${quantity}`;
 }
 
 /** The local-currency face value a quote/order carries. Amounts stay structured;
@@ -484,10 +500,13 @@ export function cleanSupplierTerms(tc: unknown): string {
 
 /* ---------- duration / countdown labels ---------- */
 export function fmtDuration(sec?: number | null): string {
-  if (!sec || sec <= 0) return '—';
-  if (sec < 60) return tr('fmt.secondsShort', { n: sec });
-  if (sec < 3600) return tr('fmt.minShort', { n: Math.round(sec / 60) });
-  return tr('fmt.hoursMinutes', { h: Math.floor(sec / 3600), m: Math.round((sec % 3600) / 60) });
+  if (typeof sec !== 'number' || !Number.isFinite(sec) || sec < 0) return '—';
+  if (sec < 1) return '<' + tr('fmt.secondsShort', { n: 1 });
+  const whole = Math.floor(sec);
+  const seconds = tr('fmt.secondsShort', { n: whole % 60 });
+  if (whole < 60) return seconds;
+  if (whole < 3600) return tr('fmt.minShort', { n: Math.floor(whole / 60) }) + ' ' + seconds;
+  return tr('fmt.hoursMinutes', { h: Math.floor(whole / 3600), m: Math.floor((whole % 3600) / 60) }) + ' ' + seconds;
 }
 
 export function fmtCountdown(ms?: number | null): string {

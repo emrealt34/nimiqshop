@@ -74,11 +74,13 @@ type Order struct {
 	// RatingComment is the optional short comment the buyer signed into the
 	// rating memo (a-z 0-9 and spaces, see internal/ratings). RatingEdits counts
 	// the on-chain ratings this record has carried, the first one included.
-	RatingComment       string    `json:"rating_comment,omitempty"`
-	RatingCommentHidden bool      `json:"rating_comment_hidden,omitempty"`
-	RatingEdits         int       `json:"rating_edits,omitempty"`
-	CreatedAt           time.Time `json:"created_at"`
-	UpdatedAt           time.Time `json:"updated_at"`
+	RatingComment       string     `json:"rating_comment,omitempty"`
+	RatingCommentHidden bool       `json:"rating_comment_hidden,omitempty"`
+	RatingEdits         int        `json:"rating_edits,omitempty"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
+	PaidAt              *time.Time `json:"paid_at,omitempty"`
+	DeliveredAt         *time.Time `json:"delivered_at,omitempty"`
 }
 
 // RatingAggregate is the running global star-rating summary. It is stored as a
@@ -167,7 +169,9 @@ type Quote struct {
 	PaymentObserved     bool            `json:"payment_observed,omitempty"`
 	// PaidAt is the moment money was FIRST observed for this purchase — the
 	// start of the public "avg delivery" window (paid → delivered).
-	PaidAt               *time.Time `json:"paid_at,omitempty"`
+	PaidAt *time.Time `json:"paid_at,omitempty"`
+	// DeliveredAt is immutable: emails, ratings and proof updates are not deliveries.
+	DeliveredAt          *time.Time `json:"delivered_at,omitempty"`
 	PaymentBlocked       bool       `json:"payment_blocked,omitempty"`
 	LightningPaymentHash string     `json:"lightning_payment_hash,omitempty"`
 	// ProductUSD is the cart's USD-equivalent value in micro-USD (approximate

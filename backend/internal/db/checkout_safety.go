@@ -163,6 +163,9 @@ func (q Quote) CanPay(now time.Time) bool {
 // PublicQuote omits the internal outbox and attribution. Historical invoices are
 // also removed when not payable, so old links cannot accidentally launch them.
 func (q Quote) PublicQuote(now time.Time) Quote {
+	if delivered := q.DeliveryTime(); !delivered.IsZero() {
+		q.DeliveredAt = &delivered
+	}
 	q.SupplierRequest = nil
 	q.EndUserIP = ""
 	q.EndUserAgent = ""
@@ -325,6 +328,10 @@ func (s *Store) ApplySupplierOrder(id string, order *cryptorefills.Order) (bool,
 		}
 		switch local {
 		case "fulfilled":
+			if q.DeliveredAt == nil && !observedAt.IsZero() {
+				t := observedAt
+				q.DeliveredAt = &t
+			}
 			q.Fulfillment = cryptorefills.FulfillmentPayload(order)
 		case "refunded":
 			if order.Refund != nil {

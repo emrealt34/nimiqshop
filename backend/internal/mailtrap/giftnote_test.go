@@ -86,6 +86,27 @@ func TestGiftBuildDeliveryAndAnonymity(t *testing.T) {
 	}
 }
 
+func TestCodeSupportNoticeIsLocalizedInGiftAndReceiptWithoutTopupCodePromises(t *testing.T) {
+	for _, lang := range i18n.All {
+		for _, self := range []bool{false, true} {
+			for _, delivery := range []string{DeliveryCard, DeliveryEsim, DeliveryTopUp} {
+				n := GiftNote{Recipient: Address{Email: "recipient@example.com"}, Lang: lang, Self: self, Delivery: delivery, ProductLabel: "10 EUR"}
+				m, err := n.Build(Config{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				notice := i18n.For(lang)("email.giftSupportNotice")
+				inText := strings.Contains(strings.Join(strings.Fields(m.Text), " "), strings.Join(strings.Fields(notice), " "))
+				inHTML := strings.Contains(m.HTML, esc(notice))
+				want := delivery != DeliveryTopUp
+				if inText != want || inHTML != want {
+					t.Fatalf("support notice language=%s self=%v delivery=%s text=%v html=%v", lang, self, delivery, inText, inHTML)
+				}
+			}
+		}
+	}
+}
+
 func TestDeliveryInferenceAndFormatting(t *testing.T) {
 	for _, tc := range []struct{ label, explicit, want string }{
 		{"normal card", "", DeliveryCard}, {"mobile top-up", "", DeliveryTopUp}, {"recharge", "", DeliveryTopUp}, {"kontör", "", DeliveryTopUp},

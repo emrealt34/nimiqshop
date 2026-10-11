@@ -52,6 +52,7 @@ var Es = map[string]string{
 	"mailcard.from":            "De",
 	"mailcard.paidFrom":        "Pagado desde",
 	"email.contactSupport":     "¿Algo no llegó? Contacta con soporte",
+	"email.giftSupportNotice":  "Si el código de regalo o el QR de eSIM no funciona, CryptoRefills puede solicitar el correo de entrega del destinatario, su país o región, la referencia del pedido y los detalles del error para investigarlo. Conserva estos datos; el destinatario debe contactar con soporte desde el correo que recibió el código.",
 	"email.disclaimer":         "Este correo te informa sobre un regalo que alguien te envió. La entrega en sí la realiza por separado CryptoRefills, socio de {{site}}, y nunca se incluye en este correo.",
 	"mailtext.disclaimerOrder": "Este correo te informa sobre tu pedido. La entrega en sí la realiza por separado CryptoRefills, socio de {{site}}, y nunca se incluye en este correo.",
 	"mailtext.badgeGift":       "nota de regalo",

@@ -249,6 +249,7 @@ function GiftNoteFields({
       </div>
 
       <div className="small muted">{targetLine ?? rules.noteWhere}</div>
+      {rules.route.hasEmail && <div className="note-box info gift-support-notice"><Icon name="info" size={15} /><span>{t('email.giftSupportNotice')}</span></div>}
 
       <div className="note-box info">
         <Icon name="info" size={15} />

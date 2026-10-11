@@ -70,6 +70,7 @@ function FaqItem({ qKey, index }: { qKey: string; index: number }) {
           orders: pagePath('/orders'),
           cashback: pagePath('/cashback'),
         }))}
+        {index === 0 && <p>{t('email.giftSupportNotice')}</p>}
       </div>
     </details>
   );

@@ -1,3 +1,4 @@
+import { deliveryTimestamp, purchaseElapsedSeconds } from '../../lib/deliveryTiming';
 /**
  * OrdersPage.tsx — React port of pages/orders.js: purchase history (legacy
  * order rows + direct CryptoRefills-Lightning quotes), filters, live local
@@ -11,7 +12,7 @@ import { AppRoot } from '../AppRoot';
 import { openLoginSheet } from '../shell/SiteShell';
 import { listOrders, listQuotes } from '../../lib/api';
 import { brandMetaFor } from '../../lib/catalogMeta';
-import { cleanProductLabel, cleanBatchProductLabels, fmtDate, fmtDuration, fmtNum, quoteFaceValue, countryName } from '../../lib/format';
+import { cleanProductLabel, cleanBatchProductLabels, fmtDate, fmtDuration, fmtNum, quoteFaceValue, purchaseFaceLabel, countryName } from '../../lib/format';
 import { friendlyApiMessage, errorDetailLine } from '../../lib/api';
 import { isAuthed } from '../../lib/session';
 import { useSession } from '../../lib/useSession';
@@ -38,6 +39,10 @@ function batchTotalsLabel(q: any): string {
       .filter(([, v]) => Number(v) > 0)
       .map(([ccy, amount]) => `${fmtNum(Number(amount))} ${String(ccy).toUpperCase()}`)
       .join(' + ');
+  }
+  if (Array.isArray(q?.lines) && q.lines.length > 1) {
+    const parts = q.lines.map((line: any) => purchaseFaceLabel(line));
+    if (parts.every(Boolean)) return parts.join(' + ');
   }
   return '';
 }
@@ -124,9 +129,7 @@ export function OrdersView() {
         qty: o.quantity,
         priceLabel: Number(o.price_usd) > 0 ? t('ordersPage.nimAtCheckout') : '—',
         paidUnit:
-          Number(o.payload && o.payload.value) > 0 && o.payload.currency
-            ? `${fmtNum(Number(o.payload.value) * (Number(o.quantity) || 1))} ${o.payload.currency}`
-            : null,
+          purchaseFaceLabel(o) || null,
         // NIM shop: the card price is "≈ X NIM" + the product's own face value.
         // A "$" conversion belonged to the old CryptoRefills UI — removed.
         // History must never drift with the market: the ≈ NIM figure is derived
@@ -142,6 +145,8 @@ export function OrdersView() {
         status: o.status,
         created_at: o.created_at,
         updated_at: o.updated_at,
+        delivered_at: deliveryTimestamp(o),
+        rated_at: o.rated_at,
         stages: o.stages,
         current_stage: o.current_stage,
         rating: o.rating || 0,
@@ -159,7 +164,7 @@ export function OrdersView() {
     const micros = Number(q.product_usd);
     const usd = isFinite(micros) && micros > 0 ? micros / 1e6 : 0;
     const { value: localVal, currency: ccy, label } = quoteFaceValue(q);
-    const local = label || (localVal > 0 && ccy ? `${fmtNum(localVal)} ${ccy}` : '');
+    const local = purchaseFaceLabel(q) || label || (localVal > 0 && ccy ? `${fmtNum(localVal)} ${ccy}` : '');
     const paidUnit = ccy && local ? local : null;
     // no "$" conversion on the cards — the NIM amount is the price, the face
     // value is the product's own denomination (5 USD stays "5 USD", that IS
@@ -220,6 +225,8 @@ export function OrdersView() {
           status: q.status,
           created_at: q.created_at,
           updated_at: q.updated_at || q.created_at,
+          delivered_at: deliveryTimestamp(q),
+          rated_at: q.rated_at,
           stages,
           current_stage: stages.findIndex((s) => s.status === 'in_progress'),
           rating: q.rating || 0,
@@ -426,8 +433,8 @@ function OrderRow({ r }: { r: any }) {
 
   let durationNode: any = null;
   if (isTerminalStatus(r.status) && r.updated_at && r.created_at) {
-    const secs = Math.round((new Date(r.updated_at).getTime() - new Date(r.created_at).getTime()) / 1000);
-    if (isFinite(secs) && secs >= 0) {
+    const secs = purchaseElapsedSeconds(r);
+    if (secs !== null) {
       durationNode = (
         <span className="xs faint" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap', flexShrink: 0 }}>
           <Icon name="clock" size={12} /> {t('common.total', { value: fmtDuration(secs) })}

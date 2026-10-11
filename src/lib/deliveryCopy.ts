@@ -381,7 +381,7 @@ export function coinAmountLabelFor(q: any, unit: 'USDT' | 'BTC'): string {
 
 /** Payment-screen helpers (moved here from the removed SimulatedPayScreen so
  * the REAL pay screen owns all of its wording). */
-import { quoteFaceValue } from './format';
+import { purchaseFaceLabel } from './format';
 
 /** Delivery wording is derived from the server's per-line manifest, so a
  * mixed cart says "email & phone" instead of claiming everything arrives in
@@ -393,8 +393,15 @@ export function deliveryLine(quote: any): { icon: string; text: string } | null 
 }
 
 export function youGetText(quote: any): string {
+  if (Array.isArray(quote?.lines) && quote.lines.length) {
+    const parts = quote.lines.map((line: QuoteLine) => {
+      const label = purchaseFaceLabel(line);
+      return [line.product_id, label].filter(Boolean).join(' · ');
+    });
+    if (quote.lines.length > 1) return parts.join(' + ');
+    return purchaseFaceLabel(quote.lines[0]) || purchaseFaceLabel(quote);
+  }
   const batchTotals = Array.isArray(quote.face_value_totals) ? quote.face_value_totals.filter(Boolean) : [];
   if (batchTotals.length) return batchTotals.join(' + ');
-  const { label } = quoteFaceValue(quote);
-  return label;
+  return purchaseFaceLabel(quote);
 }

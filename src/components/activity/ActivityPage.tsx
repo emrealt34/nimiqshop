@@ -149,7 +149,7 @@ export function ActivityView() {
       const rated = items.filter((it) => it.rating > 0);
       const dist: Record<string, number> = {};
       for (const it of rated) dist[String(it.rating)] = (Number(dist[String(it.rating)]) || 0) + 1;
-      s = { count: rated.length, average: rated.length ? rated.reduce((a: number, b: any) => a + b.rating, 0) / rated.length : 0, dist, active_users: s?.active_users || 0 };
+      s = { ...s, count: rated.length, average: rated.length ? rated.reduce((a: number, b: any) => a + b.rating, 0) / rated.length : 0, dist, active_users: s?.active_users || 0 };
     }
     setLastSummary(s);
     setSummary(s);
@@ -192,7 +192,7 @@ export function ActivityView() {
 
   const s = summary;
   const activeNow = Number(s.active_users) || 0;
-  const avgDeliv = Number(s.avg_delivery_seconds) || 0;
+  const avgDeliv = typeof s.avg_delivery_seconds === 'number' && Number.isFinite(s.avg_delivery_seconds) && s.avg_delivery_seconds >= 0 ? s.avg_delivery_seconds : null;
   const volNIM = activityVolumeNIM(allItems, nimRate);
 
   const tile = (ico: string, label: string, value: string, sub?: string, cls = '') => (
@@ -261,7 +261,7 @@ export function ActivityView() {
             {tile('bag', t('activityPage.tilePayments'), String(allItems.length))}
             {tile('nimiq', t('activityPage.tileNimVolume'), `${volNIM === null ? '—' : volNIM === 0 ? '0' : compactNIM(volNIM)} NIM`, '')}
             {tile('user', t('activityPage.tileShoppingNow'), String(activeNow), t('activityPage.liveVisitor', { count: activeNow }), activeNow > 0 ? 'hot' : '')}
-            {tile('clock', t('activityPage.tileAvgDelivery'), avgDeliv > 0 ? fmtDuration(avgDeliv) : '—', t('activityPage.paidToDelivered'))}
+            {tile('clock', t('activityPage.tileAvgDelivery'), avgDeliv !== null ? fmtDuration(avgDeliv) : '—', t('activityPage.paidToDelivered'))}
           </div>
         )}
       </div>

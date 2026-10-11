@@ -263,16 +263,17 @@ func (h *Handlers) ListActivity(ctx *fasthttp.RequestCtx) {
 			title = "Purchase"
 		}
 		e := map[string]interface{}{
-			"type":      "purchase",
-			"id":        o.ID,
-			"anonymous": o.Anonymous,
-			"time":      o.UpdatedAt,
-			"status":    o.Status,
-			"kind":      o.Kind,
-			"title":     title,
-			"country":   payloadField(o.Payload, "country"),
-			"quantity":  o.Quantity,
-			"usd":       o.PriceUSD.String(),
+			"type":       "purchase",
+			"id":         o.ID,
+			"anonymous":  o.Anonymous,
+			"time":       o.UpdatedAt,
+			"status":     o.Status,
+			"kind":       o.Kind,
+			"title":      title,
+			"country":    payloadField(o.Payload, "country"),
+			"quantity":   o.Quantity,
+			"face_label": orderFaceDetail(o),
+			"usd":        o.PriceUSD.String(),
 		}
 		if !o.Anonymous {
 			e["address"] = addrs[o.UserID]
@@ -328,9 +329,7 @@ func (h *Handlers) ListActivity(ctx *fasthttp.RequestCtx) {
 		if q.ProductCurrency != "" {
 			e["local_currency"] = q.ProductCurrency
 		}
-		if !isBatch {
-			e["face_label"] = giftFaceDetail(giftLinesFor(q)[0])
-		}
+		e["face_label"] = quoteFaceSummary(q)
 		if !q.Anonymous {
 			e["address"] = addrs[q.UserID]
 		}
@@ -391,34 +390,11 @@ func (h *Handlers) ListActivity(ctx *fasthttp.RequestCtx) {
 	agg, _ := h.Store.GetRatingAggregate()
 	summary := ratingSummaryShape(agg)
 
-	// Public average delivery time across delivered purchases (seconds),
-	// measured the way users experience it: from the moment the money was
-	// observed (paid_at) until the purchase completed — NOT from order
-	// creation. Quotes carry the payment stamp; legacy quotes without one
-	// fall back to the payment handoff time, and quotes with neither are
-	// skipped rather than guessed. Anonymous purchases contribute here too:
-	// only wallet identity and payment transaction details are private,
-	// not the purchase itself.
-	var durSum int64
-	var durN int
-	for _, q := range quotes {
-		if q.Status == "delivered" || q.Status == "complete" || q.Status == "fulfilled" {
-			var start *time.Time
-			if q.PaidAt != nil && !q.PaidAt.IsZero() {
-				start = q.PaidAt
-			} else if !q.PaymentHandoffAt.IsZero() {
-				start = &q.PaymentHandoffAt
-			}
-			if start == nil || !q.UpdatedAt.After(*start) {
-				continue
-			}
-			durN++
-			durSum += int64(q.UpdatedAt.Sub(*start).Seconds())
-		}
-	}
-	if durN > 0 {
-		summary["avg_delivery_seconds"] = durSum / int64(durN)
-		summary["delivered_count"] = durN
+	// Measure payment CONFIRMATION -> delivery, including same-observation
+	// and sub-second records. Creation/handoff and mutable updated_at are not
+	// delivery timestamps; zero is a valid measurement, not a missing record.
+	for key, value := range recordedDeliverySummary(orders, quotes) {
+		summary[key] = value
 	}
 	if h.Presence != nil {
 		summary["active_users"] = h.Presence.ActiveCount()
@@ -623,6 +599,9 @@ func (h *Handlers) TrackStatus(ctx *fasthttp.RequestCtx) {
 			"created_at":    o.CreatedAt,
 			"updated_at":    o.UpdatedAt,
 			"stages":        stages,
+			"face_label":    orderFaceDetail(o),
+			"paid_at":       o.PaidAt,
+			"delivered_at":  deliveryTimePointer(o.DeliveryTime()),
 			"current_stage": current,
 		}
 		if o.NimUsdRate > 0 {
@@ -650,18 +629,22 @@ func (h *Handlers) TrackStatus(ctx *fasthttp.RequestCtx) {
 		// expose redemption data via a partner API and are owner/admin-only.
 
 		resp := map[string]interface{}{
-			"id":           q.ID,
-			"type":         "cryptorefills_purchase",
-			"anonymous":    q.Anonymous,
-			"status":       q.Status,
-			"nim":          q.EstimatedNIM,
-			"title":        publicTitle,
-			"country":      q.ProductCountry,
-			"usd":          q.ProductUSD.String(),
-			"created_at":   q.CreatedAt,
-			"updated_at":   q.UpdatedAt,
-			"stages":       quoteStages(q),
-			"transactions": payment,
+			"id":                q.ID,
+			"type":              "cryptorefills_purchase",
+			"anonymous":         q.Anonymous,
+			"status":            q.Status,
+			"nim":               q.EstimatedNIM,
+			"title":             publicTitle,
+			"country":           q.ProductCountry,
+			"usd":               q.ProductUSD.String(),
+			"created_at":        q.CreatedAt,
+			"updated_at":        q.UpdatedAt,
+			"stages":            quoteStages(q),
+			"paid_at":           q.PaidAt,
+			"delivered_at":      deliveryTimePointer(q.DeliveryTime()),
+			"face_value_totals": q.FaceValueTotals,
+			"face_label":        quoteFaceSummary(q),
+			"transactions":      payment,
 			// Delivery CHANNEL (not the address/number) so the public timeline
 			// can say "credit went to the number" instead of promising a code
 			// for a top-up. The target itself stays owner-only.
@@ -733,8 +716,8 @@ func publicLines(q db.Quote) []map[string]interface{} {
 // its status, mirroring the order timeline so /track looks consistent.
 func quoteStages(q db.Quote) []map[string]interface{} {
 	st := q.Status
-	created := q.CreatedAt.Format(time.RFC3339)
-	updated := q.UpdatedAt.Format(time.RFC3339)
+	created := q.CreatedAt.Format(time.RFC3339Nano)
+	updated := q.UpdatedAt.Format(time.RFC3339Nano)
 	mk := func(id, title, desc, status string) map[string]interface{} {
 		return map[string]interface{}{"id": id, "title": title, "description": desc, "status": status}
 	}
@@ -777,6 +760,21 @@ func quoteStages(q db.Quote) []map[string]interface{} {
 		s3["status"] = "failed"
 		s3["timestamp"] = updated
 		s4["status"] = "failed"
+	}
+	if s2["status"] == "completed" {
+		delete(s2, "timestamp")
+		if q.PaidAt != nil && !q.PaidAt.IsZero() {
+			s2["timestamp"] = q.PaidAt.Format(time.RFC3339Nano)
+		}
+	}
+	if s3["status"] == "completed" || s3["status"] == "in_progress" {
+		delete(s3, "timestamp") // no independent processing timestamp was retained
+	}
+	if s4["status"] == "completed" {
+		delete(s4, "timestamp")
+		if delivered := q.DeliveryTime(); !delivered.IsZero() {
+			s4["timestamp"] = delivered.Format(time.RFC3339Nano)
+		}
 	}
 	return []map[string]interface{}{s1, s2, s3, s4}
 }

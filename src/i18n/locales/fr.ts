@@ -957,6 +957,7 @@ const fr = {
   },
 
   email: {
+    giftSupportNotice: "Si le code cadeau ou le QR eSIM ne fonctionne pas, CryptoRefills peut demander l’adresse e-mail de livraison du destinataire, son pays ou sa région, la référence de commande et les détails de l’erreur pour vérifier le problème. Conservez ces informations ; le destinataire doit contacter le support depuis l’adresse qui a reçu le code.",
         giftTag: 'cadeau',
     subjectAnonymous: 'Quelqu\'un vous a envoyé un cadeau 🎁',
     subjectNamed: 'Un cadeau est arrivé pour vous 🎁',
@@ -1226,7 +1227,7 @@ const fr = {
     tileShoppingNow: 'achètent maintenant',
     liveVisitor: { one: 'visiteur en direct', other: 'visiteurs en direct' },
     tileAvgDelivery: 'livraison moyenne',
-    paidToDelivered: 'payé → livré',
+    paidToDelivered: 'confirmation du paiement → livraison',
     buyerRating: { one: '{{count}} avis acheteur', other: '{{count}} avis acheteurs' },
     noRatingsYet: 'Aucun avis',
     distShow: { one: 'Voir l\'acheteur qui a noté {{star}} étoile', other: 'Voir les {{count}} acheteurs ayant noté {{star}} étoiles' },

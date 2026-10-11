@@ -411,6 +411,9 @@ func (n GiftNote) textBody(site, product, message string) string {
 	}
 	b.WriteString("\n" + tl("email.whereIs", map[string]string{"item": n.itemWordT(tl)}) + "\n")
 	b.WriteString(wrap(n.deliveryLineT(tl), 76) + "\n")
+	if n.deliveryKind() != DeliveryTopUp {
+		b.WriteString("\n" + wrap(tl("email.giftSupportNotice"), 76) + "\n")
+	}
 	b.WriteString("\n" + tl("mailtext.arrivesFrom", map[string]string{"sender": "noreply@cryptorefills.com"}) + "\n")
 	b.WriteString(tl("mailtext.openSenderMail") + " " + cryptorefillsInboxURL + "\n")
 	b.WriteString(tl("mailtext.searchInbox", map[string]string{"query": "from:noreply@cryptorefills.com"}) + "\n")
@@ -649,6 +652,9 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 		b.WriteString(`                <div style="padding-top:8px;color:` + mailInkFaint + `;font-size:11px;font-family:` + emailMono + `">` + esc(tl("email.reference")) + ` ` + esc(ref) + `</div>` + "\n")
 	}
 	disclaimerKey := "email.disclaimer"
+	if n.deliveryKind() != DeliveryTopUp {
+		b.WriteString(`                <div style="padding-top:8px;font-size:12px;line-height:1.6;color:` + mailInkFaint + `">` + esc(tl("email.giftSupportNotice")) + `</div>` + "\n")
+	}
 	if n.Self {
 		disclaimerKey = "mailtext.disclaimerOrder"
 	}

@@ -958,6 +958,7 @@ const tr = {
   },
 
   email: {
+    giftSupportNotice: "Hediye kodu veya eSIM QR’ı çalışmazsa CryptoRefills, inceleme için alıcının teslimat e-postasını, bulunduğu ülke veya bölgeyi, sipariş numarasını ve hata ayrıntılarını isteyebilir. Bu bilgileri saklayın; alıcı destekle kodun gönderildiği e-posta adresinden iletişime geçsin.",
         giftTag: 'hediye',
     subjectAnonymous: 'Sana bir hediye gönderildi 🎁',
     subjectNamed: 'Sana bir hediye geldi 🎁',
@@ -1227,7 +1228,7 @@ const tr = {
     tileShoppingNow: 'şu an alışverişte',
     liveVisitor: { one: 'canlı ziyaretçi', other: 'canlı ziyaretçi' },
     tileAvgDelivery: 'ort. teslimat',
-    paidToDelivered: 'ödendi → teslim',
+    paidToDelivered: 'ödeme teyidi → teslim',
     buyerRating: { one: '{{count}} alıcı puanı', other: '{{count}} alıcı puanı' },
     noRatingsYet: 'Henüz puan yok',
     distShow: { one: '{{star}} yıldız veren {{count}} alıcıyı göster', other: '{{star}} yıldız veren {{count}} alıcıyı göster' },

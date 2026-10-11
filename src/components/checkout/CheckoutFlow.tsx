@@ -24,7 +24,7 @@ import { identiconPngDataUrl, prepareBuyerIdenticon } from '../../lib/identicon'
 import { getAddress } from '../../lib/session';
 import { isValidEmail } from '../../lib/validate';
 import { giftRowFields } from '../../lib/giftNote';
-import { uuid } from '../../lib/format';
+import { uuid, purchaseFaceLabel } from '../../lib/format';
 import { CombinedDeliveryPicker } from './CombinedDeliveryPicker';
 import { needsPhone } from '../../lib/catalog';
 import { useT, t as tr } from '../../i18n';
@@ -1129,7 +1129,7 @@ function BatchPayPhase({ quote, items, onResult }: { quote: any; items: CartItem
       name={t('checkout.flowWholeCart', { n: items.length })}
       stepNote={t('checkout.flowOneCart')}
       note={note}
-      youGetLabel={items.map((it) => `${it.name}${(it.qty || 1) > 1 ? ' ×' + (it.qty || 1) : ''}`).join(', ')}
+      youGetLabel={items.map((it) => [it.name, purchaseFaceLabel(it)].filter(Boolean).join(' · ')).join(' + ')}
       onResult={onResult}
     />
   );
@@ -1142,7 +1142,7 @@ function PerItemPayPhase({ quote, name, qty = 1, index, total, paidCount, onResu
       ? t('checkout.flowCheckoutOfPaid', { index: index + 1, total, paid: paidCount })
       : t('checkout.flowCheckoutOf', { index: index + 1, total })
     : '';
-  return <PayScreen quote={quote} name={name} stepNote={stepNote} youGetLabel={`${name} ×${qty}`} onResult={onResult} />;
+  return <PayScreen quote={quote} name={name} stepNote={stepNote} youGetLabel={[name, youGetText({ ...quote, quantity: quote.quantity || qty })].filter(Boolean).join(' · ')} onResult={onResult} />;
 }
 
 function FailurePrompt({ issues = [], message, detail = '', activeCheckout = false, items = [], onChoice, onBackToCart }: { issues?: SupplierIssue[]; message: string; detail?: string; activeCheckout?: boolean; items?: CartItem[]; onChoice: (c: 'retry' | 'onebyone' | 'stop' | 'force') => void; onBackToCart: () => void }) {
