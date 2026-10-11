@@ -4,20 +4,22 @@
  */
 const pt = {
   refreshStatus: {
+    "finished": "Verificação de stock concluída",
+    "partial": "A atualização do catálogo ou das taxas está incompleta. As verificações sem resultado e os dados mantidos aparecem abaixo.",
     "title": "Estado da atualização",
     "intro": "Estas datas correspondem aos dados apresentados atualmente neste site.",
     "error": "Não foi possível carregar o estado.",
     "loading": "A carregar atualizações…",
     "fresh": "As verificações do catálogo e das cotações são recentes.",
-    "stale": "A verificação do catálogo ou das cotações tem mais de 90 minutos.",
+    "stale": "As verificações do catálogo ou taxas têm mais de 8 horas.",
     "catalog": "Catálogo verificado",
     "market": "Cotações verificadas",
     "countries": "Países no catálogo",
     "retained": "Listas anteriores mantidas",
     "stock": "Stock dos produtos",
-    "stockCounts": "{{checked}} verificados nesta execução · {{pending}} pendentes",
+    "stockCounts": "{{checked}} verificados nesta execução · {{pending}} pendentes · {{unresolved}} sem resultado",
     "fiat": "Data do fornecedor de câmbio",
-    "explanation": "O catálogo e as cotações são publicados juntos. O stock é verificado por turnos dentro dos limites do fornecedor. O câmbio é publicado diariamente; a data de verificação difere da data dos dados.",
+    "explanation": "O catálogo, todos os stocks e as taxas são atualizados juntos a cada 6 horas. Erros do fornecedor ou verificações em falta não contam como completos. A fonte cambial publica diariamente; a data difere da verificação.",
     "actions": "Ver atualização no GitHub"
 },
   lightningReceipt: {

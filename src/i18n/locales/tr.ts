@@ -4,20 +4,22 @@
  */
 const tr = {
   refreshStatus: {
+    "finished": "Stok taraması bitti",
+    "partial": "Katalog veya kur yenilemesi tamamlanmadı. Eksik sorgular ve korunan veriler aşağıda.",
     "title": "Güncelleme durumu",
     "intro": "Bu tarihler sitede şu anda sunulan verilere aittir.",
     "error": "Güncelleme durumu yüklenemedi.",
     "loading": "Güncelleme durumu yükleniyor…",
     "fresh": "Katalog ve kur kontrolleri güncel.",
-    "stale": "Katalog veya kur kontrolü 90 dakikadan eski.",
+    "stale": "Katalog veya kur kontrolü 8 saatten eski.",
     "catalog": "Katalog kontrolü",
     "market": "Kur kontrolü",
     "countries": "Katalogdaki ülkeler",
     "retained": "Önceki liste korundu",
     "stock": "Ürün stoku",
-    "stockCounts": "Bu çalışmada {{checked}} kontrol · sırada {{pending}}",
+    "stockCounts": "Bu çalışmada {{checked}} kontrol · sırada {{pending}} · sonuç alınamayan {{unresolved}}",
     "fiat": "Döviz sağlayıcısının veri tarihi",
-    "explanation": "Katalog ve kurlar birlikte yayınlanır. Stok kontrolleri sağlayıcı sınırları içinde sırayla yapılır. Döviz kaynağı günlük veri yayınlar; kontrol tarihiyle kaynağın veri tarihi farklıdır.",
+    "explanation": "Katalog, tüm ürün stokları ve kurlar 6 saatte bir birlikte yenilenir. Sağlayıcı hataları veya eksik kontroller tamamlandı sayılmaz. Döviz kaynağı günlük veri yayınlar; kontrol tarihiyle kaynağın veri tarihi farklıdır.",
     "actions": "GitHub güncelleme çalışmasını gör"
 },
   lightningReceipt: {

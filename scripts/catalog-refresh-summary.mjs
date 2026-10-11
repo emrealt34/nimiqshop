@@ -1,10 +1,14 @@
 import { readFile, appendFile, writeFile } from 'node:fs/promises';
+import { refreshCompletion } from './catalog-refresh-completion.mjs';
 
 const manifest = JSON.parse(await readFile(new URL('../public/data/catalog/manifest.json', import.meta.url), 'utf8'));
 const v = manifest.verified || {};
 let market;
 try { market = JSON.parse(await readFile(new URL('../public/data/market/manifest.json', import.meta.url), 'utf8')); }
 catch { market = null; }
+const completion = refreshCompletion(manifest, market, Date.now(), {
+  catalog: process.env.CATALOG_REFRESH_OUTCOME, market: process.env.MARKET_REFRESH_OUTCOME,
+});
 // This report travels with the exact snapshot served by the deployment. A
 // successful workflow alone must never make old served data look fresh.
 await writeFile(new URL('../public/data/market/refresh.json', import.meta.url), JSON.stringify({
@@ -12,7 +16,10 @@ await writeFile(new URL('../public/data/market/refresh.json', import.meta.url), 
   run_id: /^\d+$/.test(process.env.GITHUB_RUN_ID || '') ? process.env.GITHUB_RUN_ID : null,
   source: process.env.REFRESH_SOURCE || process.env.GITHUB_EVENT_NAME || 'local',
   commit: process.env.GITHUB_SHA || null,
+  complete: completion.complete,
+  rates_complete: completion.ratesComplete,
   catalog: { generated_at: manifest.generated_at, countries: Object.keys(manifest.countries || {}).length,
+    completed_at: manifest.completed_at, complete: manifest.complete,
     retained_countries: (manifest.failed || []).map(f => f.country), stock: v },
   market,
 }, null, 2) + '\n');
@@ -23,18 +30,19 @@ const marketLines = market ? [
   `BTC: ${typeof market.btc === 'object' && market.btc ? `${market.btc.usd_per_btc} USD; observed ${market.btc.observed_at}; ${market.btc.sources} sources` : market.btc}`,
   `FX: ${typeof market.fx === 'object' && market.fx ? `${market.fx.currencies} currencies from ${market.fx.source}; observed ${market.fx.observed_at}; ${market.fx.fallback_currencies.length} baseline-only currencies` : market.fx}`,
   '',
-  'The catalog and all rate files are saved in the same main workflow snapshot and deployed together. The free fiat feed publishes daily; hourly polling does not create hourly market observations.',
+  'The catalog and all rate files are saved in the same main workflow snapshot and deployed together every six hours. The free fiat feed publishes daily.',
   ...(market.fallbacks || []).map(note => `- ${note}`), '',
 ] : ['### Market refresh', '', 'No market refresh report is available.', ''];
 const summary = [
   '### Catalog refresh',
   '',
   `Snapshot timestamp: ${manifest.generated_at}`,
+  `Scan finished: ${manifest.completed_at || 'not recorded'}; full catalog complete: ${manifest.complete === true}`,
   `Countries in the catalog: ${Object.keys(manifest.countries || {}).length}`,
   `Countries kept from the previous snapshot: ${(manifest.failed || []).length}`,
   `Stock: ${v.checked || 0} checked, ${v.fresh || 0} recently checked, ${v.empty || 0} unavailable, ${v.unresolved || 0} unresolved, ${v.skipped || 0} waiting for a later run.`,
   '',
-  'Brand listings refresh each run. Product stock checks rotate oldest first within the supplier request budget. GitHub may delay scheduled runs; this timestamp records when data actually refreshed.',
+  'Scheduled scans revisit every public product family. The summary reports skipped, unresolved checks and retained countries; partial data is never a completed full catalog. GitHub may delay scheduled runs.',
   '',
   ...marketLines,
 ].join('\n');

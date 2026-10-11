@@ -3,14 +3,30 @@
 The public `/status` page reads the report inside the **served snapshot**, not
 the repository seed files. The footer links to this page. Each refreshed
 snapshot contains the main GitHub run ID, catalog time, country failures,
-rotating stock check counts, crypto provider observations and fiat provider
+full stock check counts, crypto provider observations and fiat provider
 date. An Actions success without new served data cannot make the page fresh.
 
-`catalog-refresh.yml` checks at minutes 17, 37 and 57, and avoids repeating a
-successful published refresh less than 55 minutes old. Explicit manual runs
-still force a refresh. `source=railway-watchdog` dispatches use the same guard
-to avoid races with native scheduled jobs. All snapshots are artifacts; there
-is only `main`, and no data branches or pull requests.
+`catalog-refresh.yml` runs at `17 */6 * * *`: 00:17, 06:17, 12:17 and
+18:17 UTC (03:17, 09:17, 15:17 and 21:17 in Turkey). Every scheduled slot
+runs a full scan, even after a recent manual refresh. One shared pacing gate
+limits stock reads to two per second across four workers; refusals slow it to
+one per second and honour Retry-After. Every public family is revisited; warm
+stock records cannot skip it. No e-money/KYC families are probed.
+
+The stock budget is 180 minutes and the refresh job timeout is 200 minutes,
+so normal scans can take 1–1.5 hours without the old 20-minute cut-off.
+Provider outages can still prevent complete verification. The separate
+completeness job fails when any stock check is pending/unresolved or a
+country lookup failed. The useful partial snapshot and good rate updates
+are still retained and deployed, with incomplete status publicly visible.
+An empty country directory is read twice before publishing its empty list.
+
+Runs share one concurrency group and never cancel an active scan. Catalog
+and rates remain in one artifact and deployment; no data branches or PRs.
+The backup guard uses six hours, with 270 minutes allowed for active work.
+The status page allows an eight-hour freshness window (six-hour cadence plus
+scan/deploy time), and independently requires a complete scan before showing
+its success banner. Provider observation timestamps remain unchanged.
 
 ## Independent Railway watchdog (prepared, activation pending)
 
@@ -21,7 +37,7 @@ The function is **not deployed or scheduled yet**. It has no credential.
 
 Intended service config: cron `*/5 * * * *`, restart policy `NEVER`, no public
 domain. Every check exits. It dispatches only this repository's main catalog
-workflow when fresh successful refresh data is absent. Recent queued/running
+workflow when six-hour successful refresh data is absent. Recent queued/running
 work is left alone. The script never calls suppliers, sends payments, or needs
 Cloudflare/deployment secrets.
 
@@ -36,6 +52,8 @@ After activation, verify Railway's cron execution timestamp/result and logs,
 then inspect the corresponding GitHub refresh job, deployment, and `/status`.
 A successful manual refresh is not evidence that either scheduler is working.
 
-Fiat rates may have daily provider observations even though checked hourly.
-Stock checks rotate under provider request limits; pending stock is visible
+Fiat rates may have daily provider observations even though checked every six hours.
+Stock checks cover all families each scheduled run; pending stock is visible
 in the report. Failed countries/rates retain prior data and their timestamps.
+
+The staged Railway function must be updated from the current main script before activation; it remains undeployed and has no credential.

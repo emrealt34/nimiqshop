@@ -4,20 +4,22 @@
  */
 const es = {
   refreshStatus: {
+    "finished": "Control de stock finalizado",
+    "partial": "La actualización del catálogo o de los tipos de cambio está incompleta. Las comprobaciones sin resolver y los datos conservados aparecen abajo.",
     "title": "Estado de actualización",
     "intro": "Estas fechas corresponden a los datos que muestra actualmente este sitio.",
     "error": "No se pudo cargar el estado.",
     "loading": "Cargando actualizaciones…",
     "fresh": "Las comprobaciones del catálogo y las cotizaciones son recientes.",
-    "stale": "La comprobación del catálogo o las cotizaciones tiene más de 90 minutos.",
+    "stale": "Los controles del catálogo o de tipos tienen más de 8 horas.",
     "catalog": "Catálogo comprobado",
     "market": "Cotizaciones comprobadas",
     "countries": "Países del catálogo",
     "retained": "Listas anteriores conservadas",
     "stock": "Existencias",
-    "stockCounts": "{{checked}} comprobados en esta ejecución · {{pending}} pendientes",
+    "stockCounts": "{{checked}} comprobados en esta ejecución · {{pending}} pendientes · {{unresolved}} sin resolver",
     "fiat": "Fecha del proveedor de divisas",
-    "explanation": "El catálogo y las cotizaciones se publican juntos. Las existencias se comprueban por turnos según los límites del proveedor. Las divisas se publican a diario; la fecha de comprobación difiere de la de los datos.",
+    "explanation": "El catálogo, todas las existencias y los tipos se actualizan juntos cada 6 horas. Los errores del proveedor o controles pendientes no cuentan como completos. La fuente de divisas publica a diario; su fecha difiere de la del control.",
     "actions": "Ver actualización en GitHub"
 },
   lightningReceipt: {

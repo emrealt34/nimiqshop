@@ -4,20 +4,22 @@
  */
 const fr = {
   refreshStatus: {
+    "finished": "Contrôle des stocks terminé",
+    "partial": "La mise à jour du catalogue ou des taux est incomplète. Les contrôles non résolus et les données conservées figurent ci-dessous.",
     "title": "État des mises à jour",
     "intro": "Ces dates correspondent aux données actuellement servies par ce site.",
     "error": "Impossible de charger l’état des mises à jour.",
     "loading": "Chargement des mises à jour…",
     "fresh": "Les vérifications du catalogue et des cours sont récentes.",
-    "stale": "La vérification du catalogue ou des cours date de plus de 90 minutes.",
+    "stale": "Les contrôles du catalogue ou des taux datent de plus de 8 heures.",
     "catalog": "Catalogue vérifié",
     "market": "Cours vérifiés",
     "countries": "Pays du catalogue",
     "retained": "Listes précédentes conservées",
     "stock": "Stock des produits",
-    "stockCounts": "{{checked}} vérifiés lors de cette exécution · {{pending}} en attente",
+    "stockCounts": "{{checked}} vérifiés lors de cette exécution · {{pending}} en attente · {{unresolved}} non résolus",
     "fiat": "Date des données du fournisseur de devises",
-    "explanation": "Le catalogue et les cours sont publiés ensemble. Les stocks sont vérifiés à tour de rôle selon les limites du fournisseur. Les devises sont publiées quotidiennement ; la date de vérification diffère de celle des données.",
+    "explanation": "Le catalogue, tous les stocks et les taux sont actualisés ensemble toutes les 6 heures. Les erreurs du fournisseur ou contrôles manquants ne sont pas considérés comme complets. La source de devises publie chaque jour ; sa date diffère de celle du contrôle.",
     "actions": "Voir l’exécution GitHub"
 },
   lightningReceipt: {

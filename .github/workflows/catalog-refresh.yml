@@ -1,9 +1,9 @@
-name: Hourly catalog refresh
+name: Catalog and rates · every 6 hours
 
 on:
   schedule:
-    # Off-hour retry checks recover missed schedules; the guard avoids redundant scans.
-    - cron: "17,37,57 * * * *"
+    # UTC: 00:17, 06:17, 12:17, 18:17 (03:17, 09:17, 15:17, 21:17 in Turkey).
+    - cron: "17 */6 * * *"
   workflow_dispatch:
     inputs:
       source:
@@ -50,7 +50,9 @@ jobs:
     needs: freshness
     if: needs.freshness.outputs.due == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 200
+    outputs:
+      complete: ${{ steps.result.outputs.complete }}
     permissions:
       contents: read
       actions: read # restore the previous main snapshot artifact
@@ -81,17 +83,24 @@ jobs:
         if: steps.previous.outputs.run_id != '0'
         run: node scripts/catalog-data.mjs restore
       - name: Refresh catalog
+        id: catalog
         continue-on-error: true # retain good market updates during supplier outages
         env:
           CATALOG_STOCK_STATE: scripts/data/stock-state.json
+          CATALOG_VERIFY_FULL: "1"
+          CATALOG_VERIFY_BUDGET_MS: "10800000"
+          CATALOG_VERIFY_INTERVAL_MS: "500"
         run: node scripts/sync-catalog.mjs
       - name: Refresh market
+        id: market
         continue-on-error: true # persist good catalog data and keep prior failed rates
         run: node scripts/sync-market.mjs
       - name: Publish refresh summary
         if: always()
         env:
           REFRESH_SOURCE: ${{ inputs.source || github.event_name }}
+          CATALOG_REFRESH_OUTCOME: ${{ steps.catalog.outcome }}
+          MARKET_REFRESH_OUTCOME: ${{ steps.market.outcome }}
         run: node scripts/catalog-refresh-summary.mjs
       - name: Stage refreshed snapshots
         run: node scripts/catalog-data.mjs stage
@@ -104,8 +113,33 @@ jobs:
           compression-level: 9
           if-no-files-found: error
 
+      # Keep the new data and deploy it, but never mark an incomplete scan successful.
+      - name: Record complete scan result
+        id: result
+        env:
+          CATALOG_REFRESH_OUTCOME: ${{ steps.catalog.outcome }}
+          MARKET_REFRESH_OUTCOME: ${{ steps.market.outcome }}
+        run: node scripts/catalog-refresh-result.mjs
+
+  completeness:
+    name: Confirm the full catalog scan completed
+    needs: refresh
+    if: always() && needs.refresh.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Reject an incomplete refresh
+        env:
+          COMPLETE: ${{ needs.refresh.outputs.complete }}
+        run: |
+          if [ "$COMPLETE" != "true" ]; then
+            echo 'Full catalog incomplete. The partial snapshot is retained and deployed; see the refresh summary.'
+            exit 1
+          fi
+
   deploy:
     needs: refresh
+    if: needs.refresh.result == 'success'
     permissions:
       contents: read
       actions: read # reusable deploy downloads this run's catalog-snapshots artifact

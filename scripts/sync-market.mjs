@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * sync-market.mjs — bake the NIM/BTC price and the FX table into static JSON
- * (`public/data/market/`), refreshed by the SAME hourly Pages-deploy cron as
+ * (`public/data/market/`), refreshed by the same six-hour catalog workflow as
  * the catalog snapshot, so no page load has to ask the (often down) Go
  * backend for the price any more.
  *
@@ -33,8 +33,7 @@
  * /api when a file is missing.
  *
  * WHY THAT IS STILL SAFE: this file is only as fresh as the last deploy, and
- * the hourly Pages cron that runs it is a GitHub `schedule` — which this repo
- * has measured slipping to 5-hour gaps. So the frontend no longer TRUSTS the
+ * the catalog workflow uses GitHub `schedule`, which can delay runs. So the frontend no longer TRUSTS the
  * snapshot for a number the buyer reads: it paints from it immediately and
  * then reconciles against the live API at most once per 10 minutes per tab
  * (src/lib/api.ts, onRatesChange). A late build costs a repaint, not a wrong
@@ -166,7 +165,7 @@ if (nim || (btc && num(previousRate?.usd_per_nim))) {
     ...(num(previousRate?.usd_per_nim) ? previousRate : {}),
     cached: true,
     generated_at: generatedAt,
-    sync: 'static-hourly',
+    sync: 'static-six-hourly',
   };
   if (nim) {
     body.usd_per_nim = nim.median;

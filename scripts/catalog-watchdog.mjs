@@ -1,5 +1,5 @@
 /** Railway cron (every five minutes). Dispatches the existing main workflow
- * only when an hourly refresh is due. No supplier or deployment secrets here. */
+ * only when a six-hour refresh is due. No supplier or deployment secrets here. */
 import { pathToFileURL } from 'node:url';
 
 export async function checkCatalog({ get, dispatch, now = Date.now() }) {
@@ -8,10 +8,10 @@ export async function checkCatalog({ get, dispatch, now = Date.now() }) {
   for (const r of candidates) {
     const age = now - Date.parse(r.created_at);
     if (!Number.isFinite(age) || age < 0) continue;
-    if (['queued', 'in_progress', 'waiting', 'pending', 'requested'].includes(r.status) && age < 40 * 60_000) {
+    if (['queued', 'in_progress', 'waiting', 'pending', 'requested'].includes(r.status) && age < 270 * 60_000) {
       return { action: 'skip', reason: 'refresh_running', run_id: r.id };
     }
-    if (r.status !== 'completed' || r.conclusion !== 'success' || age >= 55 * 60_000) continue;
+    if (r.status !== 'completed' || r.conclusion !== 'success' || age >= 6 * 60 * 60_000) continue;
     const { jobs = [] } = await get(`/actions/runs/${r.id}/jobs?per_page=100`);
     if (!jobs.some(j => j.name === 'Refresh and persist catalog snapshots' && j.conclusion === 'success')) continue;
     const { artifacts = [] } = await get(`/actions/runs/${r.id}/artifacts?per_page=100`);
@@ -20,7 +20,7 @@ export async function checkCatalog({ get, dispatch, now = Date.now() }) {
     }
   }
   await dispatch();
-  return { action: 'dispatch', reason: 'hourly_refresh_due', branch: 'main' };
+  return { action: 'dispatch', reason: 'six_hour_refresh_due', branch: 'main' };
 }
 
 async function main() {

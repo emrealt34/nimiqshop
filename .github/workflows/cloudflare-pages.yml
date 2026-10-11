@@ -21,7 +21,7 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-  # The hourly workflow calls this with its exact saved data artifact.
+  # The saved workflow calls this with its exact saved data artifact.
   workflow_call:
     inputs:
       skip_refresh:
@@ -81,7 +81,7 @@ jobs:
     timeout-minutes: 45
     permissions:
       contents: read
-      actions: read # download the exact hourly catalog and market snapshot artifact
+      actions: read # download the exact saved catalog and market snapshot artifact
     environment:
       name: cloudflare-pages
       url: https://shop.nimiqbase.com
@@ -95,14 +95,14 @@ jobs:
         id: source
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-      - name: Find hourly catalog data
+      - name: Find saved catalog data
         if: inputs.snapshot_run_id == ''
         id: previous
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node scripts/catalog-data.mjs find
 
-      - name: Download hourly catalog data
+      - name: Download saved catalog data
         if: inputs.snapshot_run_id != '' || steps.previous.outputs.run_id != '0'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -111,7 +111,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ inputs.snapshot_run_id || steps.previous.outputs.run_id }}
 
-      - name: Restore hourly catalog data
+      - name: Restore saved catalog data
         if: inputs.snapshot_run_id != '' || steps.previous.outputs.run_id != '0'
         run: node scripts/catalog-data.mjs restore
 
@@ -125,11 +125,11 @@ jobs:
 
       - run: npm ci --no-audit --no-fund
 
-      # Catalog AND market prices in the same hourly run: neither the brand
+      # Catalog AND market prices in the same saved run: neither the brand
       # grids nor the NIM/BTC price may depend on the Go backend at page-load
       # time. Each script keeps the previous file when its sources fail, and
       # a fully-down supplier/backend must not stop the deploy. Code pushes
-      # publish the restored hourly snapshot; do not repeat a 20-minute stock
+      # publish the restored saved snapshot; do not repeat a full stock
       # scan just to release an application fix.
       - name: Refresh static catalog snapshots
         if: github.event_name != 'push' && inputs.skip_refresh != true

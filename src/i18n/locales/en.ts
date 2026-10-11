@@ -10,20 +10,22 @@
  */
 const en = {
   refreshStatus: {
+    "finished": "Stock scan finished",
+    "partial": "The catalog or rate refresh is incomplete. Unresolved checks and retained data are listed below.",
     "title": "Refresh status",
     "intro": "These timestamps describe the data currently served by this site.",
     "error": "Refresh status could not be loaded.",
     "loading": "Loading refresh status…",
     "fresh": "Catalog and rate checks are recent.",
-    "stale": "The catalog or rate check is more than 90 minutes old.",
+    "stale": "Catalog or rate checks are older than 8 hours.",
     "catalog": "Catalog checked",
     "market": "Rates checked",
     "countries": "Countries in the catalog",
     "retained": "Previous listings retained",
     "stock": "Product stock",
-    "stockCounts": "{{checked}} checked this run · {{pending}} pending rotation",
+    "stockCounts": "{{checked}} checked this run · {{pending}} pending · {{unresolved}} unresolved",
     "fiat": "Fiat provider observation",
-    "explanation": "Catalog and rates publish together. Stock checks rotate within the supplier budget. Fiat feeds publish daily; the check time and provider observation time differ.",
+    "explanation": "The catalog, all product stock and rates refresh together every 6 hours. Supplier errors or missing checks do not count as complete. The fiat source publishes daily; its observation date differs from the check time.",
     "actions": "View GitHub refresh run"
 },
   lightningReceipt: {

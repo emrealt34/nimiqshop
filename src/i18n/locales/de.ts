@@ -4,20 +4,22 @@
  */
 const de = {
   refreshStatus: {
+    "finished": "Bestandsprüfung beendet",
+    "partial": "Die Katalog- oder Kursaktualisierung ist unvollständig. Ungeklärte Prüfungen und beibehaltene Daten stehen unten.",
     "title": "Aktualisierungsstatus",
     "intro": "Diese Zeitstempel gelten für die derzeit auf dieser Website angezeigten Daten.",
     "error": "Der Aktualisierungsstatus konnte nicht geladen werden.",
     "loading": "Aktualisierungsstatus wird geladen…",
     "fresh": "Katalog- und Kursprüfungen sind aktuell.",
-    "stale": "Die Katalog- oder Kursprüfung ist über 90 Minuten alt.",
+    "stale": "Katalog- oder Kursprüfung ist älter als 8 Stunden.",
     "catalog": "Katalog geprüft",
     "market": "Kurse geprüft",
     "countries": "Länder im Katalog",
     "retained": "Vorherige Listen beibehalten",
     "stock": "Produktbestand",
-    "stockCounts": "{{checked}} in diesem Lauf geprüft · {{pending}} ausstehend",
+    "stockCounts": "{{checked}} in diesem Lauf geprüft · {{pending}} ausstehend · {{unresolved}} ungeklärt",
     "fiat": "Datenstand des Devisenanbieters",
-    "explanation": "Katalog und Kurse werden gemeinsam veröffentlicht. Bestandsprüfungen rotieren innerhalb des Anbieterlimits. Devisendaten erscheinen täglich; Prüfzeit und Datenstand unterscheiden sich.",
+    "explanation": "Katalog, alle Produktbestände und Kurse werden alle 6 Stunden gemeinsam aktualisiert. Anbieterfehler oder fehlende Prüfungen gelten nicht als vollständig. Die Fiatquelle veröffentlicht täglich; Daten- und Prüfdatum unterscheiden sich.",
     "actions": "GitHub-Aktualisierung ansehen"
 },
   lightningReceipt: {

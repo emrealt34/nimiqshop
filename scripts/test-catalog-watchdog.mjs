@@ -9,12 +9,13 @@ async function check(runs, { jobs = [{ name: 'Refresh and persist catalog snapsh
   assert.equal(dispatched, result.action === 'dispatch' ? 1 : 0);
   return result;
 }
-test('hourly watchdog skips real recent published snapshots and running refreshes', async () => {
+test('six-hour watchdog skips real recent published snapshots and running refreshes', async () => {
   assert.equal((await check([recent])).reason, 'published_snapshot_recent');
   assert.equal((await check([{ ...recent, status: 'in_progress', conclusion: null }])).reason, 'refresh_running');
+  assert.equal((await check([{ ...recent, status: 'in_progress', conclusion: null, created_at: '2026-10-11T18:00:00Z' }])).reason, 'refresh_running', 'a two-hour full scan is still active');
 });
 test('stale, failed, guard-only or missing snapshots dispatch exactly one main refresh', async () => {
-  for (const [runs, options] of [[[]], [[{ ...recent, created_at: '2026-10-11T19:05:00Z' }]], [[{ ...recent, conclusion: 'failure' }]], [[recent], { jobs: [] }], [[recent], { artifacts: [] }], [[recent], { artifacts: [{ name: 'catalog-snapshots', expired: true }] }], [[{ ...recent, head_branch: 'other' }]]]) {
+  for (const [runs, options] of [[[]], [[{ ...recent, created_at: '2026-10-11T14:00:00Z' }]], [[{ ...recent, conclusion: 'failure' }]], [[recent], { jobs: [] }], [[recent], { artifacts: [] }], [[recent], { artifacts: [{ name: 'catalog-snapshots', expired: true }] }], [[{ ...recent, head_branch: 'other' }]]]) {
     assert.equal((await check(runs, options)).action, 'dispatch');
   }
 });

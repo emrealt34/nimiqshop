@@ -66,7 +66,7 @@ test('stock uses purchasable inventory, including merged supplier variants', () 
   ]) assert.equal(stockState(payload), want, JSON.stringify(payload));
 });
 
-test('presence-only state is invalidated; stock expires hourly and recovers', () => {
+test('presence-only state is invalidated; stock expires after six hours and recovers', () => {
   const now = Date.now();
   assert.equal(validStockRecord({ state: 'ok', at: now }), false);
   assert.equal(validStockRecord({ state: 'ok', at: now + 120_000, version: STOCK_VERSION }), false);
@@ -135,6 +135,15 @@ test('the real sync script persists stock and preserves a failed country without
     assert.equal(manifest.failed[0].country, 'DE');
     await exec(process.execPath, ['--import', preload, join(dir, 'scripts/sync-catalog.mjs')], { env, timeout: 30_000 });
     assert.equal(await readFile(join(dir, 'calls'), 'utf8'), calls, 'fresh verified records avoid duplicate stock calls');
+    await exec(process.execPath, ['--import', preload, join(dir, 'scripts/sync-catalog.mjs')], { env: { ...env, CATALOG_VERIFY_FULL: '1' }, timeout: 30_000 });
+    const full = JSON.parse(await readFile(join(dir, 'public/data/catalog/manifest.json')));
+    assert.equal(full.verified.mode, 'full');
+    assert.equal(full.verified.fresh, 0, 'full scans must revisit warm records');
+    assert.equal(full.verified.checked, 5);
+    assert.equal(full.verified.skipped, 0);
+    assert.equal(full.verified.completed, true);
+    assert.equal(full.complete, false, 'a failed country cannot be called a complete catalog');
+    assert.ok((await readFile(join(dir, 'calls'), 'utf8')).length > calls.length);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 

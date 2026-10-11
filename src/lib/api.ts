@@ -374,8 +374,7 @@ const catQS = (kind: string, country?: string, test?: boolean) => {
   return '/catalog/brands?' + p.toString();
 };
 /* ---- Static catalog snapshot — the storefront's first source -------------
- * scripts/sync-catalog.mjs pulls /v2/brands from CryptoRefills hourly (Pages
- * deploy cron) and commits a seed, so `public/data/catalog/brands/*.json`
+ * scripts/sync-catalog.mjs pulls /v2/brands from CryptoRefills every six hours and retains a committed seed, so `public/data/catalog/brands/*.json`
  * is plain static edge content: it survives a dead backend, which the old
  * /api-only path did not (shopapi down = empty shop). The kind filter the
  * Go handler applied server-side (filterBrandCategories) is mirrored here
@@ -383,8 +382,8 @@ const catQS = (kind: string, country?: string, test?: boolean) => {
  * with no snapshot file and for ?test=1 admin probes.
  * The permanent e-money/KYC exclusion is applied before kind selection;
  * older snapshots cannot bring an excluded family back to the storefront. */
-/** A static snapshot older than this is considered stale: the hourly Pages
- *  cron (or the deploy itself) may have been broken for a while, and a
+/** A static snapshot older than this is considered stale: the six-hour catalog
+ *  workflow (or the deploy itself) may have been broken for a while, and a
  *  half-day-old price/catalog is worse than a live round trip to the API.
  *  Owner's rule: static first, but never trust a snapshot older than 12 h —
  *  past that, fall through to /api automatically. */
@@ -421,7 +420,7 @@ async function staticBrandsFetch(file: string): Promise<{ country_code?: string;
     return null;
   }
 }
-/** Static market snapshot (scripts/sync-market.mjs, hourly): the NIM/BTC
+/** Static market snapshot (scripts/sync-market.mjs, every six hours): the NIM/BTC
  *  price and the FX table as edge files, so a page load never waits on the
  *  Go backend for a number that changes a few percent a day. Shapes are
  *  byte-compatible with /market/nim-rate and /market/fx. */
@@ -792,7 +791,7 @@ const NIM_CACHE_TTL_MS = 5 * 60 * 1000;
 /**
  * Live-rate reconciliation.
  *
- * The static snapshots in /data/market are baked by the hourly Pages deploy
+ * The static snapshots in /data/market are baked by the six-hour catalog deployment
  * and are trusted for up to STATIC_MAX_AGE_MS. That is fine for painting fast,
  * but it is NOT fine for a number the buyer reads: our displayed NIM price is
  * coin_amount(BTC) x btc_usd / nim_usd, and while the BTC amount is pinned by

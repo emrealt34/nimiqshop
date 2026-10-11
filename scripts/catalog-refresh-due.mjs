@@ -3,8 +3,9 @@ import { appendFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
 export async function refreshDue({ event, source, runId, now = Date.now(), get }) {
+  if (event === 'schedule') return { due: true, reason: 'Scheduled six-hour full refresh.' };
   if (event === 'workflow_dispatch' && source !== 'railway-watchdog') return { due: true, reason: 'Manual refresh requested.' };
-  const freshnessMs = 55 * 60_000;
+  const freshnessMs = 6 * 60 * 60_000;
   const runs = await get('/actions/workflows/catalog-refresh.yml/runs?branch=main&per_page=100');
   for (const run of runs.workflow_runs || []) {
     if (String(run.id) === String(runId) || run.head_branch !== 'main'
@@ -19,7 +20,7 @@ export async function refreshDue({ event, source, runId, now = Date.now(), get }
     if (!refresh) continue; // A successful guard-only run has no refreshed data.
     const artifacts = await get(`/actions/runs/${run.id}/artifacts?per_page=100`);
     if (!(artifacts.artifacts || []).some(a => a.name === 'catalog-snapshots' && !a.expired)) continue;
-    return { due: false, reason: `Catalog and market were refreshed and deployed by main run ${run.id} less than 55 minutes ago.` };
+    return { due: false, reason: `Catalog and market were refreshed and deployed by main run ${run.id} less than six hours ago.` };
   }
   return { due: true, reason: 'No recently published catalog and market snapshot; refresh is due.' };
 }
@@ -41,7 +42,7 @@ async function main() {
   catch { result = { due: true, reason: 'Freshness lookup unavailable; attempt refresh rather than silently keep stale data.' }; }
   console.log(result.reason);
   if (process.env.GITHUB_OUTPUT) await appendFile(process.env.GITHUB_OUTPUT, `due=${result.due}\n`);
-  if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, `### Hourly freshness check\n\n${result.reason}\n\nChecks run at minutes 17, 37 and 57. Recent successful refreshes are skipped; manual refresh always runs. GitHub scheduling can still be delayed.\n`);
+  if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, `### Six-hour refresh check\n\n${result.reason}\n\nScheduled full scans run at 00:17, 06:17, 12:17 and 18:17 UTC. Manual refresh always runs. GitHub scheduling can still be delayed.\n`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await main();
