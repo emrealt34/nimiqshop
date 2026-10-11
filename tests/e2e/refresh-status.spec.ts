@@ -18,8 +18,19 @@ for (const width of [320, 1280]) {
     }
     test('unavailable report never claims fresh data', async ({ page }) => {
       await page.route('**/data/market/refresh.json', route => route.fulfill({ status: 404, body: '' }));
+      await page.route('**/data/catalog/manifest.json', route => route.fulfill({ status: 404, body: '' }));
+      await page.route('**/data/market/manifest.json', route => route.fulfill({ status: 404, body: '' }));
       await open(page, path('/status'));
       await expect(page.locator('.refresh-status [role=status]')).toHaveText('Güncelleme durumu yüklenemedi.');
+    });
+    test('older snapshots expose their real served dates without inventing a run ID', async ({ page }) => {
+      const old = new Date(Date.now() - 3 * 3600_000).toISOString();
+      await page.route('**/data/market/refresh.json', route => route.fulfill({ status: 404, body: '' }));
+      await page.route('**/data/catalog/manifest.json', route => route.fulfill({ json: { generated_at: old, countries: { TR: {} }, failed: [], verified: {} } }));
+      await page.route('**/data/market/manifest.json', route => route.fulfill({ json: { generated_at: old, nim: { observed_at: old }, btc: { observed_at: old } } }));
+      await open(page, path('/status'));
+      await expect(page.locator('.refresh-status [role=status]')).toHaveText('Katalog veya kur kontrolü 90 dakikadan eski.');
+      await expect(page.getByRole('link', { name: 'GitHub güncelleme çalışmasını gör' })).toHaveAttribute('href', 'https://github.com/emrealt34/nimiqshop/actions/workflows/catalog-refresh.yml');
     });
   });
 }

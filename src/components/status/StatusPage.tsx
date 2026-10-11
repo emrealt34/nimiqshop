@@ -11,12 +11,23 @@ export function StatusView() {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const controller = new AbortController();
+    const read = async (path: string) => {
+      const r = await fetch(asset(path), { cache: 'no-store', signal: controller.signal });
+      if (!r.ok) throw Error('unavailable');
+      return r.json();
+    };
     const load = async () => {
       setNow(Date.now());
       try {
-        const r = await fetch(asset('/data/market/refresh.json'), { cache: 'no-store', signal: controller.signal });
-        if (!r.ok) throw Error('unavailable');
-        const value = await r.json();
+        let value;
+        try { value = await read('/data/market/refresh.json'); }
+        catch {
+          // Older deployed snapshots predate the report. Read their actual
+          // served timestamps; never substitute the current time or a run ID.
+          const [catalog, market] = await Promise.all([read('/data/catalog/manifest.json'), read('/data/market/manifest.json')]);
+          value = { catalog: { generated_at: catalog.generated_at, countries: Object.keys(catalog.countries || {}).length,
+            retained_countries: (catalog.failed || []).map((f: any) => f.country), stock: catalog.verified || {} }, market };
+        }
         if (!value?.catalog || !value?.market) throw Error('invalid');
         setData(value); setError(false);
       } catch { if (!controller.signal.aborted) setError(true); }
