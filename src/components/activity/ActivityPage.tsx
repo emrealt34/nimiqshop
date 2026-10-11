@@ -10,7 +10,8 @@ import { Icon } from '../ui/Icon';
 import { FlagMark } from '../ui/FlagMark';
 import { Identicon } from '../ui/Identicon';
 import { AppRoot } from '../AppRoot';
-import { getActivity, cachedNimRate, friendlyApiMessage, errorDetailLine } from '../../lib/api';
+import { getActivity, getNimRate, onRatesChange, friendlyApiMessage, errorDetailLine } from '../../lib/api';
+import { activityVolumeNIM } from '../../lib/activityVolume';
 import { cleanProductLabel, cleanBatchProductLabels, fmtNIM, countryName, shortAddr, fmtDuration } from '../../lib/format';
 import { Clipboard } from '../../lib/clipboard';
 import { useInterval } from '../../lib/useInterval';
@@ -138,6 +139,7 @@ export function ActivityView() {
   /* The exact failure behind `err` (code · status · backend message). */
   const [errDetail, setErrDetail] = useState('');
   const [loaded, setLoaded] = useState(false);
+  const [nimRate, setNimRate] = useState<unknown>(0);
   const { toast } = useToast();
 
   const renderSummary = useCallback((s: any, items: any[]) => {
@@ -172,19 +174,24 @@ export function ActivityView() {
     load();
     heartbeat();
   }, [load]);
+  useEffect(() => {
+    let active = true;
+    const update = (rates: Record<string, any>) => {
+      if (active && 'usd_per_nim' in rates) setNimRate(rates.usd_per_nim);
+    };
+    const unsubscribe = onRatesChange(update);
+    // A direct visit has no price cache. Fetch the shared hourly snapshot
+    // without delaying the activity feed, and accept live reconciliations.
+    getNimRate().then(update).catch(() => { /* Unknown volume stays a dash in NIM. */ });
+    return () => { active = false; unsubscribe(); };
+  }, []);
   useInterval(load, 15000);
   useInterval(heartbeat, 30000);
 
   const s = summary;
   const activeNow = Number(s.active_users) || 0;
   const avgDeliv = Number(s.avg_delivery_seconds) || 0;
-  const volUSD = allItems.reduce((a, it) => a + (it.usd > 0 ? it.usd : 0), 0);
-  // A missing/zero rate made this divide by zero and render "InfinityB NIM".
-  // Only convert when the cached rate is actually usable.
-  const nimRate = Number(cachedNimRate()?.usd_per_nim) || 0;
-  const volNIM =
-    allItems.reduce((a, it) => a + (it.nim > 0 ? it.nim : 0), 0) ||
-    (volUSD > 0 && nimRate > 0 ? volUSD / nimRate : 0);
+  const volNIM = activityVolumeNIM(allItems, nimRate);
 
   const tile = (ico: string, label: string, value: string, sub?: string, cls = '') => (
     // NOTE: join classes with a SPACE. The port used '.'+cls, which produced
@@ -250,11 +257,7 @@ export function ActivityView() {
         ) : (
           <div className="act-stats-grid fade-in">
             {tile('bag', t('activityPage.tilePayments'), String(allItems.length))}
-            {/* Fall back to USD volume when no NIM figure can be derived —
-                an empty/〝—〞NIM tile next to real payments reads as broken. */}
-            {volNIM > 0
-              ? tile('nimiq', t('activityPage.tileNimVolume'), compactNIM(volNIM), '')
-              : tile('nimiq', t('activityPage.tileVolume'), volUSD > 0 ? `${Math.round(volUSD)} USD` : '—', '')}
+            {tile('nimiq', t('activityPage.tileNimVolume'), `${volNIM === null ? '—' : volNIM === 0 ? '0' : compactNIM(volNIM)} NIM`, '')}
             {tile('user', t('activityPage.tileShoppingNow'), String(activeNow), t('activityPage.liveVisitor', { count: activeNow }), activeNow > 0 ? 'hot' : '')}
             {tile('clock', t('activityPage.tileAvgDelivery'), avgDeliv > 0 ? fmtDuration(avgDeliv) : '—', t('activityPage.paidToDelivered'))}
           </div>

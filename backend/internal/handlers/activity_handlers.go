@@ -328,6 +328,15 @@ func (h *Handlers) ListActivity(ctx *fasthttp.RequestCtx) {
 		if !q.Anonymous {
 			e["address"] = addrs[q.UserID]
 		}
+		// Publish the product's NIM equivalent at purchase time, like legacy
+		// orders. Invoice estimates can include fees, so use ProductUSD here.
+		// This aggregate amount reveals no anonymous payment-rail details.
+		if q.NimUsdRate > 0 && !math.IsInf(q.NimUsdRate, 0) {
+			nim := (float64(q.ProductUSD) / 1_000_000) / q.NimUsdRate
+			if nim > 0 && !math.IsInf(nim, 0) {
+				e["nim"] = formatNIM(nim)
+			}
+		}
 		if isBatch {
 			count := q.BatchItems
 			if count < 1 {
