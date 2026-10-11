@@ -8,7 +8,7 @@
  *   2. hydration clean
  *   3. uniform card geometry, stable over time (no late layout states);
  *      meta stack = country chip row + single-line clamped price row
- *   4. e-money KYC stamp on the right cards only
+ *   4. excluded e-money/KYC products never appear on the shelf
  *   5. country switch refills without wasting a default-country fetch
  *   6. cashback calculator works with the backend DOWN: no retry wall,
  *      100K→1B range, total-rate row, degraded note spacing
@@ -73,17 +73,18 @@ const browser = await chromium.launch({ args: ['--no-sandbox'] });
   const geo2 = await page.evaluate(() => [...new Set([...document.querySelectorAll('a.product-card')].map((e) => Math.round(e.getBoundingClientRect().height)))]);
   check('3c geometry stable over time', JSON.stringify(geo2) === JSON.stringify(geo.heights), geo2.join(','));
 
-  /* ---------------------------------------------- 4) KYC stamp */
+  /* ---------------------------------------------- 4) KYC exclusion */
   const kyc = await page.evaluate(() => {
     const cardsEls = [...document.querySelectorAll('a.product-card')];
     const em = cardsEls.find((c) => /Rewarble VISA USD|CashtoCode|CASHlib|bitsa|flexepin|Netease/i.test(c.querySelector('.p-name')?.textContent || ''));
     const plain = cardsEls.find((c) => (c.querySelector('.p-name')?.textContent || '').trim() === 'Amazon.com.tr');
     return {
-      emBadge: em ? (em.querySelector('.kyc-badge')?.textContent || '').trim() : null,
+      excludedCard: !!em,
+      kycBadges: document.querySelectorAll('a.product-card .kyc-badge').length,
       plainBadge: plain ? !!plain.querySelector('.kyc-badge') : null,
     };
   });
-  check('4 KYC stamp on e-money only', /KYC/i.test(kyc.emBadge || '') && kyc.plainBadge === false, `em="${kyc.emBadge}" plain=${kyc.plainBadge}`);
+  check('4 excluded e-money/KYC products hidden', !kyc.excludedCard && kyc.kycBadges === 0 && kyc.plainBadge === false);
 
   /* ------------------------------------- 5) country switch waste */
   reqs.length = 0;

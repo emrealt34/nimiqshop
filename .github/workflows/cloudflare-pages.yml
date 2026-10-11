@@ -21,8 +21,7 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-  # The hourly workflow calls this after persisting data, without relying
-  # on another push event (GITHUB_TOKEN pushes cannot trigger workflows).
+  # The hourly workflow calls this with its exact saved data artifact.
   workflow_call:
     inputs:
       skip_refresh:
@@ -129,14 +128,16 @@ jobs:
       # Catalog AND market prices in the same hourly run: neither the brand
       # grids nor the NIM/BTC price may depend on the Go backend at page-load
       # time. Each script keeps the previous file when its sources fail, and
-      # a fully-down supplier/backend must not stop the deploy.
+      # a fully-down supplier/backend must not stop the deploy. Code pushes
+      # publish the restored hourly snapshot; do not repeat a 20-minute stock
+      # scan just to release an application fix.
       - name: Refresh static catalog snapshots
-        if: inputs.skip_refresh != true
+        if: github.event_name != 'push' && inputs.skip_refresh != true
         continue-on-error: true
         run: node scripts/sync-catalog.mjs
 
       - name: Refresh static market snapshots
-        if: inputs.skip_refresh != true
+        if: github.event_name != 'push' && inputs.skip_refresh != true
         continue-on-error: true
         run: node scripts/sync-market.mjs
 

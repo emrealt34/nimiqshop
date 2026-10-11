@@ -3,9 +3,10 @@
  * immediately while the hourly snapshot/API refreshes.
  */
 import type { Product } from './catalog';
+import { excludedCatalogItem } from './catalogVisibility';
 
-// v3 invalidates old daily stock flags; the shelf now expires hourly.
-const PREFIX = 'nimshop_cat_v3:';
+// v4 invalidates cached shelves built before the e-money/KYC exclusion.
+const PREFIX = 'nimshop_cat_v4:';
 const MAX_AGE_MS = 60 * 60 * 1000;
 
 export type CatalogMap = Record<string, Product[]>;
@@ -19,9 +20,9 @@ export function readCachedCatalog(country: string): CatalogMap | null {
     if (!j || !j.at || Date.now() - j.at > MAX_AGE_MS) return null;
     if (!j.gift_card && !j.phone_refill && !j.esim) return null;
     return {
-      gift_card: Array.isArray(j.gift_card) ? j.gift_card : [],
-      phone_refill: Array.isArray(j.phone_refill) ? j.phone_refill : [],
-      esim: Array.isArray(j.esim) ? j.esim : [],
+      gift_card: Array.isArray(j.gift_card) ? j.gift_card.filter((p: Product) => !excludedCatalogItem(p)) : [],
+      phone_refill: Array.isArray(j.phone_refill) ? j.phone_refill.filter((p: Product) => !excludedCatalogItem(p)) : [],
+      esim: Array.isArray(j.esim) ? j.esim.filter((p: Product) => !excludedCatalogItem(p)) : [],
     };
   } catch {
     return null;

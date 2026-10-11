@@ -734,9 +734,12 @@ func (h *Handlers) lookupFamilyMeta(ctx *fasthttp.RequestCtx, family, country st
 		// Data / Credits / Bundle each with family="Turk Telecom" but distinct brands/categories).
 		// Merge all products so validation and SKU lookup see the full 20-item catalogue, not just the first 4.
 		var allProducts []cryptorefills.Product
+		var allCategories []string
 		brandByDenom := make(map[string]string)
 		brandByPID := make(map[string]string)
 		for _, f := range fams {
+			allCategories = append(allCategories, f.Category)
+			allCategories = append(allCategories, f.AdditionalCats...)
 			for _, p := range f.Products {
 				allProducts = append(allProducts, p)
 				if p.Denomination != "" {
@@ -769,7 +772,7 @@ func (h *Handlers) lookupFamilyMeta(ctx *fasthttp.RequestCtx, family, country st
 			BrandName:        f0.Brand,
 			Kind:             f0.Kind,
 			Category:         f0.Category,
-			AdditionalCats:   f0.AdditionalCats,
+			AdditionalCats:   allCategories,
 			OutOfStock:       allOut,
 			BrandByDenom:     brandByDenom,
 			BrandByProductID: brandByPID,

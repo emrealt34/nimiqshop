@@ -14,6 +14,7 @@ import { UnifiedThumb } from '../ui/UnifiedThumb';
 import { FlagMark } from '../ui/FlagMark';
 import { AppRoot } from '../AppRoot';
 import { friendlyApiMessage, getProduct, getNimRate, getFXRates, getProductPrice, listUnavailableFamilies, onRatesChange } from '../../lib/api';
+import { excludedCatalogItem, filterPublicFamilies } from '../../lib/catalogVisibility';
 import { loadCashbackBps, cashbackEarnLine } from '../../lib/cashback';
 import { StakerCashbackLine } from '../staker/StakerCashback';
 import { WalletBalance } from '../wallet/WalletBalance';
@@ -167,7 +168,7 @@ type ProductDetail = {
 };
 
 function familyToProduct(family: any, fallbackId: string, countryParam: string): ProductDetail | null {
-  if (!family) return null;
+  if (!family || excludedCatalogItem(family)) return null;
   const familyName = cleanName(family.family || family.brand || fallbackId);
   const countryCode = (family.country_code || countryParam).toUpperCase();
   const logo = extractLogo(family);
@@ -250,6 +251,7 @@ function familyToProduct(family: any, fallbackId: string, countryParam: string):
 }
 
 function familiesToProduct(families: any[], fallbackId: string, countryParam: string): ProductDetail | null {
+  families = filterPublicFamilies(families);
   if (!families || !families.length) return null;
   if (families.length === 1) return familyToProduct(families[0], fallbackId, countryParam);
   const base = families.find((f) => f && (f.family || f.brand)) || families[0];

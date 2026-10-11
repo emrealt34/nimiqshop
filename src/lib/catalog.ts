@@ -5,6 +5,7 @@
  */
 import { cleanFamilyName, parseCurrencyValue } from './format';
 import { brandMetaFor, brandMetaForTitle } from './catalogMeta';
+import { filterPublicCatalog } from './catalogVisibility';
 
 export type Product = {
   id: string;
@@ -119,6 +120,7 @@ export function markReportedOutOfStock(products: Product[], families: string[]):
 
 export function flattenBrands(data: any, country = 'US'): Product[] {
   if (!data) return [];
+  data = filterPublicCatalog(Array.isArray(data) ? { categories: [{ brands: data }], country_code: country } : data);
   let brands: any[] = [];
   if (data.categories && Array.isArray(data.categories)) {
     for (const cat of data.categories) {

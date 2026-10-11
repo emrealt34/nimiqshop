@@ -10,6 +10,7 @@ import { WalletBalance } from '../wallet/WalletBalance';
 import { FlagMark } from '../ui/FlagMark';
 import { ComeBackBanner, ErrorDetail } from '../ui/uiKit';
 import { flattenBrands, markReportedOutOfStock, type Product } from '../../lib/catalog';
+import { excludedCatalogItem } from '../../lib/catalogVisibility';
 import { UnifiedThumb } from '../ui/UnifiedThumb';
 import { orderedCountries } from '../../lib/countries';
 import { listGiftCards, listTopups, listEsims, listUnavailableFamilies, searchProducts, getProduct, getFXRates, cachedFX, onRatesChange, friendlyApiMessage } from '../../lib/api';
@@ -508,7 +509,7 @@ function normalizeList(data: any, country: string): Product[] {
   if (data.categories) return flattenBrands(data, country);
   if (Array.isArray(data)) {
     if (data.length > 0 && data[0].family && !data[0].name) return flattenBrands(data, country);
-    return data;
+    return data.filter((p: Product) => !excludedCatalogItem(p));
   }
   return [];
 }

@@ -85,13 +85,23 @@ func FilterBrands(rules *Rules, in *cryptorefills.BrandsResponse) *cryptorefills
 		return &cryptorefills.BrandsResponse{CountryCode: in.CountryCode, Categories: []cryptorefills.BrandCategory{}}
 	}
 	out := &cryptorefills.BrandsResponse{CountryCode: in.CountryCode}
+	// A supplier family can appear in both retail and e-money categories.
+	// Exclude every copy before the category filter loses that evidence.
+	blocked := make(map[string]bool)
+	for _, cat := range in.Categories {
+		for _, b := range cat.Brands {
+			if isEMoneyCategory(cat.Category) || isEMoneyCategory(b.Category) {
+				blocked[strings.ToLower(cleanFamilyName(b.Family))] = true
+			}
+		}
+	}
 	for _, cat := range in.Categories {
 		if rules.IsKindBanned(cat.Kind) || rules.IsCategoryBanned(cat.Category) {
 			continue
 		}
 		filtered := cryptorefills.BrandCategory{Kind: cat.Kind, Category: cat.Category}
 		for _, b := range cat.Brands {
-			if !brandVisible(rules, b) {
+			if blocked[strings.ToLower(cleanFamilyName(b.Family))] || !brandVisible(rules, b) {
 				continue
 			}
 			// Clean markdown-wrapped URLs and family names that sometimes come from supplier
@@ -142,8 +152,16 @@ func brandVisible(rules *Rules, b cryptorefills.Brand) bool {
 // dropped. Returns a possibly-empty slice (never nil-vs-original reuse).
 func FilterFamilies(rules *Rules, in []cryptorefills.Family) []cryptorefills.Family {
 	out := make([]cryptorefills.Family, 0, len(in))
+	blocked := make(map[string]bool)
 	for _, f := range in {
-		if rules.IsFamilyHidden(f.Family) || rules.IsFamilyHidden(f.Brand) {
+		for _, c := range append([]string{f.Category}, f.AdditionalCats...) {
+			if isEMoneyCategory(c) {
+				blocked[strings.ToLower(cleanFamilyName(f.Family))] = true
+			}
+		}
+	}
+	for _, f := range in {
+		if blocked[strings.ToLower(cleanFamilyName(f.Family))] || rules.IsFamilyHidden(f.Family) || rules.IsFamilyHidden(f.Brand) {
 			continue
 		}
 		cats := append([]string{f.Category}, f.AdditionalCats...)

@@ -14,6 +14,7 @@ import { dailyLimitMessage, isDailyLimitError } from './dailyLimit';
 import { countryHint, COUNTRY_HINT_HEADER } from './edgeGeo';
 import { recordAvailability } from './catalogStock';
 import { ratingStars } from './ratingStars';
+import { filterPublicCatalog, filterPublicFamilies } from './catalogVisibility';
 
 export class ApiError extends Error {
   status: number;
@@ -379,9 +380,8 @@ const catQS = (kind: string, country?: string, test?: boolean) => {
  * Go handler applied server-side (filterBrandCategories) is mirrored here
  * byte-for-byte in predicate terms; /api stays as the fallback for a country
  * with no snapshot file and for ?test=1 admin probes.
- * Note: admin catalog rules (hidden families etc.) are server-side, so the
- * static path shows the supplier's live listing unfiltered — same as what
- * the supplier's own storefront shows. */
+ * The permanent e-money/KYC exclusion is applied before kind selection;
+ * older snapshots cannot bring an excluded family back to the storefront. */
 /** A static snapshot older than this is considered stale: the hourly Pages
  *  cron (or the deploy itself) may have been broken for a while, and a
  *  half-day-old price/catalog is worse than a live round trip to the API.
@@ -415,7 +415,7 @@ async function staticBrandsFetch(file: string): Promise<{ country_code?: string;
     });
     if (!res.ok) return null;
     const j = await res.json();
-    return j && Array.isArray(j.categories) && staticFresh(j) ? j : null;
+    return j && Array.isArray(j.categories) && staticFresh(j) ? filterPublicCatalog(j) : null;
   } catch {
     return null;
   }
@@ -517,8 +517,9 @@ export const getProduct = async (
         const j = JSON.parse(raw);
         if (j && j.fetched_at && now - j.fetched_at < PROD_CACHE_TTL_MS &&
           (Array.isArray(j.data) || Array.isArray(j.data?.products))) {
-          recordAvailability(id, country || '', j.data);
-          return j.data;
+          const visible = filterPublicFamilies(j.data);
+          recordAvailability(id, country || '', visible);
+          return visible;
         }
       }
     } catch {
@@ -526,7 +527,7 @@ export const getProduct = async (
     }
   }
   try {
-    const data = await api(fullPath);
+    const data = filterPublicFamilies(await api(fullPath));
     recordAvailability(id, country || '', data);
     try {
       for (let i = sessionStorage.length - 1; i >= 0; i--) {
@@ -543,7 +544,7 @@ export const getProduct = async (
     if (!(err instanceof ApiError) || err.status !== 0) throw err;
     try {
       const raw = sessionStorage.getItem(key);
-      if (raw) return JSON.parse(raw).data;
+      if (raw) return filterPublicFamilies(JSON.parse(raw).data);
     } catch {
       /* ignore */
     }

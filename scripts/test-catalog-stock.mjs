@@ -88,12 +88,13 @@ test('the real sync script persists stock and preserves a failed country without
   const dir = await mkdtemp(join(tmpdir(), 'catalog-sync-'));
   try {
     for (const d of ['scripts/data', 'src/lib', 'public/data/catalog/brands']) await mkdir(join(dir, d), { recursive: true });
-    for (const f of ['scripts/sync-catalog.mjs', 'scripts/catalog-stock.mjs', 'src/lib/catalogAvailability.ts']) {
+    for (const f of ['scripts/sync-catalog.mjs', 'scripts/catalog-stock.mjs', 'src/lib/catalogAvailability.ts', 'src/lib/catalogVisibility.ts']) {
       await copyFile(new URL('../' + f, import.meta.url), join(dir, f));
     }
     await writeFile(join(dir, 'package.json'), '{"type":"module"}');
     await writeFile(join(dir, 'src/lib/countries.ts'), "[['TR', 'Turkey'], ['DE', 'Germany']]");
-    const old = { generated_at: '2020-01-01T00:00:00Z', categories: [{ brands: [{ family: 'previous' }] }] };
+    const old = { generated_at: '2020-01-01T00:00:00Z', categories: [{ brands: [{ family: 'previous' }] },
+      { category: 'e-money', brands: [{ family: 'old-financial' }] }] };
     await writeFile(join(dir, 'public/data/catalog/brands/DE.json'), JSON.stringify(old));
     await writeFile(join(dir, 'scripts/data/stock-state.json'), JSON.stringify({
       'TR|sold': { state: 'ok', at: Date.now() }, // old presence-only result
@@ -106,7 +107,10 @@ test('the real sync script persists stock and preserves a failed country without
         const u = new URL(input);
         if (u.pathname === '/v2/brands') {
           if (u.searchParams.get('country_code') === 'DE') return Response.json({error:'bad-shape'});
-          return Response.json({country_code:'TR',categories:[{kind:'giftcard',brands:families.map(family=>({family,is_out_of_stock:false}))}]});
+          return Response.json({country_code:'TR',categories:[
+            {kind:'giftcard',brands:[...families.map(family=>({family,is_out_of_stock:false})),{family:'mixed-banned'},{family:'kyc-only',requires_kyc:true}]},
+            {kind:'giftcard',category:'E_MONEY',brands:[{family:'mixed-banned'},{family:'financial-only'}]}
+          ]});
         }
         await appendFile(${JSON.stringify(join(dir, 'calls'))}, u.href+'\\n');
         const f = u.searchParams.get('family_name');
@@ -121,10 +125,11 @@ test('the real sync script persists stock and preserves a failed country without
     assert.deepEqual(tr.categories[0].brands.map((b) => b.is_out_of_stock), [false, true, true, true, false]);
     const global = JSON.parse(await readFile(join(dir, 'public/data/catalog/brands/_global.json')));
     assert.deepEqual(global.categories[0].brands, tr.categories[0].brands);
-    assert.deepEqual(JSON.parse(await readFile(join(dir, 'public/data/catalog/brands/DE.json'))), old);
+    assert.deepEqual(JSON.parse(await readFile(join(dir, 'public/data/catalog/brands/DE.json'))), { ...old, categories: [old.categories[0]] });
     const calls = await readFile(join(dir, 'calls'), 'utf8');
     assert.match(calls, /family_name=sold/);
     assert.match(calls, /coin=BTC/);
+    assert.doesNotMatch(calls, /family_name=(mixed-banned|financial-only|kyc-only|old-financial)/, 'CI must never probe excluded families');
     const manifest = JSON.parse(await readFile(join(dir, 'public/data/catalog/manifest.json')));
     assert.equal(manifest.verified.empty, 3);
     assert.equal(manifest.failed[0].country, 'DE');

@@ -140,11 +140,26 @@ func (r *Rules) IsCategoryBanned(categories ...string) bool {
 		if c == "" {
 			continue
 		}
+		// The owner excludes e-money in every country, including supplier
+		// aliases and additional categories. Admin test purchases use this
+		// same gate and cannot opt back into the excluded category.
+		if isEMoneyCategory(c) {
+			return true
+		}
 		if containsFold(r.BannedCategories, c) {
 			return true
 		}
 	}
 	return false
+}
+
+func isEMoneyCategory(category string) bool {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) || r == '-' || r == '_' {
+			return -1
+		}
+		return unicode.ToLower(r)
+	}, category) == "emoney"
 }
 
 // IsKindBanned matches giftcard/mobile_recharge kinds.

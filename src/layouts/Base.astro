@@ -12,6 +12,7 @@ import BuildGuard from '../components/ui/BuildGuard.tsx';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { flattenBrands } from '../lib/catalog';
+import { filterPublicCatalog } from '../lib/catalogVisibility';
 import { setShelfSeed, type ShelfSeed } from '../lib/shelfSeed';
 
 interface Props {
@@ -52,7 +53,7 @@ let seedPayload: ShelfSeed | null = null;
 if (shelfSeed) {
   try {
     const raw = readFileSync(join(process.cwd(), 'public', 'data', 'catalog', 'brands', 'TR.json'), 'utf8');
-    const j = JSON.parse(raw);
+    const j = filterPublicCatalog(JSON.parse(raw));
     const CAP = 48; // per kind: enough to fill several screens, small in HTML
     const maps = {
       gift_card: flattenBrands({ categories: (j.categories || []).filter((c: any) => c.kind === 'giftcard' || c.category === 'giftcard') }, 'TR').slice(0, CAP),

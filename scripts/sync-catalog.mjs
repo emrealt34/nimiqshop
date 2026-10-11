@@ -42,6 +42,7 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stockState as classifyStock, validStockRecord, applyStockState, RECHECK_AFTER_MS, STOCK_VERSION } from './catalog-stock.mjs';
+import { filterPublicCatalog, excludedCatalogItem } from '../src/lib/catalogVisibility.ts';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'public', 'data', 'catalog', 'brands');
@@ -91,7 +92,8 @@ async function fetchBrands(cc) {
         ? j.categories.map((c) => ({
             kind: c?.kind ?? '',
             category: c?.category ?? '',
-            brands: (Array.isArray(c?.brands) ? c.brands : []).map(pruneBrand),
+            brands: (Array.isArray(c?.brands) ? c.brands : []).map(b => ({ ...pruneBrand(b),
+              ...(excludedCatalogItem(b) ? { requires_kyc: true } : {}) })),
           }))
         : [];
       return { country_code: j?.country_code || (cc === '_global' ? '' : cc), categories: cats };
@@ -308,19 +310,31 @@ const countries = await countryList();
 const targets = ['_global', ...countries];
 await mkdir(OUT, { recursive: true });
 
+// Remove excluded families from old snapshots too, keeping their original
+// timestamps when the supplier is unavailable. Never probe these families.
+for (const cc of targets) {
+  const path = join(OUT, `${cc}.json`);
+  try {
+    const previous = JSON.parse(await readFile(path, 'utf8'));
+    await writeFile(path, JSON.stringify(filterPublicCatalog(previous)));
+  } catch (err) { if (err.code !== 'ENOENT') throw err; }
+}
+
 const manifest = { generated_at: new Date().toISOString(), source: `${BASE}/v2/brands`, countries: {}, failed: [] };
 let ok = 0;
 
 await pool(targets, async (cc) => {
   try {
-    const data = await fetchBrands(cc);
-    const brands = data.categories.reduce((n, c) => n + c.brands.length, 0);
-    if (!brands && cc !== '_global') {
+    const raw = await fetchBrands(cc);
+    const rawBrands = raw.categories.reduce((n, c) => n + c.brands.length, 0);
+    if (!rawBrands && cc !== '_global') {
       // Empty listing: keep whatever seed/snapshot is already there rather
       // than publishing a blank country (the supplier glitches occasionally).
       manifest.failed.push({ country: cc, reason: 'empty-listing-kept-previous' });
       return;
     }
+    const data = filterPublicCatalog(raw);
+    const brands = data.categories.reduce((n, c) => n + c.brands.length, 0);
     // Written after the verification pass below, so a half-finished run
     // never publishes a country whose stock flags were not yet checked.
     fetched.push({ cc, data, brands });
