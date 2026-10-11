@@ -76,9 +76,10 @@ type Handlers struct {
 	// deterministic (zero or one configured origin). Only then may a
 	// URL-keyed shared cache store a public response: otherwise the cached
 	// Access-Control-Allow-Origin of one origin would be served to another.
-	CDNCacheSafe bool
-	cache        *ttlCache
-	flights      *flightGroup
+	CDNCacheSafe   bool
+	cache          *ttlCache
+	flights        *flightGroup
+	cashbackWallet adminCashbackWalletCache
 }
 
 // setCachePolicy stamps the cache directives for one response. It is the ONE

@@ -14,9 +14,10 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '../ui/Icon';
-import { AlertBox } from '../ui/uiKit';
+import { Identicon } from '../ui/Identicon';
+import { AlertBox, CopyButton } from '../ui/uiKit';
 import { adminDashboard } from '../../lib/api';
-import { countryName, flag } from '../../lib/format';
+import { countryName, flag, fmtNIM, formatWalletAddress } from '../../lib/format';
 import { useInterval } from '../../lib/useInterval';
 
 /* ---------------- formatting ---------------- */
@@ -336,6 +337,58 @@ function CountryRankCard({ countries }: { countries: any | null }) {
 
 /* ---------------- the panel ---------------- */
 
+type CashbackWallet = {
+  address: string;
+  configured: boolean;
+  enabled: boolean;
+  available: boolean;
+  network: string;
+  balance_nim: number | null;
+  observed_at: string | null;
+  reason?: string;
+};
+
+function CashbackWalletCard({ wallet }: { wallet: CashbackWallet | null }) {
+  const address = formatWalletAddress(wallet?.address?.toUpperCase());
+  const available = wallet?.available && typeof wallet.balance_nim === 'number' && Number.isFinite(wallet.balance_nim) && wallet.balance_nim >= 0;
+  const observed = wallet?.observed_at ? new Date(wallet.observed_at) : null;
+  const reason = !wallet
+    ? 'Wallet details are not available from this API build yet.'
+    : wallet.reason === 'not_configured'
+      ? 'The cashback payout wallet is not configured.'
+      : wallet.reason === 'invalid_configuration'
+        ? 'The cashback payout wallet configuration is invalid.'
+        : 'Balance could not be read from the network. The dashboard will retry automatically.';
+  return (
+    <section className="card mt-2 admin-cashback-wallet" aria-label="Cashback wallet">
+      <div className="card-title">
+        <Icon name="wallet" size={18} />
+        <span>Cashback wallet</span>
+      </div>
+      {!wallet ? <AlertBox type="info">{reason}</AlertBox> : (
+        <>
+          <div className="admin-cashback-wallet-identity">
+            {address ? <Identicon address={address} size={64} /> : null}
+            <div className="admin-cashback-wallet-details">
+              <div className="small muted">Payout address · {wallet.network === 'testnet' ? 'Testnet' : 'Mainnet'}</div>
+              {address ? <>
+                <div className="mono strong admin-cashback-wallet-address">{address}</div>
+                <CopyButton getText={address} label="Copy payout address" />
+              </> : <div className="small muted">{reason}</div>}
+            </div>
+          </div>
+          <div className="astat-grid">
+            <MetricTile label="Available for payouts" value={available ? `${fmtNIM(wallet.balance_nim, 5)} NIM` : '— NIM'} hint="Liquid on-chain balance" />
+            <MetricTile label="Cashback payouts" value={wallet.enabled ? 'Enabled' : 'Disabled'} hint={wallet.enabled ? 'Payouts use this wallet' : 'Wallet can still receive funds'} />
+          </div>
+          {wallet.configured && !available ? <div className="small muted mt-2" role="status">{reason}</div> : null}
+          {available && observed && !Number.isNaN(observed.getTime()) ? <div className="xs faint mt-2">Balance checked {observed.toLocaleString()} · refreshes every 15 seconds while visible</div> : null}
+        </>
+      )}
+    </section>
+  );
+}
+
 export function SystemPanel() {
   const [data, setData] = useState<any | null>(null);
   const [err, setErr] = useState('');
@@ -376,6 +429,7 @@ export function SystemPanel() {
 
   return (
     <>
+      {data ? <CashbackWalletCard wallet={data.cashback_wallet || null} /> : null}
       {stale ? (
         <div className="card mt-2">
           <div className="card-title">

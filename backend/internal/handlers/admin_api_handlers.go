@@ -125,10 +125,11 @@ func (h *Handlers) AdminDashboard(ctx *fasthttp.RequestCtx) {
 		// where the budget came from, and the caches it actually opened with.
 		// Shown next to the host numbers so "why is this box using that much?"
 		// has an answer inside the console.
-		"memory":         db.MemoryReport(),
-		"cashback_queue": adminCashbackQueueView(queue),
-		"settings":       map[string]any{"updated_at": settings.UpdatedAt, "updated_by": settings.UpdatedBy, "note": "pricing margin is set by the supplier; no local margin"},
-		"payment":        map[string]any{"rail": "cryptorefills", "custody": false, "note": "customer pays the supplier's one-time wallet address with stablecoins; Cryptorefills is merchant of record"},
+		"memory":          db.MemoryReport(),
+		"cashback_queue":  adminCashbackQueueView(queue),
+		"cashback_wallet": h.adminCashbackWallet(),
+		"settings":        map[string]any{"updated_at": settings.UpdatedAt, "updated_by": settings.UpdatedBy, "note": "pricing margin is set by the supplier; no local margin"},
+		"payment":         map[string]any{"rail": "cryptorefills", "custody": false, "note": "customer pays the supplier's one-time wallet address with stablecoins; Cryptorefills is merchant of record"},
 	}
 	writeJSON(ctx, fasthttp.StatusOK, response)
 }

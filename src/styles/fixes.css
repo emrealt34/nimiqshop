@@ -706,6 +706,12 @@ html.in-nimiq-pay #main.page {
 .astat-value { font-size:1.55rem; font-weight:900; line-height:1.15; margin-top:2px; font-variant-numeric:tabular-nums; }
 .astat-hint { font-size:.66rem; font-weight:700; color:var(--ink-dim); margin-top:2px; }
 
+.admin-cashback-wallet-identity { display:flex; align-items:center; gap:14px; margin-top:12px; min-width:0; }
+.admin-cashback-wallet-identity > .identicon { flex:0 0 64px; }
+.admin-cashback-wallet-details { flex:1; min-width:0; }
+.admin-cashback-wallet-address { overflow-wrap:anywhere; margin:6px 0; user-select:text; }
+.admin-cashback-wallet .astat-value { overflow-wrap:anywhere; }
+
 /* Server + countries cards (AdminSystemPanel.tsx). The meter is the one
    addition to the .astat mini card: a percentage nobody can feel without a
    bar. Tones follow the same ink/stamp/red scale the rest of the console

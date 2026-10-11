@@ -163,14 +163,17 @@ func (c *Client) GetAccountBalance(ctx context.Context, addr string) (int64, err
 		return 0, err
 	}
 	var out struct {
-		Balance int64 `json:"balance"`
+		Balance *int64 `json:"balance"`
 	}
 	// A public balance read is safe to use against the primary endpoint. The
 	// handler adds a short cache so this endpoint is not hit on every page view.
 	if err := c.callURL(ctx, c.urls[0], "getAccountByAddress", []interface{}{addr}, &out); err != nil {
 		return 0, err
 	}
-	return out.Balance, nil
+	if out.Balance == nil || *out.Balance < 0 {
+		return 0, fmt.Errorf("nimiq rpc account response has no valid balance")
+	}
+	return *out.Balance, nil
 }
 
 // StakerInfo is the chain's answer about one address' staking position
