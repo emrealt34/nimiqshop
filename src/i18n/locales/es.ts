@@ -12,7 +12,7 @@ const es = {
     "stale": "La comprobación del catálogo o las cotizaciones tiene más de 90 minutos.",
     "catalog": "Catálogo comprobado",
     "market": "Cotizaciones comprobadas",
-    "countries": "Países actualizados",
+    "countries": "Países del catálogo",
     "retained": "Listas anteriores conservadas",
     "stock": "Existencias",
     "stockCounts": "{{checked}} comprobados en esta ejecución · {{pending}} pendientes",

@@ -18,7 +18,7 @@ const en = {
     "stale": "The catalog or rate check is more than 90 minutes old.",
     "catalog": "Catalog checked",
     "market": "Rates checked",
-    "countries": "Countries refreshed",
+    "countries": "Countries in the catalog",
     "retained": "Previous listings retained",
     "stock": "Product stock",
     "stockCounts": "{{checked}} checked this run · {{pending}} pending rotation",

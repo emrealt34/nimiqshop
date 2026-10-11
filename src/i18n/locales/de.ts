@@ -12,7 +12,7 @@ const de = {
     "stale": "Die Katalog- oder Kursprüfung ist über 90 Minuten alt.",
     "catalog": "Katalog geprüft",
     "market": "Kurse geprüft",
-    "countries": "Aktualisierte Länder",
+    "countries": "Länder im Katalog",
     "retained": "Vorherige Listen beibehalten",
     "stock": "Produktbestand",
     "stockCounts": "{{checked}} in diesem Lauf geprüft · {{pending}} ausstehend",

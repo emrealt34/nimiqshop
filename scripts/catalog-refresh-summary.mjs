@@ -30,7 +30,7 @@ const summary = [
   '### Catalog refresh',
   '',
   `Snapshot timestamp: ${manifest.generated_at}`,
-  `Countries refreshed: ${Object.keys(manifest.countries || {}).length}`,
+  `Countries in the catalog: ${Object.keys(manifest.countries || {}).length}`,
   `Countries kept from the previous snapshot: ${(manifest.failed || []).length}`,
   `Stock: ${v.checked || 0} checked, ${v.fresh || 0} recently checked, ${v.empty || 0} unavailable, ${v.unresolved || 0} unresolved, ${v.skipped || 0} waiting for a later run.`,
   '',

@@ -12,7 +12,7 @@ const tr = {
     "stale": "Katalog veya kur kontrolü 90 dakikadan eski.",
     "catalog": "Katalog kontrolü",
     "market": "Kur kontrolü",
-    "countries": "Yenilenen ülkeler",
+    "countries": "Katalogdaki ülkeler",
     "retained": "Önceki liste korundu",
     "stock": "Ürün stoku",
     "stockCounts": "Bu çalışmada {{checked}} kontrol · sırada {{pending}}",

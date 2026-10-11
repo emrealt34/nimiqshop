@@ -12,7 +12,7 @@ const fr = {
     "stale": "La vérification du catalogue ou des cours date de plus de 90 minutes.",
     "catalog": "Catalogue vérifié",
     "market": "Cours vérifiés",
-    "countries": "Pays actualisés",
+    "countries": "Pays du catalogue",
     "retained": "Listes précédentes conservées",
     "stock": "Stock des produits",
     "stockCounts": "{{checked}} vérifiés lors de cette exécution · {{pending}} en attente",

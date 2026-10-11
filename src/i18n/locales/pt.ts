@@ -12,7 +12,7 @@ const pt = {
     "stale": "A verificação do catálogo ou das cotações tem mais de 90 minutos.",
     "catalog": "Catálogo verificado",
     "market": "Cotações verificadas",
-    "countries": "Países atualizados",
+    "countries": "Países no catálogo",
     "retained": "Listas anteriores mantidas",
     "stock": "Stock dos produtos",
     "stockCounts": "{{checked}} verificados nesta execução · {{pending}} pendentes",
