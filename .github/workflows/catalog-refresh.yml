@@ -34,10 +34,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node scripts/catalog-data.mjs restore
       - name: Refresh catalog
+        continue-on-error: true # retain good market updates during supplier outages
         env:
           CATALOG_STOCK_STATE: scripts/data/stock-state.json
         run: node scripts/sync-catalog.mjs
       - name: Refresh market
+        continue-on-error: true # persist good catalog data and keep prior failed rates
         run: node scripts/sync-market.mjs
       - name: Publish refresh summary
         if: always()

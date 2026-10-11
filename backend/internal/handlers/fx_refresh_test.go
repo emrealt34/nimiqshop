@@ -3,7 +3,24 @@ package handlers
 import (
 	"math"
 	"testing"
+	"time"
 )
+
+func TestFXRefreshInterval(t *testing.T) {
+	for _, tc := range []struct {
+		raw  string
+		want time.Duration
+	}{
+		{"", time.Hour}, {"invalid", time.Hour}, {"30s", time.Hour}, {"2h", 2 * time.Hour},
+	} {
+		t.Run(tc.raw, func(t *testing.T) {
+			t.Setenv("FX_REFRESH_INTERVAL", tc.raw)
+			if got := FXRefreshInterval(); got != tc.want {
+				t.Fatalf("FXRefreshInterval() = %s; want %s", got, tc.want)
+			}
+		})
+	}
+}
 
 func TestParseERRates(t *testing.T) {
 	cases := []struct {

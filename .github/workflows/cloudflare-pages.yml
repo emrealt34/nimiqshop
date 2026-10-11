@@ -110,12 +110,15 @@ jobs:
       # grids nor the NIM/BTC price may depend on the Go backend at page-load
       # time. Each script keeps the previous file when its sources fail, and
       # a fully-down supplier/backend must not stop the deploy.
-      - name: Refresh static catalog + market snapshots
+      - name: Refresh static catalog snapshots
         if: inputs.skip_refresh != true
         continue-on-error: true
-        run: |
-          node scripts/sync-catalog.mjs
-          node scripts/sync-market.mjs
+        run: node scripts/sync-catalog.mjs
+
+      - name: Refresh static market snapshots
+        if: inputs.skip_refresh != true
+        continue-on-error: true
+        run: node scripts/sync-market.mjs
 
       - name: Test same-origin API proxy
         run: npm run test:pages-proxy

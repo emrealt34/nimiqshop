@@ -86,13 +86,9 @@ test.describe('non-English visitor', () => {
 });
 
 /**
- * The dictionary cache made the hold obsolete for anyone who has visited in
- * this language before: src/i18n writes the dictionary into localStorage and
- * Base.astro skips the hold when it is there. That is the case the owner asked
- * for — no loader, nothing hidden — so it gets its own acceptance test:
- * nothing may be hidden on the second visit, and the first paintable frame
- * must still not be English (the cache has to be applied before paint, not
- * after).
+ * The cache speeds hydration, but the static HTML still contains English
+ * React markup. Returning visitors must also stay held until the translated
+ * commit; a cached dictionary alone only translates the static shell.
  */
 const WATCH_BOOT = () => {
   (window as any).__boot = [];
@@ -102,10 +98,10 @@ const WATCH_BOOT = () => {
     if (!el) return;
     const held = el.hasAttribute('data-i18n-hold');
     if (held) (window as any).__heldEver = true;
-    const snap = { lang: el.getAttribute('lang') || '', held, text: !!(document.body && document.body.firstElementChild) };
+    const snap = { lang: el.getAttribute('lang') || '', held, text: !!(document.body && document.body.firstElementChild), english: document.body?.innerText.includes('Spend NIM on gift cards') || false };
     const list = (window as any).__boot as unknown[];
-    const last = list[list.length - 1] as { lang: string; held: boolean; text: boolean } | undefined;
-    if (!last || last.lang !== snap.lang || last.held !== snap.held || last.text !== snap.text) list.push(snap);
+    const last = list[list.length - 1] as typeof snap | undefined;
+    if (!last || last.lang !== snap.lang || last.held !== snap.held || last.text !== snap.text || last.english !== snap.english) list.push(snap);
   };
   const iv = setInterval(sample, 1);
   setTimeout(() => clearInterval(iv), 8000);
@@ -114,7 +110,7 @@ const WATCH_BOOT = () => {
 test.describe('returning visitor', () => {
   test.use({ lang: 'tr' });
 
-  test('with a cached dictionary is never held, and still never sees English', async ({ page }) => {
+  test('with a cached dictionary releases translated without an English frame', async ({ page }) => {
     // First visit fills the cache (fresh context per test: nothing is stored yet).
     await page.goto(path('/'), { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => document.documentElement.getAttribute('data-i18n-ready') === 'tr', null, { timeout: 20_000 });
@@ -126,11 +122,12 @@ test.describe('returning visitor', () => {
     await page.waitForFunction(() => document.documentElement.getAttribute('data-i18n-ready') === 'tr', null, { timeout: 20_000 });
 
     const boot = await page.evaluate(() => ({ heldEver: (window as any).__heldEver, frames: (window as any).__boot }));
-    expect(boot.heldEver, 'nothing may be hidden on a cached visit').toBe(false);
-    const englishFrames = (boot.frames as { lang: string; held: boolean; text: boolean }[]).filter(
-      (f) => f.text && !f.held && f.lang === 'en'
+    expect(boot.heldEver, 'cached visits still protect the English server markup').toBe(true);
+    expect(await page.getAttribute('html', 'data-i18n-hold'), 'hold releases after translation').toBeNull();
+    const englishFrames = (boot.frames as { lang: string; held: boolean; text: boolean; english: boolean }[]).filter(
+      (f) => f.text && !f.held && (f.lang === 'en' || f.english)
     );
-    expect(englishFrames, 'no English frame may be paintable, even without the hold').toEqual([]);
+    expect(englishFrames, 'no English frame may be paintable').toEqual([]);
     const labelled = [...new Set((boot.frames as { lang: string; text: boolean }[]).filter((f) => f.text).map((f) => f.lang))];
     expect(labelled, 'the markup was only ever labelled Turkish').toEqual(['tr']);
   });

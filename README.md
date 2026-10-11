@@ -266,6 +266,21 @@ inventory scan of every country each hour. Timeouts and malformed responses are
 unknown stock; they never prove that a product sold out. Failed country refreshes
 retain their previous file and original timestamp.
 
+The same run refreshes NIM, BTC and fiat FX rates, then persists the catalog
+and market files in one `catalog-data` commit and deploys them together.
+Fiat FX is fetched from the same USD-based provider as the backend, with
+the feed's currency-per-USD quotes inverted once into USD-per-unit. The
+provider's observation time is kept separately from the hourly check time;
+the free feed publishes daily, so unchanged hourly observations are expected.
+Malformed, partial or older FX responses cannot replace a newer snapshot.
+Each failed market leg retains its prior value and observation time. A failed
+source does not prevent successful catalog or market updates being persisted;
+the Actions summary reports these failures and actual provider timestamps.
+The backend also polls hourly by default (`FX_REFRESH_INTERVAL=1h`); a
+production environment override takes precedence. `npm run test:unit`
+includes mocked runs of the actual market sync script covering rate inversion,
+partial crypto failures, complete source outages and unchanged fallback files.
+
 The storefront reconciles visible-card prefetch results and search results with
 live product stock. Normal card clicks perform a fresh check before navigation.
 A sold-out card cannot lead the buyer into a known unavailable product page;
