@@ -72,7 +72,7 @@ jobs:
     needs: refresh
     permissions:
       contents: read
-      actions: read
+      actions: read # reusable deploy downloads this run's catalog-snapshots artifact
     # Kept compatible with the repository's actionlint version; reusable
     # workflow calls resolve this path at the caller's commit, not its checkout.
     uses: ./.github/workflows/cloudflare-pages.yml # zizmor: ignore[self-repository]
