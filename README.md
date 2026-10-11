@@ -9,7 +9,7 @@ image or a one-line installer.
 [![Tests](https://github.com/emrealt34/nimiqshop/actions/workflows/tests.yml/badge.svg)](https://github.com/emrealt34/nimiqshop/actions/workflows/tests.yml)
 [![Release](https://github.com/emrealt34/nimiqshop/actions/workflows/release.yml/badge.svg)](https://github.com/emrealt34/nimiqshop/actions/workflows/release.yml)
 [![Container](https://github.com/emrealt34/nimiqshop/actions/workflows/container.yml/badge.svg)](https://github.com/emrealt34/nimiqshop/actions/workflows/container.yml)
-[![Go coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Femrealt34%2Fnimiqshop%2Fbadges%2Fgo-coverage.json)](https://github.com/emrealt34/nimiqshop/actions/workflows/ci.yml)
+[![CI](https://github.com/emrealt34/nimiqshop/actions/workflows/ci.yml/badge.svg)](https://github.com/emrealt34/nimiqshop/actions/workflows/ci.yml)
 
 [![CodeQL](https://github.com/emrealt34/nimiqshop/actions/workflows/codeql.yml/badge.svg)](https://github.com/emrealt34/nimiqshop/actions/workflows/codeql.yml)
 [![Security](https://github.com/emrealt34/nimiqshop/actions/workflows/security.yml/badge.svg)](https://github.com/emrealt34/nimiqshop/actions/workflows/security.yml)
@@ -250,11 +250,11 @@ every CI check plus a blocking `govulncheck` first.
 
 **Hourly catalog refresh** (`.github/workflows/catalog-refresh.yml`) runs at
 minute 17 each hour on `main`, and can also be started manually in Actions.
-It commits refreshed brand listings, market snapshots and stock-check progress
-to the data-only `catalog-data` branch, so protected `main` stays untouched.
+It saves refreshed brand listings, market snapshots and stock-check progress
+in one `catalog-snapshots` Actions artifact from `main`; it never creates a branch.
 The refresh does not depend on Cloudflare credentials. A successful run calls
 **Deploy to Cloudflare Pages**, which combines code from `main` with the saved
-JSON snapshots. Only JSON files are restored; data branches cannot supply code.
+JSON snapshots. Only JSON files are restored; snapshots cannot supply code.
 GitHub may delay cron runs; check the actual timestamp and country failures in
 the refresh job summary and `public/data/catalog/manifest.json`.
 
@@ -267,7 +267,7 @@ unknown stock; they never prove that a product sold out. Failed country refreshe
 retain their previous file and original timestamp.
 
 The same run refreshes NIM, BTC and fiat FX rates, then persists the catalog
-and market files in one `catalog-data` commit and deploys them together.
+and market files in one Actions snapshot and deploys them together.
 Fiat FX is fetched from the same USD-based provider as the backend, with
 the feed's currency-per-USD quotes inverted once into USD-per-unit. The
 provider's observation time is kept separately from the hourly check time;

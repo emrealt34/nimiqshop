@@ -18,7 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
-      contents: write # persist generated JSON on the catalog-data branch
+      contents: read
+      actions: read # restore the previous main snapshot artifact
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -29,9 +30,21 @@ jobs:
           node-version: "24"
           package-manager-cache: false
       # No npm install/build/Cloudflare credentials needed to refresh data.
-      - name: Restore previous catalog snapshots
+      - name: Find previous catalog snapshot
+        id: previous
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/catalog-data.mjs find
+      - name: Download previous catalog snapshot
+        if: steps.previous.outputs.run_id != '0'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: catalog-snapshots
+          path: ${{ runner.temp }}/catalog-snapshot
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ steps.previous.outputs.run_id }}
+      - name: Restore previous catalog snapshots
+        if: steps.previous.outputs.run_id != '0'
         run: node scripts/catalog-data.mjs restore
       - name: Refresh catalog
         continue-on-error: true # retain good market updates during supplier outages
@@ -44,20 +57,28 @@ jobs:
       - name: Publish refresh summary
         if: always()
         run: node scripts/catalog-refresh-summary.mjs
-      - name: Persist refreshed snapshots
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/catalog-data.mjs persist
+      - name: Stage refreshed snapshots
+        run: node scripts/catalog-data.mjs stage
+      - name: Save catalog and market together
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: catalog-snapshots
+          path: ${{ runner.temp }}/catalog-snapshot
+          retention-days: 7
+          compression-level: 9
+          if-no-files-found: error
 
   deploy:
     needs: refresh
     permissions:
       contents: read
+      actions: read
     # Kept compatible with the repository's actionlint version; reusable
     # workflow calls resolve this path at the caller's commit, not its checkout.
     uses: ./.github/workflows/cloudflare-pages.yml # zizmor: ignore[self-repository]
     with:
       skip_refresh: true
+      snapshot_run_id: ${{ github.run_id }}
     secrets:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

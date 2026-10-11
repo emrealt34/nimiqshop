@@ -133,25 +133,23 @@ test('the real sync script persists stock and preserves a failed country without
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
-test('hourly snapshots persist and restore without changing protected main', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'catalog-data-git-'));
+test('hourly artifacts restore JSON without changing code or creating a branch', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'catalog-snapshot-test-'));
   const exec = promisify(execFile);
   const script = new URL('./catalog-data.mjs', import.meta.url).pathname;
   try {
     const root = join(dir, 'checkout');
-    const remote = join(dir, 'remote.git');
+    const snapshot = join(dir, 'snapshot');
     await mkdir(root);
-    const git = async (args, cwd = root) => (await exec('git', args, { cwd })).stdout.trim();
-    await git(['init', '--bare', remote], dir);
+    const git = async (args) => (await exec('git', args, { cwd: root })).stdout.trim();
     await git(['init', '--initial-branch=main']);
     await git(['config', 'user.name', 'Test']);
     await git(['config', 'user.email', 'test@example.test']);
-    await git(['remote', 'add', 'origin', remote]);
     for (const [path, value] of [
       ['public/data/catalog/brands/TR.json', { categories: [] }],
-      ['public/data/catalog/manifest.json', { generated_at: 'original' }],
-      ['public/data/market/fx.json', { base: 'USD' }],
-      ['scripts/data/stock-state.json', {}],
+      ['public/data/catalog/manifest.json', { generated_at: 'fresh' }],
+      ['public/data/market/fx.json', { base: 'USD', usd_per_unit: { TRY: 0.02 } }],
+      ['scripts/data/stock-state.json', { checked: true }],
     ]) {
       await mkdir(join(root, dirname(path)), { recursive: true });
       await writeFile(join(root, path), JSON.stringify(value));
@@ -159,22 +157,36 @@ test('hourly snapshots persist and restore without changing protected main', asy
     await writeFile(join(root, 'application.txt'), 'application code');
     await git(['add', '.']);
     await git(['commit', '-m', 'seed']);
-    await git(['push', 'origin', 'main']);
     const head = await git(['rev-parse', 'HEAD']);
-    await writeFile(join(remote, 'hooks/pre-receive'), '#!/bin/sh\nwhile read old new ref; do\n  if [ "$ref" = refs/heads/main ]; then exit 1; fi\ndone\n', { mode: 0o755 });
-    await writeFile(join(root, 'public/data/catalog/manifest.json'), '{"generated_at":"fresh"}');
-    const env = { ...process.env, GITHUB_TOKEN: 'test-token', RUNNER_TEMP: dir };
-    await exec(process.execPath, [script, 'persist'], { cwd: root, env });
-    assert.equal(await git(['rev-parse', 'refs/heads/main'], remote), head);
-    const files = await git(['ls-tree', '-r', '--name-only', 'catalog-data'], remote);
-    assert.ok(!files.includes('application.txt'), 'snapshot branch contains no application code');
-    assert.match(files, /stock-state.json/);
+    const env = { ...process.env, SNAPSHOT_DIR: snapshot };
+    await exec(process.execPath, [script, 'stage'], { cwd: root, env });
+    await writeFile(join(snapshot, 'application.txt'), 'untrusted code');
     await writeFile(join(root, 'public/data/catalog/manifest.json'), '{}');
+    await writeFile(join(root, 'public/data/market/fx.json'), '{}');
     await exec(process.execPath, [script, 'restore'], { cwd: root, env });
     assert.equal(JSON.parse(await readFile(join(root, 'public/data/catalog/manifest.json'))).generated_at, 'fresh');
-    await writeFile(join(root, 'public/data/catalog/manifest.json'), '{"generated_at":"newer"}');
-    await exec(process.execPath, [script, 'persist'], { cwd: root, env });
-    assert.equal(await git(['rev-list', '--count', 'catalog-data'], remote), '2', 'hourly history is retained');
-    assert.equal(await git(['rev-parse', 'refs/heads/main'], remote), head);
+    assert.equal(JSON.parse(await readFile(join(root, 'public/data/market/fx.json'))).usd_per_unit.TRY, 0.02);
+    assert.equal(await readFile(join(root, 'application.txt'), 'utf8'), 'application code');
+    assert.equal(await git(['rev-parse', 'HEAD']), head);
+    assert.equal(await git(['branch', '--format=%(refname:short)']), 'main');
+    await writeFile(join(snapshot, 'scripts/data/stock-state.json'), 'invalid JSON');
+    await assert.rejects(exec(process.execPath, [script, 'restore'], { cwd: root, env }));
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test('artifact lookup only selects a successful main hourly run with an unexpired snapshot', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'catalog-artifact-lookup-'));
+  const exec = promisify(execFile);
+  try {
+    const loader = join(dir, 'fetch.mjs');
+    const output = join(dir, 'output');
+    await writeFile(loader, `globalThis.fetch = async (url) => new Response(JSON.stringify(
+      String(url).includes('/artifacts?') ? {artifacts: [{name:'catalog-snapshots', expired:String(url).includes('/3/')}]} :
+      {workflow_runs:[{id:1,head_branch:'feature',event:'workflow_dispatch'},{id:2,head_branch:'main',event:'pull_request'},{id:3,head_branch:'main',event:'schedule'},{id:5,head_branch:'main',event:'schedule',conclusion:'failure'},{id:4,head_branch:'main',event:'workflow_dispatch'}].map(run => ({status:'completed',conclusion:'success',...run}))}
+    ));`);
+    await exec(process.execPath, ['--import', loader, new URL('./catalog-data.mjs', import.meta.url).pathname, 'find'], {
+      cwd: dir, env: { ...process.env, GITHUB_REPOSITORY: 'test/repository', GITHUB_TOKEN: 'test-token', GITHUB_OUTPUT: output },
+    });
+    assert.equal(await readFile(output, 'utf8'), 'run_id=4\n');
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
