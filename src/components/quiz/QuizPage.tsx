@@ -37,6 +37,8 @@ export function QuizView() {
   const [rawQuestions, setQuestions] = useState<QuizQuestion[] | null>(null);
   const competition = rawCompetition ? localizeQuiz(rawCompetition, lang) : null;
   const questions = rawQuestions?.map(q => localizeQuizQuestion(q, lang)) || null;
+  const [questionIndex, setQuestionIndex] = useState(0);
+  const stepHeading = useRef<HTMLHeadingElement>(null);
   const [answers, setAnswers] = useState<number[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -74,7 +76,7 @@ export function QuizView() {
 
   useEffect(() => {
     let alive = true;
-    scope.current++; revision.current++; setQuestions(null); setAnswers([]); setCompetition(null); setError(''); setSaving('saved');
+    scope.current++; revision.current++; setQuestions(null); setAnswers([]); setQuestionIndex(0); setCompetition(null); setError(''); setSaving('saved');
     if (!authed || !selected) return;
     getQuiz(selected).then((c) => { if (alive) { setCompetition(c); setEmail(c.attempt?.prize_email || ''); } })
       .catch((err) => { if (alive) setError(friendlyApiMessage(err, t('quiz.requestFailed'))); });
@@ -102,7 +104,15 @@ export function QuizView() {
     setCompetition(game.competition);
     if (game.attempt.submitted_at) { await refresh(); return; }
     setQuestions(game.questions); setAnswers(game.attempt.answers);
+    const unanswered = game.questions.findIndex((q, index) => !validAnswer(q, game.attempt.answers[index]));
+    setQuestionIndex(unanswered < 0 ? Math.max(0, game.questions.length - 1) : unanswered);
   });
+  useEffect(() => {
+    if (!rawQuestions) return;
+    const frame = requestAnimationFrame(() => { stepHeading.current?.focus({ preventScroll: true }); stepHeading.current?.scrollIntoView({ block: 'start', behavior: 'instant' }); });
+    return () => cancelAnimationFrame(frame);
+  }, [rawQuestions, questionIndex]);
+
   const choose = (index: number, answer: number) => {
     const next = answers.map((old, i) => i === index ? answer : old);
     setAnswers(next); setSaving('saving');
@@ -117,6 +127,7 @@ export function QuizView() {
       .catch(() => { if (mounted.current && version === revision.current) setSaving('failed'); });
   };
   const finish = () => perform(async () => {
+    if (!questions || questionIndex !== questions.length - 1 || saving !== 'saved' || answers.some((answer, index) => !validAnswer(questions[index], answer))) return;
     const version = scope.current;
     await progressQueue.current.catch(() => {});
     if (!mounted.current || version !== scope.current) return;
@@ -142,11 +153,11 @@ export function QuizView() {
     {error && <div className="alert error" role="alert">{error}</div>}
     {!loaded && <div className="card" role="status">{t('common.loading')}</div>}
     {loaded && items.length === 0 && !error && <div className="card quiz-gate"><Icon name="gift" size={32} /><h2>{t('quiz.empty')}</h2><p className="small muted">{t('quiz.emptyHint')}</p></div>}
-    {items.length > 0 && <div className="field quiz-selector"><label htmlFor="quiz-select">{t('quiz.competition')}</label><select id="quiz-select" className="input" value={selected} disabled={busy || !!questions} onChange={(e) => setSelected(e.target.value)}>
+    {items.length > 0 && !questions && <div className="field quiz-selector"><label htmlFor="quiz-select">{t('quiz.competition')}</label><select id="quiz-select" className="input" value={selected} disabled={busy || !!questions} onChange={(e) => setSelected(e.target.value)}>
       {items.map((c) => <option key={c.id} value={c.id}>{localizeQuiz(c, lang).title} · {t(PHASE_KEYS[c.phase])}</option>)}
     </select></div>}
     {competition && <>
-      <section className="card quiz-contest">
+      {!questions && <section className="card quiz-contest">
         <div className="row between"><h2>{competition.title}</h2><span className={`chip quiz-phase-${competition.phase}`}>{t(PHASE_KEYS[competition.phase])}</span></div>
         {competition.description && <p className="small">{competition.description}</p>}
         <QuizPrizeCard prize={competition.prize} />
@@ -167,20 +178,25 @@ export function QuizView() {
             <p className="xs muted">{t('quiz.emailPrivate')}</p><button className="btn btn-outline" disabled={busy}>{t('quiz.saveEmail')}</button>
           </form>}
         </div>}
-      </section>
-      {questions && !completed && <form className="quiz-game" onSubmit={(e) => { e.preventDefault(); void finish(); }}>
-        {questions.map((q, index) => <fieldset key={q.id} className="card quiz-question" disabled={busy || competition.phase !== 'live'}>
+      </section>}
+      {questions && !completed && <form className="quiz-game" onSubmit={(e) => { e.preventDefault(); if (questionIndex === questions.length - 1) void finish(); else if (!busy && saving === 'saved' && validAnswer(questions[questionIndex], answers[questionIndex])) setQuestionIndex(index => index + 1); }}>
+        <div className="card quiz-step-header"><h2 id="quiz-step-title" ref={stepHeading} tabIndex={-1}>{t('quiz.step', { current: questionIndex + 1, total: questions.length })}</h2><p className="small muted">{competition.title}</p><progress className="quiz-progress" value={answers.filter((a, i) => validAnswer(questions[i], a)).length} max={questions.length} aria-label={t('quiz.answered', { count: answers.filter((a, i) => validAnswer(questions[i], a)).length, total: questions.length })} /></div>
+        {questions.slice(questionIndex, questionIndex + 1).map((q) => { const index = questionIndex; return <fieldset key={q.id} className="card quiz-question" disabled={busy || competition.phase !== 'live'}>
           <legend>{index + 1}. {q.prompt}</legend>
           {q.type === 'range' ? <div className="field"><label htmlFor={`quiz-range-${q.id}`}>{t('quiz.rangeBounds', { min: q.min ?? 0, max: q.max ?? 0 })}</label><input id={`quiz-range-${q.id}`} className="input" type="number" step="1" min={q.min} max={q.max} required value={answers[index] === -1 ? '' : answers[index]} onChange={(e) => choose(index, e.target.value === '' ? -1 : Number(e.target.value))} /><input type="range" aria-label={q.prompt} min={q.min} max={q.max} step="1" value={validAnswer(q, answers[index]) ? answers[index] : Math.floor(((q.min ?? 0) + (q.max ?? 0)) / 2)} onChange={(e) => choose(index, Number(e.target.value))} /></div> : q.options.map((option, choice) => <label key={choice} className={`quiz-option${answers[index] === choice ? ' is-chosen' : ''}`}><input type="radio" name={`quiz-${q.id}`} value={choice} checked={answers[index] === choice} onChange={() => choose(index, choice)} /><span>{option}</span></label>)}
-        </fieldset>)}
-        <div className="card quiz-submit"><p className="small">{t('quiz.answered', { count: answers.filter((a, i) => validAnswer(questions[i], a)).length, total: questions.length })}</p><p className="xs muted" role="status">{saving === 'saving' ? t('quiz.saving') : saving === 'failed' ? t('quiz.saveFailed') : t('quiz.saved')}</p><p className="small">{t('quiz.submitWarning')}</p>
-          <button className="btn btn-gold" type="submit" disabled={busy || competition.phase !== 'live' || answers.some((a, i) => !validAnswer(questions[i], a))}>{busy ? t('common.loading') : t('quiz.submit')}</button>
+        </fieldset>; })}
+        <div className="card quiz-submit"><p className="small">{t('quiz.answered', { count: answers.filter((a, i) => validAnswer(questions[i], a)).length, total: questions.length })}</p><p className="xs muted" role="status">{saving === 'saving' ? t('quiz.saving') : saving === 'failed' ? t('quiz.saveFailed') : t('quiz.saved')}</p>{questionIndex === questions.length - 1 && <p className="small">{t('quiz.submitWarning')}</p>}
+          {saving === 'failed' && validAnswer(questions[questionIndex], answers[questionIndex]) && <button className="btn btn-outline" type="button" disabled={busy} onClick={() => choose(questionIndex, answers[questionIndex])}>{t('quiz.retrySave')}</button>}
+          <div className="row quiz-step-actions">
+            {questionIndex > 0 && <button className="btn btn-outline" type="button" disabled={busy || saving !== 'saved'} onClick={() => setQuestionIndex(index => index - 1)}>{t('quiz.previous')}</button>}
+            {questionIndex < questions.length - 1 ? <button className="btn btn-gold" type="button" disabled={busy || competition.phase !== 'live' || saving !== 'saved' || !validAnswer(questions[questionIndex], answers[questionIndex])} onClick={() => setQuestionIndex(index => index + 1)}>{t('quiz.next')}</button> : <button className="btn btn-gold" type="submit" disabled={busy || competition.phase !== 'live' || saving !== 'saved' || answers.some((a, i) => !validAnswer(questions[i], a))}>{busy ? t('common.loading') : t('quiz.submit')}</button>}
+          </div>
         </div>
       </form>}
-      <section className="card quiz-leaderboard"><div className="row between"><h2>{t('quiz.leaderboard')}</h2><button className="btn btn-ghost btn-sm" type="button" disabled={busy} onClick={() => void perform(refresh)}><Icon name="refresh" size={15} />{t('quiz.refresh')}</button></div>
+      {!questions && <section className="card quiz-leaderboard"><div className="row between"><h2>{t('quiz.leaderboard')}</h2><button className="btn btn-ghost btn-sm" type="button" disabled={busy} onClick={() => void perform(refresh)}><Icon name="refresh" size={15} />{t('quiz.refresh')}</button></div>
         {!competition.leaderboard?.length && <p className="small muted">{t('quiz.noResults')}</p>}
         <ol>{competition.leaderboard?.map((entry, index) => <li key={entry.participant}><span><b>#{entry.rank || index + 1}</b>{entry.is_me ? t('quiz.you') : t('quiz.player', { participant: entry.participant })}{entry.is_winner && <Icon name="star" size={16} />}</span><strong>{quizScoreLabel(entry.score)} / {competition.question_count}</strong></li>)}</ol>
-      </section>
+      </section>}
     </>}
   </div>;
 }

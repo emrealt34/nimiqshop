@@ -4,34 +4,34 @@
   "description": "nimshop.io’yu keşfet, bilgini göster. 10 soruyu cevapla, ilk 3’e gir ve ödül için yarış!",
   "winner_count": 3,
   "prize": {
-    "title": "Yarışma ödülü",
-    "value": "",
-    "description": "Ödül henüz belirlenmedi.",
+    "title": "NIM ödül havuzu",
+    "value": "10 000 NIM",
+    "description": "İlk 3 kazanan arasında paylaşılacak toplam ödül havuzu.",
     "image_url": "",
     "translations": {
       "tr": {
-        "title": "Yarışma ödülü",
-        "description": "Ödül henüz belirlenmedi."
+        "title": "NIM ödül havuzu",
+        "description": "İlk 3 kazanan arasında paylaşılacak toplam ödül havuzu."
       },
       "en": {
-        "title": "Quiz prize",
-        "description": "The prize has not been set yet."
+        "title": "NIM prize pool",
+        "description": "The total prize pool will be shared among the top 3 winners."
       },
       "de": {
-        "title": "Quizpreis",
-        "description": "Der Preis steht noch nicht fest."
+        "title": "NIM-Preispool",
+        "description": "Der gesamte Preispool wird unter den besten 3 Gewinnern aufgeteilt."
       },
       "fr": {
-        "title": "Lot du quiz",
-        "description": "Le lot n’a pas encore été défini."
+        "title": "Cagnotte en NIM",
+        "description": "La cagnotte totale sera partagée entre les 3 meilleurs gagnants."
       },
       "es": {
-        "title": "Premio del concurso",
-        "description": "El premio aún no se ha definido."
+        "title": "Fondo de premios en NIM",
+        "description": "El fondo total se repartirá entre los 3 mejores ganadores."
       },
       "pt": {
-        "title": "Prémio do concurso",
-        "description": "O prémio ainda não foi definido."
+        "title": "Fundo de prémios em NIM",
+        "description": "O fundo total será partilhado entre os 3 melhores vencedores."
       }
     }
   },

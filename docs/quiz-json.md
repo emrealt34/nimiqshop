@@ -38,3 +38,9 @@ Each confirmed winner supplies a private delivery email. Admin records manual de
 `docs/examples/shop-knowledge-quiz.json` is an unpublished nimshop.io template with 9 multiple-choice questions and 1 numeric cashback calculation. The owner-selected questions explain country-specific gift-card validity and contacting CryptoRefills from the delivery email address. GitHub infrastructure and anonymous-order questions are excluded. Fee inclusion, privacy and other factual rules are scored as choices, not as approximate numerical guesses. It is an editable draft template, not a published competition. Hypothetical percentages do not promise the operator's current cashback rate.
 
 Optional `translations` maps accept `en`, `tr`, `de`, `fr`, `es`, `pt`. At competition and prize level each language has `title` and `description`; at question level it has `prompt` and, for multiple choice, `options` in the same order as the authored options. Range bounds and correct values are shared across every language. Missing languages fall back to authored text. Translations survive JSON import, save, edit, clone and export, and can be edited in the admin translation sections before publication. Publishing freezes translated text too. Public translation views never contain correct answers or private award records.
+
+## Single-question participation
+
+Participants see one question at a time, with progress and previous/next controls. Next stays disabled until a valid answer has been saved; failed saves expose a retry. Reloading resumes the first unanswered question, or the last question when every answer is saved. Final submission is available only at the last question, after all answers are valid and saved. Earlier answers remain editable before submission.
+
+The example reward is a **total 10,000 NIM pool shared among the top three winners**, not 10,000 NIM per winner. It creates no automatic payout. The operator still sets dates and the allocation before publishing.

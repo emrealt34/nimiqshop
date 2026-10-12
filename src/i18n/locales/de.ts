@@ -61,6 +61,11 @@ const de = {
   brand: { giftTag: 'geschenk' },
 
   quiz: {
+    step: "Frage {{current}} / {{total}}",
+    next: "Nächste Frage",
+    previous: "Vorherige Frage",
+    retrySave: "Speichern erneut versuchen",
+
     rangeRules: "Ein Versuch pro Konto. Richtige Auswahlantworten geben 1 Punkt. Bereichsfragen geben 1 − |Antwort − richtiger Wert| / (Maximum − Minimum) Punkte, auf sechs Dezimalstellen aufgerundet. Höhere Summen stehen zuerst; Gleichstände an der Gewinnergrenze entscheidet der Admin.",
     winnerTop: "Die besten {{count}} abgeschlossenen Teilnehmer gewinnen. Bei weniger Abschlüssen gewinnen alle, die abschließen.",
     winnerAll: "Jeder gewinnt, der alle Antworten vor Ablauf der Frist absendet.",

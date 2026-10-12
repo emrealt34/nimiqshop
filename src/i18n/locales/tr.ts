@@ -61,6 +61,11 @@ const tr = {
   brand: { giftTag: 'hediye' },
 
   quiz: {
+    step: "Soru {{current}} / {{total}}",
+    next: "Sonraki soru",
+    previous: "Önceki soru",
+    retrySave: "Kaydetmeyi tekrar dene",
+
     rangeRules: "Hesap başına tek deneme. Şıklı soruda doğru cevap 1 puan getirir. Aralık sorusunda puan: 1 − |cevap − doğru değer| / (üst sınır − alt sınır); altı ondalık basamağa yukarı yuvarlanır. Toplam puanı yüksek olan öne geçer; son kazanan sırasında eşitlik varsa admin karar verir.",
     winnerTop: "Tamamlayanlar arasında en yüksek puanlı {{count}} kişi kazanır. Daha az kişi tamamlarsa tamamlayanların hepsi kazanır.",
     winnerAll: "Süre bitmeden tüm soruları cevaplayıp gönderen herkes kazanır.",

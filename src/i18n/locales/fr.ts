@@ -61,6 +61,11 @@ const fr = {
   brand: { giftTag: 'cadeau' },
 
   quiz: {
+    step: "Question n° {{current}} sur {{total}}",
+    next: "Question suivante",
+    previous: "Question précédente",
+    retrySave: "Réessayer l’enregistrement",
+
     rangeRules: "Une tentative par compte. Une bonne réponse à choix vaut 1 point. Une question à intervalle vaut 1 − |réponse − valeur correcte| / (maximum − minimum), arrondi vers le haut à six décimales. Le total le plus élevé passe en tête ; l’administrateur départage les égalités à la limite des gagnants.",
     winnerTop: "Les {{count}} meilleurs participants ayant terminé gagnent. S’il y en a moins, tous ceux qui terminent gagnent.",
     winnerAll: "Tous ceux qui envoient toutes les réponses avant la date limite gagnent.",

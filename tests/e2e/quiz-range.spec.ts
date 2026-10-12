@@ -79,3 +79,47 @@ for (const lang of ['en', 'tr', 'de', 'fr', 'es', 'pt'] as const) {
   });
  });
 }
+
+for (const width of [320, 1280]) {
+ test.describe(`single question progression ${width}px`, () => {
+  test.use({viewport:{width,height:900},allowedErrors:[/500/]});
+  test('one question at a time, failed saves retry, numeric bounds, resume, back and final submission', async ({page}) => {
+   let attempt:any=null; let failSave=true; let submissions=0;
+   const questions=[{id:'first',type:'choice',prompt:'Cashback base?',options:['100 NIM','105 NIM']},{id:'calc',type:'range',prompt:'Calculate cashback',options:[],min:0,max:100},{id:'last',type:'choice',prompt:'Contact support?',options:['Nimiq','CryptoRefills']}];
+   const c=()=>({id:'steps',title:'Shop knowledge',description:'Short description',prize:{title:'NIM prize pool',value:'10 000 NIM',description:'Total pool shared by the top 3.',image_url:''},starts_at:new Date(Date.now()-60000).toISOString(),ends_at:new Date(Date.now()+3600000).toISOString(),phase:'live',question_count:3,participants:1,attempt,has_ranges:true,winner_count:3,winner:'',winners:[],is_winner:false,decision_note:'',cancel_reason:'',award_delivered_at:null,leaderboard:[]});
+   await page.route('**/api/quiz**',route=>{
+    const action=new URL(route.request().url()).pathname.split('/quiz')[1];
+    if(!action||action==='/')return route.fulfill({json:{items:[c()]}});
+    if(action.endsWith('/start')){attempt ||= {answers:[-1,-1,-1],score:0,total:3,started_at:new Date().toISOString(),submitted_at:null};return route.fulfill({json:{competition:c(),attempt,questions}});}
+    if(action.endsWith('/answers')){if(failSave){failSave=false;return route.fulfill({status:500,json:{error:'Temporary save failure'}});}attempt.answers=route.request().postDataJSON().answers;return route.fulfill({json:attempt});}
+    if(action.endsWith('/submit')){submissions++;expect(route.request().postDataJSON().answers).toEqual([0,20,1]);attempt={...attempt,score:3,submitted_at:new Date().toISOString()};return route.fulfill({json:attempt});}
+    return route.fulfill({json:c()});
+   });
+   await open(page,path('/quiz'));await page.getByRole('button',{name:'Start quiz',exact:true}).click();
+   await expect(page.locator('.quiz-question')).toHaveCount(1);
+   await expect(page.locator('#quiz-step-title')).toHaveText('Question 1 / 3');
+   await expect(page.getByRole('button',{name:'Submit answers',exact:true})).toHaveCount(0);
+   await expect(page.getByRole('button',{name:'Next question',exact:true})).toBeDisabled();
+   await page.getByRole('radio',{name:'100 NIM',exact:true}).check();
+   await expect(page.getByRole('button',{name:'Retry saving',exact:true})).toBeVisible();
+   await expect(page.getByRole('button',{name:'Next question',exact:true})).toBeDisabled();
+   await page.getByRole('button',{name:'Retry saving',exact:true}).click();
+   await expect(page.getByRole('button',{name:'Next question',exact:true})).toBeEnabled();
+   await page.getByRole('button',{name:'Next question',exact:true}).click();
+   await expect(page.locator('#quiz-step-title')).toHaveText('Question 2 / 3');
+   await page.locator('#quiz-range-calc').fill('20.5');
+   await expect(page.getByRole('button',{name:'Next question',exact:true})).toBeDisabled();
+   await page.locator('#quiz-range-calc').fill('20');await expect.poll(()=>attempt.answers[1]).toBe(20);
+   await expect(page.getByRole('button',{name:'Next question',exact:true})).toBeEnabled();
+   await page.locator('#quiz-range-calc').press('Enter');await expect(page.locator('#quiz-step-title')).toHaveText('Question 3 / 3');expect(submissions).toBe(0);
+   await page.reload();await page.getByRole('button',{name:'Resume attempt',exact:true}).click();
+   await expect(page.locator('#quiz-step-title')).toHaveText('Question 3 / 3');
+   await page.getByRole('button',{name:'Previous question',exact:true}).click();await expect(page.locator('#quiz-range-calc')).toHaveValue('20');
+   await page.getByRole('button',{name:'Previous question',exact:true}).click();await expect(page.getByRole('radio',{name:'100 NIM',exact:true})).toBeChecked();
+   await page.getByRole('button',{name:'Next question',exact:true}).click();await page.getByRole('button',{name:'Next question',exact:true}).click();
+   await page.getByRole('radio',{name:'CryptoRefills',exact:true}).check();await expect(page.getByRole('button',{name:'Submit answers',exact:true})).toBeEnabled();
+   await page.getByRole('button',{name:'Submit answers',exact:true}).click();await expect(page.locator('.quiz-result')).toContainText('3 / 3');expect(submissions).toBe(1);
+   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  });
+ });
+}

@@ -69,6 +69,11 @@ const en = {
   },
 
   quiz: {
+    step: "Question {{current}} / {{total}}",
+    next: "Next question",
+    previous: "Previous question",
+    retrySave: "Retry saving",
+
     rangeRules: "One attempt per account. Choice questions give 1 point for the correct answer. Range questions give 1 − |answer − correct value| / (max − min) points, rounded up to six decimal places. Higher totals rank first; boundary ties are decided by the admin.",
     winnerTop: "The top {{count}} completed participants win. If fewer complete the quiz, all completed participants win.",
     winnerAll: "Every participant who submits all answers before the deadline wins.",

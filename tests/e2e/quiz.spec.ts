@@ -52,8 +52,12 @@ test.describe('quiz participant flow @smoke', () => {
     await expect.poll(() => attempt.answers[0]).toBe(1);
     await page.reload();
     await page.getByRole('button', { name: 'Denemeye devam et' }).click();
-    await expect(page.locator('.quiz-question').nth(0).getByRole('radio', { name: 'NIM', exact: true })).toBeChecked();
-    await page.locator('.quiz-question').nth(1).getByRole('radio', { name: 'Nimiq Pay', exact: true }).check();
+    await expect(page.locator('.quiz-question')).toHaveCount(1);
+    await expect(page.locator('.quiz-question legend')).toContainText('2.');
+    await page.getByRole('button', { name: 'Önceki soru', exact: true }).click();
+    await expect(page.getByRole('radio', { name: 'NIM', exact: true })).toBeChecked();
+    await page.getByRole('button', { name: 'Sonraki soru', exact: true }).click();
+    await page.locator('.quiz-question').getByRole('radio', { name: 'Nimiq Pay', exact: true }).check();
     await page.getByRole('button', { name: 'Cevapları gönder', exact: true }).click();
     await expect(page.locator('.quiz-result')).toContainText('Puanın: 2 / 2');
     await expect(page.getByRole('button', { name: 'Yarışmaya başla' })).toHaveCount(0);
