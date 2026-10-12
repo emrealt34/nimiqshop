@@ -225,21 +225,21 @@ func (c *Client) GetStaker(ctx context.Context, addr string) (StakerInfo, error)
 }
 
 // GetTransactionsByAddress returns recent transactions touching addr, newest
-// first. NimiqWatch's third parameter is a pagination cursor: the hash of the
-// LAST transaction of the previous page (pass "" for… a rejected empty string
-// is not accepted, so callers page by always passing the previous last hash;
-// the first page starts from a known recent tx hash). Cursor semantics
-// verified live: with cursor = an account's Nth tx hash, older txs than that
-// hash are returned.
+// first. A null cursor selects the first page; a previous transaction hash
+// selects older history. Empty strings are not valid RPC cursor hashes.
 // Cross-check: every RPC must succeed; we return the primary list when the
 // first-hash of each list matches (same head of history).
 func (c *Client) GetTransactionsByAddress(ctx context.Context, addr string, limit int, cursor string) ([]Transaction, error) {
+	var pageCursor interface{}
+	if cursor != "" {
+		pageCursor = cursor
+	}
 	if err := c.requireURLs(); err != nil {
 		return nil, err
 	}
 	if len(c.urls) == 1 {
 		var txs []Transaction
-		err := c.callURL(ctx, c.urls[0], "getTransactionsByAddress", []interface{}{addr, limit, cursor}, &txs)
+		err := c.callURL(ctx, c.urls[0], "getTransactionsByAddress", []interface{}{addr, limit, pageCursor}, &txs)
 		return txs, err
 	}
 	type res struct {
@@ -253,7 +253,7 @@ func (c *Client) GetTransactionsByAddress(ctx context.Context, addr string, limi
 		go func(i int, u string) {
 			defer wg.Done()
 			var txs []Transaction
-			err := c.callURL(ctx, u, "getTransactionsByAddress", []interface{}{addr, limit, cursor}, &txs)
+			err := c.callURL(ctx, u, "getTransactionsByAddress", []interface{}{addr, limit, pageCursor}, &txs)
 			out[i] = res{txs, err}
 		}(i, u)
 	}
