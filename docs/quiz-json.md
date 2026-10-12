@@ -32,3 +32,9 @@ Numeric ranges use whole numbers with `0 <= min < max <= 1000000000`. Correct va
 For an AI prompt, ask for **one JSON object without Markdown fences**, using this schema, 10 questions, the chosen bounds and correct values, and the desired `winner_count`. Verify generated answers before publishing. IDs, participants, status and winner records from imported JSON are ignored. Correct values/indices stay in admin views and are not sent to participants.
 
 Each confirmed winner supplies a private delivery email. Admin records manual delivery separately for that winner. Selecting winners or marking delivery does not send money, emails or gift codes.
+
+## Site-specific multilingual example
+
+`docs/examples/shop-knowledge-quiz.json` contains 10 NimiqShop questions, including the fee-excluding cashback base. It is an editable draft template, not a published competition. Hypothetical percentages do not promise the operator's current cashback rate.
+
+Optional `translations` maps accept `en`, `tr`, `de`, `fr`, `es`, `pt`. At competition and prize level each language has `title` and `description`; at question level it has `prompt` and, for multiple choice, `options` in the same order as the authored options. Range bounds and correct values are shared across every language. Missing languages fall back to authored text. Translations survive JSON import, save, edit, clone and export, and can be edited in the admin translation sections before publication. Publishing freezes translated text too. Public translation views never contain correct answers or private award records.

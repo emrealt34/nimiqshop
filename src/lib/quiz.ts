@@ -1,10 +1,13 @@
+export type QuizText = { title: string; description: string };
+export type QuizTranslations = Partial<Record<"en" | "tr" | "de" | "fr" | "es" | "pt", QuizText>>;
 import { api } from './api';
 
-export type QuizPrize = { title: string; value: string; description: string; image_url: string };
-export type QuizQuestion = { id: string; prompt: string; options: string[]; type?: 'choice' | 'range'; min?: number; max?: number };
+export type QuizPrize = { translations?: QuizTranslations; title: string; value: string; description: string; image_url: string };
+export type QuizQuestion = { translations?: Partial<Record<"en" | "tr" | "de" | "fr" | "es" | "pt", { prompt: string; options?: string[] }>>; id: string; prompt: string; options: string[]; type?: 'choice' | 'range'; min?: number; max?: number };
 export type AdminQuizQuestion = QuizQuestion & { correct_index: number; correct_value?: number };
 export type QuizAttempt = { answers: number[]; score: number; total: number; started_at: string; submitted_at: string | null; prize_email?: string };
 export type QuizCompetition = {
+ translations?: QuizTranslations;
   id: string; title: string; description: string; prize: QuizPrize; starts_at: string; ends_at: string;
   phase: 'scheduled' | 'live' | 'ended' | 'finalized' | 'cancelled'; question_count: number; participants: number;
   attempt: QuizAttempt | null; winner: string; is_winner: boolean; decision_note: string; cancel_reason: string;
@@ -13,6 +16,7 @@ export type QuizCompetition = {
   leaderboard?: { rank?: number; participant: string; score: number; is_me: boolean; is_winner: boolean }[];
 };
 export type AdminQuiz = {
+ translations?: QuizTranslations;
   id?: string; title: string; description: string; prize: QuizPrize; starts_at: string; ends_at: string;
   status: 'draft' | 'published' | 'cancelled' | 'finalized'; questions: AdminQuizQuestion[];
   participants?: number; winner_user_id?: string; decision_note?: string; award_delivered_at?: string; award_note?: string;
@@ -50,12 +54,29 @@ export function parseQuizImport(text: string): AdminQuiz {
     if (typeof value !== 'string' || [...value.trim()].length > max || (required && !value.trim())) throw new Error(`${name} must be text${required ? ' and cannot be empty' : ''} (max ${max} characters).`);
     return value.trim();
   };
+  const translations = (value: any, parse: (text: any) => any): any => {
+    if (value === undefined) return undefined;
+    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('translations must be a language object.');
+    return Object.fromEntries(Object.entries(value).map(([lang, text]) => {
+      if (!['en','tr','de','fr','es','pt'].includes(lang) || !text || typeof text !== 'object' || Array.isArray(text)) throw new Error('Invalid translation language or text.');
+      return [lang, parse(text)];
+    }));
+  };
+  const textTranslations = (value: any, titleMax: number, descriptionMax: number) => translations(value, text => ({ title: field(text.title, 'Translated title', titleMax, true), description: field(text.description, 'Translated description', descriptionMax) }));
   const winnerCount = raw.winner_count ?? 1;
   if (!Number.isInteger(winnerCount) || winnerCount < 0 || winnerCount > 10000) throw new Error('winner_count: use 1, 3, or 0 for everyone (maximum 10000).');
   if (!Array.isArray(raw.questions) || raw.questions.length < 1 || raw.questions.length > 50) throw new Error('Include 1–50 questions.');
   const questions = raw.questions.map((q: any, index: number): AdminQuizQuestion => {
     if (!q || typeof q !== 'object' || Array.isArray(q)) throw new Error(`Question ${index + 1} must be an object.`);
-    const base = { id: crypto.randomUUID(), prompt: field(q.prompt, `Question ${index + 1}`, 1000, true), correct_index: 0 };
+    const translated = translations(q.translations, text => {
+      const prompt = field(text.prompt, 'Translated question', 1000, true);
+      if (q.type === 'range') { if (text.options !== undefined && (!Array.isArray(text.options) || text.options.length)) throw new Error('Range translations cannot contain options.'); return { prompt }; }
+      if (!Array.isArray(text.options) || text.options.length !== q.options?.length) throw new Error('Translated choices must preserve option count and order.');
+      const options = text.options.map((option: any) => field(option, 'Translated option', 300, true));
+      if (new Set(options.map((option: string) => option.toLocaleLowerCase())).size !== options.length) throw new Error('Translated choices must be distinct.');
+      return { prompt, options };
+    });
+    const base = { translations: translated, id: crypto.randomUUID(), prompt: field(q.prompt, `Question ${index + 1}`, 1000, true), correct_index: 0 };
     if (q.type === 'range') {
       if (![q.min, q.max, q.correct_value].every(Number.isInteger) || q.min < 0 || q.max > 1e9 || q.max <= q.min || q.correct_value < q.min || q.correct_value > q.max || (q.options !== undefined && (!Array.isArray(q.options) || q.options.length))) throw new Error(`Question ${index + 1}: use integer min/max and correct_value inside the range, without options.`);
       return { ...base, type: 'range', options: [], min: q.min, max: q.max, correct_value: q.correct_value };
@@ -79,6 +100,16 @@ export function parseQuizImport(text: string): AdminQuiz {
   if (!prize || typeof prize !== 'object' || Array.isArray(prize)) throw new Error('Include a prize object.');
   const image = field(prize.image_url, 'Prize image', 2048);
   if (image) { let url: URL; try { url = new URL(image); } catch { throw new Error('Prize image must be an HTTPS URL.'); } if (url.protocol !== 'https:' || url.username || url.password) throw new Error('Prize image must be an HTTPS URL without credentials.'); }
-  return { title: field(raw.title, 'Title', 120, true), description: field(raw.description, 'Description', 2000), winner_count: winnerCount, starts_at: start, ends_at: end, status: 'draft', questions,
-    prize: { title: field(prize.title, 'Prize title', 140, true), value: field(prize.value, 'Prize value', 40), description: field(prize.description, 'Prize description', 1000), image_url: image } };
+  return { translations: textTranslations(raw.translations, 120, 2000), title: field(raw.title, 'Title', 120, true), description: field(raw.description, 'Description', 2000), winner_count: winnerCount, starts_at: start, ends_at: end, status: 'draft', questions,
+    prize: { translations: textTranslations(prize.translations, 140, 1000), title: field(prize.title, 'Prize title', 140, true), value: field(prize.value, 'Prize value', 40), description: field(prize.description, 'Prize description', 1000), image_url: image } };
+}
+
+/** Missing translations fall back to the authored text; numerical answers never change with language. */
+export function localizeQuiz<T extends { title: string; description: string; translations?: QuizTranslations; prize?: QuizPrize }>(value: T, lang: keyof QuizTranslations): T {
+ const text = value.translations?.[lang];
+ return { ...value, ...text, ...(value.prize ? { prize: localizeQuiz(value.prize, lang) } : {}) };
+}
+export function localizeQuizQuestion(question: QuizQuestion, lang: keyof QuizTranslations): QuizQuestion {
+ const text = question.translations?.[lang];
+ return { ...question, ...(text ? { prompt: text.prompt, options: text.options || question.options } : {}) };
 }

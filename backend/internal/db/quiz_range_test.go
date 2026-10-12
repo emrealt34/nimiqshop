@@ -138,3 +138,34 @@ func TestQuizEveryoneOnlySubmittedAttemptsAndRangeValidation(t *testing.T) {
 		t.Fatal("nil range options")
 	}
 }
+
+func TestQuizTranslationsPersistValidateAndFreeze(t *testing.T) {
+	s, c, now := rangeQuizFixture(t, 1)
+	c.ID = ""
+	c.Translations = map[string]QuizText{"fr": {Title: "Boutique", Description: "Règles"}}
+	c.Prize.Translations = map[string]QuizText{"fr": {Title: "Récompense"}}
+	c.Questions[0].Translations = map[string]QuizQuestionText{"fr": {Prompt: "Montant ?"}}
+	draft, err := s.PutQuizCompetition(c, true, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := s.GetQuizCompetition(draft.ID)
+	if err != nil || loaded.Translations["fr"].Title != "Boutique" || loaded.Prize.Translations["fr"].Title != "Récompense" || loaded.Questions[0].Translations["fr"].Prompt != "Montant ?" {
+		t.Fatal("lost translations", loaded, err)
+	}
+	if _, err := s.PublishQuiz(draft.ID, now); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.PutQuizCompetition(loaded, false, now); !errors.Is(err, ErrQuizLocked) {
+		t.Fatal("translated quiz not frozen", err)
+	}
+	c.Translations["xx"] = QuizText{Title: "bad"}
+	if _, err := s.PutQuizCompetition(c, true, now); err == nil {
+		t.Fatal("unsupported language accepted")
+	}
+	delete(c.Translations, "xx")
+	c.Questions[0].Translations["fr"] = QuizQuestionText{Prompt: "Bad range", Options: []string{"secret"}}
+	if _, err := s.PutQuizCompetition(c, true, now); err == nil {
+		t.Fatal("range options accepted")
+	}
+}

@@ -190,7 +190,7 @@ func TestQuizRangePublicViewsAndIndependentMultipleWinnerClaims(t *testing.T) {
 	other, _ := s.signIn()
 	admin := s.adminHeaders()
 	end := time.Now().UTC().Add(2 * time.Second)
-	draft := s.do("POST", "/api/admin/quiz", map[string]any{"title": "Range privacy", "prize": map[string]any{"title": "Manual reward"}, "winner_count": 0, "starts_at": time.Now().UTC().Add(-time.Minute), "ends_at": end, "questions": []map[string]any{{"type": "range", "prompt": "Closest number", "min": 0, "max": 1000, "correct_value": 500}}}, admin)
+	draft := s.do("POST", "/api/admin/quiz", map[string]any{"title": "Range privacy", "translations": map[string]any{"fr": map[string]any{"title": "Quiz boutique", "description": "Règles"}}, "prize": map[string]any{"title": "Manual reward"}, "winner_count": 0, "starts_at": time.Now().UTC().Add(-time.Minute), "ends_at": end, "questions": []map[string]any{{"type": "range", "prompt": "Closest number", "translations": map[string]any{"fr": map[string]any{"prompt": "Montant cashback ?", "correct_value": 500}}, "min": 0, "max": 1000, "correct_value": 500}}}, admin)
 	if draft.status != 200 {
 		t.Fatalf("draft: %d %s", draft.status, draft.body)
 	}
@@ -204,6 +204,9 @@ func TestQuizRangePublicViewsAndIndependentMultipleWinnerClaims(t *testing.T) {
 		r := s.do("POST", root+"/start", nil, headers)
 		if r.status != 200 || strings.Contains(string(r.body), "correct_value") || strings.Contains(string(r.body), "correct_index") {
 			t.Fatalf("answer leaked: %s", r.body)
+		}
+		if !strings.Contains(string(r.body), "Quiz boutique") || !strings.Contains(string(r.body), "Montant cashback") {
+			t.Fatalf("translations missing: %s", r.body)
 		}
 	}
 	if r := s.do("POST", root+"/submit", map[string]any{"answers": []float64{499.5}}, buyer); r.status != 400 {

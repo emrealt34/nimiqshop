@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
@@ -10,10 +10,26 @@ test('AI JSON creates only editable drafts and validates range answers and winne
  const dir = await mkdtemp(join(tmpdir(), 'quiz-import-'));
  try {
   const file = join(dir, 'quiz.cjs');
-  buildSync({ stdin: { contents: `export { parseQuizImport } from './quiz';`, resolveDir: new URL('../src/lib/', import.meta.url).pathname }, bundle: true, platform: 'node', format: 'cjs', outfile: file, define: { 'import.meta.env.BASE_URL': '"/"', 'import.meta.env': '{}' }, logLevel: 'silent' });
-  const { parseQuizImport } = createRequire(import.meta.url)(file);
+  buildSync({ stdin: { contents: `export { parseQuizImport, localizeQuiz, localizeQuizQuestion } from './quiz';`, resolveDir: new URL('../src/lib/', import.meta.url).pathname }, bundle: true, platform: 'node', format: 'cjs', outfile: file, define: { 'import.meta.env.BASE_URL': '"/"', 'import.meta.env': '{}' }, logLevel: 'silent' });
+  const { parseQuizImport, localizeQuiz, localizeQuizQuestion } = createRequire(import.meta.url)(file);
   const raw = { title: 'Closest', prize: { title: 'Manual reward' }, winner_count: 3, questions: [{ type: 'range', prompt: 'Guess a number', min: 0, max: 1000, correct_value: 500 }, { prompt: 'Pick', options: ['A','B'], correct_index: 1 }], id: 'foreign', status: 'published', winner_user_ids: ['attacker'], participants: 100 };
   const result = parseQuizImport(JSON.stringify(raw));
+  const example = parseQuizImport(await readFile(new URL('../docs/examples/shop-knowledge-quiz.json', import.meta.url), 'utf8'));
+  assert.equal(example.questions.length, 10);
+  for (const lang of ['en','tr','de','fr','es','pt']) {
+   assert.ok(localizeQuiz(example, lang).title);
+   assert.equal(localizeQuiz(example, lang).description, example.translations[lang].description);
+   assert.equal(localizeQuiz(example, lang).prize.title, example.prize.translations[lang].title);
+   for (const question of example.questions) {
+    assert.equal(localizeQuizQuestion(question, lang).prompt, question.translations[lang].prompt);
+    assert.equal(localizeQuizQuestion(question, lang).correct_value, question.correct_value);
+   }
+  }
+  assert.equal(example.questions[0].correct_value, 100);
+  assert.equal(example.questions[1].correct_value, 20);
+  assert.equal(localizeQuizQuestion(result.questions[0], 'fr').prompt, result.questions[0].prompt);
+  assert.throws(() => parseQuizImport(JSON.stringify({ ...raw, translations: { xx: { title: 'bad' } } })));
+  assert.throws(() => parseQuizImport(JSON.stringify({ ...raw, questions: [{ ...raw.questions[0], translations: { en: { prompt: 'bad', options: ['secret'] } } }] })));
   assert.equal(result.status, 'draft'); assert.equal(result.id, undefined); assert.equal(result.winner_user_ids, undefined); assert.equal(result.participants, undefined);
   assert.equal(result.winner_count, 3); assert.equal(result.questions[0].min, 0); assert.equal(result.questions[0].correct_value, 500); assert.deepEqual(result.questions[0].options, []);
   assert.notEqual(result.questions[0].id, result.questions[1].id); assert.ok(Date.parse(result.ends_at) > Date.parse(result.starts_at));

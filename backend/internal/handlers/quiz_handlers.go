@@ -61,7 +61,7 @@ func (h *Handlers) quizView(c db.QuizCompetition, user string) (map[string]any, 
 		delivered = db.QuizAwardTime(c, user)
 	}
 	return map[string]any{
-		"id": c.ID, "title": c.Title, "description": c.Description, "prize": c.Prize,
+		"id": c.ID, "translations": c.Translations, "title": c.Title, "description": c.Description, "prize": c.Prize,
 		"starts_at": c.StartsAt, "ends_at": c.EndsAt, "phase": quizPhase(c, time.Now().UTC()),
 		"question_count": len(c.Questions), "participants": c.Participants, "attempt": mine,
 		"winner": quizParticipant(c.WinnerUserID), "winners": winners, "winner_count": db.QuizWinnerLimit(c), "has_ranges": hasRanges, "is_winner": db.QuizIsWinner(c, user),
@@ -146,7 +146,7 @@ func (h *Handlers) StartQuiz(ctx *fasthttp.RequestCtx) {
 	}
 	questions := []map[string]any{}
 	for _, q := range c.Questions {
-		questions = append(questions, map[string]any{"id": q.ID, "prompt": q.Prompt, "options": q.Options, "type": q.Type, "min": q.Min, "max": q.Max})
+		questions = append(questions, map[string]any{"id": q.ID, "prompt": q.Prompt, "translations": q.Translations, "options": q.Options, "type": q.Type, "min": q.Min, "max": q.Max})
 	}
 	view, err := h.quizView(c, middleware.UserID(ctx))
 	if err != nil {

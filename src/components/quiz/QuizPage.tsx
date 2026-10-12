@@ -8,7 +8,7 @@ import { useSession } from '../../lib/useSession';
 import { friendlyApiMessage } from '../../lib/api';
 import { queryParam } from '../../lib/format';
 import { useT } from '../../i18n';
-import { listQuizzes, getQuiz, startQuiz, saveQuizProgress, submitQuiz, claimQuizPrize, quizScoreLabel, type QuizCompetition, type QuizQuestion, type QuizPrize } from '../../lib/quiz';
+import { listQuizzes, getQuiz, startQuiz, saveQuizProgress, submitQuiz, claimQuizPrize, quizScoreLabel, localizeQuiz, localizeQuizQuestion, type QuizCompetition, type QuizQuestion, type QuizPrize } from '../../lib/quiz';
 
 const PHASE_KEYS = { scheduled: 'quiz.scheduled', live: 'quiz.live', ended: 'quiz.ended', finalized: 'quiz.finalized', cancelled: 'quiz.cancelled' };
 
@@ -33,8 +33,10 @@ export function QuizView() {
   const { toast } = useToast();
   const [items, setItems] = useState<QuizCompetition[]>([]);
   const [selected, setSelected] = useState('');
-  const [competition, setCompetition] = useState<QuizCompetition | null>(null);
-  const [questions, setQuestions] = useState<QuizQuestion[] | null>(null);
+  const [rawCompetition, setCompetition] = useState<QuizCompetition | null>(null);
+  const [rawQuestions, setQuestions] = useState<QuizQuestion[] | null>(null);
+  const competition = rawCompetition ? localizeQuiz(rawCompetition, lang) : null;
+  const questions = rawQuestions?.map(q => localizeQuizQuestion(q, lang)) || null;
   const [answers, setAnswers] = useState<number[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -141,7 +143,7 @@ export function QuizView() {
     {!loaded && <div className="card" role="status">{t('common.loading')}</div>}
     {loaded && items.length === 0 && !error && <div className="card quiz-gate"><Icon name="gift" size={32} /><h2>{t('quiz.empty')}</h2><p className="small muted">{t('quiz.emptyHint')}</p></div>}
     {items.length > 0 && <div className="field quiz-selector"><label htmlFor="quiz-select">{t('quiz.competition')}</label><select id="quiz-select" className="input" value={selected} disabled={busy || !!questions} onChange={(e) => setSelected(e.target.value)}>
-      {items.map((c) => <option key={c.id} value={c.id}>{c.title} · {t(PHASE_KEYS[c.phase])}</option>)}
+      {items.map((c) => <option key={c.id} value={c.id}>{localizeQuiz(c, lang).title} · {t(PHASE_KEYS[c.phase])}</option>)}
     </select></div>}
     {competition && <>
       <section className="card quiz-contest">

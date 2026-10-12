@@ -30,15 +30,26 @@ var (
 	ErrQuizWinner  = errors.New("select the configured number of eligible completed participants; higher scores must win before boundary ties")
 )
 
+// Localized text contains no scoring data or administrative secrets.
+type QuizText struct {
+	Title       string `json:"title,omitempty"`
+	Description string `json:"description,omitempty"`
+}
+type QuizQuestionText struct {
+	Prompt  string   `json:"prompt"`
+	Options []string `json:"options,omitempty"`
+}
+
 type QuizQuestion struct {
-	ID           string   `json:"id"`
-	Prompt       string   `json:"prompt"`
-	Options      []string `json:"options"`
-	CorrectIndex int      `json:"correct_index"`
-	Type         string   `json:"type,omitempty"`
-	Min          int      `json:"min"`
-	Max          int      `json:"max"`
-	CorrectValue *int     `json:"correct_value,omitempty"`
+	Translations map[string]QuizQuestionText `json:"translations,omitempty"`
+	ID           string                      `json:"id"`
+	Prompt       string                      `json:"prompt"`
+	Options      []string                    `json:"options"`
+	CorrectIndex int                         `json:"correct_index"`
+	Type         string                      `json:"type,omitempty"`
+	Min          int                         `json:"min"`
+	Max          int                         `json:"max"`
+	CorrectValue *int                        `json:"correct_value,omitempty"`
 }
 
 type QuizAward struct {
@@ -47,13 +58,15 @@ type QuizAward struct {
 }
 
 type QuizPrize struct {
-	Title       string `json:"title"`
-	Value       string `json:"value"`
-	Description string `json:"description"`
-	ImageURL    string `json:"image_url"`
+	Translations map[string]QuizText `json:"translations,omitempty"`
+	Title        string              `json:"title"`
+	Value        string              `json:"value"`
+	Description  string              `json:"description"`
+	ImageURL     string              `json:"image_url"`
 }
 
 type QuizCompetition struct {
+	Translations     map[string]QuizText  `json:"translations,omitempty"`
 	ID               string               `json:"id"`
 	Title            string               `json:"title"`
 	Description      string               `json:"description"`
@@ -103,7 +116,28 @@ func validQuizText(s string, min, max int) bool {
 	n := utf8.RuneCountInString(strings.TrimSpace(s))
 	return n >= min && n <= max
 }
+func validateQuizTextTranslations(items map[string]QuizText, titleMax, descriptionMax int) error {
+	for lang, text := range items {
+		if !quizLanguage(lang) || !validQuizText(text.Title, 1, titleMax) || !validQuizText(text.Description, 0, descriptionMax) {
+			return fmt.Errorf("invalid quiz translation")
+		}
+	}
+	return nil
+}
+func quizLanguage(lang string) bool {
+	switch lang {
+	case "tr", "en", "de", "fr", "es", "pt":
+		return true
+	}
+	return false
+}
 func validateQuiz(c QuizCompetition) error {
+	if err := validateQuizTextTranslations(c.Translations, 120, 2000); err != nil {
+		return err
+	}
+	if err := validateQuizTextTranslations(c.Prize.Translations, 140, 1000); err != nil {
+		return err
+	}
 	if !validQuizText(c.Title, 1, 120) || !validQuizText(c.Description, 0, 2000) || !validQuizText(c.Prize.Title, 1, 140) || !validQuizText(c.Prize.Value, 0, 40) || !validQuizText(c.Prize.Description, 0, 1000) {
 		return fmt.Errorf("quiz title/prize or description is missing or too long")
 	}
@@ -128,6 +162,19 @@ func validateQuiz(c QuizCompetition) error {
 			return fmt.Errorf("each question needs a unique ID and question text")
 		}
 		ids[q.ID] = true
+		for lang, text := range q.Translations {
+			if !quizLanguage(lang) || !validQuizText(text.Prompt, 1, 1000) || (q.Type == "range" && len(text.Options) != 0) || (q.Type != "range" && len(text.Options) != len(q.Options)) {
+				return fmt.Errorf("invalid question translation")
+			}
+			seenTranslated := map[string]bool{}
+			for _, option := range text.Options {
+				key := strings.ToLower(strings.TrimSpace(option))
+				if !validQuizText(option, 1, 300) || seenTranslated[key] {
+					return fmt.Errorf("invalid translated options")
+				}
+				seenTranslated[key] = true
+			}
+		}
 		if q.Type == "range" {
 			if q.Min < 0 || q.Max > 1_000_000_000 || q.Max <= q.Min || q.CorrectValue == nil || *q.CorrectValue < q.Min || *q.CorrectValue > q.Max || len(q.Options) != 0 {
 				return fmt.Errorf("range questions need integer bounds 0–1000000000, max > min and a correct_value within the range; no options")
@@ -200,7 +247,7 @@ func (s *Store) PutQuizCompetition(input QuizCompetition, create bool, now time.
 		if create {
 			created = now.UTC()
 		}
-		result = QuizCompetition{ID: input.ID, Title: input.Title, Description: input.Description, Prize: input.Prize, StartsAt: input.StartsAt, EndsAt: input.EndsAt, Status: "draft", Questions: input.Questions, WinnerCount: input.WinnerCount, CreatedAt: created, UpdatedAt: now.UTC()}
+		result = QuizCompetition{ID: input.ID, Translations: input.Translations, Title: input.Title, Description: input.Description, Prize: input.Prize, StartsAt: input.StartsAt, EndsAt: input.EndsAt, Status: "draft", Questions: input.Questions, WinnerCount: input.WinnerCount, CreatedAt: created, UpdatedAt: now.UTC()}
 		if err := putQuizJSON(txn, quizKey(result.ID), result); err != nil {
 			return err
 		}
