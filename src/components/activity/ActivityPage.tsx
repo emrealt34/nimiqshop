@@ -239,11 +239,8 @@ export function ActivityView() {
         </div>
       </div>
 
-      {/* The stat tiles go from a one-line skeleton to a 3-tile grid once the
-          feed answers; reserving the grid's height keeps everything below it
-          (#summary and the footer) from being pushed down — that push measured
-          0.10 CLS before this. */}
-      <div id="stats" className="act-stats mt-2" style={{ minHeight: 132 }}>
+      {/* Loading uses the same four stat tiles as the settled feed. */}
+      <div id="stats" className="act-stats mt-2" aria-busy={!loaded} aria-label={!loaded ? t('common.loading') : undefined} style={{ minHeight: 132 }}>
         {!loaded ? (
           <div className="act-stats-grid" aria-hidden="true">
             {[0, 1, 2, 3].map((i) => (
@@ -276,7 +273,7 @@ export function ActivityView() {
                   <Skel w={128} h={13} style={{ display: 'block', marginTop: 8 }} />
                 </div>
               </div>
-              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div className="rs-dist">
                 {[5, 4, 3, 2, 1].map((star, i) => (
                   <div className="dist-row" key={star}>
                     <span className="dist-star"><Skel w={64} h={13} /></span>
@@ -331,7 +328,7 @@ export function ActivityView() {
         )}
       </div>
 
-      <div id="feed" className="mt-2">
+      <div id="feed" className="mt-2" aria-busy={!loaded}>
         {/* The empty state below renders an <h3>; without a section heading in
             between, the document jumped h1 → h3 and Lighthouse failed the
             heading-order audit. The section is visually self-evident, so the

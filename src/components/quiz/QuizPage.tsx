@@ -1,3 +1,4 @@
+import { LoadingRows } from '../ui/uiKit';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppRoot } from '../AppRoot';
 import { useSheet, useToast } from '../AppProviders';
@@ -136,7 +137,10 @@ export function QuizView() {
     if (mounted.current && version === scope.current) { setQuestions(null); await refresh(); toast(t('quiz.submitted'), 'success'); }
   });
 
-  if (authed === null) return <div className="container quiz-page"><div className="card" role="status">{t('common.loading')}</div></div>;
+  if (authed === null) return <div className="container quiz-page">
+    <header className="quiz-heading"><Icon name="nimiq" size={30} /><div><h1>{t('quiz.title')}</h1><p className="muted small">{t('quiz.intro')}</p></div></header>
+    <div className="card quiz-gate"><LoadingRows rows={5} /></div>
+  </div>;
   if (!authed) return <div className="container quiz-page">
     <header className="quiz-heading"><Icon name="nimiq" size={30} /><div><h1>{t('quiz.title')}</h1><p className="muted small">{t('quiz.intro')}</p></div></header>
     <div className="card quiz-gate"><Icon name="lock" size={32} /><h2>{t('quiz.loginRequired')}</h2><p>{t('quiz.loginHint')}</p>
@@ -152,7 +156,7 @@ export function QuizView() {
   return <div className="container quiz-page">
     <header className="quiz-heading"><Icon name="nimiq" size={30} /><div><h1>{t('quiz.title')}</h1><p className="muted small">{t('quiz.intro')}</p></div></header>
     {error && <div className="alert error" role="alert">{error}</div>}
-    {!loaded && <div className="card" role="status">{t('common.loading')}</div>}
+    {!loaded && <div className="card quiz-contest"><LoadingRows rows={8} /></div>}
     {loaded && items.length === 0 && !error && <div className="card quiz-gate"><Icon name="gift" size={32} /><h2>{t('quiz.empty')}</h2><p className="small muted">{t('quiz.emptyHint')}</p></div>}
     {items.length > 0 && !questions && <div className="field quiz-selector"><label htmlFor="quiz-select">{t('quiz.competition')}</label><select id="quiz-select" className="input" value={selected} disabled={busy || !!questions} onChange={(e) => setSelected(e.target.value)}>
       {items.map((c) => <option key={c.id} value={c.id}>{localizeQuiz(c, lang).title} · {t(PHASE_KEYS[c.phase])}</option>)}

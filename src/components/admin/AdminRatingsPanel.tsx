@@ -1,3 +1,4 @@
+import { LoadingRows } from '../ui/uiKit';
 /**
  * AdminRatingsPanel — operator moderation of buyer star-rating comments.
  *
@@ -92,7 +93,7 @@ export function AdminRatingsPanel() {
       {notice ? <div className="mt-2"><AlertBox type="success">{notice}</AlertBox></div> : null}
 
       {loading ? (
-        <div className="small muted mt-2">…</div>
+        <LoadingRows />
       ) : items.length === 0 ? (
         <div className="small muted mt-2">{t('rating.adminEmpty')}</div>
       ) : (

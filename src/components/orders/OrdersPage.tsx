@@ -299,9 +299,7 @@ export function OrdersView() {
       <div className="container orders-page">
         <SectionHead awaitingCount={awaitingCount} lastRefresh={lastRefresh} onRefresh={() => load(true)} />
         <div className="seg mb-2" />
-        <div className="grid products">
-          <SkeletonCards n={6} />
-        </div>
+        <SkeletonCards />
       </div>
     );
   }
@@ -343,9 +341,7 @@ export function OrdersView() {
         {err ? (
           <ErrorState message={err} detail={errDetail} retry={() => load()} />
         ) : loading && !rows.length ? (
-          <div className="grid products">
-            <SkeletonCards n={6} />
-          </div>
+          <SkeletonCards />
         ) : !rows.length ? (
           <EmptyState
             iconName="bag"

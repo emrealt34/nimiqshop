@@ -3992,3 +3992,27 @@ body { padding-bottom: 0; }
  .quiz-step-actions .btn:last-child { min-width:0; }
 }
 @media (prefers-reduced-motion:reduce) { .quiz-game .quiz-option { transition:none; } }
+
+/* Loading twins share their content containers; never collapse percentage bars. */
+.skel { vertical-align: middle; max-width: 100%; flex-shrink: 1; }
+.kv-skeleton dt { flex: 0 1 44%; min-width: 0; }
+.kv-skeleton dd { flex: 1; min-width: 0; }
+.loading-rows { display: flex; flex-direction: column; gap: 14px; width: 100%; min-width: 0; padding: 12px 0; }
+.product-card-skeleton { cursor: default; pointer-events: none; }
+.product-card-skeleton .thumb { width: 100%; }
+.product-card-skeleton .p-price { display: block; width: 100%; text-align: center; margin: 2px 0 8px; }
+.product-card-skeleton .p-meta { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; }
+.skeleton-box, .skeleton-btn, .skeleton-card { max-width: 100%; overflow: hidden; }
+@media (prefers-reduced-motion: reduce) {
+  .skel, .skeleton-box, .skeleton-btn, .skeleton-card, .skeleton-row { animation: none !important; }
+}
+
+/* Thumbnail backgrounds must not cover the shimmer inherited from .skel. */
+.thumb.skel {
+  background: linear-gradient(90deg, rgba(0,0,0,.045) 25%, rgba(0,0,0,.09) 50%, rgba(0,0,0,.045) 75%);
+  background-size: 400% 100%;
+}
+[data-theme="dark"] .thumb.skel {
+  background: linear-gradient(90deg, rgba(255,255,255,.06) 25%, rgba(255,255,255,.12) 50%, rgba(255,255,255,.06) 75%);
+  background-size: 400% 100%;
+}

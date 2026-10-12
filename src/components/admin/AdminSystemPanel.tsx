@@ -1,3 +1,4 @@
+import { LoadingRows } from '../ui/uiKit';
 /**
  * AdminSystemPanel.tsx — the Overview cards for API/server health and customer
  * locations. Server metrics carry an explicit host/instance scope; any legacy
@@ -420,6 +421,11 @@ export function SystemPanel() {
       </div>
     );
   }
+
+  if (!data) return <div className="card mt-2">
+    <div className="card-title"><Icon name="pulse" size={18} /><span>Server</span></div>
+    <LoadingRows rows={5} />
+  </div>;
 
   // A payload from a build that predates these cards says nothing about the
   // host or the countries. Saying so beats rendering an empty page: the most

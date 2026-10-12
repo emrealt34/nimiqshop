@@ -1,3 +1,5 @@
+import { Skel, ErrorState } from '../ui/uiKit';
+import { friendlyApiMessage } from '../../lib/api';
 /**
  * CashbackImpactSection.tsx — public Cashback stats,
  * personal shareable Cashback receipt card (1080×1350 PNG export + native
@@ -93,6 +95,9 @@ export function CashbackImpactSection({
   const { t } = useT();
   const [bucket, setBucket] = useState<'week' | 'month' | 'all'>('all');
   const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [retry, setRetry] = useState(0);
   const [copied, setCopied] = useState(false);
   const [address, setAddress] = useState<string>('');
   const [leaderPage, setLeaderPage] = useState(0);
@@ -106,17 +111,20 @@ export function CashbackImpactSection({
 
   useEffect(() => {
     let alive = true;
+    setLoading(true);
+    setError('');
     (async () => {
       try {
-        const lbRes = await getCashbackLeaderboard(bucket).catch(() => null);
-        if (!alive) return;
-        if (lbRes) setData(lbRes);
-      } catch {
-        /* best-effort */
+        const lbRes = await getCashbackLeaderboard(bucket);
+        if (alive) setData(lbRes);
+      } catch (cause) {
+        if (alive) setError(friendlyApiMessage(cause));
+      } finally {
+        if (alive) setLoading(false);
       }
     })();
     return () => { alive = false; };
-  }, [bucket]);
+  }, [bucket, retry]);
 
   const totals = data?.totals || {
     total_nim: 0,
@@ -717,11 +725,11 @@ export function CashbackImpactSection({
             They used to be their own full-width row at the very top of the
             page, which pushed the owner's card/rate/board order down. */}
         <div className="pt-stats pt-stats-inline">
-          <Stat icon="nimiq" value={`${formatNimCompact(globalEarned)} NIM`} label={t('cashbackCard.statEarned')} />
-          <Stat icon="gift" value={String(globalOrders)} label={t('cashbackCard.statOrders')} />
+          <Stat icon="nimiq" value={loading ? <Skel w={100} h={22} /> : error ? '—' : `${formatNimCompact(globalEarned)} NIM`} label={t('cashbackCard.statEarned')} />
+          <Stat icon="gift" value={loading ? <Skel w={60} h={22} /> : error ? '—' : String(globalOrders)} label={t('cashbackCard.statOrders')} />
         </div>
 
-        {authed && cleanUser && (
+        {!loading && !error && authed && cleanUser && (
           <div className="pt-yourank">
             {address && <Identicon address={address} size={34} className="pt-ident-lg" />}
             <div className="pt-yourank-info">
@@ -747,7 +755,13 @@ export function CashbackImpactSection({
           </div>
         )}
 
-        {leaders.length === 0 ? (
+        {loading ? <div role="status" aria-busy="true" aria-label={t('common.loading')}>
+          <ol className="pt-leader" aria-hidden="true">{Array.from({ length: 3 }, (_, i) => <li key={i}>
+            <span className="pt-badge"><Skel w={20} h={16} /></span><span className="pt-ident"><Skel w={28} h={28} r={14} /></span>
+            <span className="pt-leader-code"><Skel w={130} h={14} /></span>
+            <span className="pt-leader-meta"><Skel w={80} h={16} /><Skel w={60} h={12} /></span>
+          </li>)}</ol>
+        </div> : error ? <ErrorState message={error} retry={() => setRetry(value => value + 1)} /> : leaders.length === 0 ? (
           <p className="small muted center" style={{ margin: 0 }}>
             {t('cashbackCard.noCashbackYet')}
           </p>
@@ -875,7 +889,7 @@ function ShareBtn({
   );
 }
 
-function Stat({ icon, label, value }: { icon: string; label: string; value: string }) {
+function Stat({ icon, label, value }: { icon: string; label: string; value: ReactNode }) {
   return (
     <div className="pt-stat">
       <span className="pt-stat-ico">

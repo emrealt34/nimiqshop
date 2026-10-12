@@ -1,3 +1,4 @@
+import { LoadingRows } from '../ui/uiKit';
 /**
  * AdminPeoplePanel — the operator console's customer side.
  *
@@ -288,7 +289,7 @@ export function UsersPanel() {
       </div>
 
       {err ? <AlertBox type="error">{err}</AlertBox> : null}
-      {!rows && !err ? <div className="small muted mt-1">Loading…</div> : null}
+      {!rows && !err ? <LoadingRows /> : null}
       {rows && rows.length === 0 ? <div className="xs faint mt-2">No customers registered yet.</div> : null}
 
       {rows && rows.length ? (
@@ -374,7 +375,7 @@ function UserDetail({ userId }: { userId: string }) {
   }, [userId]);
 
   if (err) return <AlertBox type="error">{err}</AlertBox>;
-  if (!data) return <div className="small muted">Loading…</div>;
+  if (!data) return <LoadingRows />;
 
   const u = data.user || {};
   const s = data.stats || {};

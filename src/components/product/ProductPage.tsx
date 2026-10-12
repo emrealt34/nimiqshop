@@ -635,12 +635,10 @@ export function ProductPage() {
   if (loading) {
     return (
       <div className="container">
-        <div className="skeleton-row" style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-          <span className="skeleton-btn" style={{ width: 64, height: 32, borderRadius: 8, display: 'inline-block' }} />
-        </div>
-        <div className="pd pd-skeleton fade-in mt-2" aria-busy="true" aria-label={t('productPage.loadingProduct')}>
-          <div className="pd-top">
-            <div className="skeleton-box" style={{ width: 'clamp(120px, 40vw, 160px)', aspectRatio: '4 / 3', borderRadius: 12, flexShrink: 0 }} />
+        <div className="pd pd-skeleton fade-in" role="status" aria-busy="true" aria-label={t('productPage.loadingProduct')}>
+          <div className="pd-back" aria-hidden="true"><span className="skeleton-btn" style={{ width: 90, height: 36, borderRadius: 8, display: 'inline-block' }} /></div>
+          <div className="pd-top" aria-hidden="true">
+            <div className="pd-image"><div className="thumb skel" /></div>
             <div className="pd-info" style={{ flex: 1 }}>
               <div className="skeleton-box" style={{ width: '60%', maxWidth: 320, height: 28, borderRadius: 8 }} />
               <div className="skeleton-box mt-1" style={{ width: '40%', maxWidth: 240, height: 22, borderRadius: 8 }} />
@@ -648,7 +646,7 @@ export function ProductPage() {
               <div className="skeleton-box mt-1" style={{ width: '70%', height: 12, borderRadius: 6 }} />
             </div>
           </div>
-          <div className="card mt-2">
+          <div className="card mt-2" aria-hidden="true">
             <div className="skeleton-box" style={{ width: 180, height: 16, borderRadius: 8 }} />
             <div className="packages-grid mt-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
               {[0, 1, 2, 3].map((i) => (

@@ -1,3 +1,4 @@
+import { LoadingRows } from '../ui/uiKit';
 import { useEffect, useState } from 'react';
 import { Icon } from '../ui/Icon';
 import { useToast } from '../AppProviders';
@@ -81,7 +82,7 @@ export function AdminTestAccountsCard() {
         create no supplier order and move no real money. Everyone else is unaffected.
       </div>
 
-      {accounts === null && !err ? <div className="small muted">Loading…</div> : null}
+      {accounts === null && !err ? <LoadingRows /> : null}
       {accounts && accounts.length === 0 ? <div className="small muted">No test accounts yet.</div> : null}
       {accounts && accounts.length > 0 ? (
         <table className="table small">

@@ -149,11 +149,11 @@ export function RecentCashbackList({
         )}
       </div>
       {loading && !rows ? (
-        <>
+        <div role="status" aria-busy="true" aria-label={tr('common.loading')}>
           <CbRowSkeleton />
           <CbRowSkeleton />
           <CbRowSkeleton />
-        </>
+        </div>
       ) : list.length === 0 ? (
         <div className="small muted">{emptyText}</div>
       ) : (

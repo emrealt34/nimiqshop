@@ -1,3 +1,4 @@
+import { LoadingRows } from '../ui/uiKit';
 import { useEffect, useState } from 'react';
 import { useSheet } from '../AppProviders';
 import { Icon } from '../ui/Icon';
@@ -87,7 +88,7 @@ export function AdminQuizPanel() {
     <div className="card mt-2"><h3>Import quiz JSON</h3><p className="small muted">Upload one JSON object (max 256 KB). Questions can use type "choice" with options/correct_index, or "range" with min/max/correct_value. winner_count is 1, 3, 5, or 0 for all completed participants. Dates accept ISO timestamps with +03:00 for Turkey; the editor always displays Turkey time (UTC+03:00). Omitted dates start now and end in 7 days. Import never publishes automatically.</p><label className="field">JSON file<input className="input" type="file" accept=".json,application/json" disabled={busy} onChange={(e) => { void importFile(e.target.files?.[0]); e.target.value = ''; }} /></label><details><summary>Or paste / edit JSON</summary><textarea className="input" aria-label="Quiz JSON" rows={8} value={jsonText} onChange={(e) => setJsonText(e.target.value)} spellCheck={false} /><button className="btn btn-outline mt-1" type="button" disabled={busy || !jsonText.trim()} onClick={() => importJson(jsonText)}>Load JSON into editor</button></details></div>
     {importNotice && <div className="alert info mt-2" role="status">{importNotice}</div>}
     {error && <div className="alert error mt-2" role="alert">{error}</div>}
-    {!loaded && <div className="card mt-2">Loading…</div>}
+    {!loaded && <div className="card mt-2"><LoadingRows rows={5} /></div>}
     {loaded && !items.length && !draft && <div className="card mt-2">No competitions yet. Create a draft, add your Nimiq questions and prize, then publish it.</div>}
     {!draft && <div className="quiz-admin-list">{items.map((c) => <div className="card" key={c.id}><div className="row between"><div><strong>{c.title}</strong><div className="xs muted">{c.status} · {c.questions.length} questions · {c.participants || 0} entrants</div><div className="small">{c.prize.title} {c.prize.value && `· ${c.prize.value}`}</div><div className="xs muted">{new Date(c.starts_at).toLocaleString('en-GB',{timeZone:'Europe/Istanbul'})} → {new Date(c.ends_at).toLocaleString('en-GB',{timeZone:'Europe/Istanbul'})}</div></div><div className="row">
       {c.status === 'published' && <button className="btn btn-outline btn-sm" disabled={busy} onClick={() => {setDraft(structuredClone(c));setManage(null);}}>Edit</button>}

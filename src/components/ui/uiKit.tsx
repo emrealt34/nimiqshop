@@ -366,58 +366,61 @@ export function CopyButton({ getText, label }: { getText: string | (() => string
 
 /* ---------------- Skeletons & empty states ---------------- */
 
-/** Shimmer block primitive. Every list skeleton on the site is built from
- *  the SAME classes and geometry as the row it stands in for (see
- *  KvSkeleton / OrderCardSkeleton here, CbRowSkeleton in RecentCashbackList,
- *  FeedItemSkeleton in ActivityPage) — so restyling a row automatically
- *  restyles its loading twin (owner, 2026-10-05: "skeletonlar gerçek olsun,
- *  içerik değişince skeleton da değişsin"). */
+/** Decorative loading bar; dimensions follow its surrounding content layout. */
 export function Skel({ w, h, r = 6, style }: { w?: number | string; h?: number | string; r?: number; style?: CSSProperties }) {
-  return <span className="skel" aria-hidden="true" style={{ display: 'inline-block', width: w, height: h, borderRadius: r, ...style }} />;
+  return <span className="skel" aria-hidden="true" style={{ display: 'inline-block', width: w, height: h, maxWidth: '100%', borderRadius: r, ...style }} />;
 }
 
-/** Skeleton twin of <Kv>: the same dl.kv row grid, shimmer instead of dt/dd. */
+/** One accessible loading status per group, with decorative lines. */
+export function LoadingRows({ rows = 3 }: { rows?: number }) {
+  const { t } = useT();
+  return <div className="loading-rows" role="status" aria-busy="true" aria-label={t('common.loading')}>
+    {Array.from({ length: rows }, (_, i) => <Skel key={i} w={i % 2 ? '64%' : '88%'} h={16} />)}
+  </div>;
+}
+
 export function KvSkeleton({ n = 5 }: { n?: number }) {
-  return (
-    <dl className="kv" aria-hidden="true">
-      {Array.from({ length: n }).map((_, i) => (
-        <div key={i}>
-          <dt><Skel w={i % 2 ? '68%' : '84%'} h={12} /></dt>
-          <dd><Skel w={i % 3 ? '46%' : '62%'} h={12} /></dd>
-        </div>
-      ))}
+  const { t } = useT();
+  return <div role="status" aria-busy="true" aria-label={t('common.loading')}>
+    <dl className="kv kv-skeleton" aria-hidden="true">
+      {Array.from({ length: n }, (_, i) => <div key={i}>
+        <dt><Skel w={i % 2 ? '68%' : '84%'} h={12} /></dt>
+        <dd><Skel w={i % 3 ? '46%' : '62%'} h={12} /></dd>
+      </div>)}
     </dl>
-  );
+  </div>;
 }
 
-/** Skeleton twin of the order-list row (.order-card): the same thumb column
- *  width, the same three-column flex geometry as the real card. */
+/** Shares the real order's thumbnail and responsive three-row layout. */
 export function OrderCardSkeleton() {
-  return (
-    <div className="order-card" aria-hidden="true">
-      <div style={{ width: 'clamp(64px, 30vw, 140px)', flex: 'none' }}>
-        <Skel w="100%" h={64} r={10} style={{ display: 'block' }} />
+  return <div className="order-card" aria-hidden="true">
+    <div className="o-thumb"><div className="thumb skel" /></div>
+    <div className="o-main">
+      <div className="o-row-1">
+        <span className="o-title-wrap"><Skel w={160} h={18} /></span>
+        <span className="o-side"><Skel w={80} h={22} /><Skel w={56} h={12} /></span>
       </div>
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 7 }}>
-        <Skel w="52%" h={13} style={{ display: 'block' }} />
-        <Skel w="30%" h={11} style={{ display: 'block' }} />
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 7, alignItems: 'flex-end' }}>
-        <Skel w={72} h={13} />
-        <Skel w={52} h={11} />
-      </div>
+      <div className="o-row-2"><Skel w={88} h={20} /><Skel w={110} h={22} /></div>
+      <div className="o-row-3"><Skel w={140} h={12} /><Skel w={72} h={12} /></div>
     </div>
-  );
+  </div>;
 }
 
-export function SkeletonCards({ n = 8, cls = 'skel card' }: { n?: number; cls?: string }) {
-  return (
-    <>
-      {Array.from({ length: n }).map((_, i) => (
-        <div key={i} className={cls} />
-      ))}
-    </>
-  );
+export function SkeletonCards({ n = 3 }: { n?: number }) {
+  const { t } = useT();
+  return <div className="order-list" role="status" aria-busy="true" aria-label={t('common.loading')}>
+    {Array.from({ length: n }, (_, i) => <OrderCardSkeleton key={i} />)}
+  </div>;
+}
+
+/** Catalog cards keep their image, name, price and country-chip spacing. */
+export function ProductCardSkeleton() {
+  return <div className="product-card product-card-skeleton" aria-hidden="true">
+    <div className="thumb skel" />
+    <div className="p-name"><Skel w="76%" h={18} /></div>
+    <span className="p-price"><Skel w="48%" h={14} /></span>
+    <div className="p-meta"><Skel w={100} h={28} r={14} /></div>
+  </div>;
 }
 
 export function EmptyState({ iconName = 'bag', title, text, action }: { iconName?: string; title: string; text?: string; action?: ReactNode }) {

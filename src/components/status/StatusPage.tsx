@@ -1,3 +1,4 @@
+import { Skel } from '../ui/uiKit';
 import { useEffect, useState } from 'react';
 import { AppRoot } from '../AppRoot';
 import { useT } from '../../i18n';
@@ -47,6 +48,10 @@ export function StatusView() {
     <h1>{t('refreshStatus.title')}</h1>
     <p className="muted">{t('refreshStatus.intro')}</p>
     <div className={`alert ${error || (data && (!fresh || !complete)) ? 'warn' : 'info'}`} role="status">{error ? t('refreshStatus.error') : !data ? t('refreshStatus.loading') : !fresh ? t('refreshStatus.stale') : !complete ? t('refreshStatus.partial') : t('refreshStatus.fresh')}</div>
+    {!data && !error && <div className="card pad mt-2" aria-busy="true">
+      <dl className="refresh-status-list" aria-hidden="true">{Array.from({ length: 8 }, (_, i) => <StatusSkeletonRow key={i} index={i} />)}</dl>
+      <div aria-hidden="true"><Skel w="90%" h={14} /></div>
+    </div>}
     {data ? <div className="card pad mt-2">
       <dl className="refresh-status-list">
         <dt>{t('refreshStatus.catalog')}</dt><dd>{date(data.catalog.generated_at)}</dd>
@@ -64,3 +69,7 @@ export function StatusView() {
   </section>;
 }
 export function StatusPage() { return <AppRoot activeKey="none"><StatusView /></AppRoot>; }
+
+function StatusSkeletonRow({ index }: { index: number }) {
+  return <><dt><Skel w={index % 2 ? 120 : 150} h={14} /></dt><dd><Skel w="70%" h={14} /></dd></>;
+}

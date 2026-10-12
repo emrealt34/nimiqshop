@@ -9,7 +9,7 @@ import { Icon } from '../ui/Icon';
 import { RatingReminder } from '../rating/RatingReminder';
 import { WalletBalance } from '../wallet/WalletBalance';
 import { FlagMark } from '../ui/FlagMark';
-import { ComeBackBanner, ErrorDetail } from '../ui/uiKit';
+import { ComeBackBanner, ErrorDetail, ProductCardSkeleton } from '../ui/uiKit';
 import { flattenBrands, markReportedOutOfStock, type Product } from '../../lib/catalog';
 import { excludedCatalogItem } from '../../lib/catalogVisibility';
 import { UnifiedThumb } from '../ui/UnifiedThumb';
@@ -813,6 +813,7 @@ function productPriceText(p: Product, t: (k: string, v?: Record<string, string |
 
 /* ---------------- UI primitives ---------------- */
 function SkeletonGrid() {
+  const { t } = useT();
   // Four cards, not ten. `#gridWrap` is min-height:62vh, so with four cards the
   // grid area is exactly as tall as the empty state and as the error state —
   // the three states swap without changing the document height. Ten cards made
@@ -822,9 +823,9 @@ function SkeletonGrid() {
   // whenever the API is slow or down. A grid of real products grows the page
   // *downwards*, which is harmless — the footer only leaves the viewport.
   return (
-    <div className="grid products">
+    <div className="grid products" role="status" aria-busy="true" aria-label={t("common.loading")}>
       {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="skeleton-card" style={{ height: 190, borderRadius: 14 }} />
+        <ProductCardSkeleton key={i} />
       ))}
     </div>
   );

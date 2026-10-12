@@ -1,3 +1,4 @@
+import { LoadingRows } from '../ui/uiKit';
 /**
  * AdminTestCenterPanel.tsx — operator sandbox for the real order email.
  *
@@ -354,7 +355,7 @@ export function AdminTestCenterPanel() {
       {picked ? (
         <div className="field">
           <label>Denomination for {picked.name} ({picked.country})</label>
-          {loadingDetail ? <div className="small muted">Loading denominations…</div> : null}
+          {loadingDetail ? <LoadingRows rows={2} /> : null}
           {detail && detail.packages.length ? (
             <select className="input" value={chosenKey} onChange={(e) => setChosenKey(e.target.value)}>
               {detail.packages.map((p) => (

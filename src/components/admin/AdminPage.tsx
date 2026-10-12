@@ -1,3 +1,4 @@
+import { LoadingRows } from '../ui/uiKit';
 /**
  * AdminPage.tsx — React port of pages/admin.js: operator console for direct
  * email notifications (Mailtrap — the one mail transport), NIM cashback
@@ -507,7 +508,7 @@ function CashbackPanel() {
     }
   };
 
-  if (!data && !err) return <div className="card mt-2"><div className="card-title">NIM cashback</div><div className="small muted">Loading…</div></div>;
+  if (!data && !err) return <div className="card mt-2"><div className="card-title">NIM cashback</div><LoadingRows /></div>;
   if (err) return <div className="card mt-2"><div className="card-title">NIM cashback</div><div className="alert error"><div className="small">{err}</div></div></div>;
 
   const pct = Number(data.cashback_percent);
@@ -784,7 +785,7 @@ function StakeLedgerTable() {
       {err ? (
         <div className="alert error mt-1"><div className="small">{err}</div></div>
       ) : !rows ? (
-        <div className="small muted mt-1">Loading…</div>
+        <LoadingRows />
       ) : rows.length === 0 ? (
         <div className="xs faint mt-1">No ledgers yet — one appears per wallet as soon as the pool feed credits its first fee share.</div>
       ) : (
@@ -1013,7 +1014,7 @@ function OrdersPanel() {
       .then((d) => setRows(d.quotes || []))
       .catch((e) => setErr((e as Error).message || 'Could not load orders'));
   }, []);
-  if (!rows && !err) return <div className="card mt-2"><div className="card-title">Orders</div><div className="small muted">Loading…</div></div>;
+  if (!rows && !err) return <div className="card mt-2"><div className="card-title">Orders</div><LoadingRows /></div>;
   if (err) return <div className="card mt-2"><div className="card-title">Orders</div><div className="alert error"><div className="small">{err}</div></div></div>;
   const ORDERS_PAGE_SIZE = 5;
   const pages = Math.max(1, Math.ceil((rows?.length || 0) / ORDERS_PAGE_SIZE));
@@ -1205,7 +1206,7 @@ function CatalogRulesPanel() {
     }
   };
 
-  if (!rules && !err) return <div className="card mt-2"><div className="card-title">Catalog rules</div><div className="small muted">Loading…</div></div>;
+  if (!rules && !err) return <div className="card mt-2"><div className="card-title">Catalog rules</div><LoadingRows /></div>;
   if (err) return <div className="card mt-2"><div className="card-title">Catalog rules</div><div className="alert error"><div className="small">{err}</div></div></div>;
 
   return (
@@ -1341,7 +1342,7 @@ export function AdminContent() {
       <div className="container">
         <AdminHeader />
         <div className="card">
-          <div className="small muted">Loading…</div>
+          <LoadingRows />
         </div>
       </div>
     );
