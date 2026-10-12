@@ -463,9 +463,15 @@ func (h *Handlers) AdminGetOrderDetail(ctx *fasthttp.RequestCtx) {
 	id, _ := ctx.UserValue("id").(string)
 	if q, qerr := h.Store.GetQuote(id); qerr == nil {
 		user, _ := h.Store.GetUser(q.UserID)
+		inspection, err := h.Store.InspectQuotePayment(q.ID)
+		if err != nil {
+			adminStoreError(ctx)
+			return
+		}
 		writeJSON(ctx, fasthttp.StatusOK, map[string]any{
-			"quote": h.adminQuoteView(q),
-			"user":  adminUserView(user),
+			"quote":              h.adminQuoteView(q),
+			"payment_inspection": inspection,
+			"user":               adminUserView(user),
 		})
 		return
 	}
@@ -1252,6 +1258,8 @@ func adminQuoteView(quote db.Quote) map[string]any {
 	// too — same hash the public recap and the feed show. Set after the
 	// literal so gofmt alignment groups stay untouched.
 	view["lightning_payment_hash"] = quote.LightningPaymentHash
+	view["lightning_funding_hint"] = quote.LightningFundingHint
+	view["lightning_chain_proof"] = quote.LightningChainProof
 	return view
 }
 

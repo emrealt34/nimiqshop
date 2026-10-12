@@ -28,6 +28,7 @@ import {
   adminGetStakeLedger,
   adminResetStakeLedger,
   adminListQuotes,
+  adminGetOrder,
 } from '../../lib/api';
 import { fmtNIM, formatWalletAddress } from '../../lib/format';
 import { siteName } from '../../lib/config';
@@ -1036,7 +1037,9 @@ function OrdersPanel() {
         <div className="mt-1">
           {shown.map((q: any, i: number) => (
             <div key={from + i}>
-              <CashbackRow cb={q.cashback} purchaseTx={q.lightning_payment_hash || ''} extraLeft={(q.test_mode ? '🧪 TEST · ' : '') + (q.product_id || 'item') + ' · ' + (q.status || '') + (q.id ? ' · ' + String(q.id).slice(0, 8) : '')} />
+              <CashbackRow cb={q.cashback} purchaseTx={q.lightning_funding_hint || q.lightning_chain_proof?.funding_tx || ''} extraLeft={(q.test_mode ? '🧪 TEST · ' : '') + (q.product_id || 'item') + ' · ' + (q.status || '') + (q.id ? ' · ' + String(q.id).slice(0, 8) : '')} />
+              {q.lightning_payment_hash ? <div className="xs mono" style={{ overflowWrap: 'anywhere' }}>Lightning invoice hash: {q.lightning_payment_hash}</div> : null}
+              <PaymentInspectionButton id={q.id} />
               {/* Contact the buyer entered for this order (the same values the supplier request is built from). Admin-only view; never logged. */}
               <div className="xs mt-1" style={{ paddingBottom: 8, display: 'flex', flexWrap: 'wrap', gap: 12 }} data-testid="order-contact">
                 <span>
@@ -1455,4 +1458,20 @@ export function AdminPage() {
       <AdminContent />
     </AppRoot>
   );
+}
+
+function PaymentInspectionButton({ id }: { id: string }) {
+  const [inspection, setInspection] = useState<any>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  return <div className="mt-1">
+    <button type="button" className="btn btn-outline btn-sm" disabled={busy} onClick={async () => {
+      setBusy(true); setError('');
+      try { setInspection((await adminGetOrder(id)).payment_inspection); }
+      catch (err) { setError(err instanceof Error ? err.message : 'Could not inspect payment record'); }
+      finally { setBusy(false); }
+    }}>Inspect stored payment identifiers</button>
+    {error ? <div role="alert" className="xs">{error}</div> : null}
+    {inspection ? <pre className="xs mono" data-testid="payment-inspection" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{JSON.stringify(inspection, null, 2)}</pre> : null}
+  </div>;
 }
