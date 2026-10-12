@@ -137,9 +137,10 @@ export async function awaitRatingSaved(
   kind: RatingKind,
   id: string,
   body: RatingBody,
-  { attempts = 45, delayMs = 4000 }: { attempts?: number; delayMs?: number } = {},
+  { attempts = 3, delayMs = 2000 }: { attempts?: number; delayMs?: number } = {},
 ): Promise<any> {
-  for (let i = 0; i < attempts; i++) {
+  const limit = Math.max(1, Math.min(3, attempts));
+  for (let i = 0; i < limit; i++) {
     let res: any;
     try {
       res = await submitRating(kind, id, body);

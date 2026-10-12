@@ -12,8 +12,9 @@ account-scoped browser outbox before attempting the authenticated metadata POST.
 The outbox contains neither credentials nor the invoice. Entries have no expiry.
 Successful durable acknowledgements remove only the exact acknowledged entry;
 conflicts remain available for inspection. Online, session and visibility events
-resume pending writes. Transient failures back off from 5 seconds to 5 minutes;
-there are no requests when no identifiers are waiting. Different accounts do not
+resume pending writes. There is no timed retry loop. Each pending entry gets at most three attempts
+per page lifecycle, triggered by a save, connection, session or visibility event.
+Exhausted entries remain durable for a subsequent reload; they are not discarded. Different accounts do not
 upload one another's pending records.
 
 The server commits metadata independently of RPC availability. This endpoint
@@ -25,7 +26,9 @@ Public proof discovery continues to verify the invoice-bound chain receipt.
 Submitted pending reviews retain their stars, comment and known transaction hash
 beyond the former 15-minute expiry. Authenticated pending reviews also have a
 browser copy that survives tab closure. A retry confirms the existing payment
-instead of opening another wallet payment. The backend acknowledges an identical,
+instead of opening another wallet payment. Each automatic review check is limited
+to three chain-verification requests; the stored stars and comment come from the
+verified 1-Luna transaction memo, not an unverified browser payload. The backend acknowledges an identical,
 already verified review for its owner without counting another edit.
 
 Every accepted review revision is archived under `rating:history:<transaction>`

@@ -746,9 +746,7 @@ export const trackOrder = (id: string) => api(`/track/${encodeURIComponent(id)}`
 export const getLightningChainProof = (id: string) => api(`/track/${encodeURIComponent(id)}/lightning-proof`, { timeoutMs: 15000, quiet: true });
 // This queue only writes metadata. It never calls a wallet payment method.
 let submissionFlush: Promise<void> | null = null;
-let submissionTimer: ReturnType<typeof setTimeout> | undefined;
-let submissionRecoveryActive = false;
-let submissionBackoff = 5000;
+const submissionAttempts = new Map<string, number>();
 const submissionBlocked = new Set<string>();
 export async function flushPaymentSubmissions(): Promise<void> {
   if (submissionFlush) return submissionFlush;
@@ -758,24 +756,17 @@ export async function flushPaymentSubmissions(): Promise<void> {
     for (const entry of pendingSubmissions(owner)) {
       if (sessionGetter() !== owner) break;
       const key = owner + ':' + entry.id;
-      if (submissionBlocked.has(key)) continue;
+      if (submissionBlocked.has(key) || (submissionAttempts.get(key) || 0) >= 3) continue;
+      submissionAttempts.set(key, (submissionAttempts.get(key) || 0) + 1);
       try {
         await api(`/quotes/${encodeURIComponent(entry.id)}/lightning-proof`, { method: 'POST', auth: true, body: { hash: entry.hash, swap_id: entry.swapId }, timeoutMs: 15000, quiet: true });
         forgetSubmission(entry);
+        submissionAttempts.delete(key);
       } catch (error) {
         if (error instanceof ApiError && [400, 404, 409].includes(error.status)) submissionBlocked.add(key);
       }
     }
-  })().finally(() => {
-    submissionFlush = null;
-    if (submissionTimer) clearTimeout(submissionTimer);
-    const currentOwner = sessionGetter();
-    const retry = !!currentOwner && pendingSubmissions(currentOwner).some(entry => !submissionBlocked.has(currentOwner + ':' + entry.id));
-    if (submissionRecoveryActive && retry) {
-      submissionTimer = setTimeout(() => { void flushPaymentSubmissions(); }, submissionBackoff);
-      submissionBackoff = Math.min(submissionBackoff * 2, 300000);
-    } else submissionBackoff = 5000;
-  });
+  })().finally(() => { submissionFlush = null; });
   return submissionFlush;
 }
 export async function saveLightningFunding(id: string, hash: string, swapId?: string) {
@@ -785,15 +776,12 @@ export async function saveLightningFunding(id: string, hash: string, swapId?: st
   await flushPaymentSubmissions();
 }
 export function startPaymentSubmissionRecovery(): () => void {
-  submissionRecoveryActive = true;
   const recover = () => { if (document.visibilityState !== 'hidden') void flushPaymentSubmissions(); };
   recover();
   window.addEventListener('online', recover);
   window.addEventListener('nimshop:session', recover);
   document.addEventListener('visibilitychange', recover);
   return () => {
-    submissionRecoveryActive = false;
-    if (submissionTimer) clearTimeout(submissionTimer);
     window.removeEventListener('online', recover);
     window.removeEventListener('nimshop:session', recover);
     document.removeEventListener('visibilitychange', recover);

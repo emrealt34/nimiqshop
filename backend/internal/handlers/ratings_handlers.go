@@ -187,7 +187,6 @@ func (h *Handlers) submitRating(ctx *fasthttp.RequestCtx, kind string) {
 	if !ok {
 		return
 	}
-	comment, _ = ratings.NormalizeComment(req.Comment)
 
 	cctx, cancel := context.WithTimeout(context.Background(), ratingChainTimeout)
 	defer cancel()
@@ -229,12 +228,19 @@ func (h *Handlers) submitRating(ctx *fasthttp.RequestCtx, kind string) {
 		proof = det
 	}
 
+	// The verified on-chain memo is the source of the stored review.
+	// Browser fields select the requested memo, never establish a rating.
+	chainStars, chainComment, parsed := ratings.ParseMemo(string(proof.Data))
+	if !parsed {
+		writeError(ctx, 400, "invalid on-chain rating memo")
+		return
+	}
 	agg, err := h.Store.ApplyRating(db.RatingWrite{
 		Kind:       kind,
 		ID:         id,
 		UserID:     userID,
-		Stars:      req.Stars,
-		Comment:    comment,
+		Stars:      chainStars,
+		Comment:    chainComment,
 		TxHash:     proof.Hash,
 		MaxRatings: ratings.MaxRatingsPerOrder,
 		Now:        time.Now().UTC(),
@@ -265,8 +271,8 @@ func (h *Handlers) submitRating(ctx *fasthttp.RequestCtx, kind string) {
 
 	writeJSON(ctx, fasthttp.StatusOK, map[string]interface{}{
 		"order_id":   id,
-		"rating":     req.Stars,
-		"comment":    comment,
+		"rating":     chainStars,
+		"comment":    chainComment,
 		"rated_at":   time.Now().UTC(),
 		"rating_tx":  proof.Hash,
 		"edits_left": ratings.MaxRatingsPerOrder - (st.Edits + 1),

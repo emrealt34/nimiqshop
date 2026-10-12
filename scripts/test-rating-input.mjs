@@ -16,7 +16,7 @@ globalThis.window = { addEventListener() {}, location: { href: '' }, navigator: 
 globalThis.document = { addEventListener() {}, documentElement: { lang: 'en' }, createElement: () => ({ style: {} }), cookie: '' };
 export { ratingIntent, submitRating, ApiError, _setSessionGetter, saveLightningFunding, flushPaymentSubmissions } from ${JSON.stringify(new URL('../src/lib/api.ts', import.meta.url).pathname)};
 export { pendingSubmissions } from ${JSON.stringify(new URL('../src/lib/paymentSubmissionQueue.ts', import.meta.url).pathname)};
-export { readPendingRating, rememberPendingRating, markPendingRatingSubmitted } from ${JSON.stringify(new URL('../src/lib/ratingPay.ts', import.meta.url).pathname)};
+export { readPendingRating, rememberPendingRating, markPendingRatingSubmitted, awaitRatingSaved } from ${JSON.stringify(new URL('../src/lib/ratingPay.ts', import.meta.url).pathname)};
 `);
 buildSync({ entryPoints: [entry], bundle: true, platform: 'node', format: 'cjs', outfile: bundle,
   define: { 'import.meta.env.BASE_URL': '"/"', 'import.meta.env': '{}' }, loader: { '.css': 'empty' }, logLevel: 'silent' });
@@ -111,4 +111,27 @@ test('submitted review retains comment and transaction hash beyond the old 15-mi
   const recovered = client.readPendingRating('order', 'durable-review');
   assert.equal(recovered.comment, 'excellent');
   assert.equal(recovered.hash, 'ef'.repeat(32));
+});
+
+test('automatic metadata writes have a per-page budget and keep exhausted records', async () => {
+  const savedFetch = globalThis.fetch;
+  let calls = 0;
+  client._setSessionGetter(() => 'bounded-buyer');
+  globalThis.fetch = async () => { calls++; throw new TypeError('offline'); };
+  try {
+    await client.saveLightningFunding('bounded-payment', 'cd'.repeat(32), 'pending-swap');
+    for (let index = 0; index < 10; index++) await client.flushPaymentSubmissions();
+    assert.equal(calls, 3);
+    assert.equal(client.pendingSubmissions('bounded-buyer').length, 1);
+  } finally { globalThis.fetch = savedFetch; client._setSessionGetter(() => 'buyer'); }
+});
+
+test('review confirmation cannot poll more than three times or resubmit a wallet transaction', async () => {
+  const savedFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => { calls++; return Response.json({ status: 'pending' }); };
+  try {
+    await assert.rejects(client.awaitRatingSaved('order', 'pending-review', { stars: 5, comment: 'excellent' }, { attempts: 1000, delayMs: 0 }), error => error.code === 'pending');
+    assert.equal(calls, 3);
+  } finally { globalThis.fetch = savedFetch; }
 });
