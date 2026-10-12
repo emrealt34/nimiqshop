@@ -48,7 +48,7 @@ for (const width of [320, 1280]) {
         else {
           await expect(page.locator('.lightning-receipt-hash')).toHaveText(hash);
           await expect(page.locator('.lightning-receipt')).toContainText('BTC Lightning');
-          await expect(page.locator('.lightning-receipt').getByRole('link', { name: 'External verifier' })).toHaveAttribute('href', 'https://dev.blink.sv/decode');
+          await expect(page.locator('.lightning-receipt').getByRole('link', { name: 'External verifier' })).toHaveCount(0);
           await page.getByRole('button', { name: 'Payment details' }).click();
         }
         await expect(page.locator('.lightning-receipt-details').getByRole('link', { name: 'External verifier' })).toBeVisible();

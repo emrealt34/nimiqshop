@@ -112,9 +112,6 @@ export function LightningReceipt({ receipt, compact = false }: { receipt?: Light
       <button type="button" className="btn btn-outline btn-sm" onClick={() => openSheet({ title: t('lightningReceipt.title'), render: () => <ReceiptDetails receipt={receipt} /> })}>
         <Icon name="bolt" size={14} /> {t('lightningReceipt.details')}
       </button>
-      <a className="btn btn-outline btn-sm" href={LIGHTNING_VERIFIER_URL} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">
-        <Icon name="external" size={14} /> {t('lightningReceipt.external')}
-      </a>
     </div>
   </div>;
   return <div><SubmittedTransaction receipt={receipt} /><button type="button" className="lightning-receipt-chip chip xs" title={paymentHash(receipt.payment_hash)} onClick={() => openSheet({ title: t('lightningReceipt.title'), render: () => <ReceiptDetails receipt={receipt} /> })}>
