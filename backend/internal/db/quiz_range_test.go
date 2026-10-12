@@ -143,14 +143,14 @@ func TestQuizTranslationsPersistValidateAndFreeze(t *testing.T) {
 	s, c, now := rangeQuizFixture(t, 1)
 	c.ID = ""
 	c.Translations = map[string]QuizText{"fr": {Title: "Boutique", Description: "Règles"}}
-	c.Prize.Translations = map[string]QuizText{"fr": {Title: "Récompense"}}
+	c.Prize.Translations = map[string]QuizText{"fr": {Title: "Lot"}}
 	c.Questions[0].Translations = map[string]QuizQuestionText{"fr": {Prompt: "Montant ?"}}
 	draft, err := s.PutQuizCompetition(c, true, now)
 	if err != nil {
 		t.Fatal(err)
 	}
 	loaded, err := s.GetQuizCompetition(draft.ID)
-	if err != nil || loaded.Translations["fr"].Title != "Boutique" || loaded.Prize.Translations["fr"].Title != "Récompense" || loaded.Questions[0].Translations["fr"].Prompt != "Montant ?" {
+	if err != nil || loaded.Translations["fr"].Title != "Boutique" || loaded.Prize.Translations["fr"].Title != "Lot" || loaded.Questions[0].Translations["fr"].Prompt != "Montant ?" {
 		t.Fatal("lost translations", loaded, err)
 	}
 	if _, err := s.PublishQuiz(draft.ID, now); err != nil {
