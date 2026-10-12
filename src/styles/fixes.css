@@ -963,7 +963,7 @@ html.in-nimiq-pay #main.page {
 /* Global programme totals, compact, INSIDE the leaderboard card (owner,
    2026-10-05: the page was too long — the three programme-wide numbers used to
    be their own full-width row at the very top, above the receipt card). */
-.pt-stats.pt-stats-inline{ gap:8px; grid-template-columns:repeat(3,minmax(0,1fr)); margin:0 0 12px }
+.pt-stats.pt-stats-inline{ gap:8px; grid-template-columns:repeat(2,minmax(0,1fr)); margin:0 0 12px }
 .pt-stats.pt-stats-inline .pt-stat{ flex-direction:row; align-items:center; gap:8px; text-align:left;
   padding:8px 10px; border-style:solid; flex-wrap:wrap }
 .pt-stats.pt-stats-inline .pt-stat-ico{ width:30px; height:30px; border-radius:9px }

@@ -127,11 +127,11 @@ export function CashbackImpactSection({
     orders: 0,
   };
   const globalEarned = Number(totals.total_nim || 0);
-  const globalBurned = Number(totals.burned_nim || 0);
-  const globalWallet = Number(totals.wallet_nim ?? Math.max(0, globalEarned - globalBurned));
   const globalOrders = Number(totals.orders || 0);
 
-  const leaders: LeaderRow[] = data?.leaderboard || [];
+  const leaders: LeaderRow[] = (Array.isArray(data?.leaderboard) ? [...data.leaderboard] : [])
+    .sort((a, b) => (Number(b.total_nim) || 0) - (Number(a.total_nim) || 0) || String(a.user).localeCompare(String(b.user)))
+    .map((row, index) => ({ ...row, rank: index + 1 }));
   const LEADER_PER_PAGE = 5;
   const leaderPages = Math.max(1, Math.ceil(leaders.length / LEADER_PER_PAGE));
   const leaderPageSafe = Math.min(leaderPage, leaderPages - 1);
@@ -718,7 +718,6 @@ export function CashbackImpactSection({
             page, which pushed the owner's card/rate/board order down. */}
         <div className="pt-stats pt-stats-inline">
           <Stat icon="nimiq" value={`${formatNimCompact(globalEarned)} NIM`} label={t('cashbackCard.statEarned')} />
-          <Stat icon="wallet" value={`${formatNimCompact(globalWallet)} NIM`} label={t('cashbackCard.statWallet')} />
           <Stat icon="gift" value={String(globalOrders)} label={t('cashbackCard.statOrders')} />
         </div>
 
@@ -754,12 +753,11 @@ export function CashbackImpactSection({
           </p>
         ) : (
           <>
-            <ol className="pt-leader">
+            <ol className="pt-leader" start={leaderPageSafe * LEADER_PER_PAGE + 1}>
               {visibleLeaders.map((row) => (
                 <li key={row.user} className={row.rank === myLeaderRank ? 'pt-you-row' : ''}>
                   <span className={`pt-badge${row.rank <= 3 ? ' ' + RANK_CLS[row.rank - 1] : ''}`}>
-                    {row.rank <= 3 && <Icon name="award" size={15} />}
-                    {row.rank}
+                    #{row.rank}
                   </span>
                   <Identicon address={row.user} size={28} className="pt-ident" />
                   <code className="pt-leader-code" title={row.user}>
