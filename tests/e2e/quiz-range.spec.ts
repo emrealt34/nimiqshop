@@ -92,14 +92,14 @@ for (const width of [320, 1280]) {
  test.describe(`single question progression ${width}px`, () => {
   test.use({viewport:{width,height:900},allowedErrors:[/500/]});
   test('one question at a time, failed saves retry, numeric bounds, resume, back and final submission', async ({page}) => {
-   let attempt:any=null; let failSave=true; let submissions=0;
+   let attempt:any=null; let rejectNextSave=true; let submissions=0;
    const questions=[{id:'first',type:'choice',prompt:'Cashback base?',options:['100 NIM','105 NIM']},{id:'calc',type:'range',prompt:'Calculate cashback',options:[],min:0,max:100},{id:'last',type:'choice',prompt:'Contact support?',options:['Nimiq','CryptoRefills']}];
    const c=()=>({id:'steps',title:'Shop knowledge',description:'Short description',prize:{title:'NIM prize pool',value:'10 000 NIM',description:'Total pool shared by the top 3.',image_url:''},starts_at:new Date(Date.now()-60000).toISOString(),ends_at:new Date(Date.now()+3600000).toISOString(),phase:'live',question_count:3,participants:1,attempt,has_ranges:true,winner_count:5,tie_break:'submitted_at',winner:'',winners:[],is_winner:false,decision_note:'',cancel_reason:'',award_delivered_at:null,leaderboard:attempt?.submitted_at?[{rank:1,participant:'me',score:3,is_me:true,is_winner:false,submitted_at:attempt.submitted_at}]:[]});
    await page.route('**/api/quiz**',route=>{
     const action=new URL(route.request().url()).pathname.split('/quiz')[1];
     if(!action||action==='/')return route.fulfill({json:{items:[c()]}});
     if(action.endsWith('/start')){attempt ||= {answers:[-1,-1,-1],score:0,total:3,started_at:new Date().toISOString(),submitted_at:null};return route.fulfill({json:{competition:c(),attempt,questions}});}
-    if(action.endsWith('/answers')){if(failSave){failSave=false;return route.fulfill({status:500,json:{error:'Temporary save failure'}});}attempt.answers=route.request().postDataJSON().answers;return route.fulfill({json:attempt});}
+    if(action.endsWith('/answers')){if(rejectNextSave){rejectNextSave=false;return route.fulfill({status:500,json:{error:'Temporary save failure'}});}attempt.answers=route.request().postDataJSON().answers;return route.fulfill({json:attempt});}
     if(action.endsWith('/submit')){submissions++;expect(route.request().postDataJSON().answers).toEqual([0,20,1]);attempt={...attempt,score:3,submitted_at:new Date().toISOString()};return route.fulfill({json:attempt});}
     return route.fulfill({json:c()});
    });
