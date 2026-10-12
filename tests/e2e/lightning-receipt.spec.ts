@@ -99,3 +99,23 @@ test.describe('Turkish payment status', () => {
 });
 
 });
+
+for (const tx of ['ab'.repeat(32), '0x' + 'cd'.repeat(32)]) {
+  for (const surface of ['order', 'orders', 'activity']) {
+    test(`${surface} displays the SDK submission separately: ${tx.slice(0, 4)}`, async ({ page }) => {
+      const item = { ...purchase, status: 'awaiting_payment', lightning_funding_hint: tx,
+        lightning_receipt: { ...receipt, confirmed: false, confirmed_at: undefined, submitted_tx: tx } };
+      await page.route('**/api/quotes', route => route.fulfill({ json: [item] }));
+      await page.route('**/api/quotes/lightning-test', route => route.fulfill({ json: item }));
+      await page.route('**/api/activity?*', route => route.fulfill({ json: { items: [item], summary: {} } }));
+      await open(page, path(surface === 'order' ? '/order?id=lightning-test&type=quote' : '/' + surface));
+      const submission = page.locator('[data-submitted-transaction]').first();
+      await expect(submission).toBeVisible();
+      await expect(submission.locator('a')).toHaveText(tx);
+      await expect(submission.locator('a')).toHaveAttribute('href', tx.startsWith('0x') ? `https://polygonscan.com/tx/${tx}` : `https://nimiq.watch/#${tx}`);
+      await page.reload();
+      await expect(submission).toBeVisible();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    });
+  }
+}

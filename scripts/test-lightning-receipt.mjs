@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { paymentHash, lightningReceiptOf, verifyLightningPreimage } from '../src/lib/lightningReceipt.ts';
+import { paymentHash, fundingHash, lightningReceiptOf, verifyLightningPreimage } from '../src/lib/lightningReceipt.ts';
 
 const hash = '66687aadf862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925';
 const quote = { coin: 'BTC', network: 'Lightning', lightning_payment_hash: hash, status: 'awaiting_payment' };
@@ -28,4 +28,15 @@ test('proof hashes binary preimage, not its ASCII hex representation', async () 
   assert.equal(await verifyLightningPreimage(hash, '01'.repeat(32)), false);
   assert.equal(await verifyLightningPreimage(hash, 'secret'), false);
   assert.equal(await verifyLightningPreimage('lnbc123', '00'.repeat(32)), false);
+});
+
+test('SDK submission hashes survive private and public receipt mapping without asserting settlement', () => {
+  for (const tx of ['ab'.repeat(32), '0x' + 'cd'.repeat(32)]) {
+    assert.equal(lightningReceiptOf({ ...quote, lightning_funding_hint: tx }).submitted_tx, tx);
+    const receipt = lightningReceiptOf({ id: 'q', lightning_receipt: { payment_hash: hash, submitted_tx: tx, confirmed: false } }, true);
+    assert.equal(receipt.submitted_tx, tx);
+    assert.equal(receipt.confirmed, false);
+  }
+  assert.equal(fundingHash('javascript:alert(1)'), '');
+  assert.equal(fundingHash('0x' + 'ab'.repeat(31)), '');
 });

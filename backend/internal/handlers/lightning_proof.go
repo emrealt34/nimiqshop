@@ -40,7 +40,7 @@ func (h *Handlers) LightningProof(ctx *fasthttp.RequestCtx) {
 			return
 		}
 		funding = strings.ToLower(strings.TrimSpace(body.Hash))
-		if !nimiq.IsTxHash(funding) {
+		if !nimiq.IsTxHash(strings.TrimPrefix(funding, "0x")) {
 			writeError(ctx, 400, "invalid funding hash")
 			return
 		}
@@ -50,6 +50,12 @@ func (h *Handlers) LightningProof(ctx *fasthttp.RequestCtx) {
 			writeError(ctx, 503, "funding hint could not be saved")
 			return
 		}
+	}
+	// Polygon submissions are not Nimiq HTLC proofs. Persist the SDK
+	// identifier without claiming Lightning settlement or querying the wrong chain.
+	if strings.HasPrefix(funding, "0x") {
+		writeJSON(ctx, 200, map[string]any{"chain_proof": nil})
+		return
 	}
 	address := ""
 	if user, e := h.Store.GetUser(q.UserID); e == nil {

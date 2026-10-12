@@ -24,6 +24,11 @@ func publicLightningReceipt(q db.Quote) map[string]any {
 		confirmed = true
 	}
 	out := map[string]any{"payment_hash": hash, "confirmed": confirmed}
+	// Owner-reported submission is explicitly separate from verified chain proof.
+	funding := strings.ToLower(strings.TrimSpace(q.LightningFundingHint))
+	if raw, err := hex.DecodeString(strings.TrimPrefix(funding, "0x")); err == nil && len(raw) == 32 {
+		out["submitted_tx"] = funding
+	}
 	if q.CoinAmount != "" {
 		out["amount_btc"] = q.CoinAmount
 	}

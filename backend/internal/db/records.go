@@ -136,7 +136,7 @@ type QuoteLine struct {
 
 type Quote struct {
 	// Untrusted owner-provided identifier, kept for confirmation retries. It
-	// is never published as an explorer link or a settlement observation.
+	// is displayed as a reported submission, never as a settlement observation.
 	LightningFundingHint string               `json:"lightning_funding_hint,omitempty"`
 	LightningChainProof  *LightningChainProof `json:"lightning_chain_proof,omitempty"`
 	IsBatch              bool                 `json:"is_batch,omitempty"`

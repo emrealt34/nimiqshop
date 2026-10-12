@@ -4,9 +4,22 @@ import { Icon } from '../ui/Icon';
 import { CopyButton } from '../ui/uiKit';
 import { useT } from '../../i18n';
 import { fmtDate } from '../../lib/format';
-import { LIGHTNING_VERIFIER_URL, paymentHash, verifyLightningPreimage, type LightningReceiptData } from '../../lib/lightningReceipt';
+import { LIGHTNING_VERIFIER_URL, fundingHash, paymentHash, verifyLightningPreimage, type LightningReceiptData } from '../../lib/lightningReceipt';
 import { getLightningChainProof } from '../../lib/api';
 import { explorerUrl } from '../../lib/chain';
+
+function SubmittedTransaction({ receipt }: { receipt: LightningReceiptData }) {
+  const { t } = useT();
+  const hash = fundingHash(receipt.submitted_tx);
+  if (!hash) return null;
+  const polygon = hash.startsWith('0x');
+  const url = polygon ? `https://polygonscan.com/tx/${hash}` : explorerUrl(hash);
+  return <div data-submitted-transaction={hash}>
+    <div className="xs muted">{polygon ? 'Polygon' : 'NIM'} · {t('orderPage.nimiqPay.submitted')}</div>
+    <a className="lightning-receipt-hash" href={url!} target="_blank" rel="noopener noreferrer">{hash}</a>
+    <CopyButton getText={hash} label={t('lightningReceipt.copyHash')} />
+  </div>;
+}
 
 function ChainProof({ receipt }: { receipt: LightningReceiptData }) {
   const { t } = useT();
@@ -56,6 +69,7 @@ function ReceiptDetails({ receipt }: { receipt: LightningReceiptData }) {
     <div className="small muted">{receipt.confirmed ? t('lightningReceipt.confirmed') : t('lightningReceipt.pending')}
       {receipt.confirmed && receipt.confirmed_at ? ` · ${fmtDate(receipt.confirmed_at)}` : ''}
     </div>
+    <SubmittedTransaction receipt={receipt} />
     <ChainProof receipt={receipt} />
     <div className="xs faint">{t('lightningReceipt.hash')}</div>
     <code className="lightning-receipt-hash">{hash}</code>
@@ -91,6 +105,7 @@ export function LightningReceipt({ receipt, compact = false }: { receipt?: Light
   if (!compact) return <div className="lightning-receipt" data-payment-hash={paymentHash(receipt.payment_hash)}>
     <span className="xs strong"><Icon name="bolt" size={12} /> BTC Lightning</span>
     <code className="lightning-receipt-hash">{paymentHash(receipt.payment_hash)}</code>
+    <SubmittedTransaction receipt={receipt} />
     <ChainProof receipt={receipt} />
     <div className="lightning-receipt-actions">
       <button type="button" className="btn btn-outline btn-sm" onClick={() => openSheet({ title: t('lightningReceipt.title'), render: () => <ReceiptDetails receipt={receipt} /> })}>
@@ -101,7 +116,7 @@ export function LightningReceipt({ receipt, compact = false }: { receipt?: Light
       </a>
     </div>
   </div>;
-  return <button type="button" className="lightning-receipt-chip chip xs" title={paymentHash(receipt.payment_hash)} onClick={() => openSheet({ title: t('lightningReceipt.title'), render: () => <ReceiptDetails receipt={receipt} /> })}>
+  return <div><SubmittedTransaction receipt={receipt} /><button type="button" className="lightning-receipt-chip chip xs" title={paymentHash(receipt.payment_hash)} onClick={() => openSheet({ title: t('lightningReceipt.title'), render: () => <ReceiptDetails receipt={receipt} /> })}>
     <Icon name="bolt" size={12} /> BTC Lightning · {paymentHash(receipt.payment_hash).slice(0, 8)}…
-  </button>;
+  </button></div>;
 }

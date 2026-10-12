@@ -743,7 +743,17 @@ export const getActivity = async (limit = 50) => {
 };
 export const trackOrder = (id: string) => api(`/track/${encodeURIComponent(id)}`);
 export const getLightningChainProof = (id: string) => api(`/track/${encodeURIComponent(id)}/lightning-proof`, { timeoutMs: 15000, quiet: true });
-export const saveLightningFunding = (id: string, hash: string) => api(`/quotes/${encodeURIComponent(id)}/lightning-proof`, { method: 'POST', auth: true, body: { hash }, timeoutMs: 15000, quiet: true });
+// Retrying this metadata write never resubmits the Lightning invoice.
+export async function saveLightningFunding(id: string, hash: string) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await api(`/quotes/${encodeURIComponent(id)}/lightning-proof`, { method: 'POST', auth: true, body: { hash }, timeoutMs: 15000, quiet: true });
+    } catch (error) {
+      if (attempt >= 2 || (error instanceof ApiError && error.status >= 400 && error.status < 500)) throw error;
+      await new Promise(resolve => setTimeout(resolve, (attempt + 1) * 1000));
+    }
+  }
+}
 /* ---- On-chain star ratings (buyer signs and pays 1 Luna + fee) ----------
  * intent → the memo the buyer's wallet signs; rate → the shop verifies the
  * buyer's transaction on the chain and saves the rating. rate answers 202

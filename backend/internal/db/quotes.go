@@ -1004,6 +1004,9 @@ func (s *Store) SaveLightningFundingHint(id, userID, hash string) error {
 		if q.LightningChainProof != nil {
 			return nil
 		}
+		if q.LightningFundingHint != "" && q.LightningFundingHint != hash {
+			return ErrConflict
+		}
 		q.LightningFundingHint = hash
 		return putQuoteTx(tx, &q)
 	})

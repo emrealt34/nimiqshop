@@ -3,6 +3,7 @@ export const LIGHTNING_VERIFIER_URL = 'https://dev.blink.sv/decode';
 
 export type LightningReceiptData = {
   quote_id?: string;
+  submitted_tx?: string;
   chain_proof?: LightningChainProof;
   payment_hash: string;
   amount_btc?: string;
@@ -21,6 +22,7 @@ export function lightningReceiptOf(value: any, publicView = false): LightningRec
   const confirmedAt = typeof timestamp === 'string' && Number.isFinite(Date.parse(timestamp)) ? timestamp : undefined;
   return {
     quote_id: value.id,
+    submitted_tx: fundingHash(receipt?.submitted_tx || value.lightning_funding_hint),
     chain_proof: receipt?.chain_proof || value.lightning_chain_proof,
     payment_hash: hash,
     amount_btc: receipt?.amount_btc || value.coin_amount || (String(value.paid || '').match(/^([\d.]+)\s+BTC$/i)?.[1]),
@@ -42,4 +44,10 @@ export async function verifyLightningPreimage(hash: unknown, preimage: unknown):
   const digest = await crypto.subtle.digest('SHA-256', bytes);
   const actual = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
   return actual === expected;
+}
+
+/** SDK submission identifier, distinct from the invoice payment hash. */
+export function fundingHash(value: unknown): string {
+  const hash = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  return /^(0x)?[0-9a-f]{64}$/.test(hash) ? hash : '';
 }

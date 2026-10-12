@@ -126,3 +126,13 @@ func TestPublicChainProofNeverLeaksAnonymousOrSimulatedSavedReceipts(t *testing.
 		}
 	}
 }
+
+func TestPublicLightningReceiptSubmissionIsNotSettlement(t *testing.T) {
+	for _, hash := range []string{strings.Repeat("ab", 32), "0x" + strings.Repeat("cd", 32)} {
+		q := db.Quote{Coin: "BTC", Network: "Lightning", LightningPaymentHash: strings.Repeat("ef", 32), LightningFundingHint: hash}
+		got := publicLightningReceipt(q)
+		if got["submitted_tx"] != hash || got["confirmed"] != false || got["chain_proof"] != nil {
+			t.Fatalf("submission misrepresented: %#v", got)
+		}
+	}
+}
