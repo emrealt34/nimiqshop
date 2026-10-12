@@ -14,8 +14,9 @@ writeFileSync(entry, `
 globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
 globalThis.window = { addEventListener() {}, location: { href: '' }, navigator: { language: 'en' } };
 globalThis.document = { addEventListener() {}, documentElement: { lang: 'en' }, createElement: () => ({ style: {} }), cookie: '' };
-export { ratingIntent, submitRating, ApiError, _setSessionGetter } from ${JSON.stringify(new URL('../src/lib/api.ts', import.meta.url).pathname)};
-export { readPendingRating, rememberPendingRating } from ${JSON.stringify(new URL('../src/lib/ratingPay.ts', import.meta.url).pathname)};
+export { ratingIntent, submitRating, ApiError, _setSessionGetter, saveLightningFunding, flushPaymentSubmissions } from ${JSON.stringify(new URL('../src/lib/api.ts', import.meta.url).pathname)};
+export { pendingSubmissions } from ${JSON.stringify(new URL('../src/lib/paymentSubmissionQueue.ts', import.meta.url).pathname)};
+export { readPendingRating, rememberPendingRating, markPendingRatingSubmitted } from ${JSON.stringify(new URL('../src/lib/ratingPay.ts', import.meta.url).pathname)};
 `);
 buildSync({ entryPoints: [entry], bundle: true, platform: 'node', format: 'cjs', outfile: bundle,
   define: { 'import.meta.env.BASE_URL': '"/"', 'import.meta.env': '{}' }, loader: { '.css': 'empty' }, logLevel: 'silent' });
@@ -79,4 +80,35 @@ test('redirect recovery normalizes valid stars and discards malformed pending st
   storage.set(KEY, '{broken');
   assert.equal(client.readPendingRating('order', 'o1'), null);
   assert.equal(storage.has(KEY), false);
+});
+
+test('SDK identifiers remain queued offline and only the same buyer retries the metadata write', async () => {
+  const savedFetch = globalThis.fetch;
+  const hash = 'ab'.repeat(32);
+  const calls = [];
+  globalThis.fetch = async () => { throw new TypeError('offline'); };
+  try {
+    await client.saveLightningFunding('durable-payment', hash, 'wallet-swap');
+    assert.equal(client.pendingSubmissions('buyer')[0].hash, hash);
+    client._setSessionGetter(() => 'other');
+    globalThis.fetch = async (url, options) => { calls.push({ url, body: JSON.parse(options.body) }); return Response.json({ saved: true }); };
+    await client.flushPaymentSubmissions();
+    assert.equal(calls.length, 0);
+    client._setSessionGetter(() => 'buyer');
+    await client.flushPaymentSubmissions();
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls[0].body, { hash, swap_id: 'wallet-swap' });
+    assert.match(calls[0].url, /lightning-proof$/);
+    assert.equal(client.pendingSubmissions('buyer').length, 0);
+  } finally { globalThis.fetch = savedFetch; client._setSessionGetter(() => 'buyer'); }
+});
+
+test('submitted review retains comment and transaction hash beyond the old 15-minute timeout', () => {
+  client.rememberPendingRating({ kind: 'order', id: 'durable-review', stars: 5, comment: 'excellent' });
+  client.markPendingRatingSubmitted('order', 'durable-review', 'ef'.repeat(32));
+  const pending = JSON.parse(storage.get(KEY));
+  storage.set(KEY, JSON.stringify({ ...pending, ts: Date.now() - 24 * 60 * 60 * 1000 }));
+  const recovered = client.readPendingRating('order', 'durable-review');
+  assert.equal(recovered.comment, 'excellent');
+  assert.equal(recovered.hash, 'ef'.repeat(32));
 });

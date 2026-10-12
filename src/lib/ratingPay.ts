@@ -11,6 +11,7 @@ import { ApiError, submitRating, type RatingBody, type RatingKind } from './api'
 import { inNimiqPay, initNimiqMiniApp } from './miniapp';
 import { sendRatingWithHub } from './hub';
 import { classifyWalletError } from './walletErrors';
+import { getUid } from './session';
 import { ratingStars } from './ratingStars';
 
 export class RatingError extends Error {
@@ -39,31 +40,40 @@ export interface PendingRating {
   stars: number;
   comment: string;
   ts: number;
+  owner_uid?: string;
+  submitted?: boolean;
+  hash?: string;
 }
 
 export function rememberPendingRating(p: Omit<PendingRating, 'ts'>): void {
   const stars = ratingStars(p.stars);
   if (stars === null) throw new RatingError('refused', 'rating must be an integer from 1 to 5');
-  try {
-    sessionStorage.setItem(PENDING_KEY, JSON.stringify({ ...p, stars, ts: Date.now() }));
-  } catch {
-    /* private mode: the flow still works, it just cannot resume */
-  }
+  const owner = getUid();
+  const value = { ...p, stars, owner_uid: owner || undefined, ts: Date.now() };
+  pendingScope = owner ? PENDING_KEY + ':' + owner + ':' + p.kind + ':' + p.id : undefined;
+  try { sessionStorage.setItem(PENDING_KEY, JSON.stringify(value)); } catch { /* Local copy below is independent. */ }
+  if (pendingScope) try { localStorage.setItem(pendingScope, JSON.stringify(value)); } catch { /* Session copy still supports redirects. */ }
 }
 
 export function readPendingRating(kind: RatingKind, id: string): PendingRating | null {
   try {
-    const raw = sessionStorage.getItem(PENDING_KEY);
+    const owner = getUid();
+    pendingScope = owner ? PENDING_KEY + ':' + owner + ':' + kind + ':' + id : undefined;
+    let raw: string | null = null;
+    if (pendingScope) try { raw = localStorage.getItem(pendingScope); } catch { /* Fall back to session storage. */ }
+    if (!raw) raw = sessionStorage.getItem(PENDING_KEY);
     if (!raw) return null;
     const p = JSON.parse(raw) as PendingRating;
+    if (p?.owner_uid && p.owner_uid !== owner) return null;
     const stars = ratingStars(p?.stars);
     if (!p || !['order', 'quote'].includes(p.kind) || typeof p.id !== 'string' || !p.id
       || stars === null || typeof p.comment !== 'string' || !Number.isFinite(p.ts)
-      || p.ts <= 0 || p.ts > Date.now() + 60_000 || Date.now() - p.ts > PENDING_MAX_MS) {
+      || p.ts <= 0 || p.ts > Date.now() + 60_000 || (!p.submitted && Date.now() - p.ts > PENDING_MAX_MS)) {
       clearPendingRating();
       return null;
     }
     if (p.kind !== kind || p.id !== id) return null;
+    pendingScope = p.owner_uid ? PENDING_KEY + ':' + p.owner_uid + ':' + p.kind + ':' + p.id : undefined;
     return { ...p, stars };
   } catch {
     clearPendingRating();
@@ -71,12 +81,18 @@ export function readPendingRating(kind: RatingKind, id: string): PendingRating |
   }
 }
 
+let pendingScope: string | undefined;
+export function markPendingRatingSubmitted(kind: RatingKind, id: string, hash?: string): void {
+  const pending = readPendingRating(kind, id);
+  if (!pending) return;
+  const value = { ...pending, submitted: true, hash: hash || pending.hash };
+  try { sessionStorage.setItem(PENDING_KEY, JSON.stringify(value)); } catch { /* Local durable copy below remains independent. */ }
+  if (pendingScope) try { localStorage.setItem(pendingScope, JSON.stringify(value)); } catch { /* Session copy still survives navigation. */ }
+}
 export function clearPendingRating(): void {
-  try {
-    sessionStorage.removeItem(PENDING_KEY);
-  } catch {
-    /* ignore */
-  }
+  try { sessionStorage.removeItem(PENDING_KEY); } catch { /* Try the independent local copy too. */ }
+  if (pendingScope) try { localStorage.removeItem(pendingScope); } catch { /* A later lookup can safely retry this metadata operation. */ }
+  pendingScope = undefined;
 }
 
 /** Hands the intent to the buyer's wallet and resolves once the wallet is done. */

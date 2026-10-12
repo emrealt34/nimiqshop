@@ -54,13 +54,12 @@ func (h *Handlers) LightningProof(ctx *fasthttp.RequestCtx) {
 			writeError(ctx, 503, "funding hint could not be saved")
 			return
 		}
+		// A durable metadata acknowledgement must not depend on an RPC lookup.
+		writeJSON(ctx, 200, map[string]any{"saved": true})
+		return
 	}
 	if q.LightningChainProof != nil && q.LightningChainProof.SettlementTx != "" {
 		writeJSON(ctx, 200, map[string]any{"chain_proof": q.LightningChainProof})
-		return
-	}
-	if private && funding == "" {
-		writeJSON(ctx, 200, map[string]any{"chain_proof": nil})
 		return
 	}
 	// Polygon submissions are not Nimiq HTLC proofs. Persist the SDK

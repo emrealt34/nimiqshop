@@ -37,7 +37,7 @@ func (s *Store) CreateOrder(o Order) error {
 			}
 		}
 
-		blob, err := marshal(o)
+		blob, err := marshalPreservingUnknown(txn, orderKey(o.ID), o)
 		if err != nil {
 			return err
 		}
@@ -241,7 +241,7 @@ func writeOrderStatus(txn *badger.Txn, o *Order, status string) error {
 		o.DeliveredAt = &t
 	}
 
-	blob, err := marshal(*o)
+	blob, err := marshalPreservingUnknown(txn, orderKey(o.ID), *o)
 	if err != nil {
 		return err
 	}

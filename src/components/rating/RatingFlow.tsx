@@ -16,6 +16,7 @@ import {
   RatingError,
   readPendingRating,
   rememberPendingRating,
+  markPendingRatingSubmitted,
   type RatingIntent,
 } from '../../lib/ratingPay';
 import { cleanComment, commentProblem, MAX_COMMENT, memoPreview } from '../../lib/ratingComment';
@@ -89,7 +90,7 @@ export function RatingFlow({
     setStars(pending.stars);
     setComment(pending.comment);
     setPhase('waiting');
-    awaitRatingSaved(kind, id, { stars: pending.stars, comment: pending.comment })
+    awaitRatingSaved(kind, id, { stars: pending.stars, comment: pending.comment, tx_hash: pending.hash })
       .then((res) => {
         clearPendingRating();
         if (!mounted.current) return;
@@ -98,7 +99,7 @@ export function RatingFlow({
       })
       .catch((err) => {
         if (!mounted.current) return;
-        clearPendingRating();
+        if (!readPendingRating(kind, id)?.submitted) clearPendingRating();
         setPhase('idle');
         setError(messageFor(err, t));
       });
@@ -114,6 +115,15 @@ export function RatingFlow({
 
   async function submit() {
     setError(null);
+    const pending = readPendingRating(kind, id);
+    if (pending?.submitted) {
+      setPhase('waiting');
+      try {
+        const result = await awaitRatingSaved(kind, id, { stars: pending.stars, comment: pending.comment, tx_hash: pending.hash });
+        clearPendingRating(); setPhase('saved'); onSaved?.(result);
+      } catch (err) { setPhase('idle'); setError(messageFor(err, t)); }
+      return;
+    }
     if (ratingStars(stars) === null) return setError(t('rating.pickStars'));
     if (problem === 'chars') return setError(t('rating.commentChars'));
     if (problem === 'long') return setError(t('rating.commentLong', { max: cfg?.max_comment || MAX_COMMENT }));
@@ -133,6 +143,7 @@ export function RatingFlow({
     }
     try {
       const paid = await payRatingIntent(intent);
+      markPendingRatingSubmitted(kind, id, paid.hash);
       if (!mounted.current) return;
       setPhase('waiting');
       const res = await awaitRatingSaved(kind, id, { stars, comment: c, tx_hash: paid.hash });
@@ -149,7 +160,7 @@ export function RatingFlow({
         }
         return;
       }
-      clearPendingRating();
+      if (!readPendingRating(kind, id)?.submitted) clearPendingRating();
       if (mounted.current) {
         setPhase('idle');
         setError(messageFor(err, t));

@@ -171,11 +171,23 @@ func (h *Handlers) submitRating(ctx *fasthttp.RequestCtx, kind string) {
 		writeError(ctx, fasthttp.StatusBadRequest, err.Error())
 		return
 	}
+	// A lost HTTP acknowledgement must not require another rating payment.
+	// Only acknowledge the same owner's already verified, identical rating.
+	comment, commentError := ratings.NormalizeComment(req.Comment)
+	if saved, err := h.Store.GetRatingState(kind, id, userID); err == nil && commentError == nil && saved.Rated && saved.RatingTx != "" && saved.Stars == req.Stars && saved.Comment == comment && (req.TxHash == "" || req.TxHash == saved.RatingTx) {
+		agg, err := h.Store.GetRatingAggregate()
+		if err != nil {
+			writeError(ctx, 500, "could not load rating summary")
+			return
+		}
+		writeJSON(ctx, 200, map[string]any{"order_id": id, "rating": saved.Stars, "comment": saved.Comment, "rated_at": saved.RatedAt, "rating_tx": saved.RatingTx, "edits_left": ratings.MaxRatingsPerOrder - saved.Edits, "summary": ratingSummaryShape(agg)})
+		return
+	}
 	memo, st, buyer, ok := h.prepareRating(ctx, kind, id, userID, req)
 	if !ok {
 		return
 	}
-	comment, _ := ratings.NormalizeComment(req.Comment)
+	comment, _ = ratings.NormalizeComment(req.Comment)
 
 	cctx, cancel := context.WithTimeout(context.Background(), ratingChainTimeout)
 	defer cancel()

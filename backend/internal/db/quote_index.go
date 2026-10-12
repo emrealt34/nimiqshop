@@ -87,7 +87,7 @@ func putQuoteTx(tx *badger.Txn, q *Quote) error {
 	if q == nil || q.ID == "" {
 		return errors.New("db: cannot persist a quote without an id")
 	}
-	raw, err := marshal(q)
+	raw, err := marshalPreservingUnknown(tx, quoteKey(q.ID), q)
 	if err != nil {
 		return err
 	}

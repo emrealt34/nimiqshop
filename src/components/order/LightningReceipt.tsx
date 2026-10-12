@@ -46,6 +46,7 @@ function ChainProof({ receipt }: { receipt: LightningReceiptData }) {
   }, [receipt.quote_id, receipt.payment_hash, receipt.chain_proof]);
   const funding = paymentHash(proof?.funding_tx);
   const settlement = paymentHash(proof?.settlement_tx);
+  if (checked && !funding) return null;
   return <div className="lightning-chain-proof">
     <p className="xs muted" role="status">{valid ? t('lightningReceipt.chainVerified') : funding ? t('lightningReceipt.fundingOnly') : !checked ? t('lightningReceipt.chainLoading') : failed ? t('lightningReceipt.chainUnavailable') : t('lightningReceipt.chainMissing')}</p>
     <div className="lightning-receipt-actions">

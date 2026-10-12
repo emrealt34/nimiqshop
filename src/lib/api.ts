@@ -1,3 +1,4 @@
+import { rememberSubmission, pendingSubmissions, forgetSubmission } from './paymentSubmissionQueue';
 import { supplierProblemMessage } from './supplierProblems';
 /**
  * api.ts — typed fetch client for the nimiqshop Go backend. Ported verbatim
@@ -743,16 +744,60 @@ export const getActivity = async (limit = 50) => {
 };
 export const trackOrder = (id: string) => api(`/track/${encodeURIComponent(id)}`);
 export const getLightningChainProof = (id: string) => api(`/track/${encodeURIComponent(id)}/lightning-proof`, { timeoutMs: 15000, quiet: true });
-// Retrying this metadata write never resubmits the Lightning invoice.
-export async function saveLightningFunding(id: string, hash: string, swapId?: string) {
-  for (let attempt = 0; ; attempt++) {
-    try {
-      return await api(`/quotes/${encodeURIComponent(id)}/lightning-proof`, { method: 'POST', auth: true, body: { hash, swap_id: swapId }, timeoutMs: 15000, quiet: true });
-    } catch (error) {
-      if (attempt >= 2 || (error instanceof ApiError && error.status >= 400 && error.status < 500)) throw error;
-      await new Promise(resolve => setTimeout(resolve, (attempt + 1) * 1000));
+// This queue only writes metadata. It never calls a wallet payment method.
+let submissionFlush: Promise<void> | null = null;
+let submissionTimer: ReturnType<typeof setTimeout> | undefined;
+let submissionRecoveryActive = false;
+let submissionBackoff = 5000;
+const submissionBlocked = new Set<string>();
+export async function flushPaymentSubmissions(): Promise<void> {
+  if (submissionFlush) return submissionFlush;
+  const owner = sessionGetter();
+  if (!owner) return;
+  submissionFlush = (async () => {
+    for (const entry of pendingSubmissions(owner)) {
+      if (sessionGetter() !== owner) break;
+      const key = owner + ':' + entry.id;
+      if (submissionBlocked.has(key)) continue;
+      try {
+        await api(`/quotes/${encodeURIComponent(entry.id)}/lightning-proof`, { method: 'POST', auth: true, body: { hash: entry.hash, swap_id: entry.swapId }, timeoutMs: 15000, quiet: true });
+        forgetSubmission(entry);
+      } catch (error) {
+        if (error instanceof ApiError && [400, 404, 409].includes(error.status)) submissionBlocked.add(key);
+      }
     }
-  }
+  })().finally(() => {
+    submissionFlush = null;
+    if (submissionTimer) clearTimeout(submissionTimer);
+    const currentOwner = sessionGetter();
+    const retry = !!currentOwner && pendingSubmissions(currentOwner).some(entry => !submissionBlocked.has(currentOwner + ':' + entry.id));
+    if (submissionRecoveryActive && retry) {
+      submissionTimer = setTimeout(() => { void flushPaymentSubmissions(); }, submissionBackoff);
+      submissionBackoff = Math.min(submissionBackoff * 2, 300000);
+    } else submissionBackoff = 5000;
+  });
+  return submissionFlush;
+}
+export async function saveLightningFunding(id: string, hash: string, swapId?: string) {
+  const owner = sessionGetter();
+  if (!owner) throw new Error('Sign in to retain payment identifiers');
+  rememberSubmission({ owner, id, hash, swapId, recordedAt: Date.now() });
+  await flushPaymentSubmissions();
+}
+export function startPaymentSubmissionRecovery(): () => void {
+  submissionRecoveryActive = true;
+  const recover = () => { if (document.visibilityState !== 'hidden') void flushPaymentSubmissions(); };
+  recover();
+  window.addEventListener('online', recover);
+  window.addEventListener('nimshop:session', recover);
+  document.addEventListener('visibilitychange', recover);
+  return () => {
+    submissionRecoveryActive = false;
+    if (submissionTimer) clearTimeout(submissionTimer);
+    window.removeEventListener('online', recover);
+    window.removeEventListener('nimshop:session', recover);
+    document.removeEventListener('visibilitychange', recover);
+  };
 }
 /* ---- On-chain star ratings (buyer signs and pays 1 Luna + fee) ----------
  * intent → the memo the buyer's wallet signs; rate → the shop verifies the

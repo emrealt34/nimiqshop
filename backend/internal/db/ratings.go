@@ -186,11 +186,33 @@ func (s *Store) ApplyRating(w RatingWrite) (RatingAggregate, error) {
 			agg.Dist[w.Stars]++
 		}
 
+		if st.Rated && st.RatingTx != "" {
+			oldKey := []byte("rating:history:" + strings.ToLower(st.RatingTx))
+			if _, err := txn.Get(oldKey); errors.Is(err, badger.ErrKeyNotFound) {
+				previous, err := marshal(map[string]any{"Kind": w.Kind, "ID": w.ID, "UserID": w.UserID, "Stars": st.Stars, "Comment": st.Comment, "TxHash": st.RatingTx, "RatedAt": st.RatedAt})
+				if err != nil {
+					return err
+				}
+				if err := txn.Set(oldKey, previous); err != nil {
+					return err
+				}
+			} else if err != nil {
+				return err
+			}
+		}
 		now := w.Now.UTC()
 		if err := storeRatingFields(txn, w, now); err != nil {
 			return err
 		}
 		if err := txn.Set(ratingTxKey(w.TxHash), []byte(w.Kind+":"+w.ID)); err != nil {
+			return err
+		}
+		// Preserve every accepted comment revision in the same atomic commit.
+		history, err := marshal(w)
+		if err != nil {
+			return err
+		}
+		if err := txn.Set([]byte("rating:history:"+strings.ToLower(w.TxHash)), history); err != nil {
 			return err
 		}
 		if err := saveAggregate(txn, agg); err != nil {
@@ -217,7 +239,7 @@ func storeRatingFields(txn *badger.Txn, w RatingWrite, now time.Time) error {
 		o.RatingEdits++
 		o.RatingTx = w.TxHash
 		o.UpdatedAt = now
-		blob, err := marshal(o)
+		blob, err := marshalPreservingUnknown(txn, orderKey(o.ID), o)
 		if err != nil {
 			return err
 		}
@@ -250,7 +272,7 @@ func (s *Store) SetRatingCommentHidden(kind, id string, hidden bool) error {
 				return err
 			}
 			o.RatingCommentHidden = hidden
-			blob, err := marshal(o)
+			blob, err := marshalPreservingUnknown(txn, orderKey(o.ID), o)
 			if err != nil {
 				return err
 			}
