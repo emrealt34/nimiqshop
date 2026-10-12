@@ -60,6 +60,15 @@ const tr = {
 
   brand: { giftTag: 'hediye' },
 
+  ratingReminder: {
+    later: "Daha sonra",
+    purchase: "Alışveriş",
+    title: "Henüz değerlendirmediğin alışverişlerin var",
+    body: "Teslim edilmiş {{count}} alışverişini henüz değerlendirmedin. Değerlendirmek ister misin?",
+    optional: "Yıldız ve yorum isteğe bağlıdır. Devam etmek sana kalmış; değerlendirme formu, göndermeden önce cüzdan işlemini açıklar.",
+    rate: "Değerlendir",
+    all: "Tüm alışverişleri gör",
+  },
   quiz: {
     prizePayment: 'Yarışma ödülü ödemesi',
     autoPrize: "Ödüller yarışma bittikten sonra cashback cüzdanından kazananların giriş yaptığı Nimiq cüzdanlarına otomatik ödenir.",

@@ -6,6 +6,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../ui/Icon';
+import { RatingReminder } from '../rating/RatingReminder';
 import { WalletBalance } from '../wallet/WalletBalance';
 import { FlagMark } from '../ui/FlagMark';
 import { ComeBackBanner, ErrorDetail } from '../ui/uiKit';
@@ -312,6 +313,7 @@ export function HomePage() {
 
   return (
     <>
+      <RatingReminder />
       <section className="hero container fade-in">
         <div>
           <h1>

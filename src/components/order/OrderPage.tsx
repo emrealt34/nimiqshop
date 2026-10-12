@@ -16,10 +16,10 @@ import { FlagMark } from '../ui/FlagMark';
 import { AppRoot } from '../AppRoot';
 import { openLoginSheet } from '../shell/SiteShell';
 import { friendlyApiMessage, getOrder, refreshOrder, getQuote, refreshQuote, getProduct, allowNewPurchase, createQuote, errorDetailLine } from '../../lib/api';
-import { RatingFlow, type RatingCurrent } from '../rating/RatingFlow';
+import { RatingFlow } from '../rating/RatingFlow';
 import { isAuthed } from '../../lib/session';
 import { useSession } from '../../lib/useSession';
-import { quoteStages, isTerminalStatus, shouldAskRating, ratingDismissedKey } from '../../lib/orderTrack';
+import { quoteStages, isTerminalStatus } from '../../lib/orderTrack';
 import { brandMetaForTitle } from '../../lib/catalogMeta';
 import { mapKind } from '../../lib/catalog';
 import { lightningPaymentURI, rememberLightningPayment } from '../../lib/hub';
@@ -85,30 +85,6 @@ const ORDER_REDEEM_STEPS: Record<string, string[]> = {
   // halves are redeemed differently, so say so instead of picking one.
   mixed: ['orderPage.redeemMixed1', 'orderPage.redeemMixed2', 'orderPage.redeemMixed3'],
 };
-
-/**
- * Body of the "Rate your delivery" sheet. The sheet outlives the render pass
- * that opened it, so the rating form subscribes to the translator itself and a
- * language switch while it is open re-renders correctly.
- */
-function RateDeliveryPrompt({ kind, id, onSaved, onLater }: { kind: 'order' | 'quote'; id: string; onSaved: (res: any) => void; onLater: () => void }) {
-  const { t } = useT();
-  const none: RatingCurrent = { rated: false, stars: 0, comment: '', edits: 0 };
-  return (
-    <div style={{ padding: '4px 2px 2px' }}>
-      <div className="strong" style={{ fontSize: '1.05rem' }}>{t('orderPage.howWasDelivery')}</div>
-      <div className="small muted mt-1">{t('orderPage.howWasIt')}</div>
-      <div className="mt-2">
-        <RatingFlow kind={kind} id={id} current={none} onSaved={onSaved} />
-      </div>
-      <button className="btn btn-ghost btn-block mt-2" onClick={onLater}>
-        <Icon name="clock" size={16} />
-        <span className="btn-label">{t('orderPage.rateLater')}</span>
-      </button>
-      <div className="xs faint mt-1">{t('orderPage.rateNoPressure')}</div>
-    </div>
-  );
-}
 
 function giftChannelLabel(ch: string) {
   // "email" is the only note channel there is — the shop has no SMS sender.
@@ -394,11 +370,13 @@ function RatingCard({ kind, id, status, rating, comment, edits, onSaved }: {
 }) {
   const { t } = useT();
   const [changing, setChanging] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (window.location.hash === '#purchase-rating') cardRef.current?.scrollIntoView({ block: 'center' }); }, [id]);
   if (!isTerminalStatus(status)) return null;
   if (['failed', 'refunded', 'expired', 'denied', 'blocked'].includes(String(status).toLowerCase())) return null;
   if (rating && rating > 0 && !changing) {
     return (
-      <div className="card">
+      <div className="card" id="purchase-rating" ref={cardRef}>
         <div className="card-title">{t('orderPage.ratePurchase')}</div>
         <div>
           <div className="small muted mb-1">{t('orderPage.yourPublicRating')}</div>
@@ -417,7 +395,7 @@ function RatingCard({ kind, id, status, rating, comment, edits, onSaved }: {
     );
   }
   return (
-    <div className="card">
+    <div className="card" id="purchase-rating" ref={cardRef}>
       <div className="card-title">{t('orderPage.ratePurchase')}</div>
       <div className="small muted mb-1">{t('orderPage.howWasIt')}</div>
       <RatingFlow
@@ -849,49 +827,6 @@ export function OrderView() {
 
   const terminal = data ? ['fulfilled','refunded','delivered','complete'].includes(data.status || data.quote?.status) : false;
   useInterval(() => { if (data && !terminal) load(false); }, 12000, [data, terminal]);
-
-  // ---- Rate-your-delivery popup -----------------------------------------
-  // The moment the live tracking poll sees the order FULFILLED (or the buyer
-  // opens a freshly delivered order), ask ONCE for a rating. "Rate later"
-  // remembers the dismissal per order; the rating itself stays available on
-  // this page (Rate your purchase card) and on the Orders page row.
-  const rateAskedFor = useRef('');
-  useEffect(() => {
-    if (!data) return;
-    const row = isQuote ? data.quote || data : data;
-    const rowId = String(row?.id || row?.quote_id || '');
-    if (!rowId || rateAskedFor.current === rowId) return;
-    if (!shouldAskRating(row, isQuote ? 'quote' : 'order', {
-      isDismissed: (k) => {
-        try { return !!localStorage.getItem(k); } catch { return false; }
-      },
-    })) return;
-    rateAskedFor.current = rowId;
-    const laterKey = ratingDismissedKey(isQuote ? 'quote' : 'order', rowId);
-    openSheet({
-      // Both the heading and the body translate at RENDER time. The prompt
-      // opens the moment the order payload lands, which can beat this
-      // visitor's dictionary chunk; a t() captured here would leave the whole
-      // prompt (and the dialog's accessible name) in the fallback language
-      // until the sheet was closed and reopened.
-      title: (tr) => tr('orderPage.rateTitle'),
-      render: (close) => (
-        <RateDeliveryPrompt
-          kind={isQuote ? 'quote' : 'order'}
-          id={rowId}
-          onSaved={() => {
-            toast(i18nT('orderPage.ratedThanks'), 'success');
-            close();
-            load(false);
-          }}
-          onLater={() => {
-            try { localStorage.setItem(laterKey, '1'); } catch {}
-            close();
-          }}
-        />
-      ),
-    });
-  }, [data, isQuote, openSheet, toast, load, t]);
 
   if (queryReady && (!id || err === 'no-id')) {
     return (

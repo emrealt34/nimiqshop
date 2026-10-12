@@ -60,6 +60,15 @@ const de = {
 
   brand: { giftTag: 'geschenk' },
 
+  ratingReminder: {
+    later: "Später",
+    purchase: "Kauf",
+    title: "Einige Käufe warten auf deine Bewertung",
+    body: "Du hast {{count}} gelieferte Käufe noch nicht bewertet. Möchtest du sie bewerten?",
+    optional: "Sterne und Kommentar sind freiwillig. Du entscheidest, ob du fortfahren möchtest; das Formular erklärt die Wallet-Transaktion vor dem Absenden.",
+    rate: "Kauf bewerten",
+    all: "Alle Käufe ansehen",
+  },
   quiz: {
     prizePayment: 'Quizpreiszahlung',
     autoPrize: "Nach Quizende werden die Preise automatisch aus der Cashback-Wallet an die angemeldete Nimiq-Wallet jedes Gewinners ausgezahlt.",

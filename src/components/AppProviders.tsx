@@ -61,8 +61,9 @@ type SheetState = {
 type SheetCtx = {
   openSheet: (opts: { title: SheetTitle; wide?: boolean; render: SheetState['render'] }) => number;
   closeSheet: (id?: number) => void;
+  hasOpenSheet: () => boolean;
 };
-const SheetContext = createContext<SheetCtx>({ openSheet: () => 0, closeSheet: () => {} });
+const SheetContext = createContext<SheetCtx>({ openSheet: () => 0, closeSheet: () => {}, hasOpenSheet: () => false });
 export const useSheet = () => useContext(SheetContext);
 
 /**
@@ -107,6 +108,9 @@ export function AppProviders({ children }: { children: ReactNode }) {
   const sheetId = useRef(0);
   const contentRef = useRef<HTMLDivElement>(null);
   const hasSheets = sheets.length > 0;
+  const sheetsRef = useRef(sheets);
+  sheetsRef.current = sheets;
+  const hasOpenSheet = useCallback(() => sheetsRef.current.length > 0, []);
 
   useEffect(() => {
     if (!hasSheets) return;
@@ -150,7 +154,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
 
   return (
     <ToastContext.Provider value={{ toast }}>
-      <SheetContext.Provider value={{ openSheet, closeSheet }}>
+      <SheetContext.Provider value={{ openSheet, closeSheet, hasOpenSheet }}>
         <div ref={contentRef}><ErrorBoundary>{children}</ErrorBoundary></div>
         {/* Toast stack */}
         {toasts.length > 0 && (

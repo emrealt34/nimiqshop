@@ -60,6 +60,15 @@ const pt = {
 
   brand: { giftTag: 'presente' },
 
+  ratingReminder: {
+    later: "Mais tarde",
+    purchase: "Compra",
+    title: "Tens compras por avaliar",
+    body: "Ainda não avaliaste {{count}} compras entregues. Queres deixar a tua opinião?",
+    optional: "As estrelas e o comentário são opcionais. Tu decides se queres continuar; o formulário explica a transação da carteira antes do envio.",
+    rate: "Avaliar compra",
+    all: "Ver todas as compras",
+  },
   quiz: {
     prizePayment: 'Pagamento do prêmio do concurso',
     autoPrize: "Após o fim do concurso, os prémios são pagos automaticamente da carteira de cashback para a carteira Nimiq ligada de cada vencedor.",

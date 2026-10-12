@@ -48,38 +48,3 @@ export function isDeliveredStatus(s?: string | null): boolean {
 export function isIssueStatus(s?: string | null): boolean {
   return ['failed', 'refunded', 'expired', 'denied', 'blocked', 'payment_error', 'manual_review', 'failed_supplier', 'refunding'].includes(String(s).toLowerCase());
 }
-
-/* ---------------- Rate-your-delivery popup ---------------- */
-
-/** How long after fulfillment the rate popup still fires on the order page. */
-export const RATE_POPUP_FRESH_MS = 15 * 60_000;
-
-/** localStorage key under which "Rate later" is remembered per order/quote. */
-export function ratingDismissedKey(kind: 'quote' | 'order', id: string): string {
-  return `nimshop.rate-later:${kind}:${id}`;
-}
-
-/**
- * Should the "Rate your delivery" popup open for this row?
- *
- * Fires ONCE for a FRESH delivery: the status just became delivered-ish
- * (live tracking poll or the buyer opened the order right after), the buyer
- * has not rated yet, and they did not press "Rate later" before (checked by
- * the caller through the dismissed callback). Old delivered orders from
- * history never nag — their rating lives on the order page card and the
- * Orders page row instead.
- */
-export function shouldAskRating(
-  row: any,
-  kind: 'quote' | 'order',
-  opts: { now?: number; isDismissed?: (key: string) => boolean } = {}
-): boolean {
-  const id = String(row?.id || row?.quote_id || '');
-  if (!id) return false;
-  if (!isDeliveredStatus(row?.status)) return false;
-  if (Number(row?.rating) > 0) return false;
-  if (opts.isDismissed?.(ratingDismissedKey(kind, id))) return false;
-  const updated = Date.parse(deliveryTimestamp(row) || '');
-  if (!Number.isFinite(updated)) return false;
-  return (opts.now ?? Date.now()) - updated <= RATE_POPUP_FRESH_MS;
-}

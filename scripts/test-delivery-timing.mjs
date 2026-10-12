@@ -10,9 +10,9 @@ test('delivery clocks use immutable observations and preserve minutes and second
   const dir = await mkdtemp(join(tmpdir(), 'delivery-timing-'));
   try {
     const file = join(dir, 'timing.cjs');
-    buildSync({ stdin: { contents: `export { fmtDuration, purchaseFaceLabel } from './format'; export { deliverySeconds, purchaseElapsedSeconds } from './deliveryTiming'; export { quoteStages, shouldAskRating } from './orderTrack'; export { youGetText } from './deliveryCopy';`, resolveDir: new URL('../src/lib/', import.meta.url).pathname },
+    buildSync({ stdin: { contents: `export { fmtDuration, purchaseFaceLabel } from './format'; export { deliverySeconds, purchaseElapsedSeconds } from './deliveryTiming'; export { quoteStages } from './orderTrack'; export { youGetText } from './deliveryCopy';`, resolveDir: new URL('../src/lib/', import.meta.url).pathname },
       bundle: true, platform: 'node', format: 'cjs', outfile: file, define: { 'import.meta.env.BASE_URL': '"/"', 'import.meta.env': '{}' }, logLevel: 'silent' });
-    const { fmtDuration, deliverySeconds, purchaseElapsedSeconds, quoteStages, shouldAskRating, purchaseFaceLabel, youGetText } = createRequire(import.meta.url)(file);
+    const { fmtDuration, deliverySeconds, purchaseElapsedSeconds, quoteStages, purchaseFaceLabel, youGetText } = createRequire(import.meta.url)(file);
     for (const [input, expected] of [[0, '<1s'], [.5, '<1s'], [59.8, '59s'], [60, '1 min 0s'], [61, '1 min 1s'], [119, '1 min 59s'], [3599, '59 min 59s'], [3600, '1h 0m 0s'], [3661, '1h 1m 1s'], [null, '—'], [-1, '—'], [NaN, '—'], [Infinity, '—']]) assert.equal(fmtDuration(input), expected);
     const row = { id: 'real', status: 'fulfilled', created_at: '2026-10-11T16:14:36Z', paid_at: '2026-10-11T16:21:58Z', delivered_at: '2026-10-11T16:22:00Z', updated_at: '2026-10-11T21:00:00Z', rated_at: '2026-10-11T21:00:00Z' };
     assert.equal(deliverySeconds(row), 2);
@@ -24,7 +24,6 @@ test('delivery clocks use immutable observations and preserve minutes and second
     assert.equal(deliverySeconds({ ...row, delivered_at: null, supplier_updated_at: row.delivered_at }), 2);
     assert.equal(quoteStages(row)[1].timestamp, row.paid_at);
     assert.equal(quoteStages(row)[3].timestamp, row.delivered_at);
-    assert.equal(shouldAskRating({ ...row, rating: 0 }, 'quote', { now: Date.parse(row.updated_at) }), false);
     const legacy = { payload: { value: 10, currency: 'EUR', country: 'FR' }, quantity: 2 };
     assert.equal(purchaseFaceLabel(legacy), '20 € (10 € ×2)');
     assert.equal(purchaseFaceLabel({ denomination: '50 GB 90 days', quantity: 2, product_value: 16.16, product_currency: 'USD' }), '50 GB 90 days ×2');

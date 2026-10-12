@@ -68,6 +68,15 @@ const en = {
     giftTag: 'gift',
   },
 
+  ratingReminder: {
+    later: "Later",
+    purchase: "Purchase",
+    title: "A few purchases are waiting for your review",
+    body: "You have {{count}} delivered purchases you haven’t rated yet. Would you like to review them?",
+    optional: "Stars and a comment are optional. You choose whether to continue; the rating form explains the wallet transaction before you submit.",
+    rate: "Review purchase",
+    all: "View all purchases",
+  },
   quiz: {
     prizePayment: 'Quiz prize payment',
     autoPrize: "After the quiz ends, prizes are paid automatically from the cashback wallet to each winner’s signed-in Nimiq wallet.",

@@ -60,6 +60,15 @@ const fr = {
 
   brand: { giftTag: 'cadeau' },
 
+  ratingReminder: {
+    later: "Plus tard",
+    purchase: "Achat",
+    title: "Des achats attendent ton avis",
+    body: "Tu as {{count}} achats livrés que tu n’as pas encore notés. Souhaites-tu donner ton avis ?",
+    optional: "Les étoiles et le commentaire sont facultatifs. Tu choisis de continuer ; le formulaire explique la transaction du portefeuille avant l’envoi.",
+    rate: "Donner un avis",
+    all: "Voir tous les achats",
+  },
   quiz: {
     prizePayment: 'Paiement du prix du quiz',
     autoPrize: "Après la fin du quiz, les prix sont versés automatiquement depuis le portefeuille de cashback vers le portefeuille Nimiq connecté de chaque gagnant.",
