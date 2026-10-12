@@ -1,7 +1,7 @@
 import { test, expect, open } from './support/fixtures';
 import { path } from './support/data';
 
-const draft = { title: 'Closest quiz', description: 'Guess the closest value.', prize: { title: 'Manual reward', value: '10 €', description: 'Each winner receives this reward.', image_url: '' }, winner_count: 3, translations: { fr: { title: 'Quiz boutique', description: 'Découvre la boutique.' } },
+const draft = { title: 'Closest quiz', description: 'Guess the closest value.', prize: { title: 'Manual reward', value: '10 €', description: 'Each winner receives this reward.', image_url: '' }, winner_count: 5, tie_break: 'submitted_at', translations: { fr: { title: 'Quiz boutique', description: 'Découvre la boutique.' } },
  questions: Array.from({length:10},(_,i)=>({ type:'range', prompt:`Range question ${i+1}`,min:0,max:1000,correct_value:500,translations:{fr:{prompt:`Question boutique ${i+1}`}} })) };
 
 for(const width of [320,1280]) {
@@ -24,7 +24,7 @@ for(const width of [320,1280]) {
    await page.locator('.quiz-admin-question').first().getByLabel('Correct value',{exact:true}).fill('600');
    await page.getByRole('button',{name:'Save draft',exact:true}).click();
    await expect.poll(()=>stored?.questions[0].correct_value).toBe(600);
-   expect(stored.translations.fr.title).toBe('Quiz boutique'); expect(stored.questions[0].translations.fr.prompt).toBe('Question boutique 1'); expect(stored.winner_count).toBe(3);expect(published).toBe(0);
+   expect(stored.translations.fr.title).toBe('Quiz boutique'); expect(stored.questions[0].translations.fr.prompt).toBe('Question boutique 1'); expect(stored.winner_count).toBe(5);expect(stored.tie_break).toBe('submitted_at');expect(published).toBe(0);
    await page.getByRole('button',{name:'Edit',exact:true}).click();
    await page.getByLabel('Title',{exact:true}).fill('Updated saved quiz');
    await page.getByRole('button',{name:'Save draft',exact:true}).click();
@@ -86,7 +86,7 @@ for (const width of [320, 1280]) {
   test('one question at a time, failed saves retry, numeric bounds, resume, back and final submission', async ({page}) => {
    let attempt:any=null; let failSave=true; let submissions=0;
    const questions=[{id:'first',type:'choice',prompt:'Cashback base?',options:['100 NIM','105 NIM']},{id:'calc',type:'range',prompt:'Calculate cashback',options:[],min:0,max:100},{id:'last',type:'choice',prompt:'Contact support?',options:['Nimiq','CryptoRefills']}];
-   const c=()=>({id:'steps',title:'Shop knowledge',description:'Short description',prize:{title:'NIM prize pool',value:'10 000 NIM',description:'Total pool shared by the top 3.',image_url:''},starts_at:new Date(Date.now()-60000).toISOString(),ends_at:new Date(Date.now()+3600000).toISOString(),phase:'live',question_count:3,participants:1,attempt,has_ranges:true,winner_count:3,winner:'',winners:[],is_winner:false,decision_note:'',cancel_reason:'',award_delivered_at:null,leaderboard:[]});
+   const c=()=>({id:'steps',title:'Shop knowledge',description:'Short description',prize:{title:'NIM prize pool',value:'10 000 NIM',description:'Total pool shared by the top 3.',image_url:''},starts_at:new Date(Date.now()-60000).toISOString(),ends_at:new Date(Date.now()+3600000).toISOString(),phase:'live',question_count:3,participants:1,attempt,has_ranges:true,winner_count:5,tie_break:'submitted_at',winner:'',winners:[],is_winner:false,decision_note:'',cancel_reason:'',award_delivered_at:null,leaderboard:attempt?.submitted_at?[{rank:1,participant:'me',score:3,is_me:true,is_winner:false,submitted_at:attempt.submitted_at}]:[]});
    await page.route('**/api/quiz**',route=>{
     const action=new URL(route.request().url()).pathname.split('/quiz')[1];
     if(!action||action==='/')return route.fulfill({json:{items:[c()]}});
@@ -118,7 +118,7 @@ for (const width of [320, 1280]) {
    await page.getByRole('button',{name:'Previous question',exact:true}).click();await expect(page.getByRole('radio',{name:'100 NIM',exact:true})).toBeChecked();
    await page.getByRole('button',{name:'Next question',exact:true}).click();await page.getByRole('button',{name:'Next question',exact:true}).click();
    await page.getByRole('radio',{name:'CryptoRefills',exact:true}).check();await expect(page.getByRole('button',{name:'Submit answers',exact:true})).toBeEnabled();
-   await page.getByRole('button',{name:'Submit answers',exact:true}).click();await expect(page.locator('.quiz-result')).toContainText('3 / 3');expect(submissions).toBe(1);
+   await page.getByRole('button',{name:'Submit answers',exact:true}).click();await expect(page.locator('.quiz-result')).toContainText('3 / 3');await expect(page.locator('.quiz-leaderboard time')).toHaveAttribute('datetime',attempt.submitted_at);expect(submissions).toBe(1);
    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   });
  });

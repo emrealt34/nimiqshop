@@ -69,6 +69,8 @@ const en = {
   },
 
   quiz: {
+    rulesTimed: "One attempt per account. Each correct choice earns 1 point. Higher scores win; equal scores rank by earlier final submission confirmed by the server.",
+    rangeRulesTimed: "One attempt per account. Correct choices earn 1 point. Range points: 1 − |answer − correct value| / (max − min), rounded up to six decimals. Higher totals rank first; ties rank by earlier final submission confirmed by the server.",
     step: "Question {{current}} / {{total}}",
     next: "Next question",
     previous: "Previous question",

@@ -27,7 +27,7 @@ var (
 	ErrQuizClosed  = errors.New("quiz is not open")
 	ErrQuizLocked  = errors.New("published questions and completed attempts cannot be changed")
 	ErrQuizAnswers = errors.New("invalid or incomplete quiz answers")
-	ErrQuizWinner  = errors.New("select the configured number of eligible completed participants; higher scores must win before boundary ties")
+	ErrQuizWinner  = errors.New("select the configured number of eligible completed participants according to the published ranking rules")
 )
 
 // Localized text contains no scoring data or administrative secrets.
@@ -66,6 +66,8 @@ type QuizPrize struct {
 }
 
 type QuizCompetition struct {
+	TieBreak string `json:"tie_break,omitempty"` // immutable once published; empty retains legacy admin tie decisions
+
 	Translations     map[string]QuizText  `json:"translations,omitempty"`
 	ID               string               `json:"id"`
 	Title            string               `json:"title"`
@@ -132,6 +134,9 @@ func quizLanguage(lang string) bool {
 	return false
 }
 func validateQuiz(c QuizCompetition) error {
+	if c.TieBreak != "" && c.TieBreak != "submitted_at" {
+		return fmt.Errorf("tie_break must be submitted_at or omitted")
+	}
 	if err := validateQuizTextTranslations(c.Translations, 120, 2000); err != nil {
 		return err
 	}
@@ -247,7 +252,7 @@ func (s *Store) PutQuizCompetition(input QuizCompetition, create bool, now time.
 		if create {
 			created = now.UTC()
 		}
-		result = QuizCompetition{ID: input.ID, Translations: input.Translations, Title: input.Title, Description: input.Description, Prize: input.Prize, StartsAt: input.StartsAt, EndsAt: input.EndsAt, Status: "draft", Questions: input.Questions, WinnerCount: input.WinnerCount, CreatedAt: created, UpdatedAt: now.UTC()}
+		result = QuizCompetition{ID: input.ID, TieBreak: input.TieBreak, Translations: input.Translations, Title: input.Title, Description: input.Description, Prize: input.Prize, StartsAt: input.StartsAt, EndsAt: input.EndsAt, Status: "draft", Questions: input.Questions, WinnerCount: input.WinnerCount, CreatedAt: created, UpdatedAt: now.UTC()}
 		if err := putQuizJSON(txn, quizKey(result.ID), result); err != nil {
 			return err
 		}
@@ -458,6 +463,10 @@ func quizEntries(txn *badger.Txn, id string) ([]QuizAttempt, error) {
 		}
 		out = append(out, a)
 	}
+	var competition QuizCompetition
+	if err := getJSON(txn, quizKey(id), &competition); err != nil {
+		return nil, err
+	}
 	sort.Slice(out, func(i, j int) bool {
 		a, b := out[i], out[j]
 		if (a.SubmittedAt != nil) != (b.SubmittedAt != nil) {
@@ -466,7 +475,10 @@ func quizEntries(txn *badger.Txn, id string) ([]QuizAttempt, error) {
 		if QuizPoints(a) != QuizPoints(b) {
 			return QuizPoints(a) > QuizPoints(b)
 		}
-		return a.UserID < b.UserID // display order only, NEVER a tiebreaker
+		if competition.TieBreak == "submitted_at" && a.SubmittedAt != nil && b.SubmittedAt != nil && !a.SubmittedAt.Equal(*b.SubmittedAt) {
+			return a.SubmittedAt.Before(*b.SubmittedAt)
+		}
+		return a.UserID < b.UserID // deterministic fallback for exact timestamp ties; legacy display order otherwise
 	})
 	return out, nil
 }
@@ -519,7 +531,8 @@ func QuizAwardTime(c QuizCompetition, user string) *time.Time {
 	return nil
 }
 
-// All entries above the cutoff must win; a boundary tie is decided by the admin.
+// Earlier server-confirmed submissions win score ties when the published rule requests it.
+// Legacy competitions retain their published administrator-decides rule.
 func QuizEligibility(c QuizCompetition, entries []QuizAttempt) (map[string]bool, int) {
 	completed := []QuizAttempt{}
 	for _, a := range entries {
@@ -534,6 +547,22 @@ func QuizEligibility(c QuizCompetition, entries []QuizAttempt) (map[string]bool,
 	eligible := map[string]bool{}
 	if n == 0 {
 		return eligible, 0
+	}
+	if c.TieBreak == "submitted_at" {
+		sort.Slice(completed, func(i, j int) bool {
+			a, b := completed[i], completed[j]
+			if QuizPoints(a) != QuizPoints(b) {
+				return QuizPoints(a) > QuizPoints(b)
+			}
+			if !a.SubmittedAt.Equal(*b.SubmittedAt) {
+				return a.SubmittedAt.Before(*b.SubmittedAt)
+			}
+			return a.UserID < b.UserID
+		})
+		for _, a := range completed[:n] {
+			eligible[a.UserID] = true
+		}
+		return eligible, n
 	}
 	cutoff := QuizPoints(completed[n-1])
 	for _, a := range completed {
@@ -567,10 +596,10 @@ func (s *Store) FinalizeQuizWinners(id string, winners []string, note string, no
 			return err
 		}
 		eligible, count := QuizEligibility(c, entries)
-		if QuizWinnerLimit(c) == 0 {
+		if QuizWinnerLimit(c) == 0 || (c.TieBreak == "submitted_at" && len(winners) == 0) {
 			winners = nil
 			for _, a := range entries {
-				if a.SubmittedAt != nil {
+				if a.SubmittedAt != nil && eligible[a.UserID] {
 					winners = append(winners, a.UserID)
 				}
 			}

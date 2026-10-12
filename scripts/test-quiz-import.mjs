@@ -16,6 +16,9 @@ test('AI JSON creates only editable drafts and validates range answers and winne
   const result = parseQuizImport(JSON.stringify(raw));
   const example = parseQuizImport(await readFile(new URL('../docs/examples/shop-knowledge-quiz.json', import.meta.url), 'utf8'));
   assert.equal(example.questions.length, 10);
+  assert.equal(example.winner_count, 5); assert.equal(example.tie_break, 'submitted_at');
+  assert.equal(example.prize.value, '10 000 NIM');
+  assert.throws(() => parseQuizImport(JSON.stringify({ ...raw, tie_break: 'client_time' })));
   for (const lang of ['en','tr','de','fr','es','pt']) {
    assert.ok(localizeQuiz(example, lang).title);
    assert.equal(localizeQuiz(example, lang).description, example.translations[lang].description);

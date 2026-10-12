@@ -61,6 +61,8 @@ const de = {
   brand: { giftTag: 'geschenk' },
 
   quiz: {
+    rulesTimed: "Ein Versuch pro Konto. Jede richtige Auswahlantwort gibt 1 Punkt. Höhere Punktzahlen gewinnen; bei Gleichstand zählt die frühere, vom Server bestätigte endgültige Abgabe.",
+    rangeRulesTimed: "Ein Versuch pro Konto. Richtige Auswahlantworten geben 1 Punkt. Bereichspunkte: 1 − |Antwort − richtiger Wert| / (Maximum − Minimum), auf sechs Dezimalstellen aufgerundet. Höhere Summen stehen zuerst; bei Gleichstand zählt die frühere, vom Server bestätigte endgültige Abgabe.",
     step: "Frage {{current}} / {{total}}",
     next: "Nächste Frage",
     previous: "Vorherige Frage",

@@ -61,7 +61,7 @@ func (h *Handlers) quizView(c db.QuizCompetition, user string) (map[string]any, 
 		delivered = db.QuizAwardTime(c, user)
 	}
 	return map[string]any{
-		"id": c.ID, "translations": c.Translations, "title": c.Title, "description": c.Description, "prize": c.Prize,
+		"id": c.ID, "tie_break": c.TieBreak, "translations": c.Translations, "title": c.Title, "description": c.Description, "prize": c.Prize,
 		"starts_at": c.StartsAt, "ends_at": c.EndsAt, "phase": quizPhase(c, time.Now().UTC()),
 		"question_count": len(c.Questions), "participants": c.Participants, "attempt": mine,
 		"winner": quizParticipant(c.WinnerUserID), "winners": winners, "winner_count": db.QuizWinnerLimit(c), "has_ranges": hasRanges, "is_winner": db.QuizIsWinner(c, user),
@@ -130,7 +130,7 @@ func (h *Handlers) GetQuiz(ctx *fasthttp.RequestCtx) {
 		if a.SubmittedAt == nil {
 			continue
 		}
-		rows = append(rows, map[string]any{"rank": len(rows) + 1, "participant": quizParticipant(a.UserID), "score": float64(db.QuizPoints(a)) / 1_000_000, "is_me": a.UserID == user, "is_winner": db.QuizIsWinner(c, a.UserID)})
+		rows = append(rows, map[string]any{"rank": len(rows) + 1, "submitted_at": a.SubmittedAt, "participant": quizParticipant(a.UserID), "score": float64(db.QuizPoints(a)) / 1_000_000, "is_me": a.UserID == user, "is_winner": db.QuizIsWinner(c, a.UserID)})
 		if len(rows) >= 50 {
 			break
 		}

@@ -43,4 +43,10 @@ Optional `translations` maps accept `en`, `tr`, `de`, `fr`, `es`, `pt`. At compe
 
 Participants see one question at a time, with progress and previous/next controls. Next stays disabled until a valid answer has been saved; failed saves expose a retry. Reloading resumes the first unanswered question, or the last question when every answer is saved. Final submission is available only at the last question, after all answers are valid and saved. Earlier answers remain editable before submission.
 
-The example reward is a **total 10,000 NIM pool shared among the top three winners**, not 10,000 NIM per winner. It creates no automatic payout. The operator still sets dates and the allocation before publishing.
+The example reward is a **total 10,000 NIM pool with 2,000 NIM per winner for up to five winners**, not 10,000 NIM per winner. It creates no automatic payout. The operator still sets dates before publishing. If fewer than five participants finish, each selected winner still receives 2,000 NIM; the unused pool is not automatically redistributed.
+
+## Published score-tie policy
+
+`tie_break: "submitted_at"` ranks completed entries by server-computed points descending, then immutable server-confirmed final submission time ascending. Exact timestamp ties use a deterministic internal participant-ID fallback. The same order drives the public leaderboard, admin eligibility and winner finalization. The operator cannot substitute a later equal-score entry for an earlier one. Submitting again does not change the original completion timestamp. Missing `tie_break` preserves legacy administrator-decided ties for existing competitions; publish freezes this policy with the questions.
+
+The selected example uses `winner_count: 5`, a total 10,000 NIM pool and 2,000 NIM per winner. It has one attempt per account and no one-participant-per-IP restriction.

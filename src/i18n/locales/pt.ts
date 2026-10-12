@@ -61,6 +61,8 @@ const pt = {
   brand: { giftTag: 'presente' },
 
   quiz: {
+    rulesTimed: "Uma tentativa por conta. Cada opção correta dá 1 ponto. Ganham as maiores pontuações; em caso de empate, tem prioridade o envio definitivo confirmado mais cedo pelo servidor.",
+    rangeRulesTimed: "Uma tentativa por conta. As opções corretas dão 1 ponto. Pontos de intervalo: 1 − |resposta − valor correto| / (máximo − mínimo), arredondados para cima a seis casas decimais. Os maiores totais ficam primeiro; os empates são resolvidos pelo envio definitivo confirmado mais cedo pelo servidor.",
     step: "Pergunta {{current}} / {{total}}",
     next: "Próxima pergunta",
     previous: "Pergunta anterior",

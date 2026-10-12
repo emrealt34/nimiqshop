@@ -7,15 +7,17 @@ export type QuizQuestion = { translations?: Partial<Record<"en" | "tr" | "de" | 
 export type AdminQuizQuestion = QuizQuestion & { correct_index: number; correct_value?: number };
 export type QuizAttempt = { answers: number[]; score: number; total: number; started_at: string; submitted_at: string | null; prize_email?: string };
 export type QuizCompetition = {
+ tie_break?: "submitted_at" | "";
  translations?: QuizTranslations;
   id: string; title: string; description: string; prize: QuizPrize; starts_at: string; ends_at: string;
   phase: 'scheduled' | 'live' | 'ended' | 'finalized' | 'cancelled'; question_count: number; participants: number;
   attempt: QuizAttempt | null; winner: string; is_winner: boolean; decision_note: string; cancel_reason: string;
   award_delivered_at: string | null;
   winner_count?: number; winners?: string[]; has_ranges?: boolean;
-  leaderboard?: { rank?: number; participant: string; score: number; is_me: boolean; is_winner: boolean }[];
+  leaderboard?: { submitted_at?: string; rank?: number; participant: string; score: number; is_me: boolean; is_winner: boolean }[];
 };
 export type AdminQuiz = {
+ tie_break?: "submitted_at" | "";
  translations?: QuizTranslations;
   id?: string; title: string; description: string; prize: QuizPrize; starts_at: string; ends_at: string;
   status: 'draft' | 'published' | 'cancelled' | 'finalized'; questions: AdminQuizQuestion[];
@@ -63,8 +65,10 @@ export function parseQuizImport(text: string): AdminQuiz {
     }));
   };
   const textTranslations = (value: any, titleMax: number, descriptionMax: number) => translations(value, text => ({ title: field(text.title, 'Translated title', titleMax, true), description: field(text.description, 'Translated description', descriptionMax) }));
+  const tieBreak = raw.tie_break ?? '';
+  if (tieBreak !== '' && tieBreak !== 'submitted_at') throw new Error('tie_break must be submitted_at or omitted.');
   const winnerCount = raw.winner_count ?? 1;
-  if (!Number.isInteger(winnerCount) || winnerCount < 0 || winnerCount > 10000) throw new Error('winner_count: use 1, 3, or 0 for everyone (maximum 10000).');
+  if (!Number.isInteger(winnerCount) || winnerCount < 0 || winnerCount > 10000) throw new Error('winner_count: use 1, 3, 5, or 0 for everyone (maximum 10000).');
   if (!Array.isArray(raw.questions) || raw.questions.length < 1 || raw.questions.length > 50) throw new Error('Include 1–50 questions.');
   const questions = raw.questions.map((q: any, index: number): AdminQuizQuestion => {
     if (!q || typeof q !== 'object' || Array.isArray(q)) throw new Error(`Question ${index + 1} must be an object.`);
@@ -100,7 +104,7 @@ export function parseQuizImport(text: string): AdminQuiz {
   if (!prize || typeof prize !== 'object' || Array.isArray(prize)) throw new Error('Include a prize object.');
   const image = field(prize.image_url, 'Prize image', 2048);
   if (image) { let url: URL; try { url = new URL(image); } catch { throw new Error('Prize image must be an HTTPS URL.'); } if (url.protocol !== 'https:' || url.username || url.password) throw new Error('Prize image must be an HTTPS URL without credentials.'); }
-  return { translations: textTranslations(raw.translations, 120, 2000), title: field(raw.title, 'Title', 120, true), description: field(raw.description, 'Description', 2000), winner_count: winnerCount, starts_at: start, ends_at: end, status: 'draft', questions,
+  return { tie_break: tieBreak, translations: textTranslations(raw.translations, 120, 2000), title: field(raw.title, 'Title', 120, true), description: field(raw.description, 'Description', 2000), winner_count: winnerCount, starts_at: start, ends_at: end, status: 'draft', questions,
     prize: { translations: textTranslations(prize.translations, 140, 1000), title: field(prize.title, 'Prize title', 140, true), value: field(prize.value, 'Prize value', 40), description: field(prize.description, 'Prize description', 1000), image_url: image } };
 }
 

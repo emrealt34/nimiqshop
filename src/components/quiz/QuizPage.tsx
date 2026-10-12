@@ -162,7 +162,7 @@ export function QuizView() {
         {competition.description && <p className="small">{competition.description}</p>}
         <QuizPrizeCard prize={competition.prize} />
         <dl className="quiz-facts"><div><dt>{t('quiz.starts')}</dt><dd>{date(competition.starts_at)}</dd></div><div><dt>{t('quiz.ends')}</dt><dd>{date(competition.ends_at)}</dd></div><div><dt>{t('quiz.questions')}</dt><dd>{competition.question_count}</dd></div><div><dt>{t('quiz.participants')}</dt><dd>{competition.participants}</dd></div></dl>
-        <p className="small quiz-rules">{t(competition.has_ranges ? 'quiz.rangeRules' : 'quiz.rules')}</p>
+        <p className="small quiz-rules">{t(competition.has_ranges ? (competition.tie_break === 'submitted_at' ? 'quiz.rangeRulesTimed' : 'quiz.rangeRules') : (competition.tie_break === 'submitted_at' ? 'quiz.rulesTimed' : 'quiz.rules'))}</p>
         <p className="small">{competition.winner_count === 0 ? t('quiz.winnerAll') : t('quiz.winnerTop', { count: competition.winner_count ?? 1 })}</p>
         {competition.cancel_reason && <div className="alert warn">{competition.cancel_reason}</div>}
         {completed && <div className="quiz-result" role="status"><Icon name="check" size={20} /><strong>{t('quiz.yourScore', { score: quizScoreLabel(competition.attempt!.score), total: competition.question_count })}</strong><span className="small">{t('quiz.noRetry')}</span></div>}
@@ -195,7 +195,7 @@ export function QuizView() {
       </form>}
       {!questions && <section className="card quiz-leaderboard"><div className="row between"><h2>{t('quiz.leaderboard')}</h2><button className="btn btn-ghost btn-sm" type="button" disabled={busy} onClick={() => void perform(refresh)}><Icon name="refresh" size={15} />{t('quiz.refresh')}</button></div>
         {!competition.leaderboard?.length && <p className="small muted">{t('quiz.noResults')}</p>}
-        <ol>{competition.leaderboard?.map((entry, index) => <li key={entry.participant}><span><b>#{entry.rank || index + 1}</b>{entry.is_me ? t('quiz.you') : t('quiz.player', { participant: entry.participant })}{entry.is_winner && <Icon name="star" size={16} />}</span><strong>{quizScoreLabel(entry.score)} / {competition.question_count}</strong></li>)}</ol>
+        <ol>{competition.leaderboard?.map((entry, index) => <li key={entry.participant}><span><b>#{entry.rank || index + 1}</b>{entry.is_me ? t('quiz.you') : t('quiz.player', { participant: entry.participant })}{entry.is_winner && <Icon name="star" size={16} />}{competition.tie_break === 'submitted_at' && entry.submitted_at && <time className="xs muted" dateTime={entry.submitted_at}>{date(entry.submitted_at)}</time>}</span><strong>{quizScoreLabel(entry.score)} / {competition.question_count}</strong></li>)}</ol>
       </section>}
     </>}
   </div>;

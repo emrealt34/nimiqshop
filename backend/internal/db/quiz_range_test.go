@@ -169,3 +169,62 @@ func TestQuizTranslationsPersistValidateAndFreeze(t *testing.T) {
 		t.Fatal("range options accepted")
 	}
 }
+
+func TestQuizTopFiveScoreTiesUseServerSubmissionTime(t *testing.T) {
+	s, err := New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	now := time.Now().UTC()
+	correct := 500
+	count := 5
+	c, err := s.PutQuizCompetition(QuizCompetition{Title: "Top five", TieBreak: "submitted_at", WinnerCount: &count, Prize: QuizPrize{Title: "10000 NIM total", Value: "10 000 NIM"}, StartsAt: now.Add(-time.Minute), EndsAt: now.Add(time.Hour), Questions: []QuizQuestion{{ID: "guess", Prompt: "Closest", Type: "range", Min: 0, Max: 1000, CorrectValue: &correct}}}, true, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.PublishQuiz(c.ID, now); err != nil {
+		t.Fatal(err)
+	}
+	// Names deliberately oppose chronological order; starting first is not the tiebreaker.
+	users := []string{"z-first", "y-second", "x-third", "w-fourth", "v-fifth", "u-sixth"}
+	for i, user := range users {
+		rangeEntry(t, s, c, user, 500, now.Add(time.Duration(i)*time.Second))
+	}
+	rangeEntry(t, s, c, "a-late-high", 500, now.Add(10*time.Second))
+	rangeEntry(t, s, c, "b-low", 0, now.Add(-time.Second))
+	_, _, _ = s.StartQuiz(c.ID, "unfinished", now.Add(-time.Second))
+	// Retrying a completed submission must not replace the original server time.
+	a, err := s.SaveQuizAnswers(c.ID, users[0], []int{0}, true, now.Add(20*time.Second))
+	if err != nil || !a.SubmittedAt.Equal(now) {
+		t.Fatal("submission time changed", a, err)
+	}
+	entries, err := s.ListQuizEntries(c.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	eligible, slots := QuizEligibility(c, entries)
+	if slots != 5 || len(eligible) != 5 {
+		t.Fatal("wrong winner count", slots, eligible)
+	}
+	for i, user := range users {
+		if eligible[user] != (i < 5) {
+			t.Fatal("wrong tie eligibility", user, eligible)
+		}
+	}
+	if eligible["a-late-high"] || eligible["b-low"] || eligible["unfinished"] {
+		t.Fatal("ineligible participant selected", eligible)
+	}
+	if _, err := s.FinalizeQuizWinners(c.ID, []string{users[0], users[1], users[2], users[3], users[5]}, "", c.EndsAt); !errors.Is(err, ErrQuizWinner) {
+		t.Fatal("later tied participant allowed", err)
+	}
+	finalized, err := s.FinalizeQuizWinners(c.ID, nil, "Server-ranked winners", c.EndsAt)
+	if err != nil || len(finalized.WinnerUserIDs) != 5 {
+		t.Fatal("finalize", finalized, err)
+	}
+	for i, user := range finalized.WinnerUserIDs {
+		if user != users[i] {
+			t.Fatal("wrong winner order", finalized.WinnerUserIDs)
+		}
+	}
+}

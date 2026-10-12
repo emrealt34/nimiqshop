@@ -1,37 +1,37 @@
 {
   "schema_version": 1,
   "title": "nimshop.io’u Ne Kadar Tanıyorsun?",
-  "description": "nimshop.io’yu keşfet, bilgini göster. 10 soruyu cevapla, ilk 3’e gir ve ödül için yarış!",
-  "winner_count": 3,
+  "description": "nimshop.io’yu keşfet, bilgini göster. 10 soruyu cevapla, ilk 5’e gir ve ödül için yarış!",
+  "winner_count": 5,
   "prize": {
     "title": "NIM ödül havuzu",
     "value": "10 000 NIM",
-    "description": "İlk 3 kazanan arasında paylaşılacak toplam ödül havuzu.",
+    "description": "Toplam ödül havuzu 10.000 NIM. En yüksek puanlı ilk 5 kazananın her biri 2.000 NIM kazanır. Eşit puanda daha erken kesin gönderim öne geçer.",
     "image_url": "",
     "translations": {
       "tr": {
         "title": "NIM ödül havuzu",
-        "description": "İlk 3 kazanan arasında paylaşılacak toplam ödül havuzu."
+        "description": "Toplam ödül havuzu 10.000 NIM. En yüksek puanlı ilk 5 kazananın her biri 2.000 NIM kazanır. Eşit puanda daha erken kesin gönderim öne geçer."
       },
       "en": {
         "title": "NIM prize pool",
-        "description": "The total prize pool will be shared among the top 3 winners."
+        "description": "Total prize pool: 10,000 NIM. Each of the top 5 highest-scoring winners earns 2,000 NIM. Equal scores rank by earlier final submission."
       },
       "de": {
         "title": "NIM-Preispool",
-        "description": "Der gesamte Preispool wird unter den besten 3 Gewinnern aufgeteilt."
+        "description": "Gesamter Preispool: 10.000 NIM. Jeder der besten 5 Gewinner mit den höchsten Punktzahlen erhält 2.000 NIM. Bei Gleichstand zählt die frühere endgültige Abgabe."
       },
       "fr": {
         "title": "Cagnotte en NIM",
-        "description": "La cagnotte totale sera partagée entre les 3 meilleurs gagnants."
+        "description": "Cagnotte totale : 10 000 NIM. Chacun des 5 gagnants aux meilleurs scores reçoit 2 000 NIM. À égalité, l’envoi définitif le plus tôt passe en tête."
       },
       "es": {
         "title": "Fondo de premios en NIM",
-        "description": "El fondo total se repartirá entre los 3 mejores ganadores."
+        "description": "Fondo total: 10 000 NIM. Cada uno de los 5 ganadores con mayor puntuación recibe 2000 NIM. En caso de empate, tiene prioridad el envío definitivo más temprano."
       },
       "pt": {
         "title": "Fundo de prémios em NIM",
-        "description": "O fundo total será partilhado entre os 3 melhores vencedores."
+        "description": "Fundo total: 10 000 NIM. Cada um dos 5 vencedores com maior pontuação recebe 2000 NIM. Em caso de empate, tem prioridade o envio definitivo mais cedo."
       }
     }
   },
@@ -607,27 +607,28 @@
   "translations": {
     "tr": {
       "title": "nimshop.io’u Ne Kadar Tanıyorsun?",
-      "description": "nimshop.io’yu keşfet, bilgini göster. 10 soruyu cevapla, ilk 3’e gir ve ödül için yarış!"
+      "description": "nimshop.io’yu keşfet, bilgini göster. 10 soruyu cevapla, ilk 5’e gir ve ödül için yarış!"
     },
     "en": {
       "title": "How Well Do You Know nimshop.io?",
-      "description": "Discover nimshop.io and show what you know. Answer 10 questions, reach the top 3 and compete for a prize!"
+      "description": "Discover nimshop.io and show what you know. Answer 10 questions, reach the top 5 and compete for a prize!"
     },
     "de": {
       "title": "Wie gut kennst du nimshop.io?",
-      "description": "Entdecke nimshop.io und zeige dein Wissen. Beantworte 10 Fragen, erreiche die Top 3 und spiele um einen Preis!"
+      "description": "Entdecke nimshop.io und zeige dein Wissen. Beantworte 10 Fragen, erreiche die Top 5 und spiele um einen Preis!"
     },
     "fr": {
       "title": "Connais-tu bien nimshop.io ?",
-      "description": "Découvre nimshop.io et montre tes connaissances. Réponds à 10 questions, entre dans le top 3 et vise le prix !"
+      "description": "Découvre nimshop.io et montre tes connaissances. Réponds à 10 questions, entre dans le top 5 et vise le prix !"
     },
     "es": {
       "title": "¿Cuánto conoces nimshop.io?",
-      "description": "Descubre nimshop.io y demuestra lo que sabes. Responde 10 preguntas, entra en el top 3 y compite por el premio."
+      "description": "Descubre nimshop.io y demuestra lo que sabes. Responde 10 preguntas, entra en el top 5 y compite por el premio."
     },
     "pt": {
       "title": "Quanto sabes sobre a nimshop.io?",
-      "description": "Descobre a nimshop.io e mostra o que sabes. Responde a 10 perguntas, chega ao top 3 e compete pelo prémio!"
+      "description": "Descobre a nimshop.io e mostra o que sabes. Responde a 10 perguntas, chega ao top 5 e compete pelo prémio!"
     }
-  }
+  },
+  "tie_break": "submitted_at"
 }

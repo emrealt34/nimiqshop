@@ -61,6 +61,8 @@ const fr = {
   brand: { giftTag: 'cadeau' },
 
   quiz: {
+    rulesTimed: "Une tentative par compte. Chaque bonne réponse à choix vaut 1 point. Les meilleurs scores gagnent ; à égalité, l’envoi définitif confirmé le plus tôt par le serveur passe en tête.",
+    rangeRulesTimed: "Une tentative par compte. Une bonne réponse à choix vaut 1 point. Points d’intervalle : 1 − |réponse − valeur correcte| / (maximum − minimum), arrondis vers le haut à six décimales. Les meilleurs totaux passent en tête ; à égalité, l’envoi définitif confirmé le plus tôt par le serveur gagne.",
     step: "Question n° {{current}} sur {{total}}",
     next: "Question suivante",
     previous: "Question précédente",
