@@ -57,7 +57,7 @@ func (s *Store) InspectQuotePayment(id string) (PaymentInspection, error) {
 			if err := iterator.Item().Value(func(raw []byte) error { return json.Unmarshal(raw, &order) }); err != nil {
 				return err
 			}
-			if order["id"] != id && !(supplier != "" && order["supplier_order_id"] == supplier) && order["quote_id"] != id {
+			if order["id"] != id && (supplier == "" || order["supplier_order_id"] != supplier) && order["quote_id"] != id {
 				continue
 			}
 			out.Records = append(out.Records, string(iterator.Item().Key()))
