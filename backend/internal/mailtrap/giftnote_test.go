@@ -186,7 +186,7 @@ func TestIdenticonAttachment(t *testing.T) {
 	if !ok {
 		t.Fatal("valid PNG rejected")
 	}
-	n := GiftNote{Recipient: Address{Email: "friend@example.com"}, GifterNimiqAddress: "NQ00", GifterIdenticonDataURI: uri, ProductLabel: "Steam · 50 USD", SiteName: "nimiqshop.io", OrderID: "Q-9"}
+	n := GiftNote{Recipient: Address{Email: "friend@example.com"}, GifterNimiqAddress: "NQ00", GifterIdenticonDataURI: uri, ProductLabel: "Steam · 50 USD", SiteName: "nimshop.io", OrderID: "Q-9"}
 	msg, err := n.Build(Config{})
 	if err != nil {
 		t.Fatal(err)
@@ -212,7 +212,7 @@ func TestIdenticonAttachment(t *testing.T) {
 	}
 
 	// No identicon: no attachment, no image, no empty avatar box.
-	bare := GiftNote{Recipient: Address{Email: "friend@example.com"}, GifterNimiqAddress: "NQ00", ProductLabel: "Steam · 50 USD", SiteName: "nimiqshop.io", OrderID: "Q-10"}
+	bare := GiftNote{Recipient: Address{Email: "friend@example.com"}, GifterNimiqAddress: "NQ00", ProductLabel: "Steam · 50 USD", SiteName: "nimshop.io", OrderID: "Q-10"}
 	m2, err := bare.Build(Config{})
 	if err != nil {
 		t.Fatal(err)
@@ -323,12 +323,12 @@ func TestGmailBudgetHoldsForWorstCaseInputs(t *testing.T) {
 		"noisy avatar + escape-heavy message": {
 			Recipient: Address{Email: "friend@example.com"}, Message: longMsg,
 			GifterNimiqAddress: "NQ73 SE1X YRRF Q8NC DQCP HLJM NR85 8P7V 2HPD", GifterIdenticonDataURI: pngURI(t, noisy),
-			ProductLabel: strings.Repeat("Steam · 500 USD ", 30), SiteName: "nimiqshop.io", OrderID: "Q-1",
+			ProductLabel: strings.Repeat("Steam · 500 USD ", 30), SiteName: "nimshop.io", OrderID: "Q-1",
 		},
 		"sample identicon, plain purchase": {
 			Recipient: Address{Email: "buyer@example.com"}, Self: true,
 			GifterNimiqAddress: "NQ73 SE1X YRRF Q8NC DQCP HLJM NR85 8P7V 2HPD", GifterIdenticonDataURI: sampleassets.IdenticonDataURI(),
-			ProductLabel: "Steam · 50 USD", SiteName: "nimiqshop.io", OrderID: "Q-2",
+			ProductLabel: "Steam · 50 USD", SiteName: "nimshop.io", OrderID: "Q-2",
 		},
 	}
 	for name, note := range cases {
@@ -354,7 +354,7 @@ func TestGmailBudgetHoldsForWorstCaseInputs(t *testing.T) {
 // The footer reads as clean English: "an order" / "a gift", one "The" per sentence.
 func TestFooterGrammar(t *testing.T) {
 	for _, self := range []bool{true, false} {
-		n := GiftNote{Recipient: Address{Email: "a@example.com"}, Self: self, SiteName: "nimiqshop.io"}
+		n := GiftNote{Recipient: Address{Email: "a@example.com"}, Self: self, SiteName: "nimshop.io"}
 		msg, err := n.Build(Config{})
 		if err != nil {
 			t.Fatal(err)
@@ -383,7 +383,7 @@ func TestOrderMailShowsShopLogoNotTick(t *testing.T) {
 	if err != nil || !bytes.Equal(websiteLogo, shopLogoPNG) {
 		t.Fatalf("email logo must match the website logo: %v", err)
 	}
-	order := GiftNote{Recipient: Address{Email: "buyer@example.com"}, Self: true, ProductLabel: "Steam · 50 USD", SiteName: "nimiqshop.io", OrderID: "Q-20"}
+	order := GiftNote{Recipient: Address{Email: "buyer@example.com"}, Self: true, ProductLabel: "Steam · 50 USD", SiteName: "nimshop.io", OrderID: "Q-20"}
 	msg, err := order.Build(Config{})
 	if err != nil {
 		t.Fatal(err)
@@ -405,7 +405,7 @@ func TestOrderMailShowsShopLogoNotTick(t *testing.T) {
 	if !found {
 		t.Fatal("shop logo attachment missing or not the PNG")
 	}
-	gift := GiftNote{Recipient: Address{Email: "friend@example.com"}, ProductLabel: "Steam · 50 USD", SiteName: "nimiqshop.io", OrderID: "Q-21"}
+	gift := GiftNote{Recipient: Address{Email: "friend@example.com"}, ProductLabel: "Steam · 50 USD", SiteName: "nimshop.io", OrderID: "Q-21"}
 	gm, err := gift.Build(Config{})
 	if err != nil {
 		t.Fatal(err)
@@ -475,7 +475,7 @@ func TestItemListTilesAndAttachments(t *testing.T) {
 	for i := 0; i < 9; i++ {
 		items = append(items, GiftItem{Name: "Extra", Qty: 1})
 	}
-	n := GiftNote{Recipient: Address{Email: "buyer@example.com"}, Self: true, Items: items, ProductLabel: "Steam + Amazon", SiteName: "nimiqshop.io", OrderID: "Q-30"}
+	n := GiftNote{Recipient: Address{Email: "buyer@example.com"}, Self: true, Items: items, ProductLabel: "Steam + Amazon", SiteName: "nimshop.io", OrderID: "Q-30"}
 	msg, err := n.Build(Config{})
 	if err != nil {
 		t.Fatal(err)
@@ -511,7 +511,7 @@ func TestItemListTilesAndAttachments(t *testing.T) {
 
 	// An oversized logo is dropped: the tile falls back to the bag icon, and
 	// every cid reference still has its attachment.
-	big := GiftNote{Recipient: Address{Email: "buyer@example.com"}, Items: []GiftItem{{Name: "Big", Qty: 1, Logo: make([]byte, maxItemLogoBytes+1)}}, ProductLabel: "Big", SiteName: "nimiqshop.io", OrderID: "Q-31"}
+	big := GiftNote{Recipient: Address{Email: "buyer@example.com"}, Items: []GiftItem{{Name: "Big", Qty: 1, Logo: make([]byte, maxItemLogoBytes+1)}}, ProductLabel: "Big", SiteName: "nimshop.io", OrderID: "Q-31"}
 	bm, err := big.Build(Config{})
 	if err != nil {
 		t.Fatal(err)

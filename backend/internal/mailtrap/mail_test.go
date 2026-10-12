@@ -24,7 +24,7 @@ import (
 func TestReceiptInlineImagesReachMailtrap(t *testing.T) {
 	msg, err := (GiftNote{Recipient: Address{Email: "buyer@example.com"}, Self: true,
 		GifterNimiqAddress: "nq07xq4tr7ela5a62l0xsd594rne3y4l0s8m", GifterIdenticonDataURI: sampleassets.IdenticonDataURI(),
-		Items: []GiftItem{{Name: "Steam", Qty: 1}}, ProductLabel: "Steam", SiteName: "nimiqshop.io"}).Build(Config{})
+		Items: []GiftItem{{Name: "Steam", Qty: 1}}, ProductLabel: "Steam", SiteName: "nimshop.io"}).Build(Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +78,7 @@ func TestConfigEnvironmentAndValidation(t *testing.T) {
 		t.Setenv(key, "")
 	}
 	c := ConfigFromEnv()
-	if c.FromName != "nimiqshop.io" {
+	if c.FromName != "nimshop.io" {
 		t.Fatal("default sender name must match the current website brand")
 	}
 	if c.Enabled() || c.FromEmail != DefaultFromEmail || c.FromName != DefaultFromName || c.Category != DefaultCategory || c.Timeout != DefaultTimeout {

@@ -54,7 +54,7 @@ const de = {
     updateReady: 'Neue Version — zum Aktualisieren tippen',
   },
   meta: {
-    defaultTitle: 'nimiqshop.io — Geschenkkarten, eSIM & Handy-Aufladungen',
+    defaultTitle: 'nimshop.io — Geschenkkarten, eSIM & Handy-Aufladungen',
     defaultDescription: 'Geschenkkarten, eSIM und Handy-Aufladungen kaufen. Mit Nimiq (NIM) bezahlen. Ohne Verwahrung, global, in Sekunden geliefert.',
   },
 

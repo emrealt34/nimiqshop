@@ -54,7 +54,7 @@ const fr = {
     updateReady: 'Nouvelle version — touchez pour actualiser',
   },
   meta: {
-    defaultTitle: 'nimiqshop.io — Cartes cadeaux, eSIM et recharges mobiles',
+    defaultTitle: 'nimshop.io — Cartes cadeaux, eSIM et recharges mobiles',
     defaultDescription: 'Achetez des cartes cadeaux, eSIM et recharges mobiles. Payez avec Nimiq (NIM). Sans garde, mondial, livré en quelques secondes.',
   },
 

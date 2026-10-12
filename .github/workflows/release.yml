@@ -199,7 +199,7 @@ jobs:
             target=(--target "$GITHUB_SHA")
           fi
           gh release create "$TAG" dist-release/* "${target[@]}" \
-            --title "nimiqshop.io $TAG" \
+            --title "nimshop.io $TAG" \
             --notes "## Install (Linux / Windows)
 
           Linux:

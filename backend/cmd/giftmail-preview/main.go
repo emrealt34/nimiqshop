@@ -50,13 +50,13 @@ func main() {
 		Recipient:              mailtrap.Address{Email: "friend@example.com", Name: "Friend"},
 		GifterNimiqAddress:     strings.ToLower(strings.ReplaceAll(wallet, " ", "")),
 		GifterIdenticonDataURI: identiconPNG(),
-		SiteName:               "nimiqshop.io",
+		SiteName:               "nimshop.io",
 		ProductLabel:           "Steam · 50 USD",
 		Message:                "Happy birthday! 🎂 Enjoy the game!",
 		OrderID:                "Q-8842",
 		PurchasedAt:            time.Date(2026, 9, 11, 9, 24, 0, 0, time.UTC),
-		ShopURL:                "https://nimiqshop.io",
-		SupportURL:             "https://nimiqshop.io/support",
+		ShopURL:                "https://nimshop.io",
+		SupportURL:             "https://nimshop.io/support",
 		StakeValidatorAddress:  validator,
 	}
 

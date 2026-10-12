@@ -38,7 +38,7 @@ func (h *Handlers) BuildGiftNoteFromQuote(q db.Quote, lang string) mailtrap.Gift
 	note := mailtrap.GiftNote{
 		Recipient:    mailtrap.Address{Email: strings.TrimSpace(q.CustomerEmail)},
 		Anonymous:    q.Anonymous,
-		SiteName:     h.Cfg.SiteName(),
+		SiteName:     mailtrap.DefaultFromName,
 		ProductLabel: product,
 		Message:      q.GiftMessage,
 		OrderID:      q.ID,

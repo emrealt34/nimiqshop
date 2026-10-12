@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "title": "NimiqShop’u Ne Kadar Tanıyorsun?",
-  "description": "9 şıklı bilgi sorusu ve 1 sayısal cashback hesabı. Şıklı sorularda doğru cevap 1, yanlış cevap 0 puan. Yalnızca sayısal soruda doğru değere yakınlık puan kazandırır. Verilen %2 oranı varsayımsal örnektir; güncel oranını ödeme ekranında kontrol et. İlk 3 tamamlanmış katılımcı kazanır; son kazanan sırasında eşitlik varsa admin karar verir. Ödül ve tarihleri yayınlamadan önce düzenleyin.",
+  "title": "nimshop.io’u Ne Kadar Tanıyorsun?",
+  "description": "Soru seçimi bekleyen taslak: 8 şıklı soru ve 1 sayısal cashback hesabı. Eksik soruyu seçmeden yayınlamayın.",
   "winner_count": 3,
   "prize": {
     "title": "Admin tarafından belirlenecek ödül",
@@ -181,66 +181,6 @@
         "Taban sabit kalır.",
         "Yeni kurla yeniden hesaplanır.",
         "Ödenen toplam NIM tutarına dönüşür."
-      ]
-    },
-    {
-      "type": "choice",
-      "prompt": "Sitedeki ürün, stok ve kur verilerini yenileyen GitHub görevi kaç saatte bir çalışacak şekilde planlandı? Çalışmanın başlaması veya bitmesi gecikebilir.",
-      "translations": {
-        "tr": {
-          "prompt": "Sitedeki ürün, stok ve kur verilerini yenileyen GitHub görevi kaç saatte bir çalışacak şekilde planlandı? Çalışmanın başlaması veya bitmesi gecikebilir.",
-          "options": [
-            "1",
-            "6",
-            "24"
-          ]
-        },
-        "en": {
-          "prompt": "How many hours apart are the GitHub refresh jobs scheduled for the shop’s products, stock and exchange rates? Actual start or completion may be delayed.",
-          "options": [
-            "1",
-            "6",
-            "24"
-          ]
-        },
-        "de": {
-          "prompt": "In welchem Stundenabstand sind die GitHub-Aktualisierungen für Produkte, Bestand und Wechselkurse geplant? Start oder Abschluss können sich verzögern.",
-          "options": [
-            "1",
-            "6",
-            "24"
-          ]
-        },
-        "fr": {
-          "prompt": "À combien d’heures d’intervalle les mises à jour GitHub des produits, stocks et taux de change sont-elles programmées ? Le démarrage ou la fin peut être retardé.",
-          "options": [
-            "1",
-            "6",
-            "24"
-          ]
-        },
-        "es": {
-          "prompt": "¿Cada cuántas horas están programadas las actualizaciones de GitHub de productos, existencias y tipos de cambio? El inicio o la finalización pueden retrasarse.",
-          "options": [
-            "1",
-            "6",
-            "24"
-          ]
-        },
-        "pt": {
-          "prompt": "De quantas em quantas horas estão programadas as atualizações GitHub de produtos, stock e câmbios? O início ou a conclusão podem atrasar-se.",
-          "options": [
-            "1",
-            "6",
-            "24"
-          ]
-        }
-      },
-      "correct_index": 1,
-      "options": [
-        "1",
-        "6",
-        "24"
       ]
     },
     {
@@ -606,28 +546,28 @@
   ],
   "translations": {
     "tr": {
-      "title": "NimiqShop’u Ne Kadar Tanıyorsun?",
-      "description": "9 şıklı bilgi sorusu ve 1 sayısal cashback hesabı. Şıklı sorularda doğru cevap 1, yanlış cevap 0 puan. Yalnızca sayısal soruda doğru değere yakınlık puan kazandırır. Verilen %2 oranı varsayımsal örnektir; güncel oranını ödeme ekranında kontrol et. İlk 3 tamamlanmış katılımcı kazanır; son kazanan sırasında eşitlik varsa admin karar verir. Ödül ve tarihleri yayınlamadan önce düzenleyin."
+      "title": "nimshop.io’u Ne Kadar Tanıyorsun?",
+      "description": "Soru seçimi bekleyen taslak: 8 şıklı soru ve 1 sayısal cashback hesabı. Eksik soruyu seçmeden yayınlamayın."
     },
     "en": {
-      "title": "How Well Do You Know NimiqShop?",
-      "description": "9 multiple-choice knowledge questions and 1 numerical cashback calculation. Correct choices earn 1 point; incorrect choices earn 0. Only the numerical question uses proximity scoring. The stated 2% rate is hypothetical; check your current rate at checkout. The top 3 completed participants win; the administrator resolves ties at the final winning position. Edit the prize and dates before publishing."
+      "title": "How Well Do You Know nimshop.io?",
+      "description": "Draft awaiting question selection: 8 multiple-choice questions and 1 numerical cashback calculation. Do not publish before choosing the remaining question."
     },
     "de": {
-      "title": "Wie gut kennst du NimiqShop?",
-      "description": "9 Wissensfragen mit Auswahlantworten und 1 Zahlenfrage zur Cashback-Berechnung. Richtige Auswahlantworten geben 1 Punkt, falsche 0. Nur die Zahlenfrage wird nach Nähe zum richtigen Wert bewertet. Die genannten 2 % sind ein hypothetisches Beispiel; prüfe deinen aktuellen Satz an der Kasse. Die besten 3 Teilnehmer mit abgeschlossener Teilnahme gewinnen; Gleichstände am letzten Gewinnplatz entscheidet der Admin. Preis und Termine vor der Veröffentlichung bearbeiten."
+      "title": "Wie gut kennst du nimshop.io?",
+      "description": "Entwurf zur Fragenauswahl: 8 Auswahlfragen und 1 Zahlenfrage zur Cashback-Berechnung. Vor Auswahl der fehlenden Frage nicht veröffentlichen."
     },
     "fr": {
-      "title": "Connais-tu bien NimiqShop ?",
-      "description": "9 questions de connaissance à choix et 1 calcul numérique de cashback. Une bonne réponse à choix vaut 1 point, une mauvaise 0. Seule la question numérique est notée selon la proximité de la bonne valeur. Le taux de 2 % est hypothétique ; vérifie ton taux actuel au paiement. Les 3 meilleurs participants ayant terminé gagnent ; un administrateur tranche les égalités à la dernière place gagnante. Modifie le lot et les dates avant publication."
+      "title": "Connais-tu bien nimshop.io ?",
+      "description": "Brouillon en attente du choix des questions : 8 questions à choix et 1 calcul numérique de cashback. Ne pas publier avant de choisir la question manquante."
     },
     "es": {
-      "title": "¿Cuánto conoces NimiqShop?",
-      "description": "9 preguntas de conocimiento con opciones y 1 cálculo numérico de cashback. Las opciones correctas dan 1 punto; las incorrectas, 0. Solo la pregunta numérica se puntúa por cercanía al valor correcto. El 2 % indicado es hipotético; comprueba tu porcentaje actual al pagar. Ganan los 3 mejores participantes que hayan terminado; el administrador resuelve los empates en la última plaza premiada. Edita el premio y las fechas antes de publicar."
+      "title": "¿Cuánto conoces nimshop.io?",
+      "description": "Borrador pendiente de elegir las preguntas: 8 preguntas con opciones y 1 cálculo numérico de cashback. No publiques antes de elegir la pregunta que falta."
     },
     "pt": {
-      "title": "Quanto sabes sobre a NimiqShop?",
-      "description": "9 perguntas de conhecimento com opções e 1 cálculo numérico de cashback. As opções corretas dão 1 ponto; as incorretas, 0. Só a pergunta numérica é pontuada pela proximidade ao valor correto. A taxa de 2% indicada é hipotética; verifica a tua taxa atual no pagamento. Ganham os 3 melhores participantes que tenham terminado; um administrador resolve os empates na última posição premiada. Edita o prémio e as datas antes de publicar."
+      "title": "Quanto sabes sobre a nimshop.io?",
+      "description": "Rascunho à espera da escolha das perguntas: 8 perguntas com opções e 1 cálculo numérico de cashback. Não publiques antes de escolher a pergunta em falta."
     }
   }
 }

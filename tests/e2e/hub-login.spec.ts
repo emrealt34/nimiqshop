@@ -14,7 +14,7 @@ test.describe('Hub login hand-off @smoke', () => {
         checkRedirectResponse() {}
       };
     });
-    await page.route('**/api/auth/challenge', (route) => route.fulfill({ json: { challenge_token: 'test-pending-challenge', message: 'nimiqshop.io login: nonce' } }));
+    await page.route('**/api/auth/challenge', (route) => route.fulfill({ json: { challenge_token: 'test-pending-challenge', message: 'nimshop.io login: nonce' } }));
     let prematureLogin = 0;
     await page.route('**/api/auth/hub-login', (route) => { prematureLogin++; return route.fulfill({ json: {} }); });
     await open(page, path('/support'));

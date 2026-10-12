@@ -1,4 +1,4 @@
-# nimiqshop.io
+# nimshop.io
 
 Gift cards, eSIMs and mobile top-ups, paid with **NIM** (Nimiq Pay / BTC
 Lightning). A Go API with an embedded BadgerDB store
@@ -302,7 +302,7 @@ single or batch quote. Wallet addresses are uppercase in groups of four, and
 an unpaired product occupies a centered full-width row.
 
 The inbox sender icon is controlled by the email provider, separately from
-the HTML logo. The default sender display name is `nimiqshop.io`; an existing
+the HTML logo. The default sender display name is `nimshop.io`; an existing
 `MAILTRAP_FROM_NAME` environment override also needs to use the current brand.
 The verified sender email remains independently configurable. Gmail domain
 branding through [BIMI setup](https://knowledge.workspace.google.com/admin/security/set-up-bimi)

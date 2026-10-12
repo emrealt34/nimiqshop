@@ -54,7 +54,7 @@ const tr = {
     updateReady: 'Yeni sürüm — yenilemek için dokun',
   },
   meta: {
-    defaultTitle: 'nimiqshop.io — Hediye kartları, eSIM ve mobil kontör',
+    defaultTitle: 'nimshop.io — Hediye kartları, eSIM ve mobil kontör',
     defaultDescription: 'Hediye kartı, eSIM ve mobil kontör satın al. Nimiq (NIM) ile öde. Saklama gerektirmez, global, saniyeler içinde teslim.',
   },
 

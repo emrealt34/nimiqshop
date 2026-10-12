@@ -62,23 +62,13 @@ export const CFG: AppConfig = new Proxy({ ...DEFAULTS }, {
 });
 
 
-/**
- * The product wordmark shown in the navbar (owner, 2026-10-05: "navbar'da site
- * adı yerine nimiqshop.io yaz"). Deliberately NOT siteName(): that is the live
- * hostname and it stays in titles, share links, delivery notes and the API
- * copy. The 404 page already printed this same wordmark by hand; this is the
- * one place it is defined for the app chrome.
- */
-export const BRAND_NAME = 'nimiqshop.io';
-
-/** Live shop hostname. One value for titles, footer, Hub, copy. */
-export function siteName(): string {
-  const n = String(CFG.SITE_HOST || '').trim();
-  return n || 'shop.nimiqbase.com';
-}
+/** Display brand for customer-facing text. Deployment URLs use CFG independently. */
+export const BRAND_NAME = 'nimshop.io';
+export function siteName(): string { return BRAND_NAME; }
 
 export function siteURL(): string {
   const u = String(CFG.FRONTEND_URL || '').trim();
   if (/^https?:\/\//i.test(u)) return u.replace(/\/$/, '');
-  return 'https://' + siteName();
+  const host = String(CFG.SITE_HOST || '').trim() || 'shop.nimiqbase.com';
+  return 'https://' + host;
 }

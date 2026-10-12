@@ -54,7 +54,7 @@ const pt = {
     updateReady: 'Nova versão — toque para atualizar',
   },
   meta: {
-    defaultTitle: 'nimiqshop.io — Cartões-presente, eSIM e recargas móveis',
+    defaultTitle: 'nimshop.io — Cartões-presente, eSIM e recargas móveis',
     defaultDescription: 'Compre cartões-presente, eSIM e recargas móveis. Pague com Nimiq (NIM). Sem custódia, global, entregue em segundos.',
   },
 

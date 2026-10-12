@@ -60,7 +60,7 @@ const en = {
     updateReady: 'New version — tap to refresh',
   },
   meta: {
-    defaultTitle: 'nimiqshop.io — Gift cards, eSIMs & mobile top-ups',
+    defaultTitle: 'nimshop.io — Gift cards, eSIMs & mobile top-ups',
     defaultDescription: 'Buy gift cards, eSIMs and mobile top-ups. Pay with Nimiq (NIM). Non-custodial, global, delivered in seconds.',
   },
 

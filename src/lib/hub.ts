@@ -69,14 +69,14 @@ export function friendlyHubError(err: unknown): string {
 
 /* ---------------- Login via Hub signMessage ---------------- */
 function hubAppName(): string {
-  return 'nimiqshop.io';
+  return 'nimshop.io';
 }
 
 function challengeMessage(challenge: any): string {
   const msg = challenge && challenge.message;
   if (typeof msg === 'string' && msg.trim()) return msg;
   const nonce = String((challenge && challenge.nonce) || '');
-  return `nimiqshop.io login: ${nonce}`;
+  return `nimshop.io login: ${nonce}`;
 }
 
 function canUsePayProvider(payProvider: any): boolean {

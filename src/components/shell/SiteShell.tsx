@@ -118,7 +118,7 @@ export function SiteShell({ activeKey }: { activeKey: ShellKey }) {
 
 function Brand() {
   const { t } = useT();
-  /* The navbar wordmark is the product brand ("nimiqshop.io"), not the live
+  /* The navbar wordmark is the product brand ("nimshop.io"), not the live
      hostname (owner, 2026-10-05). The host still drives titles, share links
      and copy via siteName(). */
   const name = BRAND_NAME;

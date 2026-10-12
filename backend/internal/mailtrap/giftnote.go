@@ -215,7 +215,7 @@ func (n GiftNote) Build(cfg Config) (Message, error) {
 		n.GifterIdenticonDataURI = ""
 	}
 	n.Items, n.itemsMore = sanitizeItems(n.Items)
-	site := fallback(strings.TrimSpace(n.SiteName), "shop.nimiqbase.com")
+	site := fallback(strings.TrimSpace(n.SiteName), DefaultFromName)
 	product := strings.TrimSpace(n.ProductLabel)
 	tr := n.tr()
 
@@ -747,7 +747,7 @@ func plainSenderCard(tl i18n.T) string {
 }
 
 // wordmark renders the site name with the dot before the TLD in gold, the way
-// the navbar does: nimiqshop.io -> nimiqshop<gold>.</gold>io.
+// the navbar does: nimshop.io -> nimshop<gold>.</gold>io.
 func wordmark(site string) string {
 	name, tld, ok := strings.Cut(strings.TrimSpace(site), ".")
 	if !ok || name == "" || tld == "" {
@@ -907,7 +907,7 @@ var shopLogoPNG []byte
 
 // shopLogoImg is the logo as an inline image. It is trusted, constant markup;
 // the alt text is what a client with images blocked shows.
-const shopLogoImg = `<img src="cid:` + shopLogoContentID + `" width="48" height="48" alt="nimiqshop.io" style="display:block;margin:0 auto;width:48px;height:48px;border:0;outline:none">`
+const shopLogoImg = `<img src="cid:` + shopLogoContentID + `" width="48" height="48" alt="nimshop.io" style="display:block;margin:0 auto;width:48px;height:48px;border:0;outline:none">`
 
 func shopLogoAttachment() Attachment {
 	return Attachment{Filename: "nimiqshop-logo.png", ContentType: "image/png", Data: shopLogoPNG, ContentID: shopLogoContentID}

@@ -15,7 +15,7 @@ test('AI JSON creates only editable drafts and validates range answers and winne
   const raw = { title: 'Closest', prize: { title: 'Manual reward' }, winner_count: 3, questions: [{ type: 'range', prompt: 'Guess a number', min: 0, max: 1000, correct_value: 500 }, { prompt: 'Pick', options: ['A','B'], correct_index: 1 }], id: 'foreign', status: 'published', winner_user_ids: ['attacker'], participants: 100 };
   const result = parseQuizImport(JSON.stringify(raw));
   const example = parseQuizImport(await readFile(new URL('../docs/examples/shop-knowledge-quiz.json', import.meta.url), 'utf8'));
-  assert.equal(example.questions.length, 10);
+  assert.equal(example.questions.length, 9);
   for (const lang of ['en','tr','de','fr','es','pt']) {
    assert.ok(localizeQuiz(example, lang).title);
    assert.equal(localizeQuiz(example, lang).description, example.translations[lang].description);
@@ -25,7 +25,7 @@ test('AI JSON creates only editable drafts and validates range answers and winne
     assert.equal(localizeQuizQuestion(question, lang).correct_value, question.correct_value);
    }
   }
-  assert.equal(example.questions.filter(q => q.type === 'choice').length, 9);
+  assert.equal(example.questions.filter(q => q.type === 'choice').length, 8);
   assert.equal(example.questions.filter(q => q.type === 'range').length, 1);
   assert.equal(example.questions[0].options[example.questions[0].correct_index], '100 NIM');
   for (const question of example.questions.filter(q => q.type === 'choice')) {
