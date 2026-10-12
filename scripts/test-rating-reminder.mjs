@@ -6,17 +6,17 @@ import { join } from 'node:path';
 import { createRequire } from 'node:module';
 import { buildSync } from 'esbuild';
 
-test('rating reminder waits a day, excludes invalid/rated purchases, and merges supplier duplicates', async () => {
+test('rating reminder accepts new deliveries, excludes invalid/rated purchases, and merges supplier duplicates', async () => {
  const dir=await mkdtemp(join(tmpdir(),'rating-reminder-'));
  try {
   const file=join(dir,'reminder.cjs');
   buildSync({entryPoints:[new URL('../src/lib/ratingReminder.ts',import.meta.url).pathname],bundle:true,platform:'node',format:'cjs',outfile:file,logLevel:'silent'});
-  const {unratedPurchases,ratingReminderKey,RATING_REMINDER_DELAY_MS}=createRequire(import.meta.url)(file);
+  const {unratedPurchases,ratingReminderKey}=createRequire(import.meta.url)(file);
   const now=Date.parse('2026-10-12T12:00:00Z');
   const old={id:'old',status:'delivered',delivered_at:'2026-10-10T12:00:00Z',product_id:'Amazon',rating:0};
   assert.deepEqual(unratedPurchases([old],[],now),[{kind:'order',id:'old',name:'Amazon'}]);
-  for(const changed of [{rating:5},{rating_tx:'a'.repeat(64)},{rated_at:'2026-10-11T12:00:00Z'},{test_mode:true},{status:'processing'},{status:'refunded'},{delivered_at:'2026-10-12T11:59:59Z'},{delivered_at:'2026-10-13T12:00:00Z'},{delivered_at:'invalid'},{id:''}]) assert.deepEqual(unratedPurchases([{...old,...changed}],[],now),[]);
-  assert.equal(unratedPurchases([{...old,delivered_at:new Date(now-RATING_REMINDER_DELAY_MS).toISOString()}],[],now).length,1);
+  for(const changed of [{rating:5},{rating_tx:'a'.repeat(64)},{rated_at:'2026-10-11T12:00:00Z'},{test_mode:true},{status:'processing'},{status:'refunded'},{delivered_at:'2026-10-13T12:00:00Z'},{delivered_at:'invalid'},{id:''}]) assert.deepEqual(unratedPurchases([{...old,...changed}],[],now),[]);
+  assert.equal(unratedPurchases([{...old,delivered_at:new Date(now).toISOString()}],[],now).length,1);
   const order={...old,supplier_order_id:'same'};const quote={...old,id:'quote',status:'fulfilled',supplier_order_id:'same'};
   assert.deepEqual(unratedPurchases([order],[quote],now),[{kind:'quote',id:'quote',name:'Amazon'}]);
   assert.deepEqual(unratedPurchases([{...order,rating:5}],[quote],now),[]);

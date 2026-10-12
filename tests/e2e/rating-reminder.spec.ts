@@ -37,17 +37,17 @@ for(const width of [320,390,1280]) {
    await expect(page.locator('.rating-flow .star-btn')).toHaveCount(5);
    await expect(page.locator('.rating-flow .stars.picker')).toBeInViewport();
   });
-  test('fresh delivery does not prompt on shop or the completed order page',async({page})=>{
+  test('fresh delivery prompts on the next shop visit but never on the completed order page',async({page})=>{
    const fresh={...delivered,delivered_at:new Date().toISOString(),updated_at:new Date().toISOString()};
    await page.route('**/api/ratings/config',r=>r.fulfill({json:{enabled:true,comments_enabled:true}}));
    await page.route('**/api/orders',r=>r.fulfill({json:[]}));
    await page.route('**/api/quotes',r=>r.fulfill({json:[fresh]}));
    await page.route('**/api/quotes/review-quote',r=>r.fulfill({json:fresh}));
-   await open(page,path('/'));await expect(page.locator('.hero')).toBeVisible();
-   await expect(page.locator('.sheet')).toHaveCount(0);
    await open(page,path('/order?id=review-quote&type=quote'));
    await expect(page.locator('.rating-flow')).toBeVisible();
    await expect(page.locator('.sheet')).toHaveCount(0);
+   await open(page,path('/'));
+   await expect(page.locator('.sheet')).toContainText('Henüz değerlendirmediğin alışverişlerin var');
   });
  });
 }
