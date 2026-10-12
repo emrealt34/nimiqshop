@@ -25,7 +25,16 @@ test('AI JSON creates only editable drafts and validates range answers and winne
     assert.equal(localizeQuizQuestion(question, lang).correct_value, question.correct_value);
    }
   }
-  assert.equal(example.questions[0].correct_value, 100);
+  assert.equal(example.questions.filter(q => q.type === 'choice').length, 9);
+  assert.equal(example.questions.filter(q => q.type === 'range').length, 1);
+  assert.equal(example.questions[0].options[example.questions[0].correct_index], '100 NIM');
+  for (const question of example.questions.filter(q => q.type === 'choice')) {
+   assert.equal(question.correct_value, undefined);
+   for (const lang of ['en','tr','de','fr','es','pt']) {
+    assert.equal(question.translations[lang].options.length, question.options.length);
+    assert.deepEqual(localizeQuizQuestion(question, lang).options, question.translations[lang].options);
+   }
+  }
   assert.equal(example.questions[1].correct_value, 20);
   assert.equal(localizeQuizQuestion(result.questions[0], 'fr').prompt, result.questions[0].prompt);
   assert.throws(() => parseQuizImport(JSON.stringify({ ...raw, translations: { xx: { title: 'bad' } } })));

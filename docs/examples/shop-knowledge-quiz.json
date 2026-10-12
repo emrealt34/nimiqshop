@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "title": "NimiqShop’u Ne Kadar Tanıyorsun?",
-  "description": "10 sayısal soru ile alışveriş, cashback, gizlilik ve yarışma kurallarını keşfet. Oran verilen sorular varsayımsal örnektir; güncel oranını ödeme ekranında kontrol et. En yakın cevap daha çok puan kazandırır. İlk 3 tamamlanmış katılımcı kazanır; son kazanan sırasında eşitlik varsa admin karar verir. Ödülü ve tarihleri yayınlamadan önce düzenleyin.",
+  "description": "9 şıklı bilgi sorusu ve 1 sayısal cashback hesabı. Şıklı sorularda doğru cevap 1, yanlış cevap 0 puan. Yalnızca sayısal soruda doğru değere yakınlık puan kazandırır. Verilen %2 oranı varsayımsal örnektir; güncel oranını ödeme ekranında kontrol et. İlk 3 tamamlanmış katılımcı kazanır; son kazanan sırasında eşitlik varsa admin karar verir. Ödül ve tarihleri yayınlamadan önce düzenleyin.",
   "winner_count": 3,
   "prize": {
     "title": "Admin tarafından belirlenecek ödül",
@@ -37,31 +37,64 @@
   },
   "questions": [
     {
-      "type": "range",
-      "prompt": "Sitede ürünün fiyatı 100 NIM. Ücretler nedeniyle cüzdanından toplam 105 NIM çıkıyor. Cashback hangi tutar üzerinden hesaplanır? NIM olarak yaz.",
-      "min": 0,
-      "max": 200,
-      "correct_value": 100,
+      "type": "choice",
+      "prompt": "Sitede ürünün fiyatı 100 NIM. Ücretler nedeniyle cüzdanından toplam 105 NIM çıkıyor. Cashback hangi tutar üzerinden hesaplanır?",
       "translations": {
         "tr": {
-          "prompt": "Sitede ürünün fiyatı 100 NIM. Ücretler nedeniyle cüzdanından toplam 105 NIM çıkıyor. Cashback hangi tutar üzerinden hesaplanır? NIM olarak yaz."
+          "prompt": "Sitede ürünün fiyatı 100 NIM. Ücretler nedeniyle cüzdanından toplam 105 NIM çıkıyor. Cashback hangi tutar üzerinden hesaplanır?",
+          "options": [
+            "100 NIM",
+            "105 NIM",
+            "5 NIM"
+          ]
         },
         "en": {
-          "prompt": "The shop shows a product price of 100 NIM. Fees make your total wallet debit 105 NIM. What amount is used as the cashback base? Answer in NIM."
+          "prompt": "The shop shows a product price of 100 NIM. Fees make your total wallet debit 105 NIM. What amount is used as the cashback base?",
+          "options": [
+            "100 NIM",
+            "105 NIM",
+            "5 NIM"
+          ]
         },
         "de": {
-          "prompt": "Der Shop zeigt einen Produktpreis von 100 NIM. Mit Gebühren werden deiner Wallet insgesamt 105 NIM abgezogen. Welcher Betrag ist die Cashback-Grundlage? Antworte in NIM."
+          "prompt": "Der Shop zeigt einen Produktpreis von 100 NIM. Mit Gebühren werden deiner Wallet insgesamt 105 NIM abgezogen. Welcher Betrag ist die Cashback-Grundlage?",
+          "options": [
+            "100 NIM",
+            "105 NIM",
+            "5 NIM"
+          ]
         },
         "fr": {
-          "prompt": "Le produit est affiché à 100 NIM. Avec les frais, ton portefeuille est débité de 105 NIM. Quel montant sert de base au cashback ? Réponds en NIM."
+          "prompt": "Le produit est affiché à 100 NIM. Avec les frais, ton portefeuille est débité de 105 NIM. Quel montant sert de base au cashback ?",
+          "options": [
+            "100 NIM",
+            "105 NIM",
+            "5 NIM"
+          ]
         },
         "es": {
-          "prompt": "La tienda muestra un precio de 100 NIM. Con las comisiones, salen 105 NIM de tu cartera. ¿Qué importe se usa como base del cashback? Responde en NIM."
+          "prompt": "La tienda muestra un precio de 100 NIM. Con las comisiones, salen 105 NIM de tu cartera. ¿Qué importe se usa como base del cashback?",
+          "options": [
+            "100 NIM",
+            "105 NIM",
+            "5 NIM"
+          ]
         },
         "pt": {
-          "prompt": "A loja mostra um produto a 100 NIM. Com as taxas, saem 105 NIM da tua carteira. Que montante serve de base ao cashback? Responde em NIM."
+          "prompt": "A loja mostra um produto a 100 NIM. Com as taxas, saem 105 NIM da tua carteira. Que montante serve de base ao cashback?",
+          "options": [
+            "100 NIM",
+            "105 NIM",
+            "5 NIM"
+          ]
         }
-      }
+      },
+      "correct_index": 0,
+      "options": [
+        "100 NIM",
+        "105 NIM",
+        "5 NIM"
+      ]
     },
     {
       "type": "range",
@@ -91,246 +124,510 @@
       }
     },
     {
-      "type": "range",
-      "prompt": "Cashback tabanın 100 NIM olarak sabitlendi. Daha sonra NIM kuru değişti. Yalnızca bu kur değişikliği, sabitlenmiş cashback tabanını kaç NIM değiştirir?",
-      "min": 0,
-      "max": 100,
-      "correct_value": 0,
+      "type": "choice",
+      "prompt": "Cashback tabanın 100 NIM olarak sabitlendi. Daha sonra NIM kuru değişirse bu, mevcut siparişinin cashback tabanını nasıl etkiler?",
       "translations": {
         "tr": {
-          "prompt": "Cashback tabanın 100 NIM olarak sabitlendi. Daha sonra NIM kuru değişti. Yalnızca bu kur değişikliği, sabitlenmiş cashback tabanını kaç NIM değiştirir?"
+          "prompt": "Cashback tabanın 100 NIM olarak sabitlendi. Daha sonra NIM kuru değişirse bu, mevcut siparişinin cashback tabanını nasıl etkiler?",
+          "options": [
+            "Taban sabit kalır.",
+            "Yeni kurla yeniden hesaplanır.",
+            "Ödenen toplam NIM tutarına dönüşür."
+          ]
         },
         "en": {
-          "prompt": "Your cashback base was locked at 100 NIM. The NIM exchange rate later changes. By how many NIM does that exchange-rate change alone alter your locked cashback base?"
+          "prompt": "Your cashback base was locked at 100 NIM. How does a later change in the NIM exchange rate affect this order’s cashback base?",
+          "options": [
+            "The base remains fixed.",
+            "It is recalculated using the new rate.",
+            "It becomes the total NIM paid."
+          ]
         },
         "de": {
-          "prompt": "Deine Cashback-Grundlage wurde auf 100 NIM festgelegt. Später ändert sich der NIM-Kurs. Um wie viel NIM ändert allein diese Kursänderung deine festgelegte Cashback-Grundlage?"
+          "prompt": "Deine Cashback-Grundlage wurde auf 100 NIM festgelegt. Wie beeinflusst eine spätere NIM-Kursänderung die Cashback-Grundlage dieser Bestellung?",
+          "options": [
+            "Die Grundlage bleibt unverändert.",
+            "Sie wird mit dem neuen Kurs neu berechnet.",
+            "Sie wird zum insgesamt gezahlten NIM-Betrag."
+          ]
         },
         "fr": {
-          "prompt": "Ta base de cashback a été fixée à 100 NIM. Le cours du NIM change ensuite. De combien de NIM ce seul changement de cours modifie-t-il ta base fixée ?"
+          "prompt": "Ta base de cashback a été fixée à 100 NIM. Quel effet un changement ultérieur du cours du NIM a-t-il sur la base de cette commande ?",
+          "options": [
+            "La base reste fixe.",
+            "Elle est recalculée au nouveau taux.",
+            "Elle devient le total payé en NIM."
+          ]
         },
         "es": {
-          "prompt": "Tu base de cashback quedó fijada en 100 NIM. Después cambia el tipo de cambio del NIM. ¿Cuántos NIM modifica ese cambio por sí solo la base fijada?"
+          "prompt": "Tu base de cashback quedó fijada en 100 NIM. ¿Cómo afecta un cambio posterior del tipo de cambio del NIM a la base de este pedido?",
+          "options": [
+            "La base permanece fija.",
+            "Se recalcula con el nuevo tipo de cambio.",
+            "Pasa a ser el total pagado en NIM."
+          ]
         },
         "pt": {
-          "prompt": "A tua base de cashback foi fixada em 100 NIM. A cotação do NIM muda depois. Em quantos NIM essa alteração, por si só, modifica a base fixada?"
+          "prompt": "A tua base de cashback foi fixada em 100 NIM. Como afeta uma alteração posterior da cotação do NIM a base desta encomenda?",
+          "options": [
+            "A base mantém-se fixa.",
+            "É recalculada com a nova cotação.",
+            "Passa a ser o total pago em NIM."
+          ]
         }
-      }
+      },
+      "correct_index": 0,
+      "options": [
+        "Taban sabit kalır.",
+        "Yeni kurla yeniden hesaplanır.",
+        "Ödenen toplam NIM tutarına dönüşür."
+      ]
     },
     {
-      "type": "range",
+      "type": "choice",
       "prompt": "Sitedeki ürün, stok ve kur verilerini yenileyen GitHub görevi kaç saatte bir çalışacak şekilde planlandı? Çalışmanın başlaması veya bitmesi gecikebilir.",
-      "min": 1,
-      "max": 24,
-      "correct_value": 6,
       "translations": {
         "tr": {
-          "prompt": "Sitedeki ürün, stok ve kur verilerini yenileyen GitHub görevi kaç saatte bir çalışacak şekilde planlandı? Çalışmanın başlaması veya bitmesi gecikebilir."
+          "prompt": "Sitedeki ürün, stok ve kur verilerini yenileyen GitHub görevi kaç saatte bir çalışacak şekilde planlandı? Çalışmanın başlaması veya bitmesi gecikebilir.",
+          "options": [
+            "1",
+            "6",
+            "24"
+          ]
         },
         "en": {
-          "prompt": "How many hours apart are the GitHub refresh jobs scheduled for the shop’s products, stock and exchange rates? Actual start or completion may be delayed."
+          "prompt": "How many hours apart are the GitHub refresh jobs scheduled for the shop’s products, stock and exchange rates? Actual start or completion may be delayed.",
+          "options": [
+            "1",
+            "6",
+            "24"
+          ]
         },
         "de": {
-          "prompt": "In welchem Stundenabstand sind die GitHub-Aktualisierungen für Produkte, Bestand und Wechselkurse geplant? Start oder Abschluss können sich verzögern."
+          "prompt": "In welchem Stundenabstand sind die GitHub-Aktualisierungen für Produkte, Bestand und Wechselkurse geplant? Start oder Abschluss können sich verzögern.",
+          "options": [
+            "1",
+            "6",
+            "24"
+          ]
         },
         "fr": {
-          "prompt": "À combien d’heures d’intervalle les mises à jour GitHub des produits, stocks et taux de change sont-elles programmées ? Le démarrage ou la fin peut être retardé."
+          "prompt": "À combien d’heures d’intervalle les mises à jour GitHub des produits, stocks et taux de change sont-elles programmées ? Le démarrage ou la fin peut être retardé.",
+          "options": [
+            "1",
+            "6",
+            "24"
+          ]
         },
         "es": {
-          "prompt": "¿Cada cuántas horas están programadas las actualizaciones de GitHub de productos, existencias y tipos de cambio? El inicio o la finalización pueden retrasarse."
+          "prompt": "¿Cada cuántas horas están programadas las actualizaciones de GitHub de productos, existencias y tipos de cambio? El inicio o la finalización pueden retrasarse.",
+          "options": [
+            "1",
+            "6",
+            "24"
+          ]
         },
         "pt": {
-          "prompt": "De quantas em quantas horas estão programadas as atualizações GitHub de produtos, stock e câmbios? O início ou a conclusão podem atrasar-se."
+          "prompt": "De quantas em quantas horas estão programadas as atualizações GitHub de produtos, stock e câmbios? O início ou a conclusão podem atrasar-se.",
+          "options": [
+            "1",
+            "6",
+            "24"
+          ]
         }
-      }
+      },
+      "correct_index": 1,
+      "options": [
+        "1",
+        "6",
+        "24"
+      ]
     },
     {
-      "type": "range",
+      "type": "choice",
       "prompt": "Teslim edilen siparişini sitede değerlendirirken verebileceğin en yüksek tam sayı yıldız puanı kaçtır?",
-      "min": 1,
-      "max": 10,
-      "correct_value": 5,
       "translations": {
         "tr": {
-          "prompt": "Teslim edilen siparişini sitede değerlendirirken verebileceğin en yüksek tam sayı yıldız puanı kaçtır?"
+          "prompt": "Teslim edilen siparişini sitede değerlendirirken verebileceğin en yüksek tam sayı yıldız puanı kaçtır?",
+          "options": [
+            "3",
+            "5",
+            "10"
+          ]
         },
         "en": {
-          "prompt": "What is the highest whole-number star rating you can give a delivered order on the shop?"
+          "prompt": "What is the highest whole-number star rating you can give a delivered order on the shop?",
+          "options": [
+            "3",
+            "5",
+            "10"
+          ]
         },
         "de": {
-          "prompt": "Wie hoch ist die höchste ganzzahlige Sternebewertung für eine gelieferte Bestellung im Shop?"
+          "prompt": "Wie hoch ist die höchste ganzzahlige Sternebewertung für eine gelieferte Bestellung im Shop?",
+          "options": [
+            "3",
+            "5",
+            "10"
+          ]
         },
         "fr": {
-          "prompt": "Quelle est la note maximale en nombre entier d’étoiles pour une commande livrée sur le site ?"
+          "prompt": "Quelle est la note maximale en nombre entier d’étoiles pour une commande livrée sur le site ?",
+          "options": [
+            "3",
+            "5",
+            "10"
+          ]
         },
         "es": {
-          "prompt": "¿Cuál es la puntuación máxima en un número entero de estrellas para un pedido entregado en la tienda?"
+          "prompt": "¿Cuál es la puntuación máxima en un número entero de estrellas para un pedido entregado en la tienda?",
+          "options": [
+            "3",
+            "5",
+            "10"
+          ]
         },
         "pt": {
-          "prompt": "Qual é a classificação máxima, em número inteiro de estrelas, para uma encomenda entregue na loja?"
+          "prompt": "Qual é a classificação máxima, em número inteiro de estrelas, para uma encomenda entregue na loja?",
+          "options": [
+            "3",
+            "5",
+            "10"
+          ]
         }
-      }
+      },
+      "correct_index": 1,
+      "options": [
+        "3",
+        "5",
+        "10"
+      ]
     },
     {
-      "type": "range",
+      "type": "choice",
       "prompt": "Sipariş ve e-postalarda Nimiq cüzdan adresi okunabilir olması için gruplara ayrılır. Her grupta kaç karakter bulunur?",
-      "min": 1,
-      "max": 10,
-      "correct_value": 4,
       "translations": {
         "tr": {
-          "prompt": "Sipariş ve e-postalarda Nimiq cüzdan adresi okunabilir olması için gruplara ayrılır. Her grupta kaç karakter bulunur?"
+          "prompt": "Sipariş ve e-postalarda Nimiq cüzdan adresi okunabilir olması için gruplara ayrılır. Her grupta kaç karakter bulunur?",
+          "options": [
+            "2",
+            "4",
+            "8"
+          ]
         },
         "en": {
-          "prompt": "In orders and emails, Nimiq wallet addresses are grouped for readability. How many characters are in each group?"
+          "prompt": "In orders and emails, Nimiq wallet addresses are grouped for readability. How many characters are in each group?",
+          "options": [
+            "2",
+            "4",
+            "8"
+          ]
         },
         "de": {
-          "prompt": "In Bestellungen und E-Mails werden Nimiq-Wallet-Adressen zur besseren Lesbarkeit gruppiert. Wie viele Zeichen enthält jede Gruppe?"
+          "prompt": "In Bestellungen und E-Mails werden Nimiq-Wallet-Adressen zur besseren Lesbarkeit gruppiert. Wie viele Zeichen enthält jede Gruppe?",
+          "options": [
+            "2",
+            "4",
+            "8"
+          ]
         },
         "fr": {
-          "prompt": "Les adresses Nimiq sont regroupées pour être lisibles dans les commandes et les e-mails. Combien de caractères contient chaque groupe ?"
+          "prompt": "Les adresses Nimiq sont regroupées pour être lisibles dans les commandes et les e-mails. Combien de caractères contient chaque groupe ?",
+          "options": [
+            "2",
+            "4",
+            "8"
+          ]
         },
         "es": {
-          "prompt": "En los pedidos y correos, las direcciones Nimiq se agrupan para facilitar la lectura. ¿Cuántos caracteres contiene cada grupo?"
+          "prompt": "En los pedidos y correos, las direcciones Nimiq se agrupan para facilitar la lectura. ¿Cuántos caracteres contiene cada grupo?",
+          "options": [
+            "2",
+            "4",
+            "8"
+          ]
         },
         "pt": {
-          "prompt": "Nas encomendas e nos emails, os endereços Nimiq são agrupados para facilitar a leitura. Quantos caracteres tem cada grupo?"
+          "prompt": "Nas encomendas e nos emails, os endereços Nimiq são agrupados para facilitar a leitura. Quantos caracteres tem cada grupo?",
+          "options": [
+            "2",
+            "4",
+            "8"
+          ]
         }
-      }
+      },
+      "correct_index": 1,
+      "options": [
+        "2",
+        "4",
+        "8"
+      ]
     },
     {
-      "type": "range",
-      "prompt": "Siparişini anonim seçtiğinde, herkese açık Activity sayfasında alıcının cüzdan adresinden kaç karakter gösterilir? Gizlenen adres için 0 yaz.",
-      "min": 0,
-      "max": 40,
-      "correct_value": 0,
+      "type": "choice",
+      "prompt": "Siparişini anonim seçtiğinde, herkese açık Activity sayfasında ne değişir?",
       "translations": {
         "tr": {
-          "prompt": "Siparişini anonim seçtiğinde, herkese açık Activity sayfasında alıcının cüzdan adresinden kaç karakter gösterilir? Gizlenen adres için 0 yaz."
+          "prompt": "Siparişini anonim seçtiğinde, herkese açık Activity sayfasında ne değişir?",
+          "options": [
+            "Sipariş görünür; alıcının cüzdan kimliği ve ödeme işlem bilgileri gizlenir.",
+            "Alıcının cüzdan adresi herkese gösterilir.",
+            "Sipariş Activity sayfasından tamamen kaldırılır."
+          ]
         },
         "en": {
-          "prompt": "When you choose an anonymous order, how many characters of the buyer’s wallet address are shown on the public Activity page? Enter 0 for a hidden address."
+          "prompt": "What changes on the public Activity page when you choose an anonymous order?",
+          "options": [
+            "The order remains visible; the buyer’s wallet identity and payment transaction details are hidden.",
+            "The buyer’s wallet address is shown to everyone.",
+            "The order is removed from Activity entirely."
+          ]
         },
         "de": {
-          "prompt": "Wie viele Zeichen der Käufer-Wallet-Adresse zeigt die öffentliche Activity-Seite bei einer anonymen Bestellung? Gib 0 für eine verborgene Adresse ein."
+          "prompt": "Was ändert sich auf der öffentlichen Activity-Seite bei einer anonymen Bestellung?",
+          "options": [
+            "Die Bestellung bleibt sichtbar; Wallet-Identität und Zahlungsdetails des Käufers werden verborgen.",
+            "Die Wallet-Adresse des Käufers wird allen angezeigt.",
+            "Die Bestellung wird vollständig aus Activity entfernt."
+          ]
         },
         "fr": {
-          "prompt": "Pour une commande anonyme, combien de caractères de l’adresse du portefeuille de l’acheteur sont affichés dans Activity ? Saisis 0 pour une adresse masquée."
+          "prompt": "Que change le choix d’une commande anonyme sur la page publique Activity ?",
+          "options": [
+            "La commande reste visible ; l’identité du portefeuille et les détails de transaction de l’acheteur sont masqués.",
+            "L’adresse du portefeuille de l’acheteur est visible par tous.",
+            "La commande est entièrement supprimée d’Activity."
+          ]
         },
         "es": {
-          "prompt": "En un pedido anónimo, ¿cuántos caracteres de la dirección de la cartera del comprador aparecen en Activity? Escribe 0 si está oculta."
+          "prompt": "¿Qué cambia en la página pública Activity al elegir un pedido anónimo?",
+          "options": [
+            "El pedido sigue visible; se ocultan la identidad de la cartera y los datos de la transacción del comprador.",
+            "La dirección de la cartera del comprador se muestra a todos.",
+            "El pedido se elimina por completo de Activity."
+          ]
         },
         "pt": {
-          "prompt": "Numa encomenda anónima, quantos caracteres do endereço da carteira do comprador aparecem na página pública Activity? Introduz 0 para um endereço oculto."
+          "prompt": "O que muda na página pública Activity quando escolhes uma encomenda anónima?",
+          "options": [
+            "A encomenda continua visível; a identidade da carteira e os detalhes da transação do comprador ficam ocultos.",
+            "O endereço da carteira do comprador é mostrado a todos.",
+            "A encomenda é totalmente removida de Activity."
+          ]
         }
-      }
+      },
+      "correct_index": 0,
+      "options": [
+        "Sipariş görünür; alıcının cüzdan kimliği ve ödeme işlem bilgileri gizlenir.",
+        "Alıcının cüzdan adresi herkese gösterilir.",
+        "Sipariş Activity sayfasından tamamen kaldırılır."
+      ]
     },
     {
-      "type": "range",
-      "prompt": "Nimiq Pay ile yapılan tek bir BTC Lightning ödemesinin payment hash’i, tek başına kaç adet herkese açık Bitcoin zincir işlemi kanıtlar? Payment hash bir zincir işlem kimliği değilse 0 yaz.",
-      "min": 0,
-      "max": 10,
-      "correct_value": 0,
+      "type": "choice",
+      "prompt": "Nimiq Pay ile BTC Lightning ödemesinde görünen payment hash hakkında hangisi doğrudur?",
       "translations": {
         "tr": {
-          "prompt": "Nimiq Pay ile yapılan tek bir BTC Lightning ödemesinin payment hash’i, tek başına kaç adet herkese açık Bitcoin zincir işlemi kanıtlar? Payment hash bir zincir işlem kimliği değilse 0 yaz."
+          "prompt": "Nimiq Pay ile BTC Lightning ödemesinde görünen payment hash hakkında hangisi doğrudur?",
+          "options": [
+            "Payment hash, zincir dışı Lightning ödemesine ait bir tanımlayıcıdır; Bitcoin zincir işlem kimliği değildir.",
+            "Payment hash her zaman bir Bitcoin zincir işlem kimliğidir.",
+            "Payment hash hediye kartının kullanım kodudur."
+          ]
         },
         "en": {
-          "prompt": "For one BTC Lightning payment through Nimiq Pay, how many public Bitcoin on-chain transactions does its payment hash alone prove? Enter 0 if a payment hash is not an on-chain transaction ID."
+          "prompt": "Which statement is true about the payment hash shown for a BTC Lightning payment through Nimiq Pay?",
+          "options": [
+            "A payment hash identifies an off-chain Lightning payment; it is not a Bitcoin on-chain transaction ID.",
+            "A payment hash is always a Bitcoin on-chain transaction ID.",
+            "A payment hash is the gift card redemption code."
+          ]
         },
         "de": {
-          "prompt": "Wie viele öffentliche Bitcoin-On-Chain-Transaktionen beweist der Payment Hash allein bei einer BTC-Lightning-Zahlung über Nimiq Pay? Gib 0 ein, wenn er keine On-Chain-Transaktions-ID ist."
+          "prompt": "Welche Aussage zum Payment Hash einer BTC-Lightning-Zahlung über Nimiq Pay stimmt?",
+          "options": [
+            "Ein Payment Hash gehört zu einer Off-Chain-Lightning-Zahlung; er ist keine Bitcoin-On-Chain-Transaktions-ID.",
+            "Ein Payment Hash ist immer eine Bitcoin-On-Chain-Transaktions-ID.",
+            "Ein Payment Hash ist der Einlösecode des Gutscheins."
+          ]
         },
         "fr": {
-          "prompt": "Pour un paiement BTC Lightning via Nimiq Pay, combien de transactions publiques sur la chaîne Bitcoin le payment hash prouve-t-il à lui seul ? Saisis 0 s’il ne s’agit pas d’un identifiant de transaction sur la chaîne."
+          "prompt": "Quelle affirmation est correcte concernant le payment hash d’un paiement BTC Lightning via Nimiq Pay ?",
+          "options": [
+            "Le payment hash identifie un paiement Lightning hors chaîne ; ce n’est pas un identifiant de transaction Bitcoin sur la chaîne.",
+            "Le payment hash est toujours un identifiant de transaction Bitcoin sur la chaîne.",
+            "Le payment hash est le code d’utilisation de la carte cadeau."
+          ]
         },
         "es": {
-          "prompt": "En un pago BTC Lightning con Nimiq Pay, ¿cuántas transacciones públicas en la cadena Bitcoin demuestra por sí solo el payment hash? Escribe 0 si no es un identificador de transacción en la cadena."
+          "prompt": "¿Qué afirmación es correcta sobre el payment hash de un pago BTC Lightning con Nimiq Pay?",
+          "options": [
+            "El payment hash identifica un pago Lightning fuera de la cadena; no es un identificador de transacción Bitcoin en la cadena.",
+            "El payment hash siempre es un identificador de transacción Bitcoin en la cadena.",
+            "El payment hash es el código de canje de la tarjeta regalo."
+          ]
         },
         "pt": {
-          "prompt": "Num pagamento BTC Lightning através do Nimiq Pay, quantas transações públicas na cadeia Bitcoin comprova, por si só, o payment hash? Introduz 0 se não for um identificador de transação na cadeia."
+          "prompt": "Qual afirmação é correta sobre o payment hash de um pagamento BTC Lightning através do Nimiq Pay?",
+          "options": [
+            "O payment hash identifica um pagamento Lightning fora da cadeia; não é um identificador de transação Bitcoin na cadeia.",
+            "O payment hash é sempre um identificador de transação Bitcoin na cadeia.",
+            "O payment hash é o código de utilização do cartão-presente."
+          ]
         }
-      }
+      },
+      "correct_index": 0,
+      "options": [
+        "Payment hash, zincir dışı Lightning ödemesine ait bir tanımlayıcıdır; Bitcoin zincir işlem kimliği değildir.",
+        "Payment hash her zaman bir Bitcoin zincir işlem kimliğidir.",
+        "Payment hash hediye kartının kullanım kodudur."
+      ]
     },
     {
-      "type": "range",
-      "prompt": "Aynı yarışmada bir hesap kaç kez cevaplarını kesin olarak gönderebilir? Kaydedilen ama henüz gönderilmemiş cevapları devam ederek düzenlemek yeni bir gönderim sayılmaz.",
-      "min": 1,
-      "max": 10,
-      "correct_value": 1,
+      "type": "choice",
+      "prompt": "Aynı yarışmada bir hesap cevaplarını kesin olarak kaç kez gönderebilir?",
       "translations": {
         "tr": {
-          "prompt": "Aynı yarışmada bir hesap kaç kez cevaplarını kesin olarak gönderebilir? Kaydedilen ama henüz gönderilmemiş cevapları devam ederek düzenlemek yeni bir gönderim sayılmaz."
+          "prompt": "Aynı yarışmada bir hesap cevaplarını kesin olarak kaç kez gönderebilir?",
+          "options": [
+            "Bir kez; gönderimden önce kaydedilen cevaplara devam edebilirsin.",
+            "İki kez; en yüksek puan geçerli olur.",
+            "Sınırsız kez."
+          ]
         },
         "en": {
-          "prompt": "How many times can one account finally submit its answers in the same quiz? Resuming and editing saved answers before submission does not count as another submission."
+          "prompt": "How many times can one account finally submit answers in the same quiz?",
+          "options": [
+            "Once; you can resume saved answers before submitting.",
+            "Twice; the highest score counts.",
+            "An unlimited number of times."
+          ]
         },
         "de": {
-          "prompt": "Wie oft kann ein Konto seine Antworten im selben Quiz endgültig abgeben? Gespeicherte Antworten vor der Abgabe fortzusetzen und zu bearbeiten zählt nicht als weitere Abgabe."
+          "prompt": "Wie oft kann ein Konto Antworten im selben Quiz endgültig abgeben?",
+          "options": [
+            "Einmal; gespeicherte Antworten kannst du vor der Abgabe fortsetzen.",
+            "Zweimal; die höchste Punktzahl zählt.",
+            "Unbegrenzt oft."
+          ]
         },
         "fr": {
-          "prompt": "Combien de fois un compte peut-il envoyer définitivement ses réponses au même quiz ? Reprendre et modifier des réponses enregistrées avant l’envoi ne compte pas comme un nouvel envoi."
+          "prompt": "Combien de fois un compte peut-il envoyer définitivement ses réponses au même quiz ?",
+          "options": [
+            "Une fois ; tu peux reprendre les réponses enregistrées avant l’envoi.",
+            "Deux fois ; le meilleur score compte.",
+            "Un nombre illimité de fois."
+          ]
         },
         "es": {
-          "prompt": "¿Cuántas veces puede una cuenta enviar definitivamente sus respuestas en el mismo concurso? Retomar y editar respuestas guardadas antes del envío no cuenta como otro envío."
+          "prompt": "¿Cuántas veces puede una cuenta enviar definitivamente sus respuestas en el mismo concurso?",
+          "options": [
+            "Una vez; puedes retomar las respuestas guardadas antes del envío.",
+            "Dos veces; cuenta la puntuación más alta.",
+            "Un número ilimitado de veces."
+          ]
         },
         "pt": {
-          "prompt": "Quantas vezes pode uma conta enviar definitivamente as respostas no mesmo concurso? Retomar e editar respostas guardadas antes do envio não conta como outro envio."
+          "prompt": "Quantas vezes pode uma conta enviar definitivamente as respostas no mesmo concurso?",
+          "options": [
+            "Uma vez; podes retomar respostas guardadas antes do envio.",
+            "Duas vezes; conta a pontuação mais alta.",
+            "Um número ilimitado de vezes."
+          ]
         }
-      }
+      },
+      "correct_index": 0,
+      "options": [
+        "Bir kez; gönderimden önce kaydedilen cevaplara devam edebilirsin.",
+        "İki kez; en yüksek puan geçerli olur.",
+        "Sınırsız kez."
+      ]
     },
     {
-      "type": "range",
-      "prompt": "Siteden 10 € değerinde Carrefour hediye kartı aldın. Kartın kullanım ülkesini kontrol ederek kullanacaksın. Sipariş ve e-postada euro cinsinden hangi kart değeri görünmelidir? Ücretler veya NIM ödeme tutarı yerine kartın değerini yaz.",
-      "min": 0,
-      "max": 100,
-      "correct_value": 10,
+      "type": "choice",
+      "prompt": "Siteden 10 € değerinde Carrefour hediye kartı aldın. Sipariş ve e-postada kartın değeri nasıl gösterilmelidir?",
       "translations": {
         "tr": {
-          "prompt": "Siteden 10 € değerinde Carrefour hediye kartı aldın. Kartın kullanım ülkesini kontrol ederek kullanacaksın. Sipariş ve e-postada euro cinsinden hangi kart değeri görünmelidir? Ücretler veya NIM ödeme tutarı yerine kartın değerini yaz."
+          "prompt": "Siteden 10 € değerinde Carrefour hediye kartı aldın. Sipariş ve e-postada kartın değeri nasıl gösterilmelidir?",
+          "options": [
+            "10 €",
+            "10 NIM",
+            "10"
+          ]
         },
         "en": {
-          "prompt": "You bought a Carrefour gift card worth €10 on the shop and will check its valid country before use. What euro face value should appear in the order and email? Enter the card value, not fees or the NIM payment amount."
+          "prompt": "You bought a Carrefour gift card worth €10 on the shop. How should its face value appear in the order and email?",
+          "options": [
+            "10 €",
+            "10 NIM",
+            "10"
+          ]
         },
         "de": {
-          "prompt": "Du hast im Shop einen Carrefour-Gutschein im Wert von 10 € gekauft und prüfst vor der Nutzung das gültige Land. Welcher Euro-Nennwert muss in Bestellung und E-Mail stehen? Gib den Gutscheinwert ein, nicht Gebühren oder den NIM-Zahlungsbetrag."
+          "prompt": "Du hast im Shop einen Carrefour-Gutschein im Wert von 10 € gekauft. Wie muss der Nennwert in Bestellung und E-Mail angezeigt werden?",
+          "options": [
+            "10 €",
+            "10 NIM",
+            "10"
+          ]
         },
         "fr": {
-          "prompt": "Tu as acheté une carte cadeau Carrefour de 10 € sur le site et vérifieras son pays de validité avant utilisation. Quelle valeur en euros doit figurer dans la commande et l’e-mail ? Indique la valeur de la carte, pas les frais ni le paiement en NIM."
+          "prompt": "Tu as acheté une carte cadeau Carrefour de 10 € sur le site. Comment sa valeur doit-elle apparaître dans la commande et l’e-mail ?",
+          "options": [
+            "10 €",
+            "10 NIM",
+            "10"
+          ]
         },
         "es": {
-          "prompt": "Has comprado una tarjeta regalo Carrefour de 10 € en la tienda y comprobarás su país válido antes de usarla. ¿Qué valor nominal en euros debe aparecer en el pedido y correo? Indica el valor de la tarjeta, no las comisiones ni el pago en NIM."
+          "prompt": "Has comprado una tarjeta regalo Carrefour de 10 € en la tienda. ¿Cómo debe aparecer su valor nominal en el pedido y correo?",
+          "options": [
+            "10 €",
+            "10 NIM",
+            "10"
+          ]
         },
         "pt": {
-          "prompt": "Compraste um cartão-presente Carrefour de 10 € na loja e vais verificar o país válido antes de o utilizar. Que valor nominal em euros deve aparecer na encomenda e no email? Indica o valor do cartão, não as taxas nem o pagamento em NIM."
+          "prompt": "Compraste um cartão-presente Carrefour de 10 € na loja. Como deve aparecer o valor nominal na encomenda e no email?",
+          "options": [
+            "10 €",
+            "10 NIM",
+            "10"
+          ]
         }
-      }
+      },
+      "correct_index": 0,
+      "options": [
+        "10 €",
+        "10 NIM",
+        "10"
+      ]
     }
   ],
   "translations": {
     "tr": {
       "title": "NimiqShop’u Ne Kadar Tanıyorsun?",
-      "description": "10 sayısal soru ile alışveriş, cashback, gizlilik ve yarışma kurallarını keşfet. Oran verilen sorular varsayımsal örnektir; güncel oranını ödeme ekranında kontrol et. En yakın cevap daha çok puan kazandırır. İlk 3 tamamlanmış katılımcı kazanır; son kazanan sırasında eşitlik varsa admin karar verir. Ödülü ve tarihleri yayınlamadan önce düzenleyin."
+      "description": "9 şıklı bilgi sorusu ve 1 sayısal cashback hesabı. Şıklı sorularda doğru cevap 1, yanlış cevap 0 puan. Yalnızca sayısal soruda doğru değere yakınlık puan kazandırır. Verilen %2 oranı varsayımsal örnektir; güncel oranını ödeme ekranında kontrol et. İlk 3 tamamlanmış katılımcı kazanır; son kazanan sırasında eşitlik varsa admin karar verir. Ödül ve tarihleri yayınlamadan önce düzenleyin."
     },
     "en": {
       "title": "How Well Do You Know NimiqShop?",
-      "description": "Explore shopping, cashback, privacy and quiz rules through 10 numerical questions. Rates stated in questions are hypothetical examples; check your current rate at checkout. Closer answers earn more points. The top 3 completed participants win; an administrator resolves ties at the final winning position. Edit the prize and dates before publishing."
+      "description": "9 multiple-choice knowledge questions and 1 numerical cashback calculation. Correct choices earn 1 point; incorrect choices earn 0. Only the numerical question uses proximity scoring. The stated 2% rate is hypothetical; check your current rate at checkout. The top 3 completed participants win; the administrator resolves ties at the final winning position. Edit the prize and dates before publishing."
     },
     "de": {
       "title": "Wie gut kennst du NimiqShop?",
-      "description": "Entdecke Einkauf, Cashback, Datenschutz und Quizregeln in 10 Zahlenfragen. Genannte Prozentsätze sind hypothetische Beispiele; prüfe deinen aktuellen Satz an der Kasse. Nähere Antworten erhalten mehr Punkte. Die besten 3 Teilnehmer mit abgeschlossener Teilnahme gewinnen; Gleichstände am letzten Gewinnplatz entscheidet der Admin. Preis und Termine vor der Veröffentlichung bearbeiten."
+      "description": "9 Wissensfragen mit Auswahlantworten und 1 Zahlenfrage zur Cashback-Berechnung. Richtige Auswahlantworten geben 1 Punkt, falsche 0. Nur die Zahlenfrage wird nach Nähe zum richtigen Wert bewertet. Die genannten 2 % sind ein hypothetisches Beispiel; prüfe deinen aktuellen Satz an der Kasse. Die besten 3 Teilnehmer mit abgeschlossener Teilnahme gewinnen; Gleichstände am letzten Gewinnplatz entscheidet der Admin. Preis und Termine vor der Veröffentlichung bearbeiten."
     },
     "fr": {
       "title": "Connais-tu bien NimiqShop ?",
-      "description": "Découvre les achats, le cashback, la confidentialité et les règles du quiz avec 10 questions numériques. Les taux indiqués sont des exemples hypothétiques ; vérifie ton taux actuel au paiement. Les réponses les plus proches rapportent davantage de points. Les 3 meilleurs participants ayant terminé gagnent ; un administrateur tranche les égalités à la dernière place gagnante. Modifie le lot et les dates avant publication."
+      "description": "9 questions de connaissance à choix et 1 calcul numérique de cashback. Une bonne réponse à choix vaut 1 point, une mauvaise 0. Seule la question numérique est notée selon la proximité de la bonne valeur. Le taux de 2 % est hypothétique ; vérifie ton taux actuel au paiement. Les 3 meilleurs participants ayant terminé gagnent ; un administrateur tranche les égalités à la dernière place gagnante. Modifie le lot et les dates avant publication."
     },
     "es": {
       "title": "¿Cuánto conoces NimiqShop?",
-      "description": "Descubre las compras, el cashback, la privacidad y las reglas del concurso con 10 preguntas numéricas. Los porcentajes indicados son ejemplos hipotéticos; comprueba tu porcentaje actual al pagar. Las respuestas más cercanas obtienen más puntos. Ganan los 3 mejores participantes que hayan terminado; el administrador resuelve los empates en la última plaza premiada. Edita el premio y las fechas antes de publicar."
+      "description": "9 preguntas de conocimiento con opciones y 1 cálculo numérico de cashback. Las opciones correctas dan 1 punto; las incorrectas, 0. Solo la pregunta numérica se puntúa por cercanía al valor correcto. El 2 % indicado es hipotético; comprueba tu porcentaje actual al pagar. Ganan los 3 mejores participantes que hayan terminado; el administrador resuelve los empates en la última plaza premiada. Edita el premio y las fechas antes de publicar."
     },
     "pt": {
       "title": "Quanto sabes sobre a NimiqShop?",
-      "description": "Descobre as compras, o cashback, a privacidade e as regras do concurso em 10 perguntas numéricas. As taxas indicadas são exemplos hipotéticos; verifica a tua taxa atual no pagamento. As respostas mais próximas recebem mais pontos. Ganham os 3 melhores participantes que tenham terminado; um administrador resolve os empates na última posição premiada. Edita o prémio e as datas antes de publicar."
+      "description": "9 perguntas de conhecimento com opções e 1 cálculo numérico de cashback. As opções corretas dão 1 ponto; as incorretas, 0. Só a pergunta numérica é pontuada pela proximidade ao valor correto. A taxa de 2% indicada é hipotética; verifica a tua taxa atual no pagamento. Ganham os 3 melhores participantes que tenham terminado; um administrador resolve os empates na última posição premiada. Edita o prémio e as datas antes de publicar."
     }
   }
 }
