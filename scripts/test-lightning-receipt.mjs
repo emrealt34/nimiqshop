@@ -40,3 +40,9 @@ test('SDK submission hashes survive private and public receipt mapping without a
   assert.equal(fundingHash('javascript:alert(1)'), '');
   assert.equal(fundingHash('0x' + 'ab'.repeat(31)), '');
 });
+
+test('older verified funding proofs also expose the on-chain hash', () => {
+  const tx = 'de'.repeat(32);
+  assert.equal(lightningReceiptOf({ ...quote, lightning_chain_proof: { funding_tx: tx } }).submitted_tx, tx);
+  assert.equal(lightningReceiptOf({ lightning_receipt: { payment_hash: hash, chain_proof: { funding_tx: tx } } }, true).submitted_tx, tx);
+});

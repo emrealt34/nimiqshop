@@ -22,7 +22,7 @@ export function lightningReceiptOf(value: any, publicView = false): LightningRec
   const confirmedAt = typeof timestamp === 'string' && Number.isFinite(Date.parse(timestamp)) ? timestamp : undefined;
   return {
     quote_id: value.id,
-    submitted_tx: fundingHash(receipt?.submitted_tx || value.lightning_funding_hint),
+    submitted_tx: fundingHash(receipt?.submitted_tx || value.lightning_funding_hint || receipt?.chain_proof?.funding_tx || value.lightning_chain_proof?.funding_tx),
     chain_proof: receipt?.chain_proof || value.lightning_chain_proof,
     payment_hash: hash,
     amount_btc: receipt?.amount_btc || value.coin_amount || (String(value.paid || '').match(/^([\d.]+)\s+BTC$/i)?.[1]),
