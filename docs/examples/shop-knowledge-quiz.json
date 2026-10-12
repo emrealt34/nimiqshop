@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "title": "nimshop.io’u Ne Kadar Tanıyorsun?",
-  "description": "Soru seçimi bekleyen taslak: 8 şıklı soru ve 1 sayısal cashback hesabı. Eksik soruyu seçmeden yayınlamayın.",
+  "description": "10 soruyla nimshop.io’nun alışveriş ve destek kurallarını keşfet: 9 şıklı soru, 1 sayısal cashback hesabı. Şıklı soruda doğru cevap 1, yanlış cevap 0 puan. Yalnızca sayısal soruda yakınlık puanı verilir. %2 oranı varsayımsaldır; güncel oranını ödeme ekranında kontrol et. İlk 3 tamamlanmış katılımcı kazanır; son kazanan sırasında eşitliği admin çözer. Ödül ve tarihleri yayınlamadan önce düzenleyin.",
   "winner_count": 3,
   "prize": {
     "title": "Admin tarafından belirlenecek ödül",
@@ -125,6 +125,66 @@
     },
     {
       "type": "choice",
+      "prompt": "Hediye çeki teslim edilmediyse veya kod çalışmıyorsa kime, hangi e-posta adresinden ulaşmalısın?",
+      "options": [
+        "Nimiq desteğine, herhangi bir e-posta adresinden.",
+        "CryptoRefills desteğine, çekin gönderildiği e-posta adresinden.",
+        "Cüzdan sağlayıcısına, giriş e-posta adresinden."
+      ],
+      "correct_index": 1,
+      "translations": {
+        "tr": {
+          "prompt": "Hediye çeki teslim edilmediyse veya kod çalışmıyorsa kime, hangi e-posta adresinden ulaşmalısın?",
+          "options": [
+            "Nimiq desteğine, herhangi bir e-posta adresinden.",
+            "CryptoRefills desteğine, çekin gönderildiği e-posta adresinden.",
+            "Cüzdan sağlayıcısına, giriş e-posta adresinden."
+          ]
+        },
+        "en": {
+          "prompt": "If your gift card has not arrived or its code does not work, whom should you contact and from which email address?",
+          "options": [
+            "Nimiq support, from any email address.",
+            "CryptoRefills support, from the email address to which the gift card was sent.",
+            "Your wallet provider, from your login email address."
+          ]
+        },
+        "de": {
+          "prompt": "Wen kontaktierst du, wenn der Gutschein nicht angekommen ist oder der Code nicht funktioniert, und von welcher E-Mail-Adresse?",
+          "options": [
+            "Den Nimiq-Support von einer beliebigen E-Mail-Adresse.",
+            "Den CryptoRefills-Support von der E-Mail-Adresse, an die der Gutschein gesendet wurde.",
+            "Deinen Wallet-Anbieter von deiner Anmelde-E-Mail-Adresse."
+          ]
+        },
+        "fr": {
+          "prompt": "Si la carte cadeau n’est pas arrivée ou si son code ne fonctionne pas, qui dois-tu contacter et depuis quelle adresse e-mail ?",
+          "options": [
+            "L’assistance Nimiq, depuis n’importe quelle adresse e-mail.",
+            "L’assistance CryptoRefills, depuis l’adresse e-mail à laquelle la carte cadeau a été envoyée.",
+            "Ton fournisseur de portefeuille, depuis ton adresse e-mail de connexion."
+          ]
+        },
+        "es": {
+          "prompt": "Si la tarjeta regalo no ha llegado o su código no funciona, ¿con quién debes contactar y desde qué dirección de correo?",
+          "options": [
+            "Con el soporte de Nimiq, desde cualquier dirección de correo.",
+            "Con el soporte de CryptoRefills, desde la dirección de correo a la que se envió la tarjeta regalo.",
+            "Con el proveedor de tu cartera, desde tu correo de inicio de sesión."
+          ]
+        },
+        "pt": {
+          "prompt": "Se o cartão-presente não chegou ou o código não funciona, quem deves contactar e a partir de que endereço de email?",
+          "options": [
+            "O apoio da Nimiq, a partir de qualquer endereço de email.",
+            "O apoio da CryptoRefills, a partir do endereço de email para o qual o cartão-presente foi enviado.",
+            "O fornecedor da tua carteira, a partir do teu email de início de sessão."
+          ]
+        }
+      }
+    },
+    {
+      "type": "choice",
       "prompt": "Cashback tabanın 100 NIM olarak sabitlendi. Daha sonra NIM kuru değişirse bu, mevcut siparişinin cashback tabanını nasıl etkiler?",
       "translations": {
         "tr": {
@@ -182,6 +242,126 @@
         "Yeni kurla yeniden hesaplanır.",
         "Ödenen toplam NIM tutarına dönüşür."
       ]
+    },
+    {
+      "type": "choice",
+      "prompt": "nimshop.io’da ülke olarak Fransa’yı seçip Carrefour hediye çeki aldın. Bu çek hangi ülkede geçerlidir?",
+      "options": [
+        "Carrefour bulunan bütün ülkelerde.",
+        "Türkiye’deki CarrefourSA mağazalarında.",
+        "Yalnızca alındığı ülkede: Fransa’da."
+      ],
+      "correct_index": 2,
+      "translations": {
+        "tr": {
+          "prompt": "nimshop.io’da ülke olarak Fransa’yı seçip Carrefour hediye çeki aldın. Bu çek hangi ülkede geçerlidir?",
+          "options": [
+            "Carrefour bulunan bütün ülkelerde.",
+            "Türkiye’deki CarrefourSA mağazalarında.",
+            "Yalnızca alındığı ülkede: Fransa’da."
+          ]
+        },
+        "en": {
+          "prompt": "You selected France on nimshop.io and bought a Carrefour gift card. In which country is this card valid?",
+          "options": [
+            "In every country with Carrefour stores.",
+            "At CarrefourSA stores in Türkiye.",
+            "Only in the country it was purchased for: France."
+          ]
+        },
+        "de": {
+          "prompt": "Du hast auf nimshop.io Frankreich ausgewählt und einen Carrefour-Gutschein gekauft. In welchem Land ist dieser Gutschein gültig?",
+          "options": [
+            "In allen Ländern mit Carrefour-Filialen.",
+            "In CarrefourSA-Filialen in der Türkei.",
+            "Nur im Land, für das er gekauft wurde: Frankreich."
+          ]
+        },
+        "fr": {
+          "prompt": "Tu as sélectionné la France sur nimshop.io et acheté une carte cadeau Carrefour. Dans quel pays cette carte est-elle valable ?",
+          "options": [
+            "Dans tous les pays où Carrefour est présent.",
+            "Dans les magasins CarrefourSA en Turquie.",
+            "Uniquement dans le pays pour lequel elle a été achetée : la France."
+          ]
+        },
+        "es": {
+          "prompt": "Has seleccionado Francia en nimshop.io y comprado una tarjeta regalo Carrefour. ¿En qué país es válida esta tarjeta?",
+          "options": [
+            "En todos los países donde hay Carrefour.",
+            "En las tiendas CarrefourSA de Turquía.",
+            "Solo en el país para el que se compró: Francia."
+          ]
+        },
+        "pt": {
+          "prompt": "Selecionaste França na nimshop.io e compraste um cartão-presente Carrefour. Em que país é válido este cartão?",
+          "options": [
+            "Em todos os países onde existe Carrefour.",
+            "Nas lojas CarrefourSA na Turquia.",
+            "Apenas no país para o qual foi comprado: França."
+          ]
+        }
+      }
+    },
+    {
+      "type": "choice",
+      "prompt": "Gönderdiğin hediye kodu çalışmıyorsa CryptoRefills inceleme için hangi bilgileri isteyebilir?",
+      "options": [
+        "Alıcının teslimat e-postası, bulunduğu ülke veya bölge, sipariş numarası ve hata ayrıntıları.",
+        "Cüzdanının kurtarma kelimeleri ve özel anahtarı.",
+        "Yalnızca ürünün markası; sipariş bilgisi gerekmez."
+      ],
+      "correct_index": 0,
+      "translations": {
+        "tr": {
+          "prompt": "Gönderdiğin hediye kodu çalışmıyorsa CryptoRefills inceleme için hangi bilgileri isteyebilir?",
+          "options": [
+            "Alıcının teslimat e-postası, bulunduğu ülke veya bölge, sipariş numarası ve hata ayrıntıları.",
+            "Cüzdanının kurtarma kelimeleri ve özel anahtarı.",
+            "Yalnızca ürünün markası; sipariş bilgisi gerekmez."
+          ]
+        },
+        "en": {
+          "prompt": "If a gift code you sent does not work, what information may CryptoRefills request to investigate?",
+          "options": [
+            "The recipient’s delivery email, country or region, order reference and error details.",
+            "Your wallet recovery words and private key.",
+            "Only the product brand; no order details are needed."
+          ]
+        },
+        "de": {
+          "prompt": "Welche Informationen kann CryptoRefills zur Prüfung verlangen, wenn ein von dir versendeter Geschenkcode nicht funktioniert?",
+          "options": [
+            "Die Zustell-E-Mail-Adresse des Empfängers, Land oder Region, Bestellnummer und Fehlerdetails.",
+            "Deine Wallet-Wiederherstellungswörter und den privaten Schlüssel.",
+            "Nur die Produktmarke; Bestelldaten sind nicht nötig."
+          ]
+        },
+        "fr": {
+          "prompt": "Si un code cadeau que tu as envoyé ne fonctionne pas, quelles informations CryptoRefills peut-il demander pour l’examiner ?",
+          "options": [
+            "L’e-mail de livraison du destinataire, son pays ou sa région, la référence de commande et les détails de l’erreur.",
+            "Les mots de récupération et la clé privée de ton portefeuille.",
+            "Uniquement la marque du produit ; aucune information de commande n’est nécessaire."
+          ]
+        },
+        "es": {
+          "prompt": "Si un código regalo que has enviado no funciona, ¿qué información puede solicitar CryptoRefills para investigarlo?",
+          "options": [
+            "El correo de entrega del destinatario, su país o región, la referencia del pedido y los detalles del error.",
+            "Las palabras de recuperación y la clave privada de tu cartera.",
+            "Solo la marca del producto; no hacen falta datos del pedido."
+          ]
+        },
+        "pt": {
+          "prompt": "Se um código de presente que enviaste não funciona, que informações pode a CryptoRefills pedir para investigar?",
+          "options": [
+            "O email de entrega do destinatário, o país ou região, a referência da encomenda e os detalhes do erro.",
+            "As palavras de recuperação e a chave privada da tua carteira.",
+            "Só a marca do produto; não são necessários dados da encomenda."
+          ]
+        }
+      }
     },
     {
       "type": "choice",
@@ -305,66 +485,6 @@
     },
     {
       "type": "choice",
-      "prompt": "Siparişini anonim seçtiğinde, herkese açık Activity sayfasında ne değişir?",
-      "translations": {
-        "tr": {
-          "prompt": "Siparişini anonim seçtiğinde, herkese açık Activity sayfasında ne değişir?",
-          "options": [
-            "Sipariş görünür; alıcının cüzdan kimliği ve ödeme işlem bilgileri gizlenir.",
-            "Alıcının cüzdan adresi herkese gösterilir.",
-            "Sipariş Activity sayfasından tamamen kaldırılır."
-          ]
-        },
-        "en": {
-          "prompt": "What changes on the public Activity page when you choose an anonymous order?",
-          "options": [
-            "The order remains visible; the buyer’s wallet identity and payment transaction details are hidden.",
-            "The buyer’s wallet address is shown to everyone.",
-            "The order is removed from Activity entirely."
-          ]
-        },
-        "de": {
-          "prompt": "Was ändert sich auf der öffentlichen Activity-Seite bei einer anonymen Bestellung?",
-          "options": [
-            "Die Bestellung bleibt sichtbar; Wallet-Identität und Zahlungsdetails des Käufers werden verborgen.",
-            "Die Wallet-Adresse des Käufers wird allen angezeigt.",
-            "Die Bestellung wird vollständig aus Activity entfernt."
-          ]
-        },
-        "fr": {
-          "prompt": "Que change le choix d’une commande anonyme sur la page publique Activity ?",
-          "options": [
-            "La commande reste visible ; l’identité du portefeuille et les détails de transaction de l’acheteur sont masqués.",
-            "L’adresse du portefeuille de l’acheteur est visible par tous.",
-            "La commande est entièrement supprimée d’Activity."
-          ]
-        },
-        "es": {
-          "prompt": "¿Qué cambia en la página pública Activity al elegir un pedido anónimo?",
-          "options": [
-            "El pedido sigue visible; se ocultan la identidad de la cartera y los datos de la transacción del comprador.",
-            "La dirección de la cartera del comprador se muestra a todos.",
-            "El pedido se elimina por completo de Activity."
-          ]
-        },
-        "pt": {
-          "prompt": "O que muda na página pública Activity quando escolhes uma encomenda anónima?",
-          "options": [
-            "A encomenda continua visível; a identidade da carteira e os detalhes da transação do comprador ficam ocultos.",
-            "O endereço da carteira do comprador é mostrado a todos.",
-            "A encomenda é totalmente removida de Activity."
-          ]
-        }
-      },
-      "correct_index": 0,
-      "options": [
-        "Sipariş görünür; alıcının cüzdan kimliği ve ödeme işlem bilgileri gizlenir.",
-        "Alıcının cüzdan adresi herkese gösterilir.",
-        "Sipariş Activity sayfasından tamamen kaldırılır."
-      ]
-    },
-    {
-      "type": "choice",
       "prompt": "Nimiq Pay ile BTC Lightning ödemesinde görünen payment hash hakkında hangisi doğrudur?",
       "translations": {
         "tr": {
@@ -482,92 +602,32 @@
         "İki kez; en yüksek puan geçerli olur.",
         "Sınırsız kez."
       ]
-    },
-    {
-      "type": "choice",
-      "prompt": "Siteden 10 € değerinde Carrefour hediye kartı aldın. Sipariş ve e-postada kartın değeri nasıl gösterilmelidir?",
-      "translations": {
-        "tr": {
-          "prompt": "Siteden 10 € değerinde Carrefour hediye kartı aldın. Sipariş ve e-postada kartın değeri nasıl gösterilmelidir?",
-          "options": [
-            "10 €",
-            "10 NIM",
-            "10"
-          ]
-        },
-        "en": {
-          "prompt": "You bought a Carrefour gift card worth €10 on the shop. How should its face value appear in the order and email?",
-          "options": [
-            "10 €",
-            "10 NIM",
-            "10"
-          ]
-        },
-        "de": {
-          "prompt": "Du hast im Shop einen Carrefour-Gutschein im Wert von 10 € gekauft. Wie muss der Nennwert in Bestellung und E-Mail angezeigt werden?",
-          "options": [
-            "10 €",
-            "10 NIM",
-            "10"
-          ]
-        },
-        "fr": {
-          "prompt": "Tu as acheté une carte cadeau Carrefour de 10 € sur le site. Comment sa valeur doit-elle apparaître dans la commande et l’e-mail ?",
-          "options": [
-            "10 €",
-            "10 NIM",
-            "10"
-          ]
-        },
-        "es": {
-          "prompt": "Has comprado una tarjeta regalo Carrefour de 10 € en la tienda. ¿Cómo debe aparecer su valor nominal en el pedido y correo?",
-          "options": [
-            "10 €",
-            "10 NIM",
-            "10"
-          ]
-        },
-        "pt": {
-          "prompt": "Compraste um cartão-presente Carrefour de 10 € na loja. Como deve aparecer o valor nominal na encomenda e no email?",
-          "options": [
-            "10 €",
-            "10 NIM",
-            "10"
-          ]
-        }
-      },
-      "correct_index": 0,
-      "options": [
-        "10 €",
-        "10 NIM",
-        "10"
-      ]
     }
   ],
   "translations": {
     "tr": {
       "title": "nimshop.io’u Ne Kadar Tanıyorsun?",
-      "description": "Soru seçimi bekleyen taslak: 8 şıklı soru ve 1 sayısal cashback hesabı. Eksik soruyu seçmeden yayınlamayın."
+      "description": "10 soruyla nimshop.io’nun alışveriş ve destek kurallarını keşfet: 9 şıklı soru, 1 sayısal cashback hesabı. Şıklı soruda doğru cevap 1, yanlış cevap 0 puan. Yalnızca sayısal soruda yakınlık puanı verilir. %2 oranı varsayımsaldır; güncel oranını ödeme ekranında kontrol et. İlk 3 tamamlanmış katılımcı kazanır; son kazanan sırasında eşitliği admin çözer. Ödül ve tarihleri yayınlamadan önce düzenleyin."
     },
     "en": {
       "title": "How Well Do You Know nimshop.io?",
-      "description": "Draft awaiting question selection: 8 multiple-choice questions and 1 numerical cashback calculation. Do not publish before choosing the remaining question."
+      "description": "Learn nimshop.io shopping and support rules with 10 questions: 9 multiple-choice questions and 1 numerical cashback calculation. Correct choices earn 1 point; incorrect choices earn 0. Only the numerical question uses proximity scoring. The 2% rate is hypothetical; check your current rate at checkout. The top 3 completed participants win; the administrator resolves ties at the final winning position. Edit the prize and dates before publishing."
     },
     "de": {
       "title": "Wie gut kennst du nimshop.io?",
-      "description": "Entwurf zur Fragenauswahl: 8 Auswahlfragen und 1 Zahlenfrage zur Cashback-Berechnung. Vor Auswahl der fehlenden Frage nicht veröffentlichen."
+      "description": "Lerne die Einkaufs- und Supportregeln von nimshop.io mit 10 Fragen: 9 Auswahlfragen und 1 Zahlenfrage zur Cashback-Berechnung. Richtige Auswahlantworten geben 1 Punkt, falsche 0. Nur die Zahlenfrage wird nach Nähe zum richtigen Wert bewertet. Die 2 % sind hypothetisch; prüfe deinen aktuellen Satz an der Kasse. Die besten 3 Teilnehmer mit abgeschlossener Teilnahme gewinnen; Gleichstände am letzten Gewinnplatz entscheidet der Admin. Preis und Termine vor der Veröffentlichung bearbeiten."
     },
     "fr": {
       "title": "Connais-tu bien nimshop.io ?",
-      "description": "Brouillon en attente du choix des questions : 8 questions à choix et 1 calcul numérique de cashback. Ne pas publier avant de choisir la question manquante."
+      "description": "Découvre les règles d’achat et d’assistance de nimshop.io avec 10 questions : 9 questions à choix et 1 calcul numérique de cashback. Une bonne réponse à choix vaut 1 point, une mauvaise 0. Seule la question numérique est notée selon la proximité de la bonne valeur. Le taux de 2 % est hypothétique ; vérifie ton taux actuel au paiement. Les 3 meilleurs participants ayant terminé gagnent ; un administrateur tranche les égalités à la dernière place gagnante. Modifie le lot et les dates avant publication."
     },
     "es": {
       "title": "¿Cuánto conoces nimshop.io?",
-      "description": "Borrador pendiente de elegir las preguntas: 8 preguntas con opciones y 1 cálculo numérico de cashback. No publiques antes de elegir la pregunta que falta."
+      "description": "Conoce las reglas de compra y soporte de nimshop.io con 10 preguntas: 9 con opciones y 1 cálculo numérico de cashback. Las opciones correctas dan 1 punto; las incorrectas, 0. Solo la pregunta numérica se puntúa por cercanía al valor correcto. El 2 % es hipotético; comprueba tu porcentaje actual al pagar. Ganan los 3 mejores participantes que hayan terminado; el administrador resuelve los empates en la última plaza premiada. Edita el premio y las fechas antes de publicar."
     },
     "pt": {
       "title": "Quanto sabes sobre a nimshop.io?",
-      "description": "Rascunho à espera da escolha das perguntas: 8 perguntas com opções e 1 cálculo numérico de cashback. Não publiques antes de escolher a pergunta em falta."
+      "description": "Conhece as regras de compra e apoio da nimshop.io com 10 perguntas: 9 com opções e 1 cálculo numérico de cashback. As opções corretas dão 1 ponto; as incorretas, 0. Só a pergunta numérica é pontuada pela proximidade ao valor correto. A taxa de 2% é hipotética; verifica a tua taxa atual no pagamento. Ganham os 3 melhores participantes que tenham terminado; um administrador resolve os empates na última posição premiada. Edita o prémio e as datas antes de publicar."
     }
   }
 }
