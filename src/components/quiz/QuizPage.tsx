@@ -8,7 +8,7 @@ import { useSession } from '../../lib/useSession';
 import { friendlyApiMessage } from '../../lib/api';
 import { queryParam } from '../../lib/format';
 import { useT } from '../../i18n';
-import { listQuizzes, getQuiz, startQuiz, saveQuizProgress, submitQuiz, claimQuizPrize, type QuizCompetition, type QuizQuestion, type QuizPrize } from '../../lib/quiz';
+import { listQuizzes, getQuiz, startQuiz, saveQuizProgress, submitQuiz, claimQuizPrize, quizScoreLabel, type QuizCompetition, type QuizQuestion, type QuizPrize } from '../../lib/quiz';
 
 const PHASE_KEYS = { scheduled: 'quiz.scheduled', live: 'quiz.live', ended: 'quiz.ended', finalized: 'quiz.finalized', cancelled: 'quiz.cancelled' };
 
@@ -105,6 +105,7 @@ export function QuizView() {
     const next = answers.map((old, i) => i === index ? answer : old);
     setAnswers(next); setSaving('saving');
     const version = ++revision.current;
+    if (questions && next.some((value, i) => value !== -1 && !validAnswer(questions[i], value))) { setSaving('failed'); return; }
     const id = selected;
     const attemptScope = scope.current;
     // Serialize writes: a slow response for an older choice must not overwrite
@@ -132,6 +133,8 @@ export function QuizView() {
   const date = (value: string) => new Date(value).toLocaleString(lang);
   const completed = !!competition?.attempt?.submitted_at;
   const canPlay = competition?.phase === 'live' && !completed;
+  const validAnswer = (q: QuizQuestion, answer: number) => Number.isInteger(answer) && (q.type === 'range' ? answer >= (q.min ?? 0) && answer <= (q.max ?? 0) : answer >= 0 && answer < q.options.length);
+  const winnerNames = competition?.winners?.length ? competition.winners : competition?.winner ? [competition.winner] : [];
   return <div className="container quiz-page">
     <header className="quiz-heading"><Icon name="nimiq" size={30} /><div><h1>{t('quiz.title')}</h1><p className="muted small">{t('quiz.intro')}</p></div></header>
     {error && <div className="alert error" role="alert">{error}</div>}
@@ -146,13 +149,15 @@ export function QuizView() {
         {competition.description && <p className="small">{competition.description}</p>}
         <QuizPrizeCard prize={competition.prize} />
         <dl className="quiz-facts"><div><dt>{t('quiz.starts')}</dt><dd>{date(competition.starts_at)}</dd></div><div><dt>{t('quiz.ends')}</dt><dd>{date(competition.ends_at)}</dd></div><div><dt>{t('quiz.questions')}</dt><dd>{competition.question_count}</dd></div><div><dt>{t('quiz.participants')}</dt><dd>{competition.participants}</dd></div></dl>
-        <p className="small quiz-rules">{t('quiz.rules')}</p>
+        <p className="small quiz-rules">{t(competition.has_ranges ? 'quiz.rangeRules' : 'quiz.rules')}</p>
+        <p className="small">{competition.winner_count === 0 ? t('quiz.winnerAll') : t('quiz.winnerTop', { count: competition.winner_count ?? 1 })}</p>
         {competition.cancel_reason && <div className="alert warn">{competition.cancel_reason}</div>}
-        {completed && <div className="quiz-result" role="status"><Icon name="check" size={20} /><strong>{t('quiz.yourScore', { score: competition.attempt!.score, total: competition.question_count })}</strong><span className="small">{t('quiz.noRetry')}</span></div>}
+        {completed && <div className="quiz-result" role="status"><Icon name="check" size={20} /><strong>{t('quiz.yourScore', { score: quizScoreLabel(competition.attempt!.score), total: competition.question_count })}</strong><span className="small">{t('quiz.noRetry')}</span></div>}
         {canPlay && !questions && <><p className="xs muted">{t('quiz.startWarning')}</p><button className="btn btn-gold" disabled={busy} onClick={begin}>{busy ? t('common.loading') : competition.attempt ? t('quiz.resume') : t('quiz.start')}</button></>}
         {competition.phase === 'ended' && <p className="small muted">{t('quiz.waitDecision')}</p>}
         {competition.phase === 'finalized' && <div className="quiz-winner">
-          <h3>{competition.is_winner ? t('quiz.youWon') : competition.winner ? t('quiz.winner', { participant: competition.winner }) : t('quiz.noWinner')}</h3>
+          <h3>{competition.is_winner ? t('quiz.youWon') : winnerNames.length ? t('quiz.resultWinners') : t('quiz.noWinner')}</h3>
+          {winnerNames.length > 0 && <ul>{winnerNames.map((participant) => <li key={participant}>{t('quiz.player', { participant })}</li>)}</ul>}
           {competition.decision_note && <p className="small">{competition.decision_note}</p>}
           {competition.winner && <p className="small">{competition.award_delivered_at ? t('quiz.delivered') : t('quiz.prizePending')}</p>}
           {competition.is_winner && !competition.award_delivered_at && <form onSubmit={(e) => { e.preventDefault(); void perform(async () => { await claimQuizPrize(selected, email.trim()); await refresh(); toast(t('quiz.emailSaved'), 'success'); }); }}>
@@ -164,15 +169,15 @@ export function QuizView() {
       {questions && !completed && <form className="quiz-game" onSubmit={(e) => { e.preventDefault(); void finish(); }}>
         {questions.map((q, index) => <fieldset key={q.id} className="card quiz-question" disabled={busy || competition.phase !== 'live'}>
           <legend>{index + 1}. {q.prompt}</legend>
-          {q.options.map((option, choice) => <label key={choice} className={`quiz-option${answers[index] === choice ? ' is-chosen' : ''}`}><input type="radio" name={`quiz-${q.id}`} value={choice} checked={answers[index] === choice} onChange={() => choose(index, choice)} /><span>{option}</span></label>)}
+          {q.type === 'range' ? <div className="field"><label htmlFor={`quiz-range-${q.id}`}>{t('quiz.rangeBounds', { min: q.min ?? 0, max: q.max ?? 0 })}</label><input id={`quiz-range-${q.id}`} className="input" type="number" step="1" min={q.min} max={q.max} required value={answers[index] === -1 ? '' : answers[index]} onChange={(e) => choose(index, e.target.value === '' ? -1 : Number(e.target.value))} /><input type="range" aria-label={q.prompt} min={q.min} max={q.max} step="1" value={validAnswer(q, answers[index]) ? answers[index] : Math.floor(((q.min ?? 0) + (q.max ?? 0)) / 2)} onChange={(e) => choose(index, Number(e.target.value))} /></div> : q.options.map((option, choice) => <label key={choice} className={`quiz-option${answers[index] === choice ? ' is-chosen' : ''}`}><input type="radio" name={`quiz-${q.id}`} value={choice} checked={answers[index] === choice} onChange={() => choose(index, choice)} /><span>{option}</span></label>)}
         </fieldset>)}
-        <div className="card quiz-submit"><p className="small">{t('quiz.answered', { count: answers.filter((a) => a >= 0).length, total: questions.length })}</p><p className="xs muted" role="status">{saving === 'saving' ? t('quiz.saving') : saving === 'failed' ? t('quiz.saveFailed') : t('quiz.saved')}</p><p className="small">{t('quiz.submitWarning')}</p>
-          <button className="btn btn-gold" type="submit" disabled={busy || competition.phase !== 'live' || answers.some((a) => a < 0)}>{busy ? t('common.loading') : t('quiz.submit')}</button>
+        <div className="card quiz-submit"><p className="small">{t('quiz.answered', { count: answers.filter((a, i) => validAnswer(questions[i], a)).length, total: questions.length })}</p><p className="xs muted" role="status">{saving === 'saving' ? t('quiz.saving') : saving === 'failed' ? t('quiz.saveFailed') : t('quiz.saved')}</p><p className="small">{t('quiz.submitWarning')}</p>
+          <button className="btn btn-gold" type="submit" disabled={busy || competition.phase !== 'live' || answers.some((a, i) => !validAnswer(questions[i], a))}>{busy ? t('common.loading') : t('quiz.submit')}</button>
         </div>
       </form>}
       <section className="card quiz-leaderboard"><div className="row between"><h2>{t('quiz.leaderboard')}</h2><button className="btn btn-ghost btn-sm" type="button" disabled={busy} onClick={() => void perform(refresh)}><Icon name="refresh" size={15} />{t('quiz.refresh')}</button></div>
         {!competition.leaderboard?.length && <p className="small muted">{t('quiz.noResults')}</p>}
-        <ol>{competition.leaderboard?.map((entry) => <li key={entry.participant}><span>{entry.is_me ? t('quiz.you') : t('quiz.player', { participant: entry.participant })}{entry.is_winner && <Icon name="star" size={16} />}</span><strong>{entry.score} / {competition.question_count}</strong></li>)}</ol>
+        <ol>{competition.leaderboard?.map((entry, index) => <li key={entry.participant}><span><b>#{entry.rank || index + 1}</b>{entry.is_me ? t('quiz.you') : t('quiz.player', { participant: entry.participant })}{entry.is_winner && <Icon name="star" size={16} />}</span><strong>{quizScoreLabel(entry.score)} / {competition.question_count}</strong></li>)}</ol>
       </section>
     </>}
   </div>;

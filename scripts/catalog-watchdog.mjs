@@ -1,5 +1,5 @@
-/** Railway cron (every five minutes). Dispatches the existing main workflow
- * only when a six-hour refresh is due. No supplier or deployment secrets here. */
+/** Optional authenticated dispatch helper; not deployed to Railway.
+ * The deployed read-only, six-hour monitor is scripts/catalog-monitor.mjs. */
 import { pathToFileURL } from 'node:url';
 
 export async function checkCatalog({ get, dispatch, now = Date.now() }) {

@@ -542,7 +542,7 @@ func TestAdminConsole(t *testing.T) {
 	gets := []string{
 		"/api/admin/auth/me", "/api/admin/dashboard", "/api/admin/users", "/api/admin/orders",
 		"/api/admin/quotes", "/api/admin/transactions", "/api/admin/manual-review", "/api/admin/notification/status",
-		"/api/admin/oracle", "/api/admin/settings/cashback", "/api/admin/stake-ledger", "/api/admin/audit",
+		"/api/admin/settings/cashback", "/api/admin/stake-ledger", "/api/admin/audit",
 		"/api/admin/catalog-rules", "/api/admin/catalog/brands?country=US", "/api/admin/catalog/products/test-steam?country=US",
 		"/api/admin/support/tickets",
 	}
@@ -550,6 +550,17 @@ func TestAdminConsole(t *testing.T) {
 		if res := s.do(http.MethodGet, p, nil, admin); res.status != 200 {
 			t.Errorf("GET %s: %d %s", p, res.status, truncate(res.body))
 		}
+	}
+	// The health endpoint truthfully reports external provider outages as 503.
+	// Console smoke coverage must not require public exchanges to be reachable.
+	oracle := s.do(http.MethodGet, "/api/admin/oracle", nil, admin)
+	if oracle.status == http.StatusServiceUnavailable {
+		body := oracle.json(t)
+		if body["healthy"] != false || body["error"] == "" || body["error"] == nil {
+			t.Errorf("invalid degraded oracle health: %s", oracle.body)
+		}
+	} else if oracle.status != http.StatusOK || oracle.json(t)["healthy"] != true {
+		t.Errorf("unexpected oracle health: %d %s", oracle.status, oracle.body)
 	}
 	posts := []struct {
 		path string

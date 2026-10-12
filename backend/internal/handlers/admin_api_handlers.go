@@ -264,6 +264,10 @@ func (h *Handlers) AdminListUsers(ctx *fasthttp.RequestCtx) {
 		baseBps = settings.EffectiveCashbackBps()
 	}
 	out := make([]map[string]any, 0, len(rows))
+	// net/http dial workers can outlive a completed request. Do not retain the
+	// pooled fasthttp RequestCtx (including its mutable user values) in them.
+	lookupCtx, cancelLookup := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelLookup()
 	for _, row := range rows {
 		view := adminUserView(row.User)
 		view["order_count"] = row.Agg.OrderCount
@@ -287,7 +291,7 @@ func (h *Handlers) AdminListUsers(ctx *fasthttp.RequestCtx) {
 			// Per-user: the staker base applies when the wallet is staked.
 			// The operator's admin-set StakerBaseBps overrides the pool's
 			// number so the console shows what the shop will actually pay.
-			if st := h.Store.UserStakerStake(ctx, row.ID); st.Staked {
+			if st := h.Store.UserStakerStake(lookupCtx, row.ID); st.Staked {
 				st.BaseBps = settings.EffectiveStakerCashbackBps()
 				rowBase = st.EffectiveBaseBps(baseBps)
 			}

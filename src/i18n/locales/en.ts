@@ -69,6 +69,11 @@ const en = {
   },
 
   quiz: {
+    rangeRules: "One attempt per account. Choice questions give 1 point for the correct answer. Range questions give 1 − |answer − correct value| / (max − min) points, rounded up to six decimal places. Higher totals rank first; boundary ties are decided by the admin.",
+    winnerTop: "The top {{count}} completed participants win. If fewer complete the quiz, all completed participants win.",
+    winnerAll: "Every participant who submits all answers before the deadline wins.",
+    rangeBounds: "Enter a whole number from {{min}} to {{max}}. The closest answer earns the most points.",
+    resultWinners: "Confirmed winners",
     title: "Nimiq Quiz",
     intro: "Learn about Nimiq. Compete for an admin-sponsored prize.",
     loginRequired: "Sign in to participate",

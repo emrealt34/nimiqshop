@@ -183,3 +183,60 @@ func TestQuizAdminDraftLifecycleAndScheduledCancellation(t *testing.T) {
 		t.Fatalf("manual delivery before winner=%d", res.status)
 	}
 }
+
+func TestQuizRangePublicViewsAndIndependentMultipleWinnerClaims(t *testing.T) {
+	s := bootStack(t, stackOptions{testMode: true})
+	buyer, _ := s.signIn()
+	other, _ := s.signIn()
+	admin := s.adminHeaders()
+	end := time.Now().UTC().Add(2 * time.Second)
+	draft := s.do("POST", "/api/admin/quiz", map[string]any{"title": "Range privacy", "prize": map[string]any{"title": "Manual reward"}, "winner_count": 0, "starts_at": time.Now().UTC().Add(-time.Minute), "ends_at": end, "questions": []map[string]any{{"type": "range", "prompt": "Closest number", "min": 0, "max": 1000, "correct_value": 500}}}, admin)
+	if draft.status != 200 {
+		t.Fatalf("draft: %d %s", draft.status, draft.body)
+	}
+	id := draft.json(t)["id"].(string)
+	root := "/api/quiz/" + id
+	aroot := "/api/admin/quiz/" + id
+	if r := s.do("POST", aroot+"/publish", nil, admin); r.status != 200 {
+		t.Fatal(string(r.body))
+	}
+	for _, headers := range []map[string]string{buyer, other} {
+		r := s.do("POST", root+"/start", nil, headers)
+		if r.status != 200 || strings.Contains(string(r.body), "correct_value") || strings.Contains(string(r.body), "correct_index") {
+			t.Fatalf("answer leaked: %s", r.body)
+		}
+	}
+	if r := s.do("POST", root+"/submit", map[string]any{"answers": []float64{499.5}}, buyer); r.status != 400 {
+		t.Fatal("fraction accepted", r.status)
+	}
+	if r := s.do("POST", root+"/submit", map[string]any{"answers": []int{499}}, buyer); r.status != 200 || r.json(t)["score"] != 0.999 {
+		t.Fatalf("score %s", r.body)
+	}
+	if r := s.do("POST", root+"/submit", map[string]any{"answers": []int{0}}, other); r.status != 200 {
+		t.Fatal(string(r.body))
+	}
+	time.Sleep(time.Until(end) + 20*time.Millisecond)
+	if r := s.do("POST", aroot+"/finalize", map[string]any{"winner_user_ids": []string{}, "note": "All completed attempts win"}, admin); r.status != 200 {
+		t.Fatal(string(r.body))
+	}
+	for _, headers := range []map[string]string{buyer, other} {
+		r := s.do("GET", root, nil, headers)
+		if r.status != 200 || r.json(t)["is_winner"] != true || len(r.json(t)["winners"].([]any)) != 2 {
+			t.Fatal(string(r.body))
+		}
+	}
+	_ = s.do("POST", root+"/claim", map[string]any{"email": "buyer-private@example.com"}, buyer)
+	_ = s.do("POST", root+"/claim", map[string]any{"email": "other-private@example.com"}, other)
+	entries := s.do("GET", aroot+"/entries", nil, admin).json(t)["items"].([]any)
+	firstID := entries[0].(map[string]any)["user_id"].(string)
+	if r := s.do("POST", aroot+"/delivered", map[string]any{"winner_user_id": firstID, "note": "PRIVATE DELIVERY REFERENCE"}, admin); r.status != 200 {
+		t.Fatal(string(r.body))
+	}
+	r := s.do("GET", root, nil, other)
+	if r.json(t)["award_delivered_at"] != nil || strings.Contains(string(r.body), "buyer-private@example.com") || strings.Contains(string(r.body), "PRIVATE DELIVERY REFERENCE") || strings.Contains(string(r.body), firstID) {
+		t.Fatalf("private data or foreign delivery leaked: %s", r.body)
+	}
+	if r := s.do("POST", root+"/claim", map[string]any{"email": "other-updated@example.com"}, other); r.status != 200 {
+		t.Fatal("other prize was locked", string(r.body))
+	}
+}

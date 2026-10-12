@@ -28,32 +28,8 @@ The status page allows an eight-hour freshness window (six-hour cadence plus
 scan/deploy time), and independently requires a complete scan before showing
 its success banner. Provider observation timestamps remain unchanged.
 
-## Independent Railway watchdog (prepared, activation pending)
+## Read-only Railway monitor
 
-Source: `scripts/catalog-watchdog.mjs`; tests: `scripts/test-catalog-watchdog.mjs`.
-Staged function: `catalog-watchdog`, service `4abed1e3-467c-41e0-a7c4-57dddf007a8f`,
-production environment `3120ff98-7eab-40d2-81b2-1429e981917c`.
-The function is **not deployed or scheduled yet**. It has no credential.
+The `catalog-watchdog` Railway function runs `scripts/catalog-monitor.mjs` once every six hours with cron `47 3,9,15,21 * * *` (UTC). It exits after reading the public deployed refresh report, and reads GitHub's public run status only if that report is stale, incomplete, or unavailable. There is no five-minute timer or retry loop (`restartPolicyType: NEVER`), no supplier scan, no workflow dispatch, and no GitHub token. GitHub Actions continues to own the full catalog/rate refresh.
 
-Intended service config: cron `*/5 * * * *`, restart policy `NEVER`, no public
-domain. Every check exits. It dispatches only this repository's main catalog
-workflow when six-hour successful refresh data is absent. Recent queued/running
-work is left alone. The script never calls suppliers, sends payments, or needs
-Cloudflare/deployment secrets.
-
-Activation requires a service-specific `CATALOG_GITHUB_TOKEN` secret. Prefer a
-fine-grained token limited to `emrealt34/nimiqshop`, Actions read/write and
-metadata read. **Do not embed credentials in code or commit them.** Automatic
-approval review rejected persisting the existing broad PAT in Railway because
-that exact durable access was not authorized. Leave activation pending until
-the owner explicitly approves the secret storage or provides scoped access.
-
-After activation, verify Railway's cron execution timestamp/result and logs,
-then inspect the corresponding GitHub refresh job, deployment, and `/status`.
-A successful manual refresh is not evidence that either scheduler is working.
-
-Fiat rates may have daily provider observations even though checked every six hours.
-Stock checks cover all families each scheduled run; pending stock is visible
-in the report. Failed countries/rates retain prior data and their timestamps.
-
-The staged Railway function must be updated from the current main script before activation; it remains undeployed and has no credential.
+The monitor reports `published`, `refresh_in_progress`, `stale`, `incomplete`, or `unavailable` in its runtime logs. An incomplete/failed snapshot cannot appear healthy just because a workflow ran. The prior authenticated dispatch helper remains in the repository for explicit future use; it is not the deployed function.

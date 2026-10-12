@@ -36,7 +36,7 @@ func quizPhase(c db.QuizCompetition, now time.Time) string {
 	return "live"
 }
 func quizAttemptView(a db.QuizAttempt, total int) map[string]any {
-	return map[string]any{"started_at": a.StartedAt, "answers": a.Answers, "submitted_at": a.SubmittedAt, "score": a.Score, "total": total, "prize_email": a.PrizeEmail}
+	return map[string]any{"started_at": a.StartedAt, "answers": a.Answers, "submitted_at": a.SubmittedAt, "score": float64(db.QuizPoints(a)) / 1_000_000, "total": total, "prize_email": a.PrizeEmail}
 }
 func (h *Handlers) quizView(c db.QuizCompetition, user string) (map[string]any, error) {
 	var mine any
@@ -46,12 +46,26 @@ func (h *Handlers) quizView(c db.QuizCompetition, user string) (map[string]any, 
 	} else if !errors.Is(err, db.ErrNotFound) {
 		return nil, err
 	}
+	winners := []string{}
+	for _, id := range db.QuizWinners(c) {
+		winners = append(winners, quizParticipant(id))
+	}
+	hasRanges := false
+	for _, q := range c.Questions {
+		if q.Type == "range" {
+			hasRanges = true
+		}
+	}
+	delivered := c.AwardDeliveredAt
+	if db.QuizIsWinner(c, user) {
+		delivered = db.QuizAwardTime(c, user)
+	}
 	return map[string]any{
 		"id": c.ID, "title": c.Title, "description": c.Description, "prize": c.Prize,
 		"starts_at": c.StartsAt, "ends_at": c.EndsAt, "phase": quizPhase(c, time.Now().UTC()),
 		"question_count": len(c.Questions), "participants": c.Participants, "attempt": mine,
-		"winner": quizParticipant(c.WinnerUserID), "is_winner": c.WinnerUserID != "" && c.WinnerUserID == user,
-		"decision_note": c.DecisionNote, "cancel_reason": c.CancelReason, "award_delivered_at": c.AwardDeliveredAt,
+		"winner": quizParticipant(c.WinnerUserID), "winners": winners, "winner_count": db.QuizWinnerLimit(c), "has_ranges": hasRanges, "is_winner": db.QuizIsWinner(c, user),
+		"decision_note": c.DecisionNote, "cancel_reason": c.CancelReason, "award_delivered_at": delivered,
 	}, nil
 }
 func quizError(ctx *fasthttp.RequestCtx, err error) {
@@ -116,7 +130,7 @@ func (h *Handlers) GetQuiz(ctx *fasthttp.RequestCtx) {
 		if a.SubmittedAt == nil {
 			continue
 		}
-		rows = append(rows, map[string]any{"participant": quizParticipant(a.UserID), "score": a.Score, "is_me": a.UserID == user, "is_winner": a.UserID == c.WinnerUserID})
+		rows = append(rows, map[string]any{"rank": len(rows) + 1, "participant": quizParticipant(a.UserID), "score": float64(db.QuizPoints(a)) / 1_000_000, "is_me": a.UserID == user, "is_winner": db.QuizIsWinner(c, a.UserID)})
 		if len(rows) >= 50 {
 			break
 		}
@@ -132,7 +146,7 @@ func (h *Handlers) StartQuiz(ctx *fasthttp.RequestCtx) {
 	}
 	questions := []map[string]any{}
 	for _, q := range c.Questions {
-		questions = append(questions, map[string]any{"id": q.ID, "prompt": q.Prompt, "options": q.Options})
+		questions = append(questions, map[string]any{"id": q.ID, "prompt": q.Prompt, "options": q.Options, "type": q.Type, "min": q.Min, "max": q.Max})
 	}
 	view, err := h.quizView(c, middleware.UserID(ctx))
 	if err != nil {
@@ -266,28 +280,33 @@ func (h *Handlers) AdminQuizEntries(ctx *fasthttp.RequestCtx) {
 		quizError(ctx, err)
 		return
 	}
-	best := -1
+	best := float64(-1)
 	for _, a := range entries {
-		if a.SubmittedAt != nil && a.Score > best {
-			best = a.Score
+		if a.SubmittedAt != nil && float64(db.QuizPoints(a))/1_000_000 > best {
+			best = float64(db.QuizPoints(a)) / 1_000_000
 		}
 	}
 	rows := []map[string]any{}
+	eligible, winnerSlots := db.QuizEligibility(c, entries)
 	for _, a := range entries {
-		rows = append(rows, map[string]any{"user_id": a.UserID, "address": addresses[a.UserID], "started_at": a.StartedAt, "submitted_at": a.SubmittedAt, "score": a.Score, "prize_email": a.PrizeEmail, "eligible": a.SubmittedAt != nil && a.Score == best})
+		rows = append(rows, map[string]any{"user_id": a.UserID, "address": addresses[a.UserID], "started_at": a.StartedAt, "submitted_at": a.SubmittedAt, "score": float64(db.QuizPoints(a)) / 1_000_000, "prize_email": a.PrizeEmail, "eligible": eligible[a.UserID], "is_winner": db.QuizIsWinner(c, a.UserID), "award_delivered_at": db.QuizAwardTime(c, a.UserID)})
 	}
-	writeJSON(ctx, 200, map[string]any{"competition": c, "items": rows, "best_score": best})
+	writeJSON(ctx, 200, map[string]any{"competition": c, "items": rows, "best_score": best, "winner_slots": winnerSlots})
 }
 func (h *Handlers) AdminFinalizeQuiz(ctx *fasthttp.RequestCtx) {
 	var req struct {
-		Winner string `json:"winner_user_id"`
-		Note   string `json:"note"`
+		Winner  string   `json:"winner_user_id"`
+		Winners []string `json:"winner_user_ids"`
+		Note    string   `json:"note"`
 	}
 	if readJSON(ctx, &req) != nil || len(req.Note) > 4000 {
 		writeError(ctx, 400, "invalid winner decision")
 		return
 	}
-	c, err := h.Store.FinalizeQuiz(quizID(ctx), req.Winner, req.Note, time.Now().UTC())
+	if len(req.Winners) == 0 && req.Winner != "" {
+		req.Winners = []string{req.Winner}
+	}
+	c, err := h.Store.FinalizeQuizWinners(quizID(ctx), req.Winners, req.Note, time.Now().UTC())
 	if err != nil {
 		quizError(ctx, err)
 		return
@@ -297,13 +316,20 @@ func (h *Handlers) AdminFinalizeQuiz(ctx *fasthttp.RequestCtx) {
 }
 func (h *Handlers) AdminDeliverQuizPrize(ctx *fasthttp.RequestCtx) {
 	var req struct {
-		Note string `json:"note"`
+		Note   string `json:"note"`
+		Winner string `json:"winner_user_id"`
 	}
 	if readJSON(ctx, &req) != nil || len(req.Note) > 8000 {
 		writeError(ctx, 400, "invalid private delivery note")
 		return
 	}
-	c, err := h.Store.MarkQuizPrizeDelivered(quizID(ctx), req.Note, time.Now().UTC())
+	var c db.QuizCompetition
+	var err error
+	if req.Winner != "" {
+		c, err = h.Store.MarkQuizWinnerPrizeDelivered(quizID(ctx), req.Winner, req.Note, time.Now().UTC())
+	} else {
+		c, err = h.Store.MarkQuizPrizeDelivered(quizID(ctx), req.Note, time.Now().UTC())
+	}
 	if err != nil {
 		quizError(ctx, err)
 		return

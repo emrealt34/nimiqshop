@@ -61,6 +61,11 @@ const de = {
   brand: { giftTag: 'geschenk' },
 
   quiz: {
+    rangeRules: "Ein Versuch pro Konto. Richtige Auswahlantworten geben 1 Punkt. Bereichsfragen geben 1 − |Antwort − richtiger Wert| / (Maximum − Minimum) Punkte, auf sechs Dezimalstellen aufgerundet. Höhere Summen stehen zuerst; Gleichstände an der Gewinnergrenze entscheidet der Admin.",
+    winnerTop: "Die besten {{count}} abgeschlossenen Teilnehmer gewinnen. Bei weniger Abschlüssen gewinnen alle, die abschließen.",
+    winnerAll: "Jeder gewinnt, der alle Antworten vor Ablauf der Frist absendet.",
+    rangeBounds: "Ganze Zahl von {{min}} bis {{max}} eingeben. Die nächste Antwort erhält die meisten Punkte.",
+    resultWinners: "Bestätigte Gewinner",
     title: "Nimiq-Wissensquiz",
     intro: "Lerne über Nimiq und spiele um einen vom Admin bereitgestellten Preis.",
     loginRequired: "Zum Mitmachen anmelden",

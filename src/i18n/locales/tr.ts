@@ -61,6 +61,11 @@ const tr = {
   brand: { giftTag: 'hediye' },
 
   quiz: {
+    rangeRules: "Hesap başına tek deneme. Şıklı soruda doğru cevap 1 puan getirir. Aralık sorusunda puan: 1 − |cevap − doğru değer| / (üst sınır − alt sınır); altı ondalık basamağa yukarı yuvarlanır. Toplam puanı yüksek olan öne geçer; son kazanan sırasında eşitlik varsa admin karar verir.",
+    winnerTop: "Tamamlayan ilk {{count}} kişi kazanır. Daha az kişi tamamlarsa tamamlayanların hepsi kazanır.",
+    winnerAll: "Süre bitmeden tüm soruları cevaplayıp gönderen herkes kazanır.",
+    rangeBounds: "{{min}}–{{max}} arasında bir tam sayı gir. Doğru değere en yakın cevap en çok puanı kazanır.",
+    resultWinners: "Onaylanan kazananlar",
     title: "Nimiq bilgi yarışması",
     intro: "Nimiq hakkında öğren, adminin belirlediği ödül için yarış.",
     loginRequired: "Katılmak için giriş yap",

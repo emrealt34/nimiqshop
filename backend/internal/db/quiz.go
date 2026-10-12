@@ -27,7 +27,7 @@ var (
 	ErrQuizClosed  = errors.New("quiz is not open")
 	ErrQuizLocked  = errors.New("published questions and completed attempts cannot be changed")
 	ErrQuizAnswers = errors.New("invalid or incomplete quiz answers")
-	ErrQuizWinner  = errors.New("winner must be one of the highest-scoring completed participants")
+	ErrQuizWinner  = errors.New("select the configured number of eligible completed participants; higher scores must win before boundary ties")
 )
 
 type QuizQuestion struct {
@@ -35,6 +35,15 @@ type QuizQuestion struct {
 	Prompt       string   `json:"prompt"`
 	Options      []string `json:"options"`
 	CorrectIndex int      `json:"correct_index"`
+	Type         string   `json:"type,omitempty"`
+	Min          int      `json:"min"`
+	Max          int      `json:"max"`
+	CorrectValue *int     `json:"correct_value,omitempty"`
+}
+
+type QuizAward struct {
+	DeliveredAt *time.Time `json:"delivered_at,omitempty"`
+	Note        string     `json:"note,omitempty"` // admin only
 }
 
 type QuizPrize struct {
@@ -45,22 +54,25 @@ type QuizPrize struct {
 }
 
 type QuizCompetition struct {
-	ID               string         `json:"id"`
-	Title            string         `json:"title"`
-	Description      string         `json:"description"`
-	Prize            QuizPrize      `json:"prize"`
-	StartsAt         time.Time      `json:"starts_at"`
-	EndsAt           time.Time      `json:"ends_at"`
-	Status           string         `json:"status"`
-	Questions        []QuizQuestion `json:"questions"`
-	Participants     int            `json:"participants"`
-	WinnerUserID     string         `json:"winner_user_id,omitempty"`
-	DecisionNote     string         `json:"decision_note,omitempty"`
-	CancelReason     string         `json:"cancel_reason,omitempty"`
-	AwardNote        string         `json:"award_note,omitempty"` // PRIVATE: never in customer responses
-	AwardDeliveredAt *time.Time     `json:"award_delivered_at,omitempty"`
-	CreatedAt        time.Time      `json:"created_at"`
-	UpdatedAt        time.Time      `json:"updated_at"`
+	ID               string               `json:"id"`
+	Title            string               `json:"title"`
+	Description      string               `json:"description"`
+	Prize            QuizPrize            `json:"prize"`
+	StartsAt         time.Time            `json:"starts_at"`
+	EndsAt           time.Time            `json:"ends_at"`
+	Status           string               `json:"status"`
+	Questions        []QuizQuestion       `json:"questions"`
+	Participants     int                  `json:"participants"`
+	WinnerUserID     string               `json:"winner_user_id,omitempty"`
+	WinnerCount      *int                 `json:"winner_count,omitempty"` // nil = legacy single winner; zero = all completed entries
+	WinnerUserIDs    []string             `json:"winner_user_ids,omitempty"`
+	Awards           map[string]QuizAward `json:"awards,omitempty"` // private delivery records
+	DecisionNote     string               `json:"decision_note,omitempty"`
+	CancelReason     string               `json:"cancel_reason,omitempty"`
+	AwardNote        string               `json:"award_note,omitempty"` // PRIVATE: never in customer responses
+	AwardDeliveredAt *time.Time           `json:"award_delivered_at,omitempty"`
+	CreatedAt        time.Time            `json:"created_at"`
+	UpdatedAt        time.Time            `json:"updated_at"`
 }
 
 type QuizAttempt struct {
@@ -70,6 +82,7 @@ type QuizAttempt struct {
 	Answers       []int      `json:"answers"`
 	SubmittedAt   *time.Time `json:"submitted_at,omitempty"`
 	Score         int        `json:"score"`
+	Points        int64      `json:"points,omitempty"`      // millionths of a point, avoiding floating-point tie decisions
 	PrizeEmail    string     `json:"prize_email,omitempty"` // owner + admin only
 }
 
@@ -106,12 +119,24 @@ func validateQuiz(c QuizCompetition) error {
 	if len(c.Questions) > 50 {
 		return fmt.Errorf("a quiz can contain at most 50 questions")
 	}
+	if c.WinnerCount != nil && (*c.WinnerCount < 0 || *c.WinnerCount > quizMaxParticipants) {
+		return fmt.Errorf("winner_count must be 0 (everyone) or 1–10000")
+	}
 	ids := map[string]bool{}
 	for _, q := range c.Questions {
-		if q.ID == "" || ids[q.ID] || !validQuizText(q.Prompt, 1, 1000) || len(q.Options) < 2 || len(q.Options) > 6 || q.CorrectIndex < 0 || q.CorrectIndex >= len(q.Options) {
-			return fmt.Errorf("each question needs a unique ID, 2–6 options and a correct answer")
+		if q.ID == "" || ids[q.ID] || !validQuizText(q.Prompt, 1, 1000) {
+			return fmt.Errorf("each question needs a unique ID and question text")
 		}
 		ids[q.ID] = true
+		if q.Type == "range" {
+			if q.Min < 0 || q.Max > 1_000_000_000 || q.Max <= q.Min || q.CorrectValue == nil || *q.CorrectValue < q.Min || *q.CorrectValue > q.Max || len(q.Options) != 0 {
+				return fmt.Errorf("range questions need integer bounds 0–1000000000, max > min and a correct_value within the range; no options")
+			}
+			continue
+		}
+		if (q.Type != "" && q.Type != "choice") || q.CorrectValue != nil || len(q.Options) < 2 || len(q.Options) > 6 || q.CorrectIndex < 0 || q.CorrectIndex >= len(q.Options) {
+			return fmt.Errorf("each question needs a unique ID, 2–6 options and a correct answer")
+		}
 		seen := map[string]bool{}
 		for _, option := range q.Options {
 			key := strings.ToLower(strings.TrimSpace(option))
@@ -134,6 +159,9 @@ func (s *Store) PutQuizCompetition(input QuizCompetition, create bool, now time.
 		return QuizCompetition{}, fmt.Errorf("invalid quiz ID")
 	}
 	for i := range input.Questions {
+		if input.Questions[i].Type == "range" && input.Questions[i].Options == nil {
+			input.Questions[i].Options = []string{}
+		}
 		if input.Questions[i].ID == "" {
 			input.Questions[i].ID = uuid.NewString()
 		}
@@ -172,7 +200,7 @@ func (s *Store) PutQuizCompetition(input QuizCompetition, create bool, now time.
 		if create {
 			created = now.UTC()
 		}
-		result = QuizCompetition{ID: input.ID, Title: input.Title, Description: input.Description, Prize: input.Prize, StartsAt: input.StartsAt, EndsAt: input.EndsAt, Status: "draft", Questions: input.Questions, CreatedAt: created, UpdatedAt: now.UTC()}
+		result = QuizCompetition{ID: input.ID, Title: input.Title, Description: input.Description, Prize: input.Prize, StartsAt: input.StartsAt, EndsAt: input.EndsAt, Status: "draft", Questions: input.Questions, WinnerCount: input.WinnerCount, CreatedAt: created, UpdatedAt: now.UTC()}
 		if err := putQuizJSON(txn, quizKey(result.ID), result); err != nil {
 			return err
 		}
@@ -326,6 +354,13 @@ func (s *Store) SaveQuizAnswers(id, user string, answers []int, submit bool, now
 			return ErrQuizAnswers
 		}
 		for i, answer := range answers {
+			q := c.Questions[i]
+			if q.Type == "range" {
+				if answer != -1 && (answer < q.Min || answer > q.Max) || (submit && answer == -1) {
+					return ErrQuizAnswers
+				}
+				continue
+			}
 			if answer < -1 || answer >= len(c.Questions[i].Options) || (submit && answer == -1) {
 				return ErrQuizAnswers
 			}
@@ -335,9 +370,23 @@ func (s *Store) SaveQuizAnswers(id, user string, answers []int, submit bool, now
 			at := now.UTC()
 			a.SubmittedAt = &at
 			a.Score = 0
+			a.Points = 0
 			for i, answer := range a.Answers {
+				q := c.Questions[i]
+				if q.Type == "range" {
+					distance := int64(answer) - int64(*q.CorrectValue)
+					if distance < 0 {
+						distance = -distance
+					}
+					a.Points += 1_000_000 - distance*1_000_000/int64(q.Max-q.Min)
+					if distance == 0 {
+						a.Score++
+					}
+					continue
+				}
 				if answer == c.Questions[i].CorrectIndex {
 					a.Score++
+					a.Points += 1_000_000
 				}
 			}
 		}
@@ -367,8 +416,8 @@ func quizEntries(txn *badger.Txn, id string) ([]QuizAttempt, error) {
 		if (a.SubmittedAt != nil) != (b.SubmittedAt != nil) {
 			return a.SubmittedAt != nil
 		}
-		if a.Score != b.Score {
-			return a.Score > b.Score
+		if QuizPoints(a) != QuizPoints(b) {
+			return QuizPoints(a) > QuizPoints(b)
 		}
 		return a.UserID < b.UserID // display order only, NEVER a tiebreaker
 	})
@@ -379,7 +428,82 @@ func (s *Store) ListQuizEntries(id string) ([]QuizAttempt, error) {
 	err := s.View(func(txn *badger.Txn) error { var err error; out, err = quizEntries(txn, id); return err })
 	return out, err
 }
+
+// QuizPoints also reads legacy multiple-choice attempts without stored points.
+func QuizPoints(a QuizAttempt) int64 {
+	if a.Points == 0 && a.Score > 0 {
+		return int64(a.Score) * 1_000_000
+	}
+	return a.Points
+}
+func QuizWinnerLimit(c QuizCompetition) int {
+	if c.WinnerCount == nil {
+		return 1
+	}
+	return *c.WinnerCount
+}
+func QuizWinners(c QuizCompetition) []string {
+	if len(c.WinnerUserIDs) > 0 {
+		return c.WinnerUserIDs
+	}
+	if c.WinnerUserID != "" {
+		return []string{c.WinnerUserID}
+	}
+	return nil
+}
+func QuizIsWinner(c QuizCompetition, user string) bool {
+	if user == "" {
+		return false
+	}
+	for _, id := range QuizWinners(c) {
+		if id == user {
+			return true
+		}
+	}
+	return false
+}
+func QuizAwardTime(c QuizCompetition, user string) *time.Time {
+	if award, ok := c.Awards[user]; ok {
+		return award.DeliveredAt
+	}
+	if len(c.WinnerUserIDs) == 0 {
+		return c.AwardDeliveredAt
+	}
+	return nil
+}
+
+// All entries above the cutoff must win; a boundary tie is decided by the admin.
+func QuizEligibility(c QuizCompetition, entries []QuizAttempt) (map[string]bool, int) {
+	completed := []QuizAttempt{}
+	for _, a := range entries {
+		if a.SubmittedAt != nil {
+			completed = append(completed, a)
+		}
+	}
+	n := QuizWinnerLimit(c)
+	if n == 0 || n > len(completed) {
+		n = len(completed)
+	}
+	eligible := map[string]bool{}
+	if n == 0 {
+		return eligible, 0
+	}
+	cutoff := QuizPoints(completed[n-1])
+	for _, a := range completed {
+		if QuizPoints(a) >= cutoff {
+			eligible[a.UserID] = true
+		}
+	}
+	return eligible, n
+}
 func (s *Store) FinalizeQuiz(id, winner, note string, now time.Time) (QuizCompetition, error) {
+	ids := []string{}
+	if winner != "" {
+		ids = append(ids, winner)
+	}
+	return s.FinalizeQuizWinners(id, ids, note, now)
+}
+func (s *Store) FinalizeQuizWinners(id string, winners []string, note string, now time.Time) (QuizCompetition, error) {
 	var c QuizCompetition
 	if !validQuizText(note, 0, 1000) {
 		return c, fmt.Errorf("decision note is too long")
@@ -395,24 +519,52 @@ func (s *Store) FinalizeQuiz(id, winner, note string, now time.Time) (QuizCompet
 		if err != nil {
 			return err
 		}
-		best := -1
-		eligible := false
-		for _, a := range entries {
-			if a.SubmittedAt == nil {
-				continue
-			}
-			if a.Score > best {
-				best = a.Score
-			}
-			if a.UserID == winner && a.Score == best {
-				eligible = true
+		eligible, count := QuizEligibility(c, entries)
+		if QuizWinnerLimit(c) == 0 {
+			winners = nil
+			for _, a := range entries {
+				if a.SubmittedAt != nil {
+					winners = append(winners, a.UserID)
+				}
 			}
 		}
-		if (best >= 0 && !eligible) || (best < 0 && winner != "") {
+		if len(winners) != count {
 			return ErrQuizWinner
 		}
+		selected := map[string]bool{}
+		for _, id := range winners {
+			if !eligible[id] || selected[id] {
+				return ErrQuizWinner
+			}
+			selected[id] = true
+		}
+		if count > 0 {
+			completed := []QuizAttempt{}
+			for _, a := range entries {
+				if a.SubmittedAt != nil {
+					completed = append(completed, a)
+				}
+			}
+			cutoff := QuizPoints(completed[count-1])
+			for _, a := range completed {
+				if QuizPoints(a) > cutoff && !selected[a.UserID] {
+					return ErrQuizWinner
+				}
+			}
+		}
+		// Store winners in score order, independent of the admin's selection order.
+		ordered := []string{}
+		for _, a := range entries {
+			if selected[a.UserID] {
+				ordered = append(ordered, a.UserID)
+			}
+		}
 		c.Status = "finalized"
-		c.WinnerUserID = winner
+		c.WinnerUserIDs = ordered
+		c.WinnerUserID = ""
+		if len(ordered) > 0 {
+			c.WinnerUserID = ordered[0]
+		}
 		c.DecisionNote = strings.TrimSpace(note)
 		c.UpdatedAt = now.UTC()
 		return putQuizJSON(txn, quizKey(id), c)
@@ -426,7 +578,7 @@ func (s *Store) ClaimQuizPrize(id, user, email string, now time.Time) (QuizAttem
 		if err := getJSON(txn, quizKey(id), &c); err != nil {
 			return err
 		}
-		if c.Status != "finalized" || c.WinnerUserID != user || c.AwardDeliveredAt != nil {
+		if c.Status != "finalized" || !QuizIsWinner(c, user) || QuizAwardTime(c, user) != nil {
 			return ErrQuizWinner
 		}
 		if err := getJSON(txn, quizAttemptKey(id, user), &a); err != nil {
@@ -438,6 +590,16 @@ func (s *Store) ClaimQuizPrize(id, user, email string, now time.Time) (QuizAttem
 	return a, err
 }
 func (s *Store) MarkQuizPrizeDelivered(id, note string, now time.Time) (QuizCompetition, error) {
+	c, err := s.GetQuizCompetition(id)
+	if err != nil {
+		return c, err
+	}
+	if len(QuizWinners(c)) != 1 {
+		return c, ErrQuizWinner
+	}
+	return s.MarkQuizWinnerPrizeDelivered(id, QuizWinners(c)[0], note, now)
+}
+func (s *Store) MarkQuizWinnerPrizeDelivered(id, user, note string, now time.Time) (QuizCompetition, error) {
 	var c QuizCompetition
 	if !validQuizText(note, 0, 2000) {
 		return c, fmt.Errorf("delivery note is too long")
@@ -446,15 +608,29 @@ func (s *Store) MarkQuizPrizeDelivered(id, note string, now time.Time) (QuizComp
 		if err := getJSON(txn, quizKey(id), &c); err != nil {
 			return err
 		}
-		if c.Status != "finalized" || c.WinnerUserID == "" {
+		if c.Status != "finalized" || !QuizIsWinner(c, user) {
 			return ErrQuizWinner
 		}
-		if c.AwardDeliveredAt != nil {
+		if QuizAwardTime(c, user) != nil {
 			return nil
 		}
 		at := now.UTC()
-		c.AwardDeliveredAt = &at
-		c.AwardNote = strings.TrimSpace(note)
+		if c.Awards == nil {
+			c.Awards = map[string]QuizAward{}
+		}
+		c.Awards[user] = QuizAward{DeliveredAt: &at, Note: strings.TrimSpace(note)}
+		allDelivered := true
+		for _, id := range QuizWinners(c) {
+			if QuizAwardTime(c, id) == nil {
+				allDelivered = false
+			}
+		}
+		if allDelivered {
+			c.AwardDeliveredAt = &at
+		}
+		if len(QuizWinners(c)) == 1 {
+			c.AwardNote = strings.TrimSpace(note)
+		}
 		c.UpdatedAt = at
 		return putQuizJSON(txn, quizKey(id), c)
 	})

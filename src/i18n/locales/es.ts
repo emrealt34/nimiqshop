@@ -61,6 +61,11 @@ const es = {
   brand: { giftTag: 'regalo' },
 
   quiz: {
+    rangeRules: "Un intento por cuenta. Una respuesta de opción correcta da 1 punto. Las preguntas de rango dan 1 − |respuesta − valor correcto| / (máximo − mínimo), redondeado hacia arriba a seis decimales. Los totales más altos van primero; el administrador decide los empates en el límite de ganadores.",
+    winnerTop: "Ganan los {{count}} mejores participantes que completen el quiz. Si lo completan menos personas, todas ganan.",
+    winnerAll: "Gana quien envíe todas las respuestas antes del plazo.",
+    rangeBounds: "Introduce un entero entre {{min}} y {{max}}. La respuesta más cercana obtiene más puntos.",
+    resultWinners: "Ganadores confirmados",
     title: "Concurso Nimiq",
     intro: "Aprende sobre Nimiq y compite por un premio ofrecido por el administrador.",
     loginRequired: "Inicia sesión para participar",
