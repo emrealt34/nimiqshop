@@ -64,8 +64,16 @@ func (h *Handlers) CashbackMe(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
+	prizes, err := h.Store.ListQuizPayoutsByUser(userID)
+	if err != nil {
+		writeError(ctx, fasthttp.StatusInternalServerError, "could not load prize payments")
+		return
+	}
+	rows = append(rows, prizes...)
+
 	type cashbackRow struct {
 		ID                  string     `json:"id"`
+		Memo                string     `json:"memo,omitempty"`
 		QuoteID             string     `json:"quote_id"`
 		ProductID           string     `json:"product_id"`
 		AmountNIM           float64    `json:"amount_nim"`
@@ -104,6 +112,7 @@ func (h *Handlers) CashbackMe(ctx *fasthttp.RequestCtx) {
 		}
 		out = append(out, cashbackRow{
 			ID:                  cb.ID,
+			Memo:                cb.Memo,
 			QuoteID:             cb.QuoteID,
 			ProductID:           cb.ProductID,
 			AmountNIM:           float64(cb.AmountLuna) / lunaPerNIM,

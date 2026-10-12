@@ -1,3 +1,4 @@
+export type QuizPayoutConfig = { enabled: boolean; source: "cashback_wallet"; pool_nim: number; per_winner_nim: number };
 export type QuizText = { title: string; description: string };
 export type QuizTranslations = Partial<Record<"en" | "tr" | "de" | "fr" | "es" | "pt", QuizText>>;
 import { api } from './api';
@@ -7,6 +8,7 @@ export type QuizQuestion = { translations?: Partial<Record<"en" | "tr" | "de" | 
 export type AdminQuizQuestion = QuizQuestion & { correct_index: number; correct_value?: number };
 export type QuizAttempt = { answers: number[]; score: number; total: number; started_at: string; submitted_at: string | null; prize_email?: string };
 export type QuizCompetition = {
+ payout?: QuizPayoutConfig; payouts?: {participant:string;status:string;amount_nim:number;memo:string;tx_hash:string;paid_at?:string}[];
  tie_break?: "submitted_at" | "";
  translations?: QuizTranslations;
   id: string; title: string; description: string; prize: QuizPrize; starts_at: string; ends_at: string;
@@ -17,6 +19,7 @@ export type QuizCompetition = {
   leaderboard?: { submitted_at?: string; rank?: number; participant: string; score: number; is_me: boolean; is_winner: boolean }[];
 };
 export type AdminQuiz = {
+ payout?: QuizPayoutConfig;
  tie_break?: "submitted_at" | "";
  translations?: QuizTranslations;
   id?: string; title: string; description: string; prize: QuizPrize; starts_at: string; ends_at: string;
@@ -24,6 +27,7 @@ export type AdminQuiz = {
   participants?: number; winner_user_id?: string; decision_note?: string; award_delivered_at?: string; award_note?: string;
   winner_count?: number; winner_user_ids?: string[]; awards?: Record<string, { delivered_at?: string; note?: string }>;
 };
+export type AdminQuizPayment = {id:string;user_id:string;recipient:string;amount_nim:number;memo:string;status:string;tx_hash:string;paid_at?:string;last_error?:string;expired_attempts?:number};
 export type AdminQuizEntry = { user_id: string; address: string; submitted_at?: string; score: number; prize_email: string; eligible: boolean; is_winner?: boolean; award_delivered_at?: string };
 
 export const listQuizzes = async (): Promise<QuizCompetition[]> => (await api('/quiz', { auth: true })).items || [];
@@ -39,7 +43,7 @@ export const adminUpdateQuiz = async (id: string, draft: AdminQuiz): Promise<Adm
 export const adminDeleteQuiz = (id: string) => api(`/admin/quiz/${encodeURIComponent(id)}`, { method: 'DELETE' });
 export const adminPublishQuiz = (id: string) => api(`/admin/quiz/${encodeURIComponent(id)}/publish`, { method: 'POST' });
 export const adminCancelQuiz = (id: string, reason: string) => api(`/admin/quiz/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: { reason } });
-export const adminQuizEntries = async (id: string): Promise<{ competition: AdminQuiz; items: AdminQuizEntry[]; best_score: number; winner_slots: number }> => await api(`/admin/quiz/${encodeURIComponent(id)}/entries`) as { competition: AdminQuiz; items: AdminQuizEntry[]; best_score: number; winner_slots: number };
+export const adminQuizEntries = async (id: string): Promise<{ competition: AdminQuiz; items: AdminQuizEntry[]; best_score: number; winner_slots: number; payouts?: AdminQuizPayment[] }> => await api(`/admin/quiz/${encodeURIComponent(id)}/entries`) as { competition: AdminQuiz; items: AdminQuizEntry[]; best_score: number; winner_slots: number; payouts?: AdminQuizPayment[] };
 export const adminFinalizeQuiz = (id: string, winners: string[], note: string) => api(`/admin/quiz/${encodeURIComponent(id)}/finalize`, { method: 'POST', body: { winner_user_ids: winners, note } });
 export const adminDeliverQuizPrize = (id: string, note: string, winnerUserId?: string) => api(`/admin/quiz/${encodeURIComponent(id)}/delivered`, { method: 'POST', body: { note, winner_user_id: winnerUserId } });
 
@@ -70,6 +74,10 @@ export function parseQuizImport(text: string): AdminQuiz {
   const winnerCount = raw.winner_count ?? 1;
   if (!Number.isInteger(winnerCount) || winnerCount < 0 || winnerCount > 10000) throw new Error('winner_count: use 1, 3, 5, or 0 for everyone (maximum 10000).');
   if (!Array.isArray(raw.questions) || raw.questions.length < 1 || raw.questions.length > 50) throw new Error('Include 1–50 questions.');
+  const payoutRaw=raw.payout;
+  if(payoutRaw!==undefined && (!payoutRaw || typeof payoutRaw !== 'object' || Array.isArray(payoutRaw))) throw new Error('payout must be an object.');
+  const payout:QuizPayoutConfig={enabled:payoutRaw?.enabled ?? false,source:payoutRaw?.source ?? 'cashback_wallet',pool_nim:payoutRaw?.pool_nim ?? 0,per_winner_nim:payoutRaw?.per_winner_nim ?? 0};
+  if(typeof payout.enabled!=='boolean' || payout.source!=='cashback_wallet' || !Number.isSafeInteger(payout.pool_nim) || !Number.isSafeInteger(payout.per_winner_nim) || (payout.enabled && (winnerCount<1 || winnerCount>100 || tieBreak!=='submitted_at' || payout.pool_nim<1 || payout.pool_nim>10000000 || payout.per_winner_nim<1 || payout.per_winner_nim*winnerCount>payout.pool_nim))) throw new Error('Automatic payout requires cashback_wallet, submitted_at, positive whole NIM amounts and a sufficient total pool.');
   const questions = raw.questions.map((q: any, index: number): AdminQuizQuestion => {
     if (!q || typeof q !== 'object' || Array.isArray(q)) throw new Error(`Question ${index + 1} must be an object.`);
     const translated = translations(q.translations, text => {
@@ -104,7 +112,7 @@ export function parseQuizImport(text: string): AdminQuiz {
   if (!prize || typeof prize !== 'object' || Array.isArray(prize)) throw new Error('Include a prize object.');
   const image = field(prize.image_url, 'Prize image', 2048);
   if (image) { let url: URL; try { url = new URL(image); } catch { throw new Error('Prize image must be an HTTPS URL.'); } if (url.protocol !== 'https:' || url.username || url.password) throw new Error('Prize image must be an HTTPS URL without credentials.'); }
-  return { tie_break: tieBreak, translations: textTranslations(raw.translations, 120, 2000), title: field(raw.title, 'Title', 120, true), description: field(raw.description, 'Description', 2000), winner_count: winnerCount, starts_at: start, ends_at: end, status: 'draft', questions,
+  return { payout, tie_break: tieBreak, translations: textTranslations(raw.translations, 120, 2000), title: field(raw.title, 'Title', 120, true), description: field(raw.description, 'Description', 2000), winner_count: winnerCount, starts_at: start, ends_at: end, status: 'draft', questions,
     prize: { translations: textTranslations(prize.translations, 140, 1000), title: field(prize.title, 'Prize title', 140, true), value: field(prize.value, 'Prize value', 40), description: field(prize.description, 'Prize description', 1000), image_url: image } };
 }
 

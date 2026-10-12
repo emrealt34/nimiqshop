@@ -6,13 +6,14 @@ import { Icon } from '../ui/Icon';
 import { UnifiedThumb } from '../ui/UnifiedThumb';
 import { useSession } from '../../lib/useSession';
 import { friendlyApiMessage } from '../../lib/api';
+import { explorerUrl, shortTx } from '../../lib/chain';
 import { queryParam } from '../../lib/format';
 import { useT } from '../../i18n';
 import { listQuizzes, getQuiz, startQuiz, saveQuizProgress, submitQuiz, claimQuizPrize, quizScoreLabel, localizeQuiz, localizeQuizQuestion, type QuizCompetition, type QuizQuestion, type QuizPrize } from '../../lib/quiz';
 
 const PHASE_KEYS = { scheduled: 'quiz.scheduled', live: 'quiz.live', ended: 'quiz.ended', finalized: 'quiz.finalized', cancelled: 'quiz.cancelled' };
 
-export function QuizPrizeCard({ prize }: { prize: QuizPrize }) {
+export function QuizPrizeCard({ prize, automatic = false }: { prize: QuizPrize; automatic?: boolean }) {
   const { t } = useT();
   return <div className="quiz-prize">
     <div className="quiz-prize-thumb"><UnifiedThumb src={prize.image_url || ''} alt={prize.title} bg="#FFFFFF" /></div>
@@ -21,7 +22,7 @@ export function QuizPrizeCard({ prize }: { prize: QuizPrize }) {
       <h2>{prize.title}</h2>
       {prize.value && <span className="chip quiz-prize-value">{prize.value}</span>}
       {prize.description && <p className="small">{prize.description}</p>}
-      <p className="xs muted">{t('quiz.manualPrize')}</p>
+      <p className="xs muted">{t(automatic ? 'quiz.autoPrize' : 'quiz.manualPrize')}</p>
     </div>
   </div>;
 }
@@ -143,7 +144,7 @@ export function QuizView() {
     </div>
   </div>;
 
-  const date = (value: string) => new Date(value).toLocaleString(lang);
+  const date = (value: string) => new Date(value).toLocaleString(lang,{timeZone:'Europe/Istanbul'});
   const completed = !!competition?.attempt?.submitted_at;
   const canPlay = competition?.phase === 'live' && !completed;
   const validAnswer = (q: QuizQuestion, answer: number) => Number.isInteger(answer) && (q.type === 'range' ? answer >= (q.min ?? 0) && answer <= (q.max ?? 0) : answer >= 0 && answer < q.options.length);
@@ -160,8 +161,8 @@ export function QuizView() {
       {!questions && <section className="card quiz-contest">
         <div className="row between"><h2>{competition.title}</h2><span className={`chip quiz-phase-${competition.phase}`}>{t(PHASE_KEYS[competition.phase])}</span></div>
         {competition.description && <p className="small">{competition.description}</p>}
-        <QuizPrizeCard prize={competition.prize} />
-        <dl className="quiz-facts"><div><dt>{t('quiz.starts')}</dt><dd>{date(competition.starts_at)}</dd></div><div><dt>{t('quiz.ends')}</dt><dd>{date(competition.ends_at)}</dd></div><div><dt>{t('quiz.questions')}</dt><dd>{competition.question_count}</dd></div><div><dt>{t('quiz.participants')}</dt><dd>{competition.participants}</dd></div></dl>
+        <QuizPrizeCard prize={competition.prize} automatic={competition.payout?.enabled} />
+        <dl className="quiz-facts"><div><dt>{t('quiz.starts')}</dt><dd>{date(competition.starts_at)}</dd></div><div><dt>{t('quiz.ends')}</dt><dd>{date(competition.ends_at)}</dd></div><div><dt>{t('quiz.questions')}</dt><dd>{competition.question_count}</dd></div><div><dt>{t('quiz.participants')}</dt><dd>{competition.participants}</dd></div></dl><p className="xs muted">{t('quiz.timezone')}</p>
         <p className="small quiz-rules">{t(competition.has_ranges ? (competition.tie_break === 'submitted_at' ? 'quiz.rangeRulesTimed' : 'quiz.rangeRules') : (competition.tie_break === 'submitted_at' ? 'quiz.rulesTimed' : 'quiz.rules'))}</p>
         <p className="small">{competition.winner_count === 0 ? t('quiz.winnerAll') : t('quiz.winnerTop', { count: competition.winner_count ?? 1 })}</p>
         {competition.cancel_reason && <div className="alert warn">{competition.cancel_reason}</div>}
@@ -171,9 +172,10 @@ export function QuizView() {
         {competition.phase === 'finalized' && <div className="quiz-winner">
           <h3>{competition.is_winner ? t('quiz.youWon') : winnerNames.length ? t('quiz.resultWinners') : t('quiz.noWinner')}</h3>
           {winnerNames.length > 0 && <ul>{winnerNames.map((participant) => <li key={participant}>{t('quiz.player', { participant })}</li>)}</ul>}
+          {competition.payout?.enabled && <div className="quiz-payout-list"><p className="small">{t('quiz.autoPrize')}</p>{competition.payouts?.map(payment=><div className="quiz-entry" key={payment.participant}><span>{t('quiz.player',{participant:payment.participant})} · {payment.amount_nim.toLocaleString(lang)} NIM{payment.memo && <small className="block muted" style={{overflowWrap:'anywhere'}}>Memo: {payment.memo}</small>}</span><span>{t(payment.status==='paid'?'quiz.payoutPaid':payment.status==='broadcast'?'quiz.payoutBroadcast':'quiz.payoutPending')}{payment.tx_hash && explorerUrl(payment.tx_hash) && <a className="small" href={explorerUrl(payment.tx_hash)!} target="_blank" rel="noopener noreferrer"> {shortTx(payment.tx_hash)}</a>}</span></div>)}</div>}
           {competition.decision_note && <p className="small">{competition.decision_note}</p>}
-          {competition.winner && <p className="small">{competition.award_delivered_at ? t('quiz.delivered') : t('quiz.prizePending')}</p>}
-          {competition.is_winner && !competition.award_delivered_at && <form onSubmit={(e) => { e.preventDefault(); void perform(async () => { await claimQuizPrize(selected, email.trim()); await refresh(); toast(t('quiz.emailSaved'), 'success'); }); }}>
+          {competition.winner && !competition.payout?.enabled && <p className="small">{competition.award_delivered_at ? t('quiz.delivered') : t('quiz.prizePending')}</p>}
+          {competition.is_winner && !competition.payout?.enabled && !competition.award_delivered_at && <form onSubmit={(e) => { e.preventDefault(); void perform(async () => { await claimQuizPrize(selected, email.trim()); await refresh(); toast(t('quiz.emailSaved'), 'success'); }); }}>
             <div className="field"><label htmlFor="quiz-prize-email">{t('quiz.prizeEmail')}</label><input id="quiz-prize-email" className="input" type="email" required maxLength={254} value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" /></div>
             <p className="xs muted">{t('quiz.emailPrivate')}</p><button className="btn btn-outline" disabled={busy}>{t('quiz.saveEmail')}</button>
           </form>}

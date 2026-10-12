@@ -3,7 +3,7 @@ package worker
 import (
 	"context"
 	"log"
-	"strings"
+	"sync"
 	"time"
 
 	"nimiqshop/internal/db"
@@ -20,10 +20,21 @@ import (
 //  2. The signed tx hex is persisted BEFORE the first broadcast. A crash
 //     after sign, before or after send, always resumes the SAME bytes.
 //  3. Paid is set only when every configured RPC reports the tx confirmed.
-//  4. One row per quote (quote-id index) + one signed hex per row ⇒ a
-//     second payment is structurally impossible.
+//  4. One obligation per quote/winner. Replacement signatures require a
+//     persisted finalized expiry proof; ambiguous outcomes remain pending.
+type PayoutStore interface {
+	ListCashbacksByStatus(string, int) ([]db.Cashback, error)
+	ClaimCashbackSend(string) (db.Cashback, error)
+	AttachCashbackSignedTx(string, string, string, uint32) error
+	MarkCashbackBroadcast(string, string) error
+	MarkCashbackPaid(string, string) error
+	FailCashbackSend(string, string) error
+	RetireExpiredPayout(string, string, nimiq.PayoutExpiryProof) error
+}
+
 type Worker struct {
-	Store     *db.Store
+	tickMu    sync.Mutex
+	Store     PayoutStore
 	RPC       *nimiq.Client
 	SeedHex   string
 	NetworkID byte
@@ -128,6 +139,8 @@ func (w *Worker) logBalance(addr string) {
 }
 
 func (w *Worker) tick(ctx context.Context) {
+	w.tickMu.Lock()
+	defer w.tickMu.Unlock()
 	if ctx.Err() != nil {
 		return
 	}
@@ -179,12 +192,17 @@ func (w *Worker) confirm(ctx context.Context, cb db.Cashback) {
 	defer cancel()
 	found, confirmed, err := w.RPC.GetTransactionByHash(cctx, cb.TxHash)
 	if err != nil {
+		_ = w.Store.FailCashbackSend(cb.ID, "confirmation unavailable: "+err.Error())
 		return // RPC disagreement / outage: stay broadcast, retry next tick
 	}
 	if confirmed {
 		if err := w.Store.MarkCashbackPaid(cb.ID, cb.TxHash); err == nil {
 			log.Printf("cashback: paid quote %s tx=%s luna=%d dest=%s", cb.QuoteID, cb.TxHash, cb.AmountLuna, cb.CashbackDestination)
 		}
+		return
+	}
+	if found {
+		w.rebroadcast(ctx, cb)
 		return
 	}
 	if !found {
@@ -235,6 +253,20 @@ func (w *Worker) sendOne(ctx context.Context, cb db.Cashback) {
 
 	txHex := claimed.SignedTxHex
 	if txHex == "" {
+		address, err := nimiq.AddressFromKeyHex(w.SeedHex)
+		if err != nil {
+			_ = w.Store.FailCashbackSend(claimed.ID, "wallet: "+err.Error())
+			return
+		}
+		balance, err := w.RPC.GetAccountBalance(cctx, address)
+		if err != nil {
+			_ = w.Store.FailCashbackSend(claimed.ID, "balance unavailable: "+err.Error())
+			return
+		}
+		if balance < claimed.AmountLuna || balance-claimed.AmountLuna < w.FeeLuna {
+			_ = w.Store.FailCashbackSend(claimed.ID, "insufficient wallet balance; waiting for funding")
+			return
+		}
 		height, err := w.RPC.GetBlockNumber(cctx)
 		if err != nil {
 			_ = w.Store.FailCashbackSend(claimed.ID, "block height: "+err.Error())
@@ -250,13 +282,18 @@ func (w *Worker) sendOne(ctx context.Context, cb db.Cashback) {
 		// write. A crash after broadcast but before we learn the node's reply
 		// can then confirm the payout by this deterministic hash instead of
 		// re-sending blind — no loss, no double-send, record self-heals.
-		if err := w.Store.AttachCashbackSignedTx(claimed.ID, txHex, txHash, uint32(height)); err != nil {
+		_, start, _, parseErr := nimiq.SignedTxInfo(txHex)
+		if parseErr != nil {
+			_ = w.Store.FailCashbackSend(claimed.ID, "signed transaction validation failed")
+			return
+		}
+		if err := w.Store.AttachCashbackSignedTx(claimed.ID, txHex, txHash, start); err != nil {
 			log.Printf("cashback: persist signed tx failed quote %s: %v", claimed.QuoteID, err)
 			return
 		}
 		claimed.SignedTxHex = txHex
 		claimed.TxHash = txHash
-		claimed.ValidityStart = uint32(height)
+		claimed.ValidityStart = start
 	}
 
 	w.rebroadcast(cctx, claimed)
@@ -268,6 +305,40 @@ func (w *Worker) rebroadcast(ctx context.Context, cb db.Cashback) {
 	}
 	cctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
+	// Reconcile the canonical hash before any retry. An accepted transaction
+	// whose RPC reply was lost must be confirmed, not replaced.
+	canonical, _, network, parseErr := nimiq.SignedTxInfo(cb.SignedTxHex)
+	if parseErr != nil || network != w.NetworkID || (cb.TxHash != "" && cb.TxHash != canonical) {
+		_ = w.Store.FailCashbackSend(cb.ID, "signed transaction identity/network requires operator review")
+		return
+	}
+	found, confirmed, lookupErr := w.RPC.GetTransactionByHash(cctx, canonical)
+	if lookupErr != nil {
+		_ = w.Store.FailCashbackSend(cb.ID, "transaction lookup unavailable: "+lookupErr.Error())
+		return
+	}
+	if found {
+		if err := w.Store.MarkCashbackBroadcast(cb.ID, canonical); err == nil && confirmed {
+			_ = w.Store.MarkCashbackPaid(cb.ID, canonical)
+		}
+		if confirmed {
+			return
+		}
+	}
+	proof, expired, proofErr := w.RPC.ProvePayoutExpired(cctx, cb.SignedTxHex)
+	if proofErr != nil {
+		_ = w.Store.FailCashbackSend(cb.ID, "expiry proof unavailable: "+proofErr.Error())
+		return
+	}
+	if expired {
+		if err := w.Store.RetireExpiredPayout(cb.ID, cb.SignedTxHex, proof); err != nil {
+			log.Printf("cashback: expiry recovery deferred id=%s: %v", cb.ID, err)
+		}
+		return
+	}
+	if found {
+		return
+	}
 	hash, err := w.RPC.BroadcastRawTransaction(cctx, cb.SignedTxHex)
 	if err != nil {
 		msg := err.Error()
@@ -286,12 +357,6 @@ func (w *Worker) rebroadcast(ctx context.Context, cb db.Cashback) {
 				return
 			}
 		}
-		if alreadyOnChain(msg) {
-			if hint != "" {
-				_ = w.Store.MarkCashbackBroadcast(cb.ID, hint)
-			}
-			return
-		}
 		// Genuinely not on chain: keep the signed bytes and retry next tick.
 		_ = w.Store.FailCashbackSend(cb.ID, "broadcast: "+msg)
 		log.Printf("cashback: broadcast failed quote %s: %v (will retry same tx)", cb.QuoteID, err)
@@ -305,9 +370,4 @@ func (w *Worker) rebroadcast(ctx context.Context, cb db.Cashback) {
 	} else {
 		log.Printf("cashback: broadcast quote %s → %s luna=%d tx=%s memo=%q", cb.QuoteID, cb.Recipient, cb.AmountLuna, hash, cb.Memo)
 	}
-}
-
-func alreadyOnChain(msg string) bool {
-	m := strings.ToLower(msg)
-	return strings.Contains(m, "already") || strings.Contains(m, "known")
 }

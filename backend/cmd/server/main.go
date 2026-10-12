@@ -374,7 +374,7 @@ func main() {
 		netID = byte(nimiq.NetworkTestnet)
 	}
 	cbWorker := &cbworker.Worker{
-		Store: store, RPC: nimiq.NewClient(cfg.NimiqRPCURL, cfg.NimiqRPCURL2),
+		Store: cbworker.WithQuizPayouts(store), RPC: nimiq.NewClient(cfg.NimiqRPCURL, cfg.NimiqRPCURL2),
 		SeedHex: cfg.CashbackWalletSeed, NetworkID: netID,
 		FeeLuna: int64(cfg.CashbackFeeLuna), Enabled: cfg.CashbackEnabled,
 	}

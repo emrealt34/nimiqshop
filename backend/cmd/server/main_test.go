@@ -74,6 +74,8 @@ func bootStack(t *testing.T, opts stackOptions) *testStack {
 		// loopback, so raise them far above what a test issues.
 		"RATE_TIER_OVERRIDES": "login=6000:2000,checkout=6000:2000,refresh=6000:2000,pool=6000:2000,promo=6000:2000,support=6000:2000,presence=6000:2000,write=6000:2000,admin-login=6000:2000,admin=6000:2000",
 		"TEST_MODE":           fmt.Sprint(opts.testMode),
+		// Keep supplier invoice conversion deterministic and offline too.
+		"MOCK_BTC_USD": "50000",
 	}
 	for k, v := range opts.env {
 		env[k] = v

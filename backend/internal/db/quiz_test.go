@@ -90,10 +90,10 @@ func TestQuizConcurrentStartCreatesOneAttempt(t *testing.T) {
 		t.Fatalf("repeat reservation: participants=%d entries=%d", got.Participants, len(entries))
 	}
 }
-func TestQuizPublishedRulesFrozenAndDeadlinesEnforced(t *testing.T) {
+func TestQuizLiveEditsAndDeadlinesEnforced(t *testing.T) {
 	s, c, now := quizFixture(t)
 	c.Questions[0].CorrectIndex = 0
-	if _, err := s.PutQuizCompetition(c, false, now); !errors.Is(err, ErrQuizLocked) {
+	if updated, err := s.PutQuizCompetition(c, false, now); err != nil || updated.Status != "published" {
 		t.Fatalf("edit published: %v", err)
 	}
 	if err := s.DeleteQuizDraft(c.ID); !errors.Is(err, ErrQuizLocked) {

@@ -69,6 +69,13 @@ const en = {
   },
 
   quiz: {
+    prizePayment: 'Quiz prize payment',
+    autoPrize: "After the quiz ends, prizes are paid automatically from the cashback wallet to each winner’s signed-in Nimiq wallet.",
+    timezone: "All times are Turkey time (UTC+03:00).",
+    payoutPaid: "Paid",
+    payoutBroadcast: "Awaiting network confirmation",
+    payoutPending: "Payment queued",
+
     rulesTimed: "One attempt per account. Each correct choice earns 1 point. Higher scores win; equal scores rank by earlier final submission confirmed by the server.",
     rangeRulesTimed: "One attempt per account. Correct choices earn 1 point. Range points: 1 − |answer − correct value| / (max − min), rounded up to six decimals. Higher totals rank first; ties rank by earlier final submission confirmed by the server.",
     step: "Question {{current}} / {{total}}",

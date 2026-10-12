@@ -11,6 +11,7 @@ import (
 	"github.com/valyala/fasthttp"
 	"nimiqshop/internal/db"
 	"nimiqshop/internal/middleware"
+	"nimiqshop/internal/nimiq"
 )
 
 // Explicit safe views: never serialize the database competition/question to
@@ -60,8 +61,19 @@ func (h *Handlers) quizView(c db.QuizCompetition, user string) (map[string]any, 
 	if db.QuizIsWinner(c, user) {
 		delivered = db.QuizAwardTime(c, user)
 	}
+	payouts := []map[string]any{}
+	if c.Payout.Enabled {
+		rows, e := h.Store.ListQuizPayouts(c.ID)
+		if e != nil {
+			return nil, e
+		}
+		for _, row := range rows {
+			payouts = append(payouts, map[string]any{"participant": quizParticipant(row.UserID), "status": row.Status, "amount_nim": float64(row.AmountLuna) / 100_000, "memo": row.Memo, "tx_hash": row.TxHash, "paid_at": row.PaidAt})
+		}
+	}
 	return map[string]any{
-		"id": c.ID, "tie_break": c.TieBreak, "translations": c.Translations, "title": c.Title, "description": c.Description, "prize": c.Prize,
+		"payouts": payouts,
+		"id":      c.ID, "payout": c.Payout, "tie_break": c.TieBreak, "translations": c.Translations, "title": c.Title, "description": c.Description, "prize": c.Prize,
 		"starts_at": c.StartsAt, "ends_at": c.EndsAt, "phase": quizPhase(c, time.Now().UTC()),
 		"question_count": len(c.Questions), "participants": c.Participants, "attempt": mine,
 		"winner": quizParticipant(c.WinnerUserID), "winners": winners, "winner_count": db.QuizWinnerLimit(c), "has_ranges": hasRanges, "is_winner": db.QuizIsWinner(c, user),
@@ -291,7 +303,17 @@ func (h *Handlers) AdminQuizEntries(ctx *fasthttp.RequestCtx) {
 	for _, a := range entries {
 		rows = append(rows, map[string]any{"user_id": a.UserID, "address": addresses[a.UserID], "started_at": a.StartedAt, "submitted_at": a.SubmittedAt, "score": float64(db.QuizPoints(a)) / 1_000_000, "prize_email": a.PrizeEmail, "eligible": eligible[a.UserID], "is_winner": db.QuizIsWinner(c, a.UserID), "award_delivered_at": db.QuizAwardTime(c, a.UserID)})
 	}
-	writeJSON(ctx, 200, map[string]any{"competition": c, "items": rows, "best_score": best, "winner_slots": winnerSlots})
+	payments, err := h.Store.ListQuizPayouts(c.ID)
+	if err != nil {
+		quizError(ctx, err)
+		return
+	}
+	paymentViews := []map[string]any{}
+	for _, p := range payments {
+		recipient, _ := nimiq.PrettyAddress(p.Recipient)
+		paymentViews = append(paymentViews, map[string]any{"id": p.ID, "user_id": p.UserID, "recipient": recipient, "amount_nim": float64(p.AmountLuna) / 100000, "memo": p.Memo, "status": p.Status, "tx_hash": p.TxHash, "paid_at": p.PaidAt, "last_error": p.LastError, "expired_attempts": len(p.ExpiredAttempts)})
+	}
+	writeJSON(ctx, 200, map[string]any{"competition": c, "items": rows, "best_score": best, "winner_slots": winnerSlots, "payouts": paymentViews})
 }
 func (h *Handlers) AdminFinalizeQuiz(ctx *fasthttp.RequestCtx) {
 	var req struct {

@@ -61,6 +61,13 @@ const fr = {
   brand: { giftTag: 'cadeau' },
 
   quiz: {
+    prizePayment: 'Paiement du prix du quiz',
+    autoPrize: "Après la fin du quiz, les prix sont versés automatiquement depuis le portefeuille de cashback vers le portefeuille Nimiq connecté de chaque gagnant.",
+    timezone: "Toutes les heures sont celles de la Turquie (UTC+03:00).",
+    payoutPaid: "Payé",
+    payoutBroadcast: "En attente de confirmation du réseau",
+    payoutPending: "Paiement en attente",
+
     rulesTimed: "Une tentative par compte. Chaque bonne réponse à choix vaut 1 point. Les meilleurs scores gagnent ; à égalité, l’envoi définitif confirmé le plus tôt par le serveur passe en tête.",
     rangeRulesTimed: "Une tentative par compte. Une bonne réponse à choix vaut 1 point. Points d’intervalle : 1 − |réponse − valeur correcte| / (maximum − minimum), arrondis vers le haut à six décimales. Les meilleurs totaux passent en tête ; à égalité, l’envoi définitif confirmé le plus tôt par le serveur gagne.",
     step: "Question n° {{current}} sur {{total}}",

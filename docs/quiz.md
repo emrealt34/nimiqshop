@@ -16,7 +16,7 @@ Open `/admin?section=quiz` with the **separate operator session**. The system st
 - `/quiz` is a normal Astro/React route with the site's existing light/dark kraft theme and navigation.
 - The page renders a login gate before showing competition data. **Every `/api/quiz` endpoint is protected by the existing wallet-session authentication middleware**, including list/detail reads. Mutating cookie requests use the existing CSRF checks and per-account write limiter.
 - Starting creates one transactionally unique attempt per competition/account in BadgerDB. Reloads and retried start requests resume the same attempt; they do not create a second entry. Progress is server-saved, and client writes are serialized.
-- Submission sends option indices, not a score. The server validates all indices and scores against its private immutable questions. Correct indices are never included in customer list/detail/start responses. The submitted attempt is immutable; a lost-response retry returns the same result.
+- Submission sends option indices, not a score. The server validates all indices and scores against its private questions for that competition version. Correct indices are never included in customer list/detail/start responses. The submitted attempt is immutable; a lost-response retry returns the same result.
 - Server time controls entry/submission deadlines. Drafts and cancelled competitions cannot be played. Only completed attempts can win.
 - This is **one attempt per account/wallet**, not a proof that each entrant is a unique human. Multiple-wallet/Sybil resistance and outside research are not prevented. No participation fee or wallet transfer is requested.
 - Other players are shown with pseudonymous participant labels, not full wallet addresses or emails. Prize delivery references remain operator-only.
@@ -26,4 +26,12 @@ Open `/admin?section=quiz` with the **separate operator session**. The system st
 
 The frontend and Go backend must both be updated. Badger requires no SQL migration: the new `quiz:c:`, `quiz:ix:` and `quiz:a:` namespaces are created when the first draft/attempt is written.
 
-Regression coverage includes transactional one-attempt enforcement, resume/replay safety, server scoring, frozen rules, end boundaries, tied winner selection, manual delivery idempotency, authentication/privacy API checks and browser login/layout/quiz tests.
+Regression coverage includes transactional one-attempt enforcement, resume/replay safety, server scoring, versioned rules, end boundaries, tied winner selection, manual delivery idempotency, authentication/privacy API checks and browser login/layout/quiz tests.
+
+## Automatic payouts and safe live editing
+
+See [quiz JSON](quiz-json.md) for the automatic NIM payout schema. At the deadline, winner selection and one deterministic payment obligation per winner are committed atomically. The existing cashback worker handles both queues with the same configured wallet. Prize payments remain separate from purchase cashback accounting, but are visible in the owner’s cashback history.
+
+A published competition can be edited before the automatic payout deadline. Changing questions/ranking after participants have entered archives the previous version and preserves its attempts; a fresh version opens with no inherited answers. Completed answers cannot be changed. Queued and paid prizes are immutable.
+
+See [payment recovery](payout-recovery.md) for crash, funding and duplicate-payment safeguards and testnet verification.

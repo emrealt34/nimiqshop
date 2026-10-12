@@ -31,7 +31,7 @@ Numeric ranges use whole numbers with `0 <= min < max <= 1000000000`. Correct va
 
 For an AI prompt, ask for **one JSON object without Markdown fences**, using this schema, 10 questions, the chosen bounds and correct values, and the desired `winner_count`. Verify generated answers before publishing. IDs, participants, status and winner records from imported JSON are ignored. Correct values/indices stay in admin views and are not sent to participants.
 
-Each confirmed winner supplies a private delivery email. Admin records manual delivery separately for that winner. Selecting winners or marking delivery does not send money, emails or gift codes.
+For manual rewards, each confirmed winner supplies a private delivery email and admin records manual delivery. With automatic NIM rewards enabled, the sender pays the winner’s signed-in Nimiq wallet; no email claim is required.
 
 ## Site-specific multilingual example
 
@@ -43,10 +43,26 @@ Optional `translations` maps accept `en`, `tr`, `de`, `fr`, `es`, `pt`. At compe
 
 Participants see one question at a time, with progress and previous/next controls. Next stays disabled until a valid answer has been saved; failed saves expose a retry. Reloading resumes the first unanswered question, or the last question when every answer is saved. Final submission is available only at the last question, after all answers are valid and saved. Earlier answers remain editable before submission.
 
-The example reward is a **total 10,000 NIM pool with 2,000 NIM per winner for up to five winners**, not 10,000 NIM per winner. It creates no automatic payout. The operator still sets dates before publishing. If fewer than five participants finish, each selected winner still receives 2,000 NIM; the unused pool is not automatically redistributed.
+The example reward is a **total 10,000 NIM pool with 2,000 NIM per winner for up to five winners**, not 10,000 NIM per winner. It enables automatic payouts from the configured cashback wallet, with an end date of 11 November 2026 at 12:00 Turkey time (`2026-11-11T12:00:00+03:00`). Import still creates only a draft; publishing is explicit. If fewer than five participants finish, each selected winner still receives 2,000 NIM; the unused pool is not automatically redistributed.
 
 ## Published score-tie policy
 
-`tie_break: "submitted_at"` ranks completed entries by server-computed points descending, then immutable server-confirmed final submission time ascending. Exact timestamp ties use a deterministic internal participant-ID fallback. The same order drives the public leaderboard, admin eligibility and winner finalization. The operator cannot substitute a later equal-score entry for an earlier one. Submitting again does not change the original completion timestamp. Missing `tie_break` preserves legacy administrator-decided ties for existing competitions; publish freezes this policy with the questions.
+`tie_break: "submitted_at"` ranks completed entries by server-computed points descending, then immutable server-confirmed final submission time ascending. Exact timestamp ties use a deterministic internal participant-ID fallback. The same order drives the public leaderboard, admin eligibility and winner finalization. The operator cannot substitute a later equal-score entry for an earlier one. Submitting again does not change the original completion timestamp. Missing `tie_break` preserves legacy administrator-decided ties for existing competitions; Changes to questions or ranking after participation archive that version with its attempts intact and create a fresh published version. Metadata/date edits retain the existing attempts until the payout deadline. Financial records are locked at the deadline.
 
 The selected example uses `winner_count: 5`, a total 10,000 NIM pool and 2,000 NIM per winner. It has one attempt per account and no one-participant-per-IP restriction.
+
+## Automatic NIM prizes
+
+```json
+"payout": {
+  "enabled": true,
+  "source": "cashback_wallet",
+  "pool_nim": 10000,
+  "per_winner_nim": 2000
+},
+"winner_count": 5,
+"tie_break": "submitted_at",
+"ends_at": "2026-11-11T12:00:00+03:00"
+```
+
+Amounts are positive whole NIM. The total pool must cover every configured winner. Automatic payouts require a fixed winner count (1–100) and server submission-time ties. No wallet seed belongs in JSON. The existing cashback sender schedules a durable separate prize queue after the deadline. Insufficient balance leaves payments pending until funding. Prize transfers include memos and appear in the owner’s cashback payment history without changing purchase cashback or staking totals. Admin may edit a published competition through fields or JSON before its automatic payout deadline. Finalized payout obligations cannot be cancelled, rewritten or marked delivered manually.

@@ -232,15 +232,81 @@ func DecodeUserFriendlyAddress(addr string) ([]byte, error) {
 	return hash, nil
 }
 
-// SignedTxHash is a local blake2b-256 of the signed wire bytes, used only as
-// a fallback lookup key when the RPC accepted the tx but did not echo a
-// hash (crash between send and persist). Paid still requires RPC confirmation.
+// SignedTxHash returns the canonical content hash, not a hash of wire/proof
+// bytes. Only the basic-account formats emitted by this signer are accepted.
 func SignedTxHash(txHex string) string {
-	raw, err := hex.DecodeString(strings.TrimSpace(txHex))
-	if err != nil || len(raw) == 0 {
+	hash, _, _, err := SignedTxInfo(txHex)
+	if err != nil {
 		return ""
 	}
+	return hash
+}
+
+// SignedTxInfo verifies our signed wire format before using its hash and
+// validity height for recovery. Malformed or unsupported transactions fail closed.
+func SignedTxInfo(txHex string) (string, uint32, byte, error) {
+	raw, err := hex.DecodeString(strings.TrimSpace(txHex))
+	if err != nil || len(raw) < 75 {
+		return "", 0, 0, errors.New("invalid signed transaction")
+	}
+	var content bytes.Buffer
+	var pub, sig []byte
+	var height uint32
+	var network byte
+	switch raw[0] {
+	case 0:
+		if len(raw) != 139 || raw[1] != 0 {
+			return "", 0, 0, errors.New("unsupported basic transaction")
+		}
+		pub, sig = raw[2:34], raw[75:]
+		sender, err := AddressFromPublicKey(pub)
+		if err != nil {
+			return "", 0, 0, err
+		}
+		senderBytes, err := DecodeUserFriendlyAddress(sender)
+		if err != nil {
+			return "", 0, 0, err
+		}
+		content.Write([]byte{0, 0})
+		content.Write(senderBytes)
+		content.WriteByte(0)
+		content.Write(raw[34:54])
+		content.WriteByte(0)
+		content.Write(raw[54:75])
+		content.Write([]byte{0, 0})
+		height, network = binary.BigEndian.Uint32(raw[70:74]), raw[74]
+	case 1:
+		if raw[21] != 0 || raw[22] != 0 || raw[43] != 0 || raw[44] > MaxMemoLen {
+			return "", 0, 0, errors.New("unsupported extended transaction")
+		}
+		n := int(raw[44])
+		end := 45 + n
+		if len(raw) != end+121 || raw[end+21] != 0 || raw[end+22] != 98 || raw[end+23] != 0 || raw[end+56] != 0 {
+			return "", 0, 0, errors.New("invalid extended proof")
+		}
+		pub, sig = raw[end+24:end+56], raw[end+57:]
+		sender, err := AddressFromPublicKey(pub)
+		if err != nil {
+			return "", 0, 0, err
+		}
+		senderBytes, err := DecodeUserFriendlyAddress(sender)
+		if err != nil || !bytes.Equal(senderBytes, raw[1:21]) {
+			return "", 0, 0, errors.New("signed sender mismatch")
+		}
+		_ = binary.Write(&content, binary.BigEndian, uint16(n))
+		content.Write(raw[45:end])
+		content.Write(raw[1:22])
+		content.Write(raw[23:44])
+		content.Write(raw[end : end+22])
+		content.WriteByte(0)
+		height, network = binary.BigEndian.Uint32(raw[end+16:end+20]), raw[end+20]
+	default:
+		return "", 0, 0, errors.New("unsupported transaction variant")
+	}
+	if !ed25519.Verify(pub, content.Bytes(), sig) {
+		return "", 0, 0, errors.New("invalid transaction signature")
+	}
 	h, _ := blake2b.New256(nil)
-	h.Write(raw)
-	return hex.EncodeToString(h.Sum(nil))
+	h.Write(content.Bytes())
+	return hex.EncodeToString(h.Sum(nil)), height, network, nil
 }

@@ -818,6 +818,14 @@ func (h *Handlers) AdminGetCashback(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	recent, _ := h.Store.ListRecentCashbacks(40)
+	prizes, err := h.Store.ListQuizPayouts("")
+	if err != nil {
+		adminStoreError(ctx)
+		return
+	}
+	for _, prize := range prizes {
+		recent = append(recent, prize.Cashback)
+	}
 	rows := make([]map[string]any, 0, len(recent))
 	for _, cb := range recent {
 		row := adminCashbackView(cb)
@@ -1249,16 +1257,17 @@ func adminQuoteView(quote db.Quote) map[string]any {
 
 func adminCashbackView(cb db.Cashback) map[string]any {
 	return map[string]any{
-		"status":      cb.Status,
-		"paid":        cb.Status == db.CashbackPaid,
-		"amount_nim":  float64(cb.AmountLuna) / 100000.0,
-		"amount_luna": cb.AmountLuna,
-		"bps":         cb.Bps,
-		"tx_hash":     cb.TxHash,
-		"skip_reason": cb.SkipReason,
-		"last_error":  cb.LastError,
-		"paid_at":     cb.PaidAt,
-		"recipient":   cb.Recipient,
+		"status":           cb.Status,
+		"paid":             cb.Status == db.CashbackPaid,
+		"amount_nim":       float64(cb.AmountLuna) / 100000.0,
+		"amount_luna":      cb.AmountLuna,
+		"bps":              cb.Bps,
+		"tx_hash":          cb.TxHash,
+		"skip_reason":      cb.SkipReason,
+		"last_error":       cb.LastError,
+		"paid_at":          cb.PaidAt,
+		"recipient":        cb.Recipient,
+		"expired_attempts": len(cb.ExpiredAttempts),
 		// Test-center payouts carry a TESTTX- hash; flag them so the queue
 		// view can badge simulated rows.
 		"test_mode":   cb.TestMode,

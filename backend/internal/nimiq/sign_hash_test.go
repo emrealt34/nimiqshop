@@ -40,3 +40,26 @@ func TestBuildBasicTransactionReturnsCanonicalHash(t *testing.T) {
 		t.Errorf("hash not deterministic: %s vs %s", hash, hash2)
 	}
 }
+
+func TestSignedTxInfoMatchesCanonicalHashAndRejectsTampering(t *testing.T) {
+	v := vectors(t)
+	for _, memo := range []string{"", "nimshop.io prize #1: 2000 NIM"} {
+		raw, hash, err := BuildBasicTransaction(v["tx.seed"], v["tx.to"], 100000, 1, 1000000, NetworkTestnet, []byte(memo))
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, start, network, err := SignedTxInfo(raw)
+		if err != nil || got != hash || SignedTxHash(raw) != hash || start != 1000005 || network != NetworkTestnet {
+			t.Fatal("wrong recovery identity", got, start, network, err)
+		}
+		bad := raw[:len(raw)-2] + "ff"
+		if _, _, _, err := SignedTxInfo(bad); err == nil {
+			t.Fatal("tampered signature accepted")
+		}
+	}
+	for _, raw := range []string{"", "00", "ff", "not-hex"} {
+		if _, _, _, err := SignedTxInfo(raw); err == nil {
+			t.Fatal("malformed transaction accepted")
+		}
+	}
+}

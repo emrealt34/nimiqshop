@@ -5,6 +5,7 @@
  * name + rate chip · status · +NIM · rate source / tx.
  */
 import React from 'react';
+import { explorerUrl } from '../../lib/chain';
 import { Icon } from '../ui/Icon';
 import { BrandThumbStack } from '../ui/UnifiedThumb';
 import { fmtStakeNIM, pctLabel } from '../../lib/stakerCashback';
@@ -22,6 +23,7 @@ export type RecentCashbackRow = {
   status_label?: string;
   cashback_source?: string;
   tx_hash?: string;
+  memo?: string;
   /** The purchase's Lightning payment hash — the tx of what you bought. */
   purchase_tx?: string;
   /** REQ-62 class fix: the thumb needs the buyer's catalog country. */
@@ -30,6 +32,7 @@ export type RecentCashbackRow = {
 
 export function rateSourceLabel(cb: RecentCashbackRow): string {
   switch (cb.cashback_source) {
+    case 'quiz_prize': return tr('quiz.prizePayment');
     case 'code': return tr('cashback.rateCode');
     case 'ledger': return tr('cashback.rateLedger');
     case 'staker': return tr('cashback.rateStaker');
@@ -65,15 +68,16 @@ export function RecentCashbackRowView({ cb }: { cb: RecentCashbackRow }) {
   const bps = Number(cb.bps) || 0;
   return (
     <div className="cb-row">
-      <CashbackThumb title={String(name)} country={cb.country} />
+      {cb.cashback_source === 'quiz_prize' ? <div className="cb-thumb"><Icon name="nimiq" size={32} /></div> : <CashbackThumb title={String(name)} country={cb.country} />}
       <div className="cb-row-main">
         <div className="small strong cb-row-title">
           <span className="cb-row-name" title={name}>{name}</span>
-          <span className="chip cb-rate-chip" title={tr('cashback.rcRateTitle')} style={{ color: bps > 0 ? 'var(--green)' : undefined }}>
+          {cb.cashback_source !== 'quiz_prize' && <span className="chip cb-rate-chip" title={tr('cashback.rcRateTitle')} style={{ color: bps > 0 ? 'var(--green)' : undefined }}>
             {pctLabel(bps)}
-          </span>
+          </span>}
         </div>
         <div className="xs faint">{cb.status_label || cb.status || 'pending'}</div>
+        {cb.memo && <div className="xs faint" style={{overflowWrap:'anywhere'}}>Memo: {cb.memo}</div>}
         {cb.purchase_tx ? (
           <div className="mono xs faint" title={cb.purchase_tx} style={{ wordBreak: 'break-all' }}>
             tx {String(cb.purchase_tx).slice(0, 10)}…{String(cb.purchase_tx).slice(-6)}
@@ -83,7 +87,7 @@ export function RecentCashbackRowView({ cb }: { cb: RecentCashbackRow }) {
       <div className="cb-row-right">
         <div className="small strong cb-row-amount">+{fmtStakeNIM(Number(cb.amount_nim) || 0)} <NimUnitMark /></div>
         {cb.tx_hash ? (
-          <span className="mono xs faint" title={cb.tx_hash}>{String(cb.tx_hash).slice(0, 10)}…</span>
+          <span className="mono xs faint" title={cb.tx_hash}>{explorerUrl(cb.tx_hash) ? <a href={explorerUrl(cb.tx_hash)!} target="_blank" rel="noopener noreferrer">{String(cb.tx_hash).slice(0, 10)}…</a> : String(cb.tx_hash).slice(0, 10)+'…'}</span>
         ) : (
           <span className="xs faint">{rateSourceLabel(cb)}</span>
         )}

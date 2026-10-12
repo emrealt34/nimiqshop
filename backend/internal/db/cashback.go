@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -783,7 +784,7 @@ func (s *Store) GetCashbackByQuote(quoteID string) (Cashback, error) {
 func (s *Store) ListCashbacksByStatus(status string, limit int) ([]Cashback, error) {
 	var out []Cashback
 	err := s.View(func(tx *badger.Txn) error {
-		return scanIndex(tx, cashbackStatusIndexKey(status, ""), limit, func(id string) error {
+		return scanIndex(tx, cashbackStatusIndexKey(status, ""), 0, func(id string) error {
 			var cb Cashback
 			if err := getJSON(tx, cashbackKey(id), &cb); err != nil {
 				if errors.Is(err, ErrNotFound) {
@@ -795,6 +796,15 @@ func (s *Store) ListCashbacksByStatus(status string, limit int) ([]Cashback, err
 			return nil
 		})
 	})
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].UpdatedAt.Equal(out[j].UpdatedAt) {
+			return out[i].ID < out[j].ID
+		}
+		return out[i].UpdatedAt.Before(out[j].UpdatedAt)
+	})
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
+	}
 	return out, err
 }
 
@@ -849,6 +859,9 @@ func (s *Store) ClaimCashbackSend(id string) (Cashback, error) {
 		if err := tx.Delete(cashbackStatusIndexKey(cb.Status, cb.ID)); err != nil {
 			return err
 		}
+		if !cb.TestMode && !strings.HasSuffix(cb.Memo, " ["+cb.ID+"]") {
+			cb.Memo = uniqueCashbackMemo(cb.Memo, cb.ID)
+		}
 		cb.Status = CashbackSending
 		cb.SendingAt = &now
 		cb.UpdatedAt = now
@@ -874,11 +887,16 @@ func (s *Store) AttachCashbackSignedTx(id, txHex, txHash string, validityStart u
 		return ErrConflict
 	}
 	return s.patchCashback(id, func(cb *Cashback, tx *badger.Txn) error {
+		for _, attempt := range cb.ExpiredAttempts {
+			if attempt.SignedTxHex == txHex || attempt.Proof.Hash == txHash {
+				return ErrConflict
+			}
+		}
 		if cb.Status != CashbackSending && cb.Status != CashbackQueued {
 			return ErrConflict
 		}
 		if cb.SignedTxHex != "" {
-			if cb.SignedTxHex != txHex {
+			if cb.SignedTxHex != txHex || cb.TxHash != txHash {
 				return ErrConflict
 			}
 			return nil
@@ -913,7 +931,13 @@ func (s *Store) MarkCashbackBroadcast(id, txHash string) error {
 func (s *Store) MarkCashbackPaid(id, txHash string) error {
 	return s.patchCashback(id, func(cb *Cashback, tx *badger.Txn) error {
 		if cb.Status == CashbackPaid {
+			if cb.TxHash != txHash {
+				return ErrConflict
+			}
 			return nil
+		}
+		if cb.Status != CashbackBroadcast || txHash == "" || cb.TxHash != txHash {
+			return ErrConflict
 		}
 		if err := tx.Delete(cashbackStatusIndexKey(cb.Status, cb.ID)); err != nil {
 			return err
@@ -931,7 +955,7 @@ func (s *Store) MarkCashbackPaid(id, txHash string) error {
 
 func (s *Store) FailCashbackSend(id, reason string) error {
 	return s.patchCashback(id, func(cb *Cashback, tx *badger.Txn) error {
-		if cb.Status != CashbackSending {
+		if cb.Status != CashbackSending && cb.Status != CashbackBroadcast {
 			return nil
 		}
 		cb.LastError = reason

@@ -630,5 +630,13 @@
       "description": "Descobre a nimshop.io e mostra o que sabes. Responde a 10 perguntas, chega ao top 5 e compete pelo prémio!"
     }
   },
-  "tie_break": "submitted_at"
+  "tie_break": "submitted_at",
+  "starts_at": "2026-10-12T15:25:00+03:00",
+  "ends_at": "2026-11-11T12:00:00+03:00",
+  "payout": {
+    "enabled": true,
+    "source": "cashback_wallet",
+    "pool_nim": 10000,
+    "per_winner_nim": 2000
+  }
 }

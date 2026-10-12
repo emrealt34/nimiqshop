@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -25,7 +26,7 @@ const (
 
 var (
 	ErrQuizClosed  = errors.New("quiz is not open")
-	ErrQuizLocked  = errors.New("published questions and completed attempts cannot be changed")
+	ErrQuizLocked  = errors.New("completed attempts and finalized payout records cannot be changed")
 	ErrQuizAnswers = errors.New("invalid or incomplete quiz answers")
 	ErrQuizWinner  = errors.New("select the configured number of eligible completed participants according to the published ranking rules")
 )
@@ -65,7 +66,16 @@ type QuizPrize struct {
 	ImageURL     string              `json:"image_url"`
 }
 
+type QuizPayoutConfig struct {
+	Enabled      bool   `json:"enabled"`
+	Source       string `json:"source"`
+	PoolNIM      int64  `json:"pool_nim"`
+	PerWinnerNIM int64  `json:"per_winner_nim"`
+}
+
 type QuizCompetition struct {
+	Payout QuizPayoutConfig `json:"payout"`
+
 	TieBreak string `json:"tie_break,omitempty"` // immutable once published; empty retains legacy admin tie decisions
 
 	Translations     map[string]QuizText  `json:"translations,omitempty"`
@@ -134,6 +144,10 @@ func quizLanguage(lang string) bool {
 	return false
 }
 func validateQuiz(c QuizCompetition) error {
+	if c.Payout.Enabled && (c.Payout.Source != "cashback_wallet" || c.TieBreak != "submitted_at" || c.WinnerCount == nil || *c.WinnerCount < 1 || *c.WinnerCount > 100 || c.Payout.PerWinnerNIM < 1 || c.Payout.PoolNIM < 1 || c.Payout.PoolNIM > 10_000_000 || c.Payout.PerWinnerNIM > c.Payout.PoolNIM/int64(*c.WinnerCount)) {
+		return fmt.Errorf("automatic prizes require cashback_wallet, submitted_at, a bounded winner count and a sufficient integer-NIM pool")
+	}
+
 	if c.TieBreak != "" && c.TieBreak != "submitted_at" {
 		return fmt.Errorf("tie_break must be submitted_at or omitted")
 	}
@@ -201,8 +215,29 @@ func validateQuiz(c QuizCompetition) error {
 	return nil
 }
 
-// Only drafts can be edited. Publish freezes questions, prize and dates so
-// an admin cannot silently change the rules after somebody has entered.
+// Live edits are allowed until finalization. Scoring changes after participation
+// archive the old version rather than rewriting existing answers.
+func quizRulesChanged(old, next QuizCompetition) bool {
+	if !reflect.DeepEqual(old.WinnerCount, next.WinnerCount) || old.TieBreak != next.TieBreak || len(old.Questions) != len(next.Questions) {
+		return true
+	}
+	for i := range old.Questions {
+		a, b := old.Questions[i], next.Questions[i]
+		a.ID = ""
+		b.ID = ""
+		if a.Type == "" {
+			a.Type = "choice"
+		}
+		if b.Type == "" {
+			b.Type = "choice"
+		}
+		if !reflect.DeepEqual(a, b) {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *Store) PutQuizCompetition(input QuizCompetition, create bool, now time.Time) (QuizCompetition, error) {
 	if create && input.ID == "" {
 		input.ID = uuid.NewString()
@@ -230,7 +265,9 @@ func (s *Store) PutQuizCompetition(input QuizCompetition, create bool, now time.
 		return QuizCompetition{}, err
 	}
 	var result QuizCompetition
+	originalInput, originalCreate := input, create
 	err := s.Update(func(txn *badger.Txn) error {
+		input, create = originalInput, originalCreate
 		var old QuizCompetition
 		err := getJSON(txn, quizKey(input.ID), &old)
 		if create {
@@ -244,15 +281,34 @@ func (s *Store) PutQuizCompetition(input QuizCompetition, create bool, now time.
 			if err != nil {
 				return err
 			}
-			if old.Status != "draft" {
+			if old.Status == "published" && old.Payout.Enabled && !now.Before(old.EndsAt) {
 				return ErrQuizLocked
+			}
+			if old.Status != "draft" && old.Status != "published" {
+				return ErrQuizLocked
+			}
+			if old.Status == "published" && old.Participants > 0 && quizRulesChanged(old, input) {
+				archived := old
+				archived.Status = "cancelled"
+				archived.CancelReason = "Questions or ranking rules updated; answers preserved in this archived version."
+				archived.UpdatedAt = now.UTC()
+				if err := putQuizJSON(txn, quizKey(old.ID), archived); err != nil {
+					return err
+				}
+				input.ID = uuid.NewString()
+				old = QuizCompetition{Status: "published", CreatedAt: now.UTC()}
+				create = true
 			}
 		}
 		created := old.CreatedAt
 		if create {
 			created = now.UTC()
 		}
-		result = QuizCompetition{ID: input.ID, TieBreak: input.TieBreak, Translations: input.Translations, Title: input.Title, Description: input.Description, Prize: input.Prize, StartsAt: input.StartsAt, EndsAt: input.EndsAt, Status: "draft", Questions: input.Questions, WinnerCount: input.WinnerCount, CreatedAt: created, UpdatedAt: now.UTC()}
+		status := "draft"
+		if old.Status == "published" {
+			status = "published"
+		}
+		result = QuizCompetition{ID: input.ID, Payout: input.Payout, TieBreak: input.TieBreak, Translations: input.Translations, Title: input.Title, Description: input.Description, Prize: input.Prize, StartsAt: input.StartsAt, EndsAt: input.EndsAt, Status: status, Questions: input.Questions, Participants: old.Participants, WinnerCount: input.WinnerCount, CreatedAt: created, UpdatedAt: now.UTC()}
 		if err := putQuizJSON(txn, quizKey(result.ID), result); err != nil {
 			return err
 		}
@@ -328,7 +384,7 @@ func (s *Store) CancelQuiz(id, reason string, now time.Time) (QuizCompetition, e
 		if err := getJSON(txn, quizKey(id), &c); err != nil {
 			return err
 		}
-		if c.Status != "draft" && c.Status != "published" {
+		if (c.Status != "draft" && c.Status != "published") || (c.Status == "published" && c.Payout.Enabled && !now.Before(c.EndsAt)) {
 			return ErrQuizLocked
 		}
 		c.Status = "cancelled"
@@ -595,6 +651,9 @@ func (s *Store) FinalizeQuizWinners(id string, winners []string, note string, no
 		if err != nil {
 			return err
 		}
+		if c.Payout.Enabled {
+			return ErrQuizLocked
+		}
 		eligible, count := QuizEligibility(c, entries)
 		if QuizWinnerLimit(c) == 0 || (c.TieBreak == "submitted_at" && len(winners) == 0) {
 			winners = nil
@@ -654,7 +713,7 @@ func (s *Store) ClaimQuizPrize(id, user, email string, now time.Time) (QuizAttem
 		if err := getJSON(txn, quizKey(id), &c); err != nil {
 			return err
 		}
-		if c.Status != "finalized" || !QuizIsWinner(c, user) || QuizAwardTime(c, user) != nil {
+		if c.Payout.Enabled || c.Status != "finalized" || !QuizIsWinner(c, user) || QuizAwardTime(c, user) != nil {
 			return ErrQuizWinner
 		}
 		if err := getJSON(txn, quizAttemptKey(id, user), &a); err != nil {
@@ -684,7 +743,7 @@ func (s *Store) MarkQuizWinnerPrizeDelivered(id, user, note string, now time.Tim
 		if err := getJSON(txn, quizKey(id), &c); err != nil {
 			return err
 		}
-		if c.Status != "finalized" || !QuizIsWinner(c, user) {
+		if c.Payout.Enabled || c.Status != "finalized" || !QuizIsWinner(c, user) {
 			return ErrQuizWinner
 		}
 		if QuizAwardTime(c, user) != nil {

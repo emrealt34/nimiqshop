@@ -61,6 +61,13 @@ const pt = {
   brand: { giftTag: 'presente' },
 
   quiz: {
+    prizePayment: 'Pagamento do prêmio do concurso',
+    autoPrize: "Após o fim do concurso, os prémios são pagos automaticamente da carteira de cashback para a carteira Nimiq ligada de cada vencedor.",
+    timezone: "Todas as horas são da Turquia (UTC+03:00).",
+    payoutPaid: "Pago",
+    payoutBroadcast: "A aguardar confirmação da rede",
+    payoutPending: "Pagamento em fila",
+
     rulesTimed: "Uma tentativa por conta. Cada opção correta dá 1 ponto. Ganham as maiores pontuações; em caso de empate, tem prioridade o envio definitivo confirmado mais cedo pelo servidor.",
     rangeRulesTimed: "Uma tentativa por conta. As opções corretas dão 1 ponto. Pontos de intervalo: 1 − |resposta − valor correto| / (máximo − mínimo), arredondados para cima a seis casas decimais. Os maiores totais ficam primeiro; os empates são resolvidos pelo envio definitivo confirmado mais cedo pelo servidor.",
     step: "Pergunta {{current}} / {{total}}",

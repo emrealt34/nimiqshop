@@ -61,6 +61,13 @@ const tr = {
   brand: { giftTag: 'hediye' },
 
   quiz: {
+    prizePayment: 'Yarışma ödülü ödemesi',
+    autoPrize: "Ödüller yarışma bittikten sonra cashback cüzdanından kazananların giriş yaptığı Nimiq cüzdanlarına otomatik ödenir.",
+    timezone: "Tüm saatler Türkiye saatiyle (UTC+03:00).",
+    payoutPaid: "Ödendi",
+    payoutBroadcast: "Ağ onayı bekleniyor",
+    payoutPending: "Ödeme kuyruğunda",
+
     rulesTimed: "Hesap başına tek deneme. Her doğru şıklı cevap 1 puan. En yüksek puanlı katılımcılar kazanır; eşit puanda cevaplarını sunucuya daha erken kesin olarak gönderen öne geçer.",
     rangeRulesTimed: "Hesap başına tek deneme. Doğru şıklı cevap 1 puan. Aralık sorusunda puan: 1 − |cevap − doğru değer| / (üst sınır − alt sınır); altı ondalığa yukarı yuvarlanır. En yüksek toplam puan öne geçer; eşit puanda sunucuya daha erken kesin gönderim kazanır.",
     step: "Soru {{current}} / {{total}}",

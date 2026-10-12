@@ -139,7 +139,7 @@ func TestQuizEveryoneOnlySubmittedAttemptsAndRangeValidation(t *testing.T) {
 	}
 }
 
-func TestQuizTranslationsPersistValidateAndFreeze(t *testing.T) {
+func TestQuizTranslationsPersistValidateAndLiveEdit(t *testing.T) {
 	s, c, now := rangeQuizFixture(t, 1)
 	c.ID = ""
 	c.Translations = map[string]QuizText{"fr": {Title: "Boutique", Description: "Règles"}}
@@ -156,8 +156,8 @@ func TestQuizTranslationsPersistValidateAndFreeze(t *testing.T) {
 	if _, err := s.PublishQuiz(draft.ID, now); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.PutQuizCompetition(loaded, false, now); !errors.Is(err, ErrQuizLocked) {
-		t.Fatal("translated quiz not frozen", err)
+	if updated, err := s.PutQuizCompetition(loaded, false, now); err != nil || updated.Status != "published" {
+		t.Fatal("translated live edit failed", err)
 	}
 	c.Translations["xx"] = QuizText{Title: "bad"}
 	if _, err := s.PutQuizCompetition(c, true, now); err == nil {
@@ -175,7 +175,7 @@ func TestQuizTopFiveScoreTiesUseServerSubmissionTime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 	now := time.Now().UTC()
 	correct := 500
 	count := 5

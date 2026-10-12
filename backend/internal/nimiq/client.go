@@ -16,6 +16,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -79,6 +80,13 @@ type rpcResponse struct {
 	} `json:"error"`
 }
 
+type RPCError struct {
+	Code    int
+	Message string
+}
+
+func (e *RPCError) Error() string { return fmt.Sprintf("nimiq rpc error %d: %s", e.Code, e.Message) }
+
 // callURL posts one JSON-RPC request. NimiqWatch-style endpoints (rpc.nimiqwatch.com,
 // rpc.testnet.nimiqwatch.com) wrap every result as {"data": <payload>,
 // "metadata": …}; that wrapper is unwrapped here so every caller below can
@@ -103,17 +111,20 @@ func (c *Client) callURL(ctx context.Context, baseURL, method string, params []i
 		return fmt.Errorf("nimiq rpc %s %s: %w", baseURL, method, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("nimiq rpc %s: HTTP %d", method, resp.StatusCode)
+	}
 
 	var rr rpcResponse
 	if err := json.NewDecoder(resp.Body).Decode(&rr); err != nil {
 		return fmt.Errorf("decode rpc response from %s: %w", baseURL, err)
 	}
 	if rr.Error != nil {
-		return fmt.Errorf("nimiq rpc %s error %d: %s", baseURL, rr.Error.Code, rr.Error.Message)
+		return &RPCError{Code: rr.Error.Code, Message: rr.Error.Message}
 	}
 	if out != nil {
-		if len(rr.Result) == 0 || string(rr.Result) == "null" {
-			return nil
+		if len(rr.Result) == 0 {
+			return fmt.Errorf("nimiq rpc %s: missing result", method)
 		}
 		// Unwrap {"data": <payload>, "metadata": …} when present. Both keys
 		// must exist — a bare transaction object may itself carry a "data"
@@ -281,6 +292,9 @@ func (c *Client) GetBlockNumber(ctx context.Context) (int64, error) {
 			defer wg.Done()
 			var h int64
 			err := c.callURL(ctx, u, "getBlockNumber", nil, &h)
+			if err == nil && (h <= 0 || h > int64(^uint32(0))-5) {
+				err = fmt.Errorf("nimiq rpc: invalid head height %d", h)
+			}
 			out[i] = res{h, err}
 		}(i, u)
 	}
@@ -387,20 +401,48 @@ type txLookup struct {
 // live): {"hash", "blockNumber", "confirmations", "executionResult", …} —
 // a mempool tx has no blockNumber/confirmations yet.
 func (c *Client) getTxOne(ctx context.Context, baseURL, hash string) (found bool, confirmed bool, err error) {
+	var raw json.RawMessage
 	var out struct {
 		Hash            *string `json:"hash"`
 		BlockNumber     *int64  `json:"blockNumber"`
 		Confirmations   int64   `json:"confirmations"`
 		ExecutionResult *bool   `json:"executionResult"`
 	}
-	if err := c.callURL(ctx, baseURL, "getTransactionByHash", []interface{}{hash}, &out); err != nil {
+	if err := c.callURL(ctx, baseURL, "getTransactionByHash", []interface{}{hash}, &raw); err != nil {
+		var rpcErr *RPCError
+		if errors.As(err, &rpcErr) && strings.EqualFold(strings.TrimSpace(rpcErr.Message), "Transaction not found: "+hash) {
+			return false, false, nil
+		}
+		return false, false, err
+	}
+	if string(raw) == "null" {
+		return false, false, nil
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
 		return false, false, err
 	}
 	if out.Hash == nil {
-		return false, false, nil // unknown to this RPC
+		return false, false, fmt.Errorf("nimiq rpc: malformed transaction lookup")
+	}
+	if !strings.EqualFold(*out.Hash, hash) {
+		return false, false, fmt.Errorf("nimiq rpc: lookup returned another transaction hash")
 	}
 	confirmed = (out.Confirmations > 0 && out.ExecutionResult != nil && *out.ExecutionResult) ||
 		(out.BlockNumber != nil && out.ExecutionResult != nil && *out.ExecutionResult)
+	if confirmed {
+		if out.BlockNumber == nil || *out.BlockNumber <= 0 {
+			return true, false, nil
+		}
+		var head int64
+		if err := c.callURL(ctx, baseURL, "getBlockNumber", []interface{}{}, &head); err != nil {
+			return true, false, err
+		}
+		var finalized int64
+		if err := c.callURL(ctx, baseURL, "getLastMacroBlock", []interface{}{head}, &finalized); err != nil {
+			return true, false, err
+		}
+		confirmed = finalized >= *out.BlockNumber && finalized <= head
+	}
 	return true, confirmed, nil
 }
 
@@ -454,7 +496,7 @@ func (c *Client) GetTransactionByHash(ctx context.Context, hash string) (found b
 	}
 	if foundN < len(c.urls) {
 		// One RPC sees it, the other does not — wait, do not mark paid.
-		return false, false, nil
+		return true, false, nil
 	}
 	return true, confN == len(c.urls), nil
 }

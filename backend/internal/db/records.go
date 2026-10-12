@@ -3,6 +3,7 @@ package db
 import (
 	"encoding/json"
 	"log"
+	"nimiqshop/internal/nimiq"
 	"time"
 
 	"nimiqshop/internal/money"
@@ -356,19 +357,28 @@ type Cashback struct {
 	PaidBaseNIM float64 `json:"paid_base_nim,omitempty"`
 	BaseSource  string  `json:"base_source,omitempty"`
 	// SignedTxHex is the exact wire bytes we will (re)broadcast. Persisted
-	// BEFORE the first RPC send so a crash can never produce a second
-	// signature for the same cashback row — double-pay is structurally
-	// impossible. Empty means we have not signed yet.
-	SignedTxHex   string     `json:"signed_tx_hex,omitempty"`
-	ValidityStart uint32     `json:"validity_start,omitempty"`
-	LastError     string     `json:"last_error,omitempty"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
-	SendingAt     *time.Time `json:"sending_at,omitempty"`
-	PaidAt        *time.Time `json:"paid_at,omitempty"`
+	// BEFORE the first RPC send. Replacement is allowed only after a verified
+	// finalized expiry proof; every retired attempt stays in the audit trail.
+	// Empty means no current signed attempt exists.
+	SignedTxHex     string                 `json:"signed_tx_hex,omitempty"`
+	ExpiredAttempts []ExpiredPayoutAttempt `json:"expired_attempts,omitempty"`
+	ValidityStart   uint32                 `json:"validity_start,omitempty"`
+	LastError       string                 `json:"last_error,omitempty"`
+	CreatedAt       time.Time              `json:"created_at"`
+	UpdatedAt       time.Time              `json:"updated_at"`
+	SendingAt       *time.Time             `json:"sending_at,omitempty"`
+	PaidAt          *time.Time             `json:"paid_at,omitempty"`
 	// StakeReconciled is a durable idempotency marker for the rare recovery
 	// payout created after a pool outage hid a fresh stake at fulfillment.
 	StakeReconciled bool `json:"stake_reconciled,omitempty"`
+}
+
+// Retired signed bytes and their finalized expiry proof stay in the durable
+// audit trail. They must never be reattached or broadcast as a fresh attempt.
+type ExpiredPayoutAttempt struct {
+	SignedTxHex string                  `json:"signed_tx_hex"`
+	Proof       nimiq.PayoutExpiryProof `json:"proof"`
+	RetiredAt   time.Time               `json:"retired_at"`
 }
 
 // CashbackDestination is where a buyer wants their cashback to go.
