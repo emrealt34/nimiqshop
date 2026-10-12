@@ -1,37 +1,37 @@
 {
   "schema_version": 1,
   "title": "nimshop.io’u Ne Kadar Tanıyorsun?",
-  "description": "10 soruyla nimshop.io’nun alışveriş ve destek kurallarını keşfet: 9 şıklı soru, 1 sayısal cashback hesabı. Şıklı soruda doğru cevap 1, yanlış cevap 0 puan. Yalnızca sayısal soruda yakınlık puanı verilir. %2 oranı varsayımsaldır; güncel oranını ödeme ekranında kontrol et. İlk 3 tamamlanmış katılımcı kazanır; son kazanan sırasında eşitliği admin çözer. Ödül ve tarihleri yayınlamadan önce düzenleyin.",
+  "description": "nimshop.io’yu keşfet, bilgini göster. 10 soruyu cevapla, ilk 3’e gir ve ödül için yarış!",
   "winner_count": 3,
   "prize": {
-    "title": "Admin tarafından belirlenecek ödül",
+    "title": "Yarışma ödülü",
     "value": "",
-    "description": "Yayınlamadan önce ödülün markasını, tutarını, geçerli ülkesini ve teslim şartlarını belirtin. Tanımlanan ödül her kazanana ayrı ayrı teslim edilir.",
+    "description": "Ödül henüz belirlenmedi.",
     "image_url": "",
     "translations": {
       "tr": {
-        "title": "Admin tarafından belirlenecek ödül",
-        "description": "Yayınlamadan önce ödülün markasını, tutarını, geçerli ülkesini ve teslim şartlarını belirtin. Tanımlanan ödül her kazanana ayrı ayrı teslim edilir."
+        "title": "Yarışma ödülü",
+        "description": "Ödül henüz belirlenmedi."
       },
       "en": {
-        "title": "Prize to be set by the administrator",
-        "description": "Before publishing, specify the prize brand, value, valid country and delivery conditions. Each winner receives the specified prize separately."
+        "title": "Quiz prize",
+        "description": "The prize has not been set yet."
       },
       "de": {
-        "title": "Vom Admin festzulegender Preis",
-        "description": "Vor der Veröffentlichung Marke, Wert, gültiges Land und Lieferbedingungen des Preises angeben. Jeder Gewinner erhält den festgelegten Preis separat."
+        "title": "Quizpreis",
+        "description": "Der Preis steht noch nicht fest."
       },
       "fr": {
-        "title": "Lot à définir par l’administrateur",
-        "description": "Avant publication, précise la marque, la valeur, le pays de validité et les conditions de livraison du lot. Chaque gagnant reçoit séparément le lot indiqué."
+        "title": "Lot du quiz",
+        "description": "Le lot n’a pas encore été défini."
       },
       "es": {
-        "title": "Premio que definirá el administrador",
-        "description": "Antes de publicar, especifica la marca, el valor, el país válido y las condiciones de entrega del premio. Cada ganador recibe el premio indicado por separado."
+        "title": "Premio del concurso",
+        "description": "El premio aún no se ha definido."
       },
       "pt": {
-        "title": "Prémio a definir pelo administrador",
-        "description": "Antes de publicar, indica a marca, o valor, o país válido e as condições de entrega do prémio. Cada vencedor recebe separadamente o prémio indicado."
+        "title": "Prémio do concurso",
+        "description": "O prémio ainda não foi definido."
       }
     }
   },
@@ -607,27 +607,27 @@
   "translations": {
     "tr": {
       "title": "nimshop.io’u Ne Kadar Tanıyorsun?",
-      "description": "10 soruyla nimshop.io’nun alışveriş ve destek kurallarını keşfet: 9 şıklı soru, 1 sayısal cashback hesabı. Şıklı soruda doğru cevap 1, yanlış cevap 0 puan. Yalnızca sayısal soruda yakınlık puanı verilir. %2 oranı varsayımsaldır; güncel oranını ödeme ekranında kontrol et. İlk 3 tamamlanmış katılımcı kazanır; son kazanan sırasında eşitliği admin çözer. Ödül ve tarihleri yayınlamadan önce düzenleyin."
+      "description": "nimshop.io’yu keşfet, bilgini göster. 10 soruyu cevapla, ilk 3’e gir ve ödül için yarış!"
     },
     "en": {
       "title": "How Well Do You Know nimshop.io?",
-      "description": "Learn nimshop.io shopping and support rules with 10 questions: 9 multiple-choice questions and 1 numerical cashback calculation. Correct choices earn 1 point; incorrect choices earn 0. Only the numerical question uses proximity scoring. The 2% rate is hypothetical; check your current rate at checkout. The top 3 completed participants win; the administrator resolves ties at the final winning position. Edit the prize and dates before publishing."
+      "description": "Discover nimshop.io and show what you know. Answer 10 questions, reach the top 3 and compete for a prize!"
     },
     "de": {
       "title": "Wie gut kennst du nimshop.io?",
-      "description": "Lerne die Einkaufs- und Supportregeln von nimshop.io mit 10 Fragen: 9 Auswahlfragen und 1 Zahlenfrage zur Cashback-Berechnung. Richtige Auswahlantworten geben 1 Punkt, falsche 0. Nur die Zahlenfrage wird nach Nähe zum richtigen Wert bewertet. Die 2 % sind hypothetisch; prüfe deinen aktuellen Satz an der Kasse. Die besten 3 Teilnehmer mit abgeschlossener Teilnahme gewinnen; Gleichstände am letzten Gewinnplatz entscheidet der Admin. Preis und Termine vor der Veröffentlichung bearbeiten."
+      "description": "Entdecke nimshop.io und zeige dein Wissen. Beantworte 10 Fragen, erreiche die Top 3 und spiele um einen Preis!"
     },
     "fr": {
       "title": "Connais-tu bien nimshop.io ?",
-      "description": "Découvre les règles d’achat et d’assistance de nimshop.io avec 10 questions : 9 questions à choix et 1 calcul numérique de cashback. Une bonne réponse à choix vaut 1 point, une mauvaise 0. Seule la question numérique est notée selon la proximité de la bonne valeur. Le taux de 2 % est hypothétique ; vérifie ton taux actuel au paiement. Les 3 meilleurs participants ayant terminé gagnent ; un administrateur tranche les égalités à la dernière place gagnante. Modifie le lot et les dates avant publication."
+      "description": "Découvre nimshop.io et montre tes connaissances. Réponds à 10 questions, entre dans le top 3 et vise le prix !"
     },
     "es": {
       "title": "¿Cuánto conoces nimshop.io?",
-      "description": "Conoce las reglas de compra y soporte de nimshop.io con 10 preguntas: 9 con opciones y 1 cálculo numérico de cashback. Las opciones correctas dan 1 punto; las incorrectas, 0. Solo la pregunta numérica se puntúa por cercanía al valor correcto. El 2 % es hipotético; comprueba tu porcentaje actual al pagar. Ganan los 3 mejores participantes que hayan terminado; el administrador resuelve los empates en la última plaza premiada. Edita el premio y las fechas antes de publicar."
+      "description": "Descubre nimshop.io y demuestra lo que sabes. Responde 10 preguntas, entra en el top 3 y compite por el premio."
     },
     "pt": {
       "title": "Quanto sabes sobre a nimshop.io?",
-      "description": "Conhece as regras de compra e apoio da nimshop.io com 10 perguntas: 9 com opções e 1 cálculo numérico de cashback. As opções corretas dão 1 ponto; as incorretas, 0. Só a pergunta numérica é pontuada pela proximidade ao valor correto. A taxa de 2% é hipotética; verifica a tua taxa atual no pagamento. Ganham os 3 melhores participantes que tenham terminado; um administrador resolve os empates na última posição premiada. Edita o prémio e as datas antes de publicar."
+      "description": "Descobre a nimshop.io e mostra o que sabes. Responde a 10 perguntas, chega ao top 3 e compete pelo prémio!"
     }
   }
 }
