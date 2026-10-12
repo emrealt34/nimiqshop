@@ -3,12 +3,14 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"github.com/valyala/fasthttp"
 	"nimiqshop/internal/db"
 	"nimiqshop/internal/middleware"
 	"nimiqshop/internal/nimiq"
 	"strings"
 	"time"
+	"unicode"
 )
 
 // LightningProof only reads the chain; it never sends payment, retries an
@@ -23,33 +25,43 @@ func (h *Handlers) LightningProof(ctx *fasthttp.RequestCtx) {
 		writeError(ctx, 404, "payment proof unavailable")
 		return
 	}
-	if q.LightningChainProof != nil && q.LightningChainProof.SettlementTx != "" {
-		writeJSON(ctx, 200, map[string]any{"chain_proof": q.LightningChainProof})
-		return
-	}
 	funding := q.LightningFundingHint
 	if q.LightningChainProof != nil {
 		funding = q.LightningChainProof.FundingTx
 	}
 	if private {
 		var body struct {
-			Hash string `json:"hash"`
+			Hash   string `json:"hash"`
+			SwapID string `json:"swap_id"`
 		}
 		if json.Unmarshal(ctx.PostBody(), &body) != nil {
 			writeError(ctx, 400, "invalid proof request")
 			return
 		}
 		funding = strings.ToLower(strings.TrimSpace(body.Hash))
-		if !nimiq.IsTxHash(strings.TrimPrefix(funding, "0x")) {
+		body.SwapID = strings.TrimSpace(body.SwapID)
+		if (funding == "" && body.SwapID == "") || (funding != "" && !nimiq.IsTxHash(strings.TrimPrefix(funding, "0x"))) || len(body.SwapID) > 256 || strings.IndexFunc(body.SwapID, unicode.IsControl) >= 0 {
 			writeError(ctx, 400, "invalid funding hash")
 			return
 		}
 		// The SDK reports submission before mining. Keep the hint privately
 		// so a later public lookup can verify it after chain confirmation.
-		if h.Store.SaveLightningFundingHint(q.ID, q.UserID, funding) != nil {
+		if err := h.Store.SaveLightningSubmission(q.ID, q.UserID, funding, body.SwapID); err != nil {
+			if errors.Is(err, db.ErrConflict) {
+				writeError(ctx, 409, "submission identifiers conflict")
+				return
+			}
 			writeError(ctx, 503, "funding hint could not be saved")
 			return
 		}
+	}
+	if q.LightningChainProof != nil && q.LightningChainProof.SettlementTx != "" {
+		writeJSON(ctx, 200, map[string]any{"chain_proof": q.LightningChainProof})
+		return
+	}
+	if private && funding == "" {
+		writeJSON(ctx, 200, map[string]any{"chain_proof": nil})
+		return
 	}
 	// Polygon submissions are not Nimiq HTLC proofs. Persist the SDK
 	// identifier without claiming Lightning settlement or querying the wrong chain.

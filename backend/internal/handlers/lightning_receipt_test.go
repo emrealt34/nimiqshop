@@ -51,7 +51,7 @@ func TestActivityAndTrackPublishOnlySafeLightningMetadata(t *testing.T) {
 			id = "anonymous-lightning"
 		}
 		q := db.Quote{ID: id, UserID: "buyer", ProductID: "Carrefour", Status: "awaiting_payment", Coin: "BTC", Network: "Lightning", CoinAmount: "0.00012", Anonymous: anonymous,
-			LightningPaymentHash: strings.Repeat("ab", 32), WalletAddress: "private-invoice", SupplierOrderID: "private-supplier-id", CustomerEmail: "private@example.test"}
+			LightningPaymentHash: strings.Repeat("ab", 32), WalletAddress: "private-invoice", SupplierOrderID: "private-supplier-id", CustomerEmail: "private@example.test", LightningSwapID: "wallet-swap-private"}
 		if err := store.CreateQuoteWithDailyLimits(q, 0, 0, time.Now().Add(-time.Hour)); err != nil {
 			t.Fatal(err)
 		}
@@ -77,7 +77,7 @@ func TestActivityAndTrackPublishOnlySafeLightningMetadata(t *testing.T) {
 		} else if item["lightning_receipt"] == nil {
 			t.Fatalf("public track missing receipt: %s", ctx.Response.Body())
 		}
-		for _, secret := range []string{"private-invoice", "private-supplier-id", "private@example.test"} {
+		for _, secret := range []string{"private-invoice", "private-supplier-id", "private@example.test", "wallet-swap-private"} {
 			if strings.Contains(string(ctx.Response.Body()), secret) {
 				t.Fatalf("track leaked %s", secret)
 			}
@@ -94,6 +94,9 @@ func TestActivityAndTrackPublishOnlySafeLightningMetadata(t *testing.T) {
 	}
 	if len(body.Items) != 2 {
 		t.Fatalf("missing real purchases: %s", ctx.Response.Body())
+	}
+	if strings.Contains(string(ctx.Response.Body()), "wallet-swap-private") {
+		t.Fatal("activity leaked swap id")
 	}
 	for _, item := range body.Items {
 		if item["tx"] != nil {
@@ -134,5 +137,52 @@ func TestPublicLightningReceiptSubmissionIsNotSettlement(t *testing.T) {
 		if got["submitted_tx"] != hash || got["confirmed"] != false || got["chain_proof"] != nil {
 			t.Fatalf("submission misrepresented: %#v", got)
 		}
+	}
+}
+
+func TestLightningSwapOnlyOwnerDetailAndSubmissionWrite(t *testing.T) {
+	store, err := db.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	h := &Handlers{Store: store}
+	q := db.Quote{ID: "swap-private", UserID: "buyer", Coin: "BTC", Network: "Lightning", LightningPaymentHash: strings.Repeat("ab", 32), Status: "awaiting_payment"}
+	if err := store.CreateQuoteWithDailyLimits(q, 0, 0, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	var post fasthttp.RequestCtx
+	post.SetUserValue("id", q.ID)
+	post.SetUserValue("user_id", q.UserID)
+	post.Request.Header.SetMethod("POST")
+	post.Request.SetBodyString(`{"swap_id":"wallet-swap-private"}`)
+	h.LightningProof(&post)
+	if post.Response.StatusCode() != 200 {
+		t.Fatalf("swap-only submission rejected: %s", post.Response.Body())
+	}
+	saved, err := store.GetQuote(q.ID)
+	if err != nil || saved.LightningSwapID != "wallet-swap-private" || saved.PaidAt != nil || saved.PaymentObserved {
+		t.Fatalf("submission: %#v %v", saved, err)
+	}
+	for _, user := range []string{"buyer", "other", ""} {
+		var ctx fasthttp.RequestCtx
+		ctx.SetUserValue("id", q.ID)
+		ctx.SetUserValue("user_id", user)
+		h.GetUserQuote(&ctx)
+		exposed := strings.Contains(string(ctx.Response.Body()), "wallet-swap-private")
+		if exposed != (user == "buyer") {
+			t.Fatalf("owner visibility for %q: %s", user, ctx.Response.Body())
+		}
+	}
+	var listed fasthttp.RequestCtx
+	listed.SetUserValue("user_id", q.UserID)
+	h.ListUserQuotes(&listed)
+	if strings.Contains(string(listed.Response.Body()), "wallet-swap-private") {
+		t.Fatal("swap reference escaped private detail")
+	}
+	post.Request.SetBodyString(`{"swap_id":"replacement-swap"}`)
+	h.LightningProof(&post)
+	if post.Response.StatusCode() != 409 {
+		t.Fatalf("conflicting reference accepted: %s", post.Response.Body())
 	}
 }

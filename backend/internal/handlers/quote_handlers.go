@@ -906,10 +906,12 @@ func (h *Handlers) GetUserQuote(ctx *fasthttp.RequestCtx) {
 	if len(q.Fulfillment) > 0 && string(q.Fulfillment) != "null" {
 		fulfillment = q.Fulfillment
 	}
+	ownerQuote := q.PublicQuote(time.Now().UTC())
+	ownerQuote.LightningSwapID = q.LightningSwapID
 	out := map[string]interface{}{
 		"test_mode":   h.Cfg.TestMode || q.TestMode,
 		"test_pay":    h.canTestPay(q),
-		"quote":       q.PublicQuote(time.Now().UTC()),
+		"quote":       ownerQuote,
 		"can_pay":     q.CanPay(time.Now().UTC()),
 		"fulfillment": fulfillment,
 		"refund":      quoteRefundView(q),

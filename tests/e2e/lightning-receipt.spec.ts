@@ -119,3 +119,23 @@ for (const tx of ['ab'.repeat(32), '0x' + 'cd'.repeat(32)]) {
     });
   }
 }
+
+for (const width of [320, 1280]) {
+  test(`private order summary exposes swap id, public pages do not (${width}px)`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    const item = { ...purchase, lightning_swap_id: 'wallet-swap-private', lightning_receipt: receipt };
+    await page.route('**/api/quotes/lightning-test', route => route.fulfill({ json: { quote: item } }));
+    await page.route('**/api/activity?*', route => route.fulfill({ json: { items: [item], summary: {} } }));
+    await page.route('**/api/track/lightning-test', route => route.fulfill({ json: item }));
+    await open(page, path('/order?id=lightning-test&type=quote'));
+    await expect(page.locator('body')).toContainText('Swap ID');
+    await expect(page.locator('body')).toContainText('wallet-swap-private');
+    await page.reload();
+    await expect(page.locator('body')).toContainText('wallet-swap-private');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    for (const url of ['/activity', '/track?order=lightning-test']) {
+      await open(page, path(url));
+      await expect(page.locator('body')).not.toContainText('wallet-swap-private');
+    }
+  });
+}

@@ -137,6 +137,8 @@ type QuoteLine struct {
 type Quote struct {
 	// Untrusted owner-provided identifier, kept for confirmation retries. It
 	// is displayed as a reported submission, never as a settlement observation.
+	// Private wallet swap reference: only the authenticated order detail exposes it.
+	LightningSwapID      string               `json:"lightning_swap_id,omitempty"`
 	LightningFundingHint string               `json:"lightning_funding_hint,omitempty"`
 	LightningChainProof  *LightningChainProof `json:"lightning_chain_proof,omitempty"`
 	IsBatch              bool                 `json:"is_batch,omitempty"`

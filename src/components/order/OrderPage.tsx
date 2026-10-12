@@ -730,6 +730,7 @@ function PayNowCard({ q }: { q: any }) {
             {lightningReceiptOf(q) ? (
               <div><dt>{t('lightningReceipt.hash')}</dt><dd><LightningReceipt receipt={lightningReceiptOf(q)} /></dd></div>
             ) : null}
+            {q.lightning_swap_id ? <div><dt>Swap ID</dt><dd><code className="lightning-receipt-hash">{q.lightning_swap_id}</code><CopyButton getText={q.lightning_swap_id} label="" /></dd></div> : null}
             <div><dt>{t('orderPage.rowTo')}</dt><dd>{t('orderPage.toSupplier')}</dd></div>
             <div><dt>{t('orderPage.youGet')}</dt><dd>{selectedAmountLabel(q) || cleanProductLabel(q.product_id) || t('orderPage.instantDelivery')}</dd></div>
             <div><dt>{t('orderPage.rowDelivery')}</dt><dd>{del.sentence}</dd></div>
@@ -1293,7 +1294,7 @@ function QuoteContent({ q, refund, fulfillment, onChanged }: { q: any; refund?: 
                 invoice={quoteBolt11(q)}
                 onSubmitted={outcome => {
                   rememberLightningPayment(quoteBolt11(q), { kind: 'quote', ref: q.id });
-                  if ('hash' in outcome && outcome.hash) void saveLightningFunding(q.id, outcome.hash).catch(() => {});
+                  if ('hash' in outcome || 'swapId' in outcome) void saveLightningFunding(q.id, outcome.hash || '', outcome.swapId).catch(() => {});
                 }}
               />
             ) : null}
@@ -1379,6 +1380,7 @@ function QuoteContent({ q, refund, fulfillment, onChanged }: { q: any; refund?: 
     lightningReceiptOf(q)
       ? [t('lightningReceipt.hash'), <LightningReceipt key="tx" receipt={lightningReceiptOf(q)} />]
       : null,
+    q.lightning_swap_id ? ['Swap ID', <span key="swap-id"><code className="lightning-receipt-hash">{q.lightning_swap_id}</code><CopyButton getText={q.lightning_swap_id} label="" /></span>] : null,
     [t('orderPage.rowTotal'), qRail.isUsdt && coinAmountLabel(q) ? coinAmountLabel(q) : <NimAmount key="t" q={q} fallback="—" />],
     [t('orderPage.orderId'), copyIdNode(q.id || '')],
     [t('orderPage.rowUpdated'), fmtDate(q.updated_at || q.created_at)],

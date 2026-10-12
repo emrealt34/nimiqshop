@@ -163,6 +163,7 @@ func (q Quote) CanPay(now time.Time) bool {
 // PublicQuote omits the internal outbox and attribution. Historical invoices are
 // also removed when not payable, so old links cannot accidentally launch them.
 func (q Quote) PublicQuote(now time.Time) Quote {
+	q.LightningSwapID = ""
 	if delivered := q.DeliveryTime(); !delivered.IsZero() {
 		q.DeliveredAt = &delivered
 	}

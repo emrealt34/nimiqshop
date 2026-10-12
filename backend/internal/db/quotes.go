@@ -993,6 +993,11 @@ func (s *Store) SaveLightningChainProof(id, paymentHash string, proof LightningC
 }
 
 func (s *Store) SaveLightningFundingHint(id, userID, hash string) error {
+	return s.SaveLightningSubmission(id, userID, hash, "")
+}
+
+// SaveLightningSubmission atomically records identifiers, never settlement.
+func (s *Store) SaveLightningSubmission(id, userID, hash, swapID string) error {
 	return s.Update(func(tx *badger.Txn) error {
 		var q Quote
 		if err := getJSON(tx, quoteKey(id), &q); err != nil {
@@ -1001,13 +1006,18 @@ func (s *Store) SaveLightningFundingHint(id, userID, hash string) error {
 		if q.UserID != userID {
 			return ErrNotFound
 		}
-		if q.LightningChainProof != nil {
-			return nil
-		}
-		if q.LightningFundingHint != "" && q.LightningFundingHint != hash {
+		if swapID != "" && q.LightningSwapID != "" && q.LightningSwapID != swapID {
 			return ErrConflict
 		}
-		q.LightningFundingHint = hash
+		if swapID != "" {
+			q.LightningSwapID = swapID
+		}
+		if hash != "" && q.LightningFundingHint != "" && q.LightningFundingHint != hash {
+			return ErrConflict
+		}
+		if hash != "" && q.LightningChainProof == nil {
+			q.LightningFundingHint = hash
+		}
 		return putQuoteTx(tx, &q)
 	})
 }

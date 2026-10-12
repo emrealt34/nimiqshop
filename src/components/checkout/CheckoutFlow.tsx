@@ -1076,7 +1076,7 @@ export function PayScreen({
               invoice={invoice}
               onSubmitted={outcome => {
                 rememberLightningPayment(invoice, { kind: 'quote', ref: quoteIdOf(current) });
-                if ('hash' in outcome && outcome.hash) void saveLightningFunding(quoteIdOf(current), outcome.hash).catch(() => {});
+                if ('hash' in outcome || 'swapId' in outcome) void saveLightningFunding(quoteIdOf(current), outcome.hash || '', outcome.swapId).catch(() => {});
               }}
               amountNim={Number(nimAmountFor(current, cachedNimRate())) || 0}
               className="btn btn-gold btn-block btn-lg"

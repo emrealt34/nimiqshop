@@ -138,7 +138,7 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, hidePayButt
       if (action === 'pay' && insidePay) {
         const res = await payLightningInvoice(invoice);
         if (isTerminalOutcome(res)) {
-          if ('hash' in res && res.hash) void saveLightningFunding(quoteId, res.hash).catch(() => {});
+          if ('hash' in res || 'swapId' in res) void saveLightningFunding(quoteId, res.hash || '', res.swapId).catch(() => {});
           setPayLocked(true);
           toast(
             res.status === 'submitted'

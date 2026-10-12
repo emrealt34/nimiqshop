@@ -18,10 +18,10 @@ func TestLightningSubmissionSurvivesRestartAndRejectsReplacement(t *testing.T) {
 		t.Fatal(err)
 	}
 	hash := "0x" + strings.Repeat("ab", 32)
-	if err := store.SaveLightningFundingHint(q.ID, q.UserID, hash); err != nil {
+	if err := store.SaveLightningSubmission(q.ID, q.UserID, hash, "wallet-swap-private"); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.SaveLightningFundingHint(q.ID, q.UserID, hash); err != nil {
+	if err := store.SaveLightningSubmission(q.ID, q.UserID, hash, "wallet-swap-private"); err != nil {
 		t.Fatal(err)
 	}
 	if err := store.SaveLightningFundingHint(q.ID, q.UserID, strings.Repeat("cd", 32)); !errors.Is(err, ErrConflict) {
@@ -29,6 +29,9 @@ func TestLightningSubmissionSurvivesRestartAndRejectsReplacement(t *testing.T) {
 	}
 	if err := store.SaveLightningFundingHint(q.ID, "other", hash); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("ownership: %v", err)
+	}
+	if err := store.SaveLightningSubmission(q.ID, q.UserID, hash, "replacement-swap"); !errors.Is(err, ErrConflict) {
+		t.Fatalf("swap replacement: %v", err)
 	}
 	if err := store.Close(); err != nil {
 		t.Fatal(err)
@@ -39,7 +42,10 @@ func TestLightningSubmissionSurvivesRestartAndRejectsReplacement(t *testing.T) {
 	}
 	defer func() { _ = store.Close() }()
 	saved, err := store.GetQuote(q.ID)
-	if err != nil || saved.LightningFundingHint != hash || saved.PaymentObserved || saved.PaidAt != nil {
+	if err != nil || saved.LightningFundingHint != hash || saved.LightningSwapID != "wallet-swap-private" || saved.PaymentObserved || saved.PaidAt != nil {
 		t.Fatalf("submission lost or settlement invented: %#v %v", saved, err)
+	}
+	if saved.PublicQuote(time.Now()).LightningSwapID != "" {
+		t.Fatal("public quote exposed private swap id")
 	}
 }
