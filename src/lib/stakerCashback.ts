@@ -1,3 +1,4 @@
+import { getUid, getAddress } from './session';
 /**
  * stakerCashback.ts — the "stake in our pool, earn more cashback" programme,
  * v2 (single ledger).
@@ -126,7 +127,7 @@ export type MyStake = {
 };
 
 const PROGRAM_KEY = 'nim_staker_program_v3';
-const MY_STAKE_KEY = 'nim_my_stake_v2';
+const myStakeKey = () => 'nim_my_stake_v3:' + getUid() + ':' + getAddress().replace(/\s/g, '').toUpperCase();
 const PROGRAM_TTL_MS = 5 * 60 * 1000;
 const MY_STAKE_TTL_MS = 60 * 1000;
 
@@ -292,12 +293,14 @@ function parseMyStake(r: any): MyStake | null {
 
 /** The signed-in buyer's standing. Null when signed out or on a hard error. */
 export async function loadMyStake(): Promise<MyStake | null> {
-  const cached = readCache<MyStake>(MY_STAKE_KEY, MY_STAKE_TTL_MS);
+  const key = myStakeKey();
+  const cached = readCache<MyStake>(key, MY_STAKE_TTL_MS);
   if (cached) return cached;
   try {
     const r: any = await getPoolStake();
     const mine = parseMyStake(r);
-    if (mine) writeCache(MY_STAKE_KEY, mine);
+    if (myStakeKey() !== key) return null;
+    if (mine) writeCache(key, mine);
     return mine;
   } catch {
     return cached;
@@ -306,15 +309,17 @@ export async function loadMyStake(): Promise<MyStake | null> {
 
 /** Drops the cached answer and re-asks — used right after a stake tx. */
 export async function refreshMyStake(): Promise<MyStake | null> {
+  const key = myStakeKey();
   try {
-    sessionStorage.removeItem(MY_STAKE_KEY);
+    sessionStorage.removeItem(key);
   } catch {
     /* ignore */
   }
   try {
     const r: any = await refreshPoolStake();
     const mine = parseMyStake(r);
-    if (mine) writeCache(MY_STAKE_KEY, mine);
+    if (myStakeKey() !== key) return null;
+    if (mine) writeCache(key, mine);
     return mine;
   } catch {
     return null;

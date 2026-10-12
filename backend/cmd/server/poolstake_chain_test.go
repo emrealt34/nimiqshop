@@ -163,3 +163,44 @@ func TestPoolStakeMeWithNoChainAnswerStaysNotStaked(t *testing.T) {
 		t.Fatalf("cashback_bps = %v, want 0", body["cashback_bps"])
 	}
 }
+
+// Positions remain readable without the pool service and never accept another wallet.
+func TestStakePositionIsOwnerScopedAndIndependentOfPool(t *testing.T) {
+	const validator = "NQ49 N8MB XYCR XBUP 404C KXKK L49M A7BT F082"
+	var chainCalls int64
+	rpc := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Method string   `json:"method"`
+			Params []string `json:"params"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		if req.Method != "getStakerByAddress" {
+			_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":1,"result":null}`))
+			return
+		}
+		atomic.AddInt64(&chainCalls, 1)
+		_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":1,"result":{"data":{"balance":10000000,"inactiveBalance":2000000,"retiredBalance":3000000,"delegation":"NQ12 CPDG 4KKU 70UB NC7U 0Q82 T8U7 US17 PYHU"},"metadata":{"blockNumber":63301077}}}`))
+	}))
+	defer rpc.Close()
+	s := bootStack(t, stackOptions{env: map[string]string{"POOL_VALIDATOR_ADDRESS": validator, "NIMIQ_RPC_URL": rpc.URL}})
+	if got := s.do(http.MethodGet, "/api/poolstake/position", nil, nil); got.status != 401 {
+		t.Fatalf("private route: %d", got.status)
+	}
+	auth, address := s.signIn()
+	got := s.do(http.MethodGet, "/api/poolstake/position?address=NQ49N8MBXYCRXBUP404CKXKKL49MA7BTF082", nil, auth)
+	if got.status != 200 {
+		t.Fatalf("position: %d %s", got.status, got.body)
+	}
+	body := got.json(t)
+	if body["address"] != strings.ReplaceAll(address, " ", "") || body["exists"] != true || body["active_nim"] != float64(100) || body["inactive_nim"] != float64(20) || body["retired_nim"] != float64(30) {
+		t.Fatalf("wrong position: %v", body)
+	}
+	s.do(http.MethodGet, "/api/poolstake/position", nil, auth)
+	if atomic.LoadInt64(&chainCalls) != 1 {
+		t.Fatal("cache missed")
+	}
+	got = s.do(http.MethodPost, "/api/poolstake/position/refresh", map[string]any{}, auth)
+	if got.status != 200 || atomic.LoadInt64(&chainCalls) != 2 {
+		t.Fatalf("refresh failed: %d %s calls=%d", got.status, got.body, chainCalls)
+	}
+}

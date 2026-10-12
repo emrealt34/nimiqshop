@@ -4016,3 +4016,14 @@ body { padding-bottom: 0; }
   background: linear-gradient(90deg, rgba(255,255,255,.06) 25%, rgba(255,255,255,.12) 50%, rgba(255,255,255,.06) 75%);
   background-size: 400% 100%;
 }
+
+.cb-position { padding-bottom: 18px; margin-bottom: 18px; border-bottom: 1px dashed var(--line); }
+.cb-position h3 { margin: 0; }
+.cb-position-validator { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 14px 0; }
+.cb-position-validator > div { flex: 1; min-width: 0; }
+.cb-position-validator img { object-fit: contain; border-radius: 8px; flex: none; }
+.cb-position-validator code { display: block; font-size: .72rem; overflow-wrap: anywhere; margin-top: 4px; }
+.cb-position-balances { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 16px 0; }
+.cb-position-balances dt { font-size: .75rem; color: var(--muted); }
+.cb-position-balances dd { margin: 5px 0 0; font-weight: 800; overflow-wrap: anywhere; }
+@media (max-width: 480px) { .cb-position-balances { grid-template-columns: 1fr; gap: 8px; } .cb-position-balances > div { display: flex; justify-content: space-between; gap: 12px; } .cb-position-balances dd { margin: 0; } }

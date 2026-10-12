@@ -3,6 +3,24 @@
  * Türkçe'de çoğul: sayı 1 ise tekil, diğer hallerde çoğul.
  */
 const tr = {
+  stakePosition: {
+    "title": "Stake durumun",
+    "unavailable": "Stake durumun doğrulanamadı. İşlem göndermeden önce yenile.",
+    "none": "Henüz bir stake kaydın yok.",
+    "here": "Stake delegasyonun bizim havuzumuzda.",
+    "elsewhere": "Stake kaydın başka bir validatorda.",
+    "validator": "Mevcut validator",
+    "verify": "Doğrula",
+    "active_nim": "Aktif stake",
+    "inactive_nim": "Pasif stake",
+    "retired_nim": "Emekli stake",
+    "cooldown": "Pasif veya emekli fonların bekleme süresi devam ediyor olabilir. Cüzdan, değişiklik veya çekim onayından önce ağ kısıtlamalarını kontrol eder.",
+    "manageWallet": "Cüzdanda yönet",
+    "source": "Bakiyeler zincirden doğrulanır. Validator adı ve logosu validator API’sinden alınır.",
+    "changed": "Stake durumun değişti. Devam etmeden önce güncel durumu incele.",
+    "exceeds": "Tutar bu işlem için kullanılabilir bakiyeyi aşıyor.",
+    "pending": "İşlem onayı bekleniyor. Yeni işlem göndermeden önce yenile ve cüzdanını kontrol et."
+},
   refreshStatus: {
     "finished": "Stok taraması bitti",
     "partial": "Katalog veya kur yenilemesi tamamlanmadı. Eksik sorgular ve korunan veriler aşağıda.",

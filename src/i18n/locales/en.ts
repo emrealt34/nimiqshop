@@ -9,6 +9,24 @@
  * in the other five locales.
  */
 const en = {
+  stakePosition: {
+    "title": "Your staking position",
+    "unavailable": "Your staking position could not be verified. Refresh before sending a transaction.",
+    "none": "You have no staking position yet.",
+    "here": "Your delegation is with our pool.",
+    "elsewhere": "Your staking position is with another validator.",
+    "validator": "Current validator",
+    "verify": "Verify",
+    "active_nim": "Active stake",
+    "inactive_nim": "Inactive stake",
+    "retired_nim": "Retired stake",
+    "cooldown": "Inactive or retired funds may still be cooling down. The wallet checks network restrictions before approving changes or withdrawals.",
+    "manageWallet": "Manage in wallet",
+    "source": "Balances are verified on-chain. Validator names and logos come from the validator API.",
+    "changed": "Your staking position changed. Review the latest position before continuing.",
+    "exceeds": "The amount exceeds the balance available for this operation.",
+    "pending": "Transaction confirmation is pending. Refresh and check your wallet before sending another transaction."
+},
   refreshStatus: {
     "finished": "Stock scan finished",
     "partial": "The catalog or rate refresh is incomplete. Unresolved checks and retained data are listed below.",

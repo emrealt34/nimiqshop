@@ -12,8 +12,9 @@ import { CashbackImpactSection } from './CashbackImpactSection';
  * $500/day and $1000/month. There are no levels to climb and no locks to
  * choose: the page shows the programme once, then the buyer's own ledger.
  *
- * All stake figures come from the operator's own pool (GET /api/poolstake/me).
- * The chain is never queried from here.
+ * Personal positions are verified by the backend against the chain; validator
+ * names and logos come from the validator worker API. Cashback ledgers remain
+ * sourced from the operator's pool.
  *
  * v8 layout (owner, 2026-10-05: "o sayfayı basitleştir çok uzun"): receipt
  * card → compact "your cashback right now" strip → leaderboard → calculator →
@@ -64,7 +65,9 @@ import { CashbackImpactSection } from './CashbackImpactSection';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AppRoot } from '../AppRoot';
 import { Icon } from '../ui/Icon';
-import { ElsewhereStake } from './ElsewhereStake';
+import { StakePositionCard } from './StakePositionCard';
+import { useStakePosition, type StakePosition } from '../../lib/stakePosition';
+import { getUid, getAddress } from '../../lib/session';
 import { CashbackCalculator } from './CashbackCalculator';
 import { useSheet, useToast } from '../AppProviders';
 import { useSession } from '../../lib/useSession';
@@ -245,13 +248,33 @@ function WalletRedirectSheet({ guide }: { guide: WalletGuide }) {
 export function CashbackView() {
   const { t } = useT();
   const authed = useSession();
+  const { position, loading: positionLoading, error: positionError, refresh: refreshPosition, owner: positionOwner } = useStakePosition(authed);
+  const stakeSending = useRef(false);
+  const [pendingStake, setPendingStake] = useState<{ owner: string; hash: string; before: string } | null>(null);
   const { toast } = useToast();
   const { openSheet } = useSheet();
 
   const [program, setProgram] = useState<StakerProgram | null>(null);
-  const [mine, setMine] = useState<MyStake | null>(null);
+  const [mineRaw, setMine] = useState<MyStake | null>(null);
+  const [mineOwner, setMineOwner] = useState('');
+  const mine = mineOwner === positionOwner ? mineRaw : null;
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('nimshop.pendingStake:' + positionOwner) || 'null');
+      setPendingStake(stored?.owner === positionOwner && (stored.hash === '' || /^[a-f0-9]{64}$/i.test(stored.hash)) && typeof stored.before === 'string' ? stored : null);
+    } catch { setPendingStake(null); }
+  }, [positionOwner]);
+  function savePending(value: typeof pendingStake) {
+    setPendingStake(value);
+    try {
+      if (value) localStorage.setItem('nimshop.pendingStake:' + value.owner, JSON.stringify(value));
+      else localStorage.removeItem('nimshop.pendingStake:' + positionOwner);
+    } catch { /* Memory still blocks duplicate clicks when storage is unavailable. */ }
+  }
   const watchRef = useRef<StakeWatch | null>(null);
-  const [ledger, setLedger] = useState<MyCashback | null>(null);
+  const [ledgerRaw, setLedger] = useState<MyCashback | null>(null);
+  const [ledgerOwner, setLedgerOwner] = useState('');
+  const ledger = ledgerOwner === positionOwner ? ledgerRaw : null;
   const [amount, setAmount] = useState<string>('10000000');
   const [busy, setBusy] = useState<StakeOp['kind'] | ''>('');
   const [err, setErr] = useState('');
@@ -276,14 +299,17 @@ export function CashbackView() {
   /* -------------------------------------------------------------- loading */
 
   const reload = useCallback(async () => {
+    const owner = positionOwner;
     const [p, m] = await Promise.all([loadStakerProgram(), authed ? loadMyStake() : Promise.resolve(null)]);
+    if (authed && owner !== getUid() + ':' + getAddress().replace(/\s/g, '').toUpperCase()) return;
     setProgram(p);
+    setMineOwner(owner);
     setMine(m);
     if (m && m.stake_nim > 0 && (!activeNIM || Number(activeNIM) === 0)) setActiveNIM(String(m.stake_nim));
     // setActiveNIM is a state setter (stable) — listed because the React
     // Compiler's inferred dependency set includes it, and a mismatch there
     // costs this page its automatic memoization.
-  }, [authed, activeNIM, setActiveNIM]);
+  }, [authed, activeNIM, setActiveNIM, positionOwner]);
 
   /**
    * Re-asks the backend for the live programme. The programme is PUBLIC —
@@ -340,9 +366,11 @@ export function CashbackView() {
       return;
     }
     let alive = true;
+    const owner = positionOwner;
     getMyCashback()
       .then((r) => {
-        if (!alive) return;
+        if (!alive || owner !== getUid() + ':' + getAddress().replace(/\s/g, '').toUpperCase()) return;
+        setLedgerOwner(owner);
         // Normalise: a proxy error page / partial payload must not crash the
         // whole page (ledger.totals.pending_nim used to throw on `{}`).
         const raw = (r || {}) as Partial<MyCashback>;
@@ -364,13 +392,25 @@ export function CashbackView() {
     return () => {
       alive = false;
     };
-  }, [authed]);
+  }, [authed, positionOwner]);
+
+  useEffect(() => {
+    watchRef.current?.stop();
+    return () => { watchRef.current?.stop(); };
+  }, [positionOwner]);
 
   /* ---------------------------------------------------------------- state */
 
   const params = program?.program || null;
   const validator = normalizeValidator(mine?.pool_validator_address || program?.validator || '');
-  const stakedHere = !!mine?.staked && (mine?.stake_luna || 0) > 0;
+  const poolPosition = !!position?.exists && !!validator && position.delegation === validator;
+  const stakedHere = position ? poolPosition && position.active_nim > 0 : !!mine?.staked && (mine?.stake_luna || 0) > 0;
+  const pending = pendingStake?.owner === positionOwner ? pendingStake : null;
+  const positionKey = (p: StakePosition) => JSON.stringify([p.exists, p.delegation, p.active_nim, p.inactive_nim, p.retired_nim]);
+  async function recheckPosition() {
+    const fresh = await refreshPosition();
+    if (fresh && pending && positionKey(fresh) !== pending.before) savePending(null);
+  }
   // The universal base (non-stakers; 0 by default) and the pool's staker
   // base (any positive stake). Both come from the API — the pool's number,
   // verbatim. There is no local fallback: what the pool publishes is what
@@ -389,10 +429,26 @@ export function CashbackView() {
    * nothing to sign, so the same tap opens the guided wallet hand-off instead.
    */
   async function send(op: StakeOp, successNote?: string) {
+    if (busy || pending || stakeSending.current) return false;
+    stakeSending.current = true;
+    const user = getUid();
     setErr('');
     setBusy(op.kind);
+    let attemptedPosition: StakePosition | null = null;
     try {
+      const current = await refreshPosition();
+      if (!current || getUid() !== user) throw Error(t('stakePosition.unavailable'));
+      const here = current.delegation === validator;
+      if ((op.kind === 'newStaker' && current.exists) || (op.kind === 'addStake' && (!current.exists || !here)) || (op.kind === 'changeDelegation' && (!current.exists || here || current.active_nim + current.inactive_nim <= 0))) throw Error(t('stakePosition.changed'));
+      if (op.kind === 'setActiveStake' && (!here || op.activeNIM > current.active_nim + current.inactive_nim)) throw Error(t('stakePosition.exceeds'));
+      if (op.kind === 'retireStake' && (!here || op.amountNIM > current.inactive_nim)) throw Error(t('stakePosition.exceeds'));
+      if (op.kind === 'removeStake' && (!here || op.amountNIM > current.retired_nim)) throw Error(t('stakePosition.exceeds'));
+      attemptedPosition = current;
       const hash = await runStakeOp(op);
+      if (!/^[a-f0-9]{64}$/i.test(hash)) throw Object.assign(Error(t('stake.noTxHash')), { type: 'TRANSACTION_OUTCOME_UNKNOWN' });
+      savePending({ owner: positionOwner, hash, before: positionKey(current) });
+      const updated = await refreshPosition();
+      if (updated && positionKey(updated) !== positionKey(current)) savePending(null);
       toast(t('cashback.toastStakeSent', { op: t(OP_KEY[op.kind]), hash: String(hash).slice(0, 10) }), 'success');
       // No "I've staked" claim is sent (and the shop no longer accepts one):
       // buyer claims are not evidence, the pool is the single source. If an
@@ -403,7 +459,8 @@ export function CashbackView() {
       // refreshed rate can still be the old one. Say so rather than implying
       // the new rate is already locked in.
       const fresh = await refreshMyStake();
-      if (fresh) setMine(fresh);
+      if (getUid() !== user) return true;
+      if (fresh) { setMineOwner(positionOwner); setMine(fresh); }
       if (fresh?.staked) toast(t('cashback.toastStakerActive', { pct: pct(fresh.cashback_bps) }), 'success');
       else {
         toast(successNote || t('cashback.toastPoolPicksUp'), 'info');
@@ -413,15 +470,17 @@ export function CashbackView() {
         watchRef.current?.stop();
         watchRef.current = watchStakeDetection({
           onUpdate: (m) => {
-            if (m) setMine(m);
+            if (m && getUid() === user) { setMineOwner(positionOwner); setMine(m); }
           },
           onDetected: (m) => toast(t('cashback.toastStakerActive', { pct: pct(m.cashback_bps) }), 'success'),
         });
       }
       return true;
     } catch (e) {
+      const failure = e as Error & { type?: string };
+      if (attemptedPosition && /TRANSACTION_OUTCOME_UNKNOWN|TransactionOutcomeUnknown/i.test(failure?.type || failure?.name || '')) savePending({ owner: positionOwner, hash: '', before: positionKey(attemptedPosition) });
       if (e instanceof StakeCancelledError) setErr(e.message);
-      else if (e instanceof StakeUnsupportedError) setErr(e.message);
+      else if (e instanceof StakeUnsupportedError) { setErr(e.message); showWalletRedirect(); }
       else if (e instanceof StakeInvalidError) {
         setErr(e.message);
         // A rejected FIRST delegation means the wallet already has a staker
@@ -430,6 +489,7 @@ export function CashbackView() {
       } else setErr((e as Error).message || t('cashback.toastTxFailed'));
       return false;
     } finally {
+      stakeSending.current = false;
       setBusy('');
     }
   }
@@ -440,16 +500,16 @@ export function CashbackView() {
       setErr(t('cashback.errAmountZero'));
       return;
     }
-    if (!stakedHere && nim < MIN_STAKE_NIM) {
+    if (!position?.exists && nim < MIN_STAKE_NIM) {
       setErr(t('cashback.errFirstStakeMin', { nim: String(MIN_STAKE_NIM) }));
       return;
     }
-    if (!inPay) {
+    if (!inPay || !authed) {
       setErr('');
       showWalletRedirect();
       return;
     }
-    void send(stakedHere ? { kind: 'addStake', amountNIM: nim } : { kind: 'newStaker', delegation: validator, amountNIM: nim });
+    void send(poolPosition ? { kind: 'addStake', amountNIM: nim } : { kind: 'newStaker', delegation: validator, amountNIM: nim });
   }
 
   function doSetActive() {
@@ -483,15 +543,16 @@ export function CashbackView() {
    * For a wallet that already stakes with ANOTHER validator: creating a new
    * staker is impossible (the chain rejects it), so the only way in is moving
    * the existing delegation to our pool — the stake stays, only the validator
-   * changes, and everything inactive is reactivated.
+   * changes. Inactive stake is not silently reactivated.
    */
   function doMove() {
+    if (!inPay || !supportsOp({ kind: 'changeDelegation', delegation: validator })) { showWalletRedirect(); return; }
     if (!validator) {
       setErr(t('cashback.errNoValidator'));
       return;
     }
     void send(
-      { kind: 'changeDelegation', delegation: validator, reactivateAll: true },
+      { kind: 'changeDelegation', delegation: validator },
       t('cashback.noteMoveSent')
     );
   }
@@ -502,7 +563,7 @@ export function CashbackView() {
 
   function showWalletRedirect() {
     openSheet({
-      title: t('cashback.formNotInPay'),
+      title: inPay ? t('stakePosition.manageWallet') : t('cashback.formNotInPay'),
       render: () => <WalletRedirectSheet guide={walletGuide} />,
     });
   }
@@ -546,7 +607,7 @@ export function CashbackView() {
             <span className="small muted">
               {stakedHere
                 ? t('cashback.heroStaked', {
-                    nim: fmtStakeNIM(mine?.stake_nim || 0),
+                    nim: fmtStakeNIM(position?.active_nim ?? mine?.stake_nim ?? 0),
                     loyalty: (mine?.loyalty_days || 0) > 0 ? t('cashback.heroLoyalty', { days: String(mine?.loyalty_days) }) : '',
                   })
                 : t('cashback.heroNoStake', { pct: pct(stakerBaseBps), max: String(params?.max_boost_percent ?? '?') })}
@@ -557,7 +618,7 @@ export function CashbackView() {
             {stakedHere && (
               <div>
                 <div className="xs faint">{t('cashback.statYourStake')}</div>
-                <div className="strong">{fmtStakeNIM(mine?.stake_nim || 0)} <NimUnit size={13} /></div>
+                <div className="strong">{fmtStakeNIM(position?.active_nim ?? mine?.stake_nim ?? 0)} <NimUnit size={13} /></div>
               </div>
             )}
             {myLedger && (
@@ -631,23 +692,13 @@ export function CashbackView() {
   // Staked with ANOTHER validator: one clear card (that validator + a Change
   // button). No amount or preset form, because a new delegation would only
   // create a second staker.
-  const elsewhereValidator = authed && !stakedHere && mine?.other_validator ? mine.other_validator : '';
+  const showStakeForm = !authed || (!!position && (!position.exists || poolPosition));
   const stakeFooter = (
     <div id="cb-stake-form">
-      {elsewhereValidator ? (
-        <>
-          <div className="card-title">
-            <Icon name="bolt" size={16} /> {t('cashback.elsewhereTitle')}
-          </div>
-          <ElsewhereStake
-            address={elsewhereValidator}
-            stakeNim={mine?.other_stake_nim ?? 0}
-            canMove={!!validator && supportsOp({ kind: 'changeDelegation', delegation: validator })}
-            busy={busy === 'changeDelegation'}
-            onMove={doMove}
-          />
-        </>
-      ) : (
+      {authed && <StakePositionCard position={position} loading={positionLoading || (!position && !positionError)} error={positionError} pool={validator} busy={!!busy || !!pending} onRefresh={() => { void recheckPosition(); }} onMove={doMove} onWallet={showWalletRedirect} />}
+      {pending && <div className="alert info" role="status">{t('stakePosition.pending')} <code style={{ overflowWrap: 'anywhere' }}>{pending.hash}</code><button className="btn btn-sm" onClick={() => { void recheckPosition(); }} disabled={positionLoading}>{t('common.refresh')}</button><button className="btn btn-sm btn-outline" onClick={showWalletRedirect}>{t('stakePosition.manageWallet')}</button></div>}
+      {err && !showStakeForm && <div className="alert error" role="alert">{err}</div>}
+      {!showStakeForm ? null : (
       <>
       <div className="card-title">
         <Icon name="bolt" size={16} /> {t('cashback.formAddToStake')}
@@ -667,7 +718,7 @@ export function CashbackView() {
               setErr('');
             }}
           >
-            {stakedHere ? `+${n.toLocaleString('en-US')}` : n.toLocaleString('en-US')}
+            {poolPosition ? `+${n.toLocaleString('en-US')}` : n.toLocaleString('en-US')}
           </button>
         ))}
       </div>
@@ -683,9 +734,9 @@ export function CashbackView() {
           aria-label={t('cashback.formAmountAria')}
         />
         <NimUnit size={12} className="cb-unit" />
-        <button className="btn btn-gold cb-primary" onClick={stakeCustom} disabled={!!busy || (inPay && !validator)}>
+        <button className="btn btn-gold cb-primary" onClick={stakeCustom} disabled={!!busy || !!pending || (inPay && !!authed && (!validator || !position || positionLoading))}>
           <Icon name={inPay ? 'bolt' : 'external'} size={14} />
-          {stakeBusy ? t('cashback.formWaitingPay') : !inPay ? t('cashback.formOpenWalletStake') : stakedHere ? t('cashback.opAddStake') : t('cashback.opNewStaker')}
+          {stakeBusy ? t('cashback.formWaitingPay') : !inPay ? t('cashback.formOpenWalletStake') : poolPosition ? t('cashback.opAddStake') : t('cashback.opNewStaker')}
         </button>
       </div>
       {/* The two lines the form always promised and quietly lost: no account is
@@ -714,7 +765,7 @@ export function CashbackView() {
         </div>
       )}
 
-      {stakedHere && (
+      {poolPosition && (
         <details className="cb-details mt-2" open={manageOpen} onToggle={(e) => setManageOpen((e.target as HTMLDetailsElement).open)}>
           <summary className="small strong">
             <Icon name="chevron" size={14} /> {t('cashback.formMoreTools')}
@@ -732,16 +783,16 @@ export function CashbackView() {
                 aria-label={t('cashback.formActiveStakeAria')}
               />
               <NimUnit size={12} className="cb-unit" />
-              <button className="btn" onClick={doSetActive} disabled={busy === 'setActiveStake' || !supportsOp({ kind: 'setActiveStake', activeNIM: 0 })}>
+              <button className="btn" onClick={doSetActive} disabled={!!busy || !!pending || positionLoading || !supportsOp({ kind: 'setActiveStake', activeNIM: 0 })}>
                 {busy === 'setActiveStake' ? t('cashback.formWaiting') : t('cashback.opSetActiveStake')}
               </button>
             </div>
             <div className="xs faint mt-2">{t('cashback.formRetireNote')}</div>
             <div className="cb-tools-row">
-              <button className="btn" onClick={doRetire} disabled={busy === 'retireStake'}>
+              <button className="btn" onClick={doRetire} disabled={!!busy || !!pending || positionLoading || !position?.inactive_nim}>
                 {busy === 'retireStake' ? t('cashback.formWaiting') : t('cashback.opRetireStake')}
               </button>
-              <button className="btn" onClick={doRemove} disabled={busy === 'removeStake'}>
+              <button className="btn" onClick={doRemove} disabled={!!busy || !!pending || positionLoading || !position?.retired_nim}>
                 {busy === 'removeStake' ? t('cashback.formWaiting') : t('cashback.opRemoveStake')}
               </button>
             </div>
@@ -764,7 +815,7 @@ export function CashbackView() {
           hesaplayıcı"): the receipt card leads, the live rate follows it, the
           board comes next and the calculator closes the page. ONE component
           renders all three blocks so the order can never drift apart again. */}
-      <CashbackImpactSection authed={authed === true} myTotals={ledger?.totals ?? null} between={rateStrip} />
+      <CashbackImpactSection key={positionOwner || 'guest'} authed={authed === true} myTotals={ledger?.totals ?? null} between={rateStrip} />
 
       {/* ------------------------------------------------------ calculator */}
       {/*

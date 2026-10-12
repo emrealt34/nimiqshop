@@ -3,6 +3,24 @@
  * Plural en español: uno (n===1) / otros.
  */
 const es = {
+  stakePosition: {
+    "title": "Tu posición de staking",
+    "unavailable": "No se pudo verificar tu posición de staking. Actualiza antes de enviar una transacción.",
+    "none": "Todavía no tienes una posición de staking.",
+    "here": "Tu delegación está en nuestro pool.",
+    "elsewhere": "Tu posición de staking está en otro validador.",
+    "validator": "Validador actual",
+    "verify": "Verificar",
+    "active_nim": "Stake activo",
+    "inactive_nim": "Stake inactivo",
+    "retired_nim": "Stake retirado del staking",
+    "cooldown": "Los fondos inactivos o retirados del staking pueden seguir bloqueados. La cartera comprueba las restricciones de la red antes de aprobar cambios o retiros.",
+    "manageWallet": "Gestionar en la cartera",
+    "source": "Los saldos se verifican en la cadena. Los nombres y logos de validadores proceden de la API de validadores.",
+    "changed": "Tu posición de staking cambió. Revisa la posición actual antes de continuar.",
+    "exceeds": "El importe supera el saldo disponible para esta operación.",
+    "pending": "La confirmación está pendiente. Actualiza y revisa tu cartera antes de enviar otra transacción."
+},
   refreshStatus: {
     "finished": "Control de stock finalizado",
     "partial": "La actualización del catálogo o de los tipos de cambio está incompleta. Las comprobaciones sin resolver y los datos conservados aparecen abajo.",

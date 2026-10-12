@@ -113,6 +113,7 @@ function payload(p: string, method: string, o: ApiOptions): unknown {
     staker_program_enabled: false,
   };
   if (p === '/account/limits') return { daily_usd: 500, used_usd: 20 };
+  if (p === '/poolstake/position' || p === '/poolstake/position/refresh') return { address: ADDRESS, exists: false, delegation: '', active_nim: 0, inactive_nim: 0, retired_nim: 0, checked_at: iso(), from_cache: false };
   if (p === '/orders') return o.authed ? [order('o1', 'delivered', 0), order('o2', 'supplier_processing', 1), order('o3', 'failed', 2)] : [];
   if (p.startsWith('/orders/')) return order(p.split('/')[2], 'delivered', 0);
   if (p === '/quotes') return [];

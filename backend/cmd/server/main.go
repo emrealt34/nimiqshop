@@ -49,6 +49,9 @@ import (
 // exercise the wiring production runs: a fallback that only lives inside
 // main() is a fallback no test can ever catch.
 func wireStakeSources(h *handlers.Handlers, store *db.Store, cfg config.Config) {
+	// Personal positions remain readable even when pool indexing is disabled.
+	chain := chainstake.New(nimiq.NewClient(cfg.NimiqRPCURL, cfg.NimiqRPCURL2), cfg.PoolValidatorAddress, 0, 0)
+	h.Chain = chain
 	if cfg.PoolAPIURL == "" {
 		log.Printf("poolstake: POOL_API_URL unset — staker cashback programme disabled")
 		return
@@ -64,8 +67,6 @@ func wireStakeSources(h *handlers.Handlers, store *db.Store, cfg config.Config) 
 	// pool reported zero stakers while the chain showed delegators to
 	// the pool's own validator) — and when it does, every real staker is
 	// silently paid and shown the non-staker rate.
-	chain := chainstake.New(nimiq.NewClient(cfg.NimiqRPCURL, cfg.NimiqRPCURL2), cfg.PoolValidatorAddress, 0, 0)
-	h.Chain = chain
 	store.SetStakerLookupDetailed(func(ctx context.Context, address string) (db.StakerStake, error) {
 		st, err := pool.Stake(ctx, address)
 		if err != nil {
@@ -1090,6 +1091,8 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 	r.GET("/api/cashback/code", tiered(tPromo, pinPrivate(h.PublicCashbackCode)))
 	r.GET("/api/cashback/me", authed(h.CashbackMe))
 	r.GET("/api/poolstake/me", authed(h.PoolStakeMe))
+	r.GET("/api/poolstake/position", authed(h.StakePosition))
+	r.POST("/api/poolstake/position/refresh", authedTiered(aPool, h.StakePosition))
 	// Public validator name + logo (Nimiq validators registry, cached upstream).
 	r.GET("/api/poolstake/validator", wrap(publicCached(3600, 86400, h.ValidatorInfo)))
 	r.POST("/api/poolstake/refresh", authedTiered(aPool, h.PoolStakeRefresh))

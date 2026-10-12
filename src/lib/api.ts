@@ -815,6 +815,7 @@ export const validateCashbackCode = (code: string, orderUSD = 0) => api(`/cashba
 // operator's validator and the rate it earns. All three are authed in the Go
 // backend (RequireAuth) — without `auth: true` the real server answers
 // 401 {"error":"missing bearer token"} for every cashback-page load.
+export const getStakePosition = (refresh = false) => api(refresh ? '/poolstake/position/refresh' : '/poolstake/position', { auth: true, method: refresh ? 'POST' : 'GET' });
 export const getPoolStake = () => api('/poolstake/me', { auth: true });
 /** Public name + logo of a validator (Nimiq's registry, via our backend). */
 export const getValidatorInfo = (address: string) =>

@@ -28,6 +28,7 @@ package chainstake
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"sync"
 	"time"
@@ -49,8 +50,13 @@ const (
 
 // Staker is one verified position.
 type Staker struct {
-	Staked    bool
-	StakeLuna int64
+	Exists       bool
+	ActiveLuna   int64
+	InactiveLuna int64
+	RetiredLuna  int64
+	InactiveFrom *uint32
+	Staked       bool
+	StakeLuna    int64
 	// Delegation is the validator the chain reports (canonical, no spaces).
 	Delegation string
 	// Elsewhere is true when the chain shows a live stake with ANOTHER validator
@@ -152,6 +158,7 @@ func (v *Verifier) Verify(ctx context.Context, address string) (Staker, error) {
 	}
 
 	st := Staker{
+		Exists: true, ActiveLuna: info.Balance, InactiveLuna: info.InactiveBalance, RetiredLuna: info.RetiredBalance, InactiveFrom: info.InactiveFrom,
 		Staked:     info.HasStake() && canonical(info.Delegation) == v.validator,
 		StakeLuna:  info.Balance,
 		Delegation: canonical(info.Delegation),
@@ -206,13 +213,16 @@ func isNoStaker(err error) bool {
 	if err == nil {
 		return false
 	}
-	msg := strings.ToLower(err.Error())
+	var rpcErr *nimiq.RPCError
+	if !errors.As(err, &rpcErr) {
+		return false
+	}
+	msg := strings.ToLower(rpcErr.Message)
 	for _, needle := range []string{
 		"no staker",
 		"not a staker",
 		"no account",
 		"account not found",
-		"not found",
 		"does not exist",
 	} {
 		if strings.Contains(msg, needle) {

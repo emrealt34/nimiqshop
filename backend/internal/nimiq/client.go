@@ -200,11 +200,12 @@ func (c *Client) GetAccountBalance(ctx context.Context, addr string) (int64, err
 // an error, which is surfaced as an error here (callers treat "no record" as
 // not staked, never as a lookup failure).
 type StakerInfo struct {
-	Address         string `json:"address"`
-	Balance         int64  `json:"balance"`
-	Delegation      string `json:"delegation"`
-	InactiveBalance int64  `json:"inactiveBalance"`
-	RetiredBalance  int64  `json:"retiredBalance"`
+	Address         string  `json:"address"`
+	Balance         int64   `json:"balance"`
+	Delegation      string  `json:"delegation"`
+	InactiveBalance int64   `json:"inactiveBalance"`
+	RetiredBalance  int64   `json:"retiredBalance"`
+	InactiveFrom    *uint32 `json:"inactiveFrom"`
 }
 
 // HasStake reports whether the chain sees an active stake worth using.
@@ -217,9 +218,23 @@ func (c *Client) GetStaker(ctx context.Context, addr string) (StakerInfo, error)
 	if err := c.requireURLs(); err != nil {
 		return StakerInfo{}, err
 	}
-	var out StakerInfo
-	if err := c.callURL(ctx, c.urls[0], "getStakerByAddress", []interface{}{addr}, &out); err != nil {
+	var raw json.RawMessage
+	if err := c.callURL(ctx, c.urls[0], "getStakerByAddress", []interface{}{addr}, &raw); err != nil {
 		return StakerInfo{}, err
+	}
+	if string(bytes.TrimSpace(raw)) == "null" {
+		return StakerInfo{}, &RPCError{Code: -32004, Message: "No staker found for the given address"}
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil || len(fields["balance"]) == 0 || string(fields["balance"]) == "null" {
+		return StakerInfo{}, fmt.Errorf("invalid staking position response")
+	}
+	var out StakerInfo
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return StakerInfo{}, err
+	}
+	if out.Balance < 0 || out.InactiveBalance < 0 || out.RetiredBalance < 0 {
+		return StakerInfo{}, fmt.Errorf("invalid staking balances")
 	}
 	return out, nil
 }

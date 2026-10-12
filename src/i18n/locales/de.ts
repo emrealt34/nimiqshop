@@ -3,6 +3,24 @@
  * Plural: eins (n===1) / andere.
  */
 const de = {
+  stakePosition: {
+    "title": "Deine Staking-Position",
+    "unavailable": "Deine Staking-Position konnte nicht bestätigt werden. Aktualisiere sie vor einer Transaktion.",
+    "none": "Du hast noch keine Staking-Position.",
+    "here": "Deine Delegation liegt bei unserem Pool.",
+    "elsewhere": "Deine Staking-Position liegt bei einem anderen Validator.",
+    "validator": "Aktueller Validator",
+    "verify": "Prüfen",
+    "active_nim": "Aktiver Stake",
+    "inactive_nim": "Inaktiver Stake",
+    "retired_nim": "Ausgemusterter Stake",
+    "cooldown": "Inaktive oder ausgemusterte Mittel können noch gesperrt sein. Die Wallet prüft Netzwerkeinschränkungen vor Änderungen oder Auszahlungen.",
+    "manageWallet": "In der Wallet verwalten",
+    "source": "Guthaben werden auf der Blockchain geprüft. Validatornamen und Logos stammen aus der Validator-API.",
+    "changed": "Deine Staking-Position hat sich geändert. Prüfe den aktuellen Stand, bevor du fortfährst.",
+    "exceeds": "Der Betrag übersteigt das für diesen Vorgang verfügbare Guthaben.",
+    "pending": "Die Transaktionsbestätigung steht aus. Aktualisiere den Stand und prüfe deine Wallet vor einer weiteren Transaktion."
+},
   refreshStatus: {
     "finished": "Bestandsprüfung beendet",
     "partial": "Die Katalog- oder Kursaktualisierung ist unvollständig. Ungeklärte Prüfungen und beibehaltene Daten stehen unten.",

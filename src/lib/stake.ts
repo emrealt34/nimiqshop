@@ -275,14 +275,14 @@ function isCancellation(e: unknown): boolean {
 export function classifyStakeError(type: string, message: string, opKind?: StakeOp['kind']): Error {
   const t = String(type || '');
   const m = String(message || '');
-  if (/PermissionDenied/i.test(t) || isCancellation(t + ' ' + m)) return new StakeCancelledError();
-  if (/InvalidTransaction/i.test(t)) {
+  if (/Permission_?Denied/i.test(t) || isCancellation(t + ' ' + m)) return new StakeCancelledError();
+  if (/Invalid_?Transaction/i.test(t)) {
     if (opKind === 'newStaker') {
       return new StakeInvalidError(tr('stake.alreadyStaker', { detail: m ? ` (${m})` : '' }));
     }
     return new StakeInvalidError(tr('stake.rejectedInvalid', { detail: m ? `: ${m}` : '.' }));
   }
-  return new Error(m || t || tr('stake.errorGeneric'));
+  return Object.assign(new Error(m || t || tr('stake.errorGeneric')), { type: t });
 }
 
 /**
@@ -342,9 +342,9 @@ export async function runStakeOp(op: StakeOp): Promise<string> {
     if (e instanceof StakeCancelledError || e instanceof StakeInvalidError) throw e; // already classified above
     // Thrown path: the SDK/older hosts reject instead of resolving an error
     // object — the error NAME often carries the provider type.
-    const name = String((e as Error)?.name || '');
+    const name = String((e as { type?: string })?.type || (e as Error)?.name || '');
     const msg = String((e as Error)?.message || e || '');
-    if (/PermissionDenied|InvalidTransaction/i.test(name) || isCancellation(msg)) {
+    if (/Permission_?Denied|Invalid_?Transaction/i.test(name) || isCancellation(msg)) {
       throw classifyStakeError(name || msg, msg, op.kind);
     }
     throw e;
