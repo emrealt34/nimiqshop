@@ -2,13 +2,13 @@
 
 13 Ekim 2026 tarihinde bağlantılı test geçti. Önceki ayrı havuz/API ve ödeme testlerinden farklı olarak bu test, aynı gerçek yerel validator kazancını mağaza ekranına, alışverişe, cashback defterine ve kesinleşmiş NIM ödemesine kadar izler.
 
-## Testin sınırı
+## Kapsam
 
 İki resmi Nimiq 2.2.0 node'u **izole UnitAlbatross** ağında gerçek consensus, stake, epoch ödülü ve transfer üretir. Bu ağın NIM'i üretim fonu değildir; aşağıdaki hash'ler genel testnet veya mainnet explorer'ında bulunmaz. Bu sonuçlar üretim APY'si değildir.
 
 Havuzun gerçekten ürettiği Badger veritabanının tutarlı yedeği, NimiqBase'in gerçek API koduyla açılır. Ödül, stake ve komisyon kayıtları uydurulmaz. Mağazanın gerçek router'ı, oturum doğrulaması, sipariş takibi, defteri, veritabanı ve cashback worker'ı çalışır. Chromium gerçek frontend'e bağlanır; mağaza API cevapları tarayıcıda taklit edilmez.
 
-**Piyasa fiyatları, tedarikçinin Lightning tahsilat bildirimi ve hediye çeki teslimatı test doubles kullanır.** Cüzdanın harcama ayağı yerel basic NIM transferidir; gerçek Nimiq Pay atomic swap veya BTC Lightning tahsilatı sınanmamıştır. Gerçek ürün veya üretim cüzdanı kullanılmaz. Canlı VPS dağıtımı bu yerel testin parçası değildir.
+**Piyasa fiyatları, tedarikçinin Lightning tahsilat bildirimi ve hediye çeki teslimatı test doubles kullanır.** Cüzdanın harcama ayağı yerel basic NIM transferidir; gerçek Nimiq Pay atomic swap veya BTC Lightning tahsilatı sınanmamıştır. Gerçek ürün veya üretim cüzdanı kullanılmaz. Canlı VPS dağıtımı bu yerel doğrulamanın parçası değildir.
 
 ## Bulunan ve düzeltilen hata
 
@@ -22,7 +22,7 @@ Normal alışverişin temel oranı `CashbackCodeBps` alanına yazılıyordu. Kod
 ## Gerçek bağlantılı sonuç
 
 | Kontrol | Sonuç |
-|---|---|
+| --- | --- |
 | Stake | 100 NIM, gerçek yerel validator'a delege edildi |
 | Kazanılmış, kullanıcıya atfedilmiş havuz komisyonu | 28.396.579 Luna |
 | Program sınırından sonra mağaza ek kredisi | 10 NIM |
@@ -71,4 +71,4 @@ NIMSHOP_BROWSER_EXECUTABLE=/path/to/chromium \
   -run '^TestLocalValidatorEpochRewardsAndStakerEarnings$' -v -count=1 -timeout=35m
 ```
 
-Checkout'lar, API ve node'lar aynı test sürecinin alt süreçleridir; ayrı localhost ağları kurulmaz. Varsayılan olarak hata testin başarısız olmasını sağlar. Yalnız geliştirme sırasında `NIMSHOP_FLOW_DEBUG_RETRY=1` aynı kazanılmış fixture'ı tutar ve `test-results/pool-shopping/retry` dosyasıyla yeniden shop denemesi bekler. Normal CI bu pahalı gerçek-node testini açıkça etkinleştirmedikçe çalıştırmaz.
+Checkout'lar, API ve node'lar aynı test sürecinin alt süreçleridir; ayrı localhost ağları kurulmaz. Varsayılan olarak hata doğrulamanın başarısız olmasını sağlar. Yalnız geliştirme sırasında `NIMSHOP_FLOW_DEBUG_RETRY=1` aynı kazanılmış fixture'ı tutar ve `test-results/pool-shopping/retry` dosyasıyla yeniden shop denemesi bekler. Normal CI bu pahalı gerçek-node testini açıkça etkinleştirmedikçe çalıştırmaz.
