@@ -27,7 +27,7 @@ Havuzun `/api/cashback/profit` yanıtındaki `pool_fee_luna`, checkpoint ödül�
 
 Kesinleşen testnet işlem hash'leri:
 
-```
+```text
 16b829152d25c4817f4206dac5ce6ae0aedd742212e13bc550bc134105db3065
 f6c855e69d2ce6a9c6bd74a59b7f5c35b5f3e9238ea8682354ca2fc773ca5dd1
 ```

@@ -12,7 +12,11 @@ func TestProfitSnapshotNeverCreditsRegressionsOrReplayedMonths(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		if err := s.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 	now := time.Date(2026, 10, 13, 0, 0, 0, 0, time.UTC)
 	apply := func(month string, fee int64) float64 {
 		t.Helper()
@@ -80,7 +84,11 @@ func TestProfitSnapshotsAreIdempotentAcrossRacesAndRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		if err := s.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 	if got, e := s.ApplyProfitSnapshot(address, "2026-10", 1000000, .01, 0, 1, 100000000, now); e != nil || got != 0 {
 		t.Fatalf("restart replay %v %v", got, e)
 	}
@@ -91,7 +99,11 @@ func TestNoRealizedFeeMeansNoBoostCredit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		if err := s.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 	now := time.Date(2026, 10, 13, 0, 0, 0, 0, time.UTC)
 	addr := "NQ73SE1XYRRFQ8NCDQCPHLJMNR858P7V2HPD"
 	got, err := s.ApplyProfitSnapshot(addr, "2026-10", 0, .01, 1825, 1, 100000000, now)

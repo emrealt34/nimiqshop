@@ -129,7 +129,11 @@ func TestLivePoolProfitLedger(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.Close()
+	defer func() {
+		if err := store.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 	from, err := time.Parse(time.RFC3339, p.From)
 	if err != nil {
 		t.Fatal(err)

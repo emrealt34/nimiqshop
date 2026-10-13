@@ -240,7 +240,9 @@ func TestPublicWalletStakeWithoutShopLogin(t *testing.T) {
 }
 
 func TestPublicWalletStakeOutageDoesNotPretendZero(t *testing.T) {
-	rpc := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.Error(w, "unavailable", 503) }))
+	rpc := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "unavailable", http.StatusServiceUnavailable)
+	}))
 	defer rpc.Close()
 	s := bootStack(t, stackOptions{env: map[string]string{"NIMIQ_RPC_URL": rpc.URL}})
 	res := s.do(http.MethodGet, "/api/wallet/stake?address=NQ49N8MBXYCRXBUP404CKXKKL49MA7BTF082", nil, nil)
