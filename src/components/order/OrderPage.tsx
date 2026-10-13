@@ -371,7 +371,7 @@ function RatingCard({ kind, id, status, rating, comment, edits, onSaved }: {
   const { t } = useT();
   const [changing, setChanging] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (window.location.hash === '#purchase-rating') cardRef.current?.scrollIntoView({ block: 'center' }); }, [id]);
+  useEffect(() => { if (window.location.hash === '#purchase-rating') cardRef.current?.scrollIntoView({ block: 'center' }); }, [id, status, rating, changing]);
   if (!isTerminalStatus(status)) return null;
   if (['failed', 'refunded', 'expired', 'denied', 'blocked'].includes(String(status).toLowerCase())) return null;
   if (rating && rating > 0 && !changing) {

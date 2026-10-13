@@ -113,6 +113,10 @@ export function AppProviders({ children }: { children: ReactNode }) {
   const hasOpenSheet = useCallback(() => sheetsRef.current.length > 0, []);
 
   useEffect(() => {
+    window.dispatchEvent(new Event('nimshop:sheets-changed'));
+  }, [sheets.length]);
+
+  useEffect(() => {
     if (!hasSheets) return;
     const overflow = document.body.style.overflow;
     const content = contentRef.current;

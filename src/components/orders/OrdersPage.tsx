@@ -409,7 +409,7 @@ function awaitingPay(x: any): boolean {
 function OrderRow({ r }: { r: any }) {
   const { t } = useT();
   const href = pagePath(r.rowKind === 'quote' ? `/order?type=quote&id=${encodeURIComponent(r.id)}` : `/order?id=${encodeURIComponent(r.id)}`);
-  const [rated] = useState(r.rating > 0);
+  const rated = r.rating > 0;
   // Only render an "≈ NIM" price when the row carries a LOCKED snapshot
   // (explicit amount or purchase-time rate). Without one, a live conversion
   // would make history drift every time NIM moves — show the product's own
@@ -455,10 +455,10 @@ function OrderRow({ r }: { r: any }) {
       ratingNode = (
         // Rating (stars + optional comment, paid by the buyer) happens on the
         // order page, so the row only points there.
-        <span className="row ord-rate" style={{ gap: '6px', alignItems: 'center' }}>
+        <a className="row ord-rate" href={`${href}#purchase-rating`} style={{ gap: '6px', alignItems: 'center' }}>
           <span className="xs faint">{t('common.rate')}</span>
           <StarsDisplay rating={0} size={14} />
-        </span>
+        </a>
       );
     }
   }

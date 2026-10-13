@@ -38,13 +38,25 @@ export function RatingReminder() {
   useEffect(() => {
     let disposeCheck = () => {};
     let sheetId = 0;
+    let checkedUid: string | undefined;
+    let pending: { uid: string; purchases: UnratedPurchase[] } | undefined;
+    const showPending = () => {
+      if (!pending || sheetId || hasOpenSheet() || !isAuthed() || getUid() !== pending.uid) return;
+      const { uid, purchases } = pending;
+      pending = undefined;
+      purchases.forEach(purchase => snooze(ratingReminderKey(uid, purchase)));
+      sheetId = openSheet({ title: t => t('ratingReminder.title'), render: close => <ReminderBody purchases={purchases} close={close} /> });
+    };
     const check = () => {
+      const uid = isAuthed() ? getUid() : '';
+      // Session bootstrap renews metadata for the same buyer. It must not
+      // cancel their in-flight check or close an already visible reminder.
+      if (uid === checkedUid) return;
+      checkedUid = uid;
       disposeCheck();
+      pending = undefined;
       if (sheetId) { closeSheet(sheetId); sheetId = 0; }
-      const uid = getUid();
-      if (!isAuthed() || !uid) return;
-      const key = ratingReminderKey(uid);
-      if (snoozed(key)) return;
+      if (!uid) return;
       let cancelled = false;
       disposeCheck = () => { cancelled = true; };
       void (async () => {
@@ -52,19 +64,20 @@ export function RatingReminder() {
           const cfg: any = await getRatingConfig();
           if (!cfg?.enabled || cancelled) return;
           const [orders, quotes] = await Promise.all([listOrders(), listQuotes()]);
-          if (cancelled || !isAuthed() || getUid() !== uid || snoozed(key)) return;
-          const purchases = unratedPurchases(orders, quotes);
-          if (!purchases.length || hasOpenSheet()) return;
+          if (cancelled || !isAuthed() || getUid() !== uid) return;
+          const purchases = unratedPurchases(orders, quotes).filter(purchase => !snoozed(ratingReminderKey(uid, purchase)));
+          if (!purchases.length) return;
           // Snooze when shown, including X/backdrop/Escape dismissal and
           // navigation to the purchase. No repeated nagging on every visit.
-          snooze(key);
-          sheetId = openSheet({ title: t => t('ratingReminder.title'), render: close => <ReminderBody purchases={purchases} close={close} /> });
+          pending = { uid, purchases };
+          showPending();
         } catch { /* An unavailable history must never block shopping. */ }
       })();
     };
     check();
     const unsubscribe = subscribeSession(check);
-    return () => { disposeCheck(); unsubscribe(); if (sheetId) closeSheet(sheetId); };
+    window.addEventListener('nimshop:sheets-changed', showPending);
+    return () => { disposeCheck(); unsubscribe(); window.removeEventListener('nimshop:sheets-changed', showPending); if (sheetId) closeSheet(sheetId); };
   }, [openSheet, closeSheet, hasOpenSheet]);
   return null;
 }
