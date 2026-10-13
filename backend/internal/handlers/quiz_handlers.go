@@ -40,6 +40,13 @@ func quizAttemptView(a db.QuizAttempt, total int) map[string]any {
 	return map[string]any{"started_at": a.StartedAt, "answers": a.Answers, "submitted_at": a.SubmittedAt, "score": float64(db.QuizPoints(a)) / 1_000_000, "total": total, "prize_email": a.PrizeEmail}
 }
 func (h *Handlers) quizView(c db.QuizCompetition, user string) (map[string]any, error) {
+	if c.CashbackReward != nil && user != "" {
+		if attempt, err := h.Store.GetQuizAttempt(c.ID, user); err == nil && attempt.SubmittedAt != nil {
+			if err := h.Store.EnsureQuizCashbackGrant(c.ID, user, time.Now().UTC()); err != nil {
+				return nil, err
+			}
+		}
+	}
 	var mine any
 	a, err := h.Store.GetQuizAttempt(c.ID, user)
 	if err == nil {
@@ -73,7 +80,7 @@ func (h *Handlers) quizView(c db.QuizCompetition, user string) (map[string]any, 
 	}
 	return map[string]any{
 		"payouts": payouts,
-		"id":      c.ID, "payout": c.Payout, "tie_break": c.TieBreak, "translations": c.Translations, "title": c.Title, "description": c.Description, "prize": c.Prize,
+		"id":      c.ID, "payout": c.Payout, "cashback_reward": c.CashbackReward, "cashback_unlocked": c.CashbackReward != nil && h.Store.QuizCashbackUnlocked(c.CashbackReward.Code, user), "tie_break": c.TieBreak, "translations": c.Translations, "title": c.Title, "description": c.Description, "prize": c.Prize,
 		"starts_at": c.StartsAt, "ends_at": c.EndsAt, "phase": quizPhase(c, time.Now().UTC()),
 		"question_count": len(c.Questions), "participants": c.Participants, "attempt": mine,
 		"winner": quizParticipant(c.WinnerUserID), "winners": winners, "winner_count": db.QuizWinnerLimit(c), "has_ranges": hasRanges, "is_winner": db.QuizIsWinner(c, user),
@@ -130,6 +137,11 @@ func (h *Handlers) GetQuiz(ctx *fasthttp.RequestCtx) {
 	view, err := h.quizView(c, user)
 	if err != nil {
 		quizError(ctx, err)
+		return
+	}
+	if c.CashbackReward != nil {
+		view["leaderboard"] = []any{}
+		writeJSON(ctx, 200, view)
 		return
 	}
 	entries, err := h.Store.ListQuizEntries(c.ID)
@@ -226,6 +238,10 @@ func (h *Handlers) adminSaveQuiz(ctx *fasthttp.RequestCtx, create bool) {
 		req.ID = ""
 	} else {
 		req.ID = quizID(ctx)
+	}
+	if req.CashbackReward == nil && (create || req.Status == "draft" || req.Status == "published") {
+		req.CashbackReward = &db.QuizCashbackReward{Code: "ILOVENIM", CashbackBps: 100}
+		req.Payout = db.QuizPayoutConfig{}
 	}
 	c, err := h.Store.PutQuizCompetition(req, create, time.Now().UTC())
 	if err != nil {

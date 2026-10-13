@@ -285,6 +285,15 @@ func ReserveCodeRedemption(tx *badger.Txn, code, userID, quoteID string, limits 
 	if code == "" {
 		return nil
 	}
+	var quizReward quizCashbackDefinition
+	if err := getJSON(tx, quizCodeKey(code), &quizReward); err == nil {
+		if _, err := tx.Get(quizGrantKey(code, userID)); err != nil {
+			return &CodeLimitDetail{Code: code, Reason: "complete the quiz to unlock this account-only code", Limit: "quiz"}
+		}
+		limits.MaxUsesPerUser = 1
+	} else if !errors.Is(err, ErrNotFound) {
+		return err
+	}
 	if !limits.ExpiresAt.IsZero() && now.After(limits.ExpiresAt) {
 		return &CodeLimitDetail{Code: code, Reason: "this promotion has ended", Limit: "expired"}
 	}

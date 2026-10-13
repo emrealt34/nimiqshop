@@ -95,18 +95,30 @@ test.describe('operator quiz authoring @smoke', () => {
     await open(page, path('/admin?section=quiz'));
     await page.getByRole('button', { name: 'New competition', exact: true }).click();
     await page.getByLabel('Title', { exact: true }).fill('Nimiq competition');
-    await page.getByLabel('Prize name (e.g. Amazon gift card)').fill('Amazon gift card');
-    await page.getByLabel('Value (e.g. 5 USD)').fill('5 USD');
+    await page.getByLabel('Shared cashback code').fill('ILOVENIM');
+    await page.getByLabel('Cashback rate (%)', {exact:true}).fill('5');
+    await page.getByLabel('Accounts that may unlock the code (0 = unlimited)').fill('0');
     await page.getByRole('button', { name: 'Add question', exact: true }).click();
     await page.getByLabel('Question text').fill('Nimiq ticker?');
     for (const [index, value] of ['BTC', 'NIM', 'ETH', 'USDT'].entries()) await page.getByLabel(`Question 1, option ${index + 1}`, { exact: true }).fill(value);
     await page.getByRole('radio', { name: 'Option 2 is correct' }).check();
+    await expect(page.getByRole('button',{name:'Export draft JSON',exact:true})).toBeVisible();
     await page.getByRole('button', { name: 'Save draft', exact: true }).click();
     await expect.poll(() => stored?.questions[0]?.correct_index).toBe(1);
+    expect(stored.cashback_reward).toEqual({code:'ILOVENIM',cashback_bps:500,max_recipients:0,min_score_percent:0});
     await expect(page.locator('.quiz-admin-list')).toContainText('Nimiq competition');
     await page.getByRole('button', { name: 'Publish', exact: true }).click();
     await page.locator('.sheet').getByRole('button', { name: 'Confirm', exact: true }).click();
     await expect.poll(() => stored?.status).toBe('published');
     await expect(page.locator('.quiz-admin-list')).toContainText('published');
   });
+});
+
+test('completed cashback quiz unlocks a code without a prize pool or ranking',async({page})=>{
+ const c={...baseCompetition,cashback_reward:{code:'ILOVENIM',cashback_bps:500,max_recipients:0,min_score_percent:0},cashback_unlocked:true,attempt:{answers:[1,1],score:2,total:2,started_at:new Date().toISOString(),submitted_at:new Date().toISOString()}};
+ await page.route('**/api/quiz**',r=>r.fulfill({json:r.request().url().endsWith('/quiz')?{items:[c]}:c}));
+ await open(page,path('/quiz'));
+ await expect(page.locator('.quiz-prize')).toContainText('ILOVENIM · 5%');
+ await expect(page.locator('.quiz-leaderboard')).toHaveCount(0);
+ await expect(page.locator('.quiz-prize button')).toBeVisible();
 });

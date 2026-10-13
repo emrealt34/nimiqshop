@@ -814,7 +814,7 @@ export const rateOrder = (id: string, body: RatingBody) => submitRating('order',
 export const rateQuote = (id: string, body: RatingBody) => submitRating('quote', id, body);
 export const getAccountLimits = () => api('/account/limits', { auth: true });
 export const getCashbackRate = () => api('/cashback/rate');
-export const validateCashbackCode = (code: string, orderUSD = 0) => api(`/cashback/code?code=${encodeURIComponent(code)}&order_usd=${encodeURIComponent(String(orderUSD > 0 ? orderUSD : 0))}`);
+export const validateCashbackCode = (code: string, orderUSD = 0) => api(`/cashback/code?code=${encodeURIComponent(code)}&order_usd=${encodeURIComponent(String(orderUSD > 0 ? orderUSD : 0))}`, {auth:!!sessionGetter()});
 
 // Pool-staker cashback: the signed-in buyer's active delegation to the
 // operator's validator and the rate it earns. All three are authed in the Go

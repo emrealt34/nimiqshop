@@ -6,6 +6,7 @@ import { openLoginSheet } from '../shell/SiteShell';
 import { Icon } from '../ui/Icon';
 import { UnifiedThumb } from '../ui/UnifiedThumb';
 import { useSession } from '../../lib/useSession';
+import { applyCashbackCode } from '../../lib/cashbackCode';
 import { friendlyApiMessage } from '../../lib/api';
 import { explorerUrl, shortTx } from '../../lib/chain';
 import { queryParam } from '../../lib/format';
@@ -138,11 +139,11 @@ export function QuizView() {
   });
 
   if (authed === null) return <div className="container quiz-page">
-    <header className="quiz-heading"><Icon name="nimiq" size={30} /><div><h1>{t('quiz.title')}</h1><p className="muted small">{t('quiz.intro')}</p></div></header>
+    <header className="quiz-heading"><Icon name="nimiq" size={30} /><div><h1>{t('quiz.title')}</h1><p className="muted small">{t('quiz.cashbackIntro')}</p></div></header>
     <div className="card quiz-gate"><LoadingRows rows={5} /></div>
   </div>;
   if (!authed) return <div className="container quiz-page">
-    <header className="quiz-heading"><Icon name="nimiq" size={30} /><div><h1>{t('quiz.title')}</h1><p className="muted small">{t('quiz.intro')}</p></div></header>
+    <header className="quiz-heading"><Icon name="nimiq" size={30} /><div><h1>{t('quiz.title')}</h1><p className="muted small">{t('quiz.cashbackIntro')}</p></div></header>
     <div className="card quiz-gate"><Icon name="lock" size={32} /><h2>{t('quiz.loginRequired')}</h2><p>{t('quiz.loginHint')}</p>
       <button className="btn btn-gold" onClick={() => openLoginSheet({ openSheet, closeSheet, toast })}>{t('quiz.signIn')}</button>
     </div>
@@ -154,7 +155,7 @@ export function QuizView() {
   const validAnswer = (q: QuizQuestion, answer: number) => Number.isInteger(answer) && (q.type === 'range' ? answer >= (q.min ?? 0) && answer <= (q.max ?? 0) : answer >= 0 && answer < q.options.length);
   const winnerNames = competition?.winners?.length ? competition.winners : competition?.winner ? [competition.winner] : [];
   return <div className="container quiz-page">
-    <header className="quiz-heading"><Icon name="nimiq" size={30} /><div><h1>{t('quiz.title')}</h1><p className="muted small">{t('quiz.intro')}</p></div></header>
+    <header className="quiz-heading"><Icon name="nimiq" size={30} /><div><h1>{t('quiz.title')}</h1><p className="muted small">{t('quiz.cashbackIntro')}</p></div></header>
     {error && <div className="alert error" role="alert">{error}</div>}
     {!loaded && <div className="card quiz-contest"><LoadingRows rows={8} /></div>}
     {loaded && items.length === 0 && !error && <div className="card quiz-gate"><Icon name="gift" size={32} /><h2>{t('quiz.empty')}</h2><p className="small muted">{t('quiz.emptyHint')}</p></div>}
@@ -165,15 +166,15 @@ export function QuizView() {
       {!questions && <section className="card quiz-contest">
         <div className="row between"><h2>{competition.title}</h2><span className={`chip quiz-phase-${competition.phase}`}>{t(PHASE_KEYS[competition.phase])}</span></div>
         {competition.description && <p className="small">{competition.description}</p>}
-        <QuizPrizeCard prize={competition.prize} automatic={competition.payout?.enabled} />
+        {competition.cashback_reward ? <div className="quiz-prize"><h3>{t('quiz.cashbackRewardTitle')}</h3><strong>{competition.cashback_reward.code} · {competition.cashback_reward.cashback_bps/100}%</strong><p className="small">{t('quiz.cashbackRewardRule',{rate:competition.cashback_reward.cashback_bps/100})}</p>{competition.cashback_reward.min_score_percent > 0 && <p className="small">{t('quiz.cashbackMinScore',{score:competition.cashback_reward.min_score_percent})}</p>}<p className="small">{t(competition.cashback_reward.max_recipients ? 'quiz.cashbackLimited' : 'quiz.cashbackUnlimited',{count:competition.cashback_reward.max_recipients})}</p>{completed && <p role="status">{t(competition.cashback_unlocked ? 'quiz.cashbackUnlocked' : 'quiz.cashbackNotUnlocked')}</p>}{competition.cashback_unlocked && <button className="btn btn-gold" disabled={busy} onClick={()=>void perform(async()=>{await applyCashbackCode(competition.cashback_reward!.code);toast(t('quiz.cashbackApplied'),'success');})}>{t('quiz.cashbackApply')}</button>}</div> : <QuizPrizeCard prize={competition.prize} automatic={competition.payout?.enabled} />}
         <dl className="quiz-facts"><div><dt>{t('quiz.starts')}</dt><dd>{date(competition.starts_at)}</dd></div><div><dt>{t('quiz.ends')}</dt><dd>{date(competition.ends_at)}</dd></div><div><dt>{t('quiz.questions')}</dt><dd>{competition.question_count}</dd></div><div><dt>{t('quiz.participants')}</dt><dd>{competition.participants}</dd></div></dl><p className="xs muted">{t('quiz.timezone')}</p>
-        <p className="small quiz-rules">{t(competition.has_ranges ? (competition.tie_break === 'submitted_at' ? 'quiz.rangeRulesTimed' : 'quiz.rangeRules') : (competition.tie_break === 'submitted_at' ? 'quiz.rulesTimed' : 'quiz.rules'))}</p>
-        <p className="small">{competition.winner_count === 0 ? t('quiz.winnerAll') : t('quiz.winnerTop', { count: competition.winner_count ?? 1 })}</p>
+        {!competition.cashback_reward && <p className="small quiz-rules">{t(competition.has_ranges ? (competition.tie_break === 'submitted_at' ? 'quiz.rangeRulesTimed' : 'quiz.rangeRules') : (competition.tie_break === 'submitted_at' ? 'quiz.rulesTimed' : 'quiz.rules'))}</p>}
+        {!competition.cashback_reward && <p className="small">{competition.winner_count === 0 ? t('quiz.winnerAll') : t('quiz.winnerTop', { count: competition.winner_count ?? 1 })}</p>}
         {competition.cancel_reason && <div className="alert warn">{competition.cancel_reason}</div>}
         {completed && <div className="quiz-result" role="status"><Icon name="check" size={20} /><strong>{t('quiz.yourScore', { score: quizScoreLabel(competition.attempt!.score), total: competition.question_count })}</strong><span className="small">{t('quiz.noRetry')}</span></div>}
         {canPlay && !questions && <><p className="xs muted">{t('quiz.startWarning')}</p><button className="btn btn-gold" disabled={busy} onClick={begin}>{busy ? t('common.loading') : competition.attempt ? t('quiz.resume') : t('quiz.start')}</button></>}
-        {competition.phase === 'ended' && <p className="small muted">{t('quiz.waitDecision')}</p>}
-        {competition.phase === 'finalized' && <div className="quiz-winner">
+        {!competition.cashback_reward && competition.phase === 'ended' && <p className="small muted">{t('quiz.waitDecision')}</p>}
+        {!competition.cashback_reward && competition.phase === 'finalized' && <div className="quiz-winner">
           <h3>{competition.is_winner ? t('quiz.youWon') : winnerNames.length ? t('quiz.resultWinners') : t('quiz.noWinner')}</h3>
           {winnerNames.length > 0 && <ul>{winnerNames.map((participant) => <li key={participant}>{t('quiz.player', { participant })}</li>)}</ul>}
           {competition.payout?.enabled && <div className="quiz-payout-list"><p className="small">{t('quiz.autoPrize')}</p>{competition.payouts?.map(payment=><div className="quiz-entry" key={payment.participant}><span>{t('quiz.player',{participant:payment.participant})} · {payment.amount_nim.toLocaleString(lang)} NIM{payment.memo && <small className="block muted" style={{overflowWrap:'anywhere'}}>Memo: {payment.memo}</small>}</span><span>{t(payment.status==='paid'?'quiz.payoutPaid':payment.status==='broadcast'?'quiz.payoutBroadcast':'quiz.payoutPending')}{payment.tx_hash && explorerUrl(payment.tx_hash) && <a className="small" href={explorerUrl(payment.tx_hash)!} target="_blank" rel="noopener noreferrer"> {shortTx(payment.tx_hash)}</a>}</span></div>)}</div>}
@@ -186,7 +187,7 @@ export function QuizView() {
         </div>}
       </section>}
       {questions && !completed && <form className="quiz-game" onSubmit={(e) => { e.preventDefault(); if (questionIndex === questions.length - 1) void finish(); else if (!busy && saving === 'saved' && validAnswer(questions[questionIndex], answers[questionIndex])) setQuestionIndex(index => index + 1); }}>
-        <div className="card quiz-step-header"><div className="quiz-step-top"><h2 id="quiz-step-title" ref={stepHeading} tabIndex={-1}>{t('quiz.step', { current: questionIndex + 1, total: questions.length })}</h2>{competition.prize.value && <span className="quiz-step-prize"><Icon name="gift" size={15} />{competition.prize.value}</span>}</div><p className="small muted">{competition.title}</p><progress className="quiz-progress" value={answers.filter((a, i) => validAnswer(questions[i], a)).length} max={questions.length} aria-label={t('quiz.answered', { count: answers.filter((a, i) => validAnswer(questions[i], a)).length, total: questions.length })} /></div>
+        <div className="card quiz-step-header"><div className="quiz-step-top"><h2 id="quiz-step-title" ref={stepHeading} tabIndex={-1}>{t('quiz.step', { current: questionIndex + 1, total: questions.length })}</h2>{!competition.cashback_reward && competition.prize.value && <span className="quiz-step-prize"><Icon name="gift" size={15} />{competition.prize.value}</span>}</div><p className="small muted">{competition.title}</p><progress className="quiz-progress" value={answers.filter((a, i) => validAnswer(questions[i], a)).length} max={questions.length} aria-label={t('quiz.answered', { count: answers.filter((a, i) => validAnswer(questions[i], a)).length, total: questions.length })} /></div>
         {questions.slice(questionIndex, questionIndex + 1).map((q) => { const index = questionIndex; return <fieldset key={q.id} className="card quiz-question" disabled={busy || competition.phase !== 'live'}>
           <legend className="quiz-question-legend">{index + 1}. {q.prompt}</legend><h3 className="quiz-question-title" aria-hidden="true">{q.prompt}</h3>
           {q.type === 'range' ? <div className="field"><label htmlFor={`quiz-range-${q.id}`}>{t('quiz.rangeBounds', { min: q.min ?? 0, max: q.max ?? 0 })}</label><input id={`quiz-range-${q.id}`} className="input" type="number" step="1" min={q.min} max={q.max} required value={answers[index] === -1 ? '' : answers[index]} onChange={(e) => choose(index, e.target.value === '' ? -1 : Number(e.target.value))} /><input type="range" aria-label={q.prompt} min={q.min} max={q.max} step="1" value={validAnswer(q, answers[index]) ? answers[index] : Math.floor(((q.min ?? 0) + (q.max ?? 0)) / 2)} onChange={(e) => choose(index, Number(e.target.value))} /></div> : q.options.map((option, choice) => <label key={choice} className={`quiz-option${answers[index] === choice ? ' is-chosen' : ''}`}><input type="radio" name={`quiz-${q.id}`} value={choice} checked={answers[index] === choice} onChange={() => choose(index, choice)} /><span className="quiz-option-key" aria-hidden="true">{String.fromCharCode(65 + choice)}</span><span className="quiz-option-text">{option}</span></label>)}
@@ -199,7 +200,7 @@ export function QuizView() {
           </div>
         </div>
       </form>}
-      {!questions && <section className="card quiz-leaderboard"><div className="row between"><h2>{t('quiz.leaderboard')}</h2><button className="btn btn-ghost btn-sm" type="button" disabled={busy} onClick={() => void perform(refresh)}><Icon name="refresh" size={15} />{t('quiz.refresh')}</button></div>
+      {!questions && !competition.cashback_reward && <section className="card quiz-leaderboard"><div className="row between"><h2>{t('quiz.leaderboard')}</h2><button className="btn btn-ghost btn-sm" type="button" disabled={busy} onClick={() => void perform(refresh)}><Icon name="refresh" size={15} />{t('quiz.refresh')}</button></div>
         {!competition.leaderboard?.length && <p className="small muted">{t('quiz.noResults')}</p>}
         <ol>{competition.leaderboard?.map((entry, index) => <li key={entry.participant}><span><b>#{entry.rank || index + 1}</b>{entry.is_me ? t('quiz.you') : t('quiz.player', { participant: entry.participant })}{entry.is_winner && <Icon name="star" size={16} />}{competition.tie_break === 'submitted_at' && entry.submitted_at && <time className="xs muted" dateTime={entry.submitted_at}>{date(entry.submitted_at)}</time>}</span><strong>{quizScoreLabel(entry.score)} / {competition.question_count}</strong></li>)}</ol>
       </section>}

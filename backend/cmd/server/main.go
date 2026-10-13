@@ -258,6 +258,9 @@ func main() {
 		log.Printf("cashback: programme caps day=$%.0f month=$%.0f (stored_row=%v)", pc.DailyCapUSD, pc.MonthlyCapUSD, st.StakeCashback != nil)
 	}
 	// Wire cashback runtime enrichment: burn wallet address.
+	if err := store.ConvertOpenQuizzesToCashbackCodes(time.Now().UTC()); err != nil {
+		log.Fatalf("quiz cashback migration: %v", err)
+	}
 	store.SetCashbackEnrichment(cfg.BurnNimAddress)
 	defer func() {
 		// Closing Badger flushes pending writes; skipping it can leave
@@ -1090,7 +1093,7 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 	r.GET("/api/cashback/rate", wrap(publicCached(300, 1800, h.PublicCashbackRate)))
 	r.GET("/api/cashback/leaderboard", wrap(publicCached(60, 600, h.CashbackLeaderboard)))
 	// Echoes per-account redemption state for the code being looked up.
-	r.GET("/api/cashback/code", tiered(tPromo, pinPrivate(h.PublicCashbackCode)))
+	r.GET("/api/cashback/code", tiered(tPromo, pinPrivate(middleware.OptionalAuth(cfg.JWTSecret, authOpts(cfg), h.PublicCashbackCode))))
 	r.GET("/api/cashback/me", authed(h.CashbackMe))
 	r.GET("/api/poolstake/me", authed(h.PoolStakeMe))
 	r.GET("/api/poolstake/position", authed(h.StakePosition))

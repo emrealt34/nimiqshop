@@ -13,6 +13,7 @@ import (
 	"nimiqshop/internal/cashback"
 	"nimiqshop/internal/cashbackcode"
 	"nimiqshop/internal/db"
+	"nimiqshop/internal/middleware"
 	"nimiqshop/internal/money"
 )
 
@@ -71,7 +72,7 @@ func (h *Handlers) effectiveCashbackCodeRules() ([]adminmodel.CashbackCodeRule, 
 
 func (h *Handlers) cashbackCodeEnabled() bool {
 	rules, _, err := h.effectiveCashbackCodeRules()
-	return err == nil && len(rules) > 0
+	return err == nil && (len(rules) > 0 || h.Store.HasQuizCashbackRewards())
 }
 
 func (h *Handlers) lookupCashbackCodeRule(codeRaw string) (adminmodel.CashbackCodeRule, bool, error) {
@@ -81,6 +82,11 @@ func (h *Handlers) lookupCashbackCodeRule(codeRaw string) (adminmodel.CashbackCo
 	}
 	if err := cashbackcode.ValidateCode(code); err != nil {
 		return adminmodel.CashbackCodeRule{}, false, err
+	}
+	if reward, ok, err := h.Store.GetQuizCashbackReward(code); err != nil {
+		return adminmodel.CashbackCodeRule{}, false, err
+	} else if ok {
+		return adminmodel.CashbackCodeRule{Code: reward.Code, CashbackBps: reward.CashbackBps, MaxUsesPerUser: 1}, true, nil
 	}
 	rules, _, err := h.effectiveCashbackCodeRules()
 	if err != nil {
@@ -132,6 +138,11 @@ func (h *Handlers) resolveQuoteCashback(code string, userID string) (quoteCashba
 			src = "ledger"
 		}
 		return quoteCashbackView{Bps: bps, Source: src}, nil
+	}
+	if _, quizCode, err := h.Store.GetQuizCashbackReward(code); err != nil {
+		return quoteCashbackView{}, err
+	} else if quizCode && !h.Store.QuizCashbackUnlocked(code, userID) {
+		return quoteCashbackView{}, fmt.Errorf("complete the quiz to unlock this cashback code for your account")
 	}
 	rule, ok, err := h.lookupCashbackCodeRule(code)
 	if err != nil {
@@ -211,6 +222,13 @@ func (h *Handlers) PublicCashbackCode(ctx *fasthttp.RequestCtx) {
 	code := strings.TrimSpace(string(ctx.QueryArgs().Peek("code")))
 	if code == "" {
 		writeError(ctx, fasthttp.StatusBadRequest, "code is required")
+		return
+	}
+	if _, quizCode, err := h.Store.GetQuizCashbackReward(code); err != nil {
+		writeError(ctx, 503, "cashback code unavailable")
+		return
+	} else if quizCode && !h.Store.QuizCashbackUnlocked(code, middleware.UserID(ctx)) {
+		writeError(ctx, 403, "complete the quiz to unlock this cashback code for your account")
 		return
 	}
 	rule, ok, err := h.lookupCashbackCodeRule(code)

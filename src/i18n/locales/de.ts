@@ -88,6 +88,18 @@ const de = {
     all: "Alle Käufe ansehen",
   },
   quiz: {
+    cashbackIntro: "Lerne nimshop.io kennen und schalte einen einmaligen Cashback-Code frei.",
+    cashbackMinScore: "Erforderliche Punktzahl: mindestens {{score}}%.",
+
+    cashbackRewardTitle: "Cashback-Code",
+    cashbackRewardRule: "Schließe dieses Quiz ab und erhalte {{rate}}% Cashback, einmal pro Konto einlösbar.",
+    cashbackUnlimited: "Unbegrenzt viele Konten können den Code freischalten.",
+    cashbackLimited: "Die ersten {{count}} berechtigten Konten können den Code freischalten.",
+    cashbackUnlocked: "Dein Konto hat diesen Code freigeschaltet.",
+    cashbackNotUnlocked: "Der Code ist für dieses Konto nicht freigeschaltet (Punktzahl oder Kontolimit).",
+    cashbackApply: "Cashback-Code verwenden",
+    cashbackApplied: "Cashback-Code angewendet",
+
     prizePayment: 'Quizpreiszahlung',
     autoPrize: "Nach Quizende werden die Preise automatisch aus der Cashback-Wallet an die angemeldete Nimiq-Wallet jedes Gewinners ausgezahlt.",
     timezone: "Alle Zeiten gelten für die Türkei (UTC+03:00).",

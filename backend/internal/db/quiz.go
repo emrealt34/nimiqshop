@@ -74,7 +74,8 @@ type QuizPayoutConfig struct {
 }
 
 type QuizCompetition struct {
-	Payout QuizPayoutConfig `json:"payout"`
+	CashbackReward *QuizCashbackReward `json:"cashback_reward,omitempty"`
+	Payout         QuizPayoutConfig    `json:"payout"`
 
 	TieBreak string `json:"tie_break,omitempty"` // immutable once published; empty retains legacy admin tie decisions
 
@@ -144,6 +145,12 @@ func quizLanguage(lang string) bool {
 	return false
 }
 func validateQuiz(c QuizCompetition) error {
+	if err := validateQuizCashback(c.CashbackReward); err != nil {
+		return err
+	}
+	if c.CashbackReward != nil && c.Payout.Enabled {
+		return fmt.Errorf("cashback code quizzes cannot pay NIM prizes")
+	}
 	if c.Payout.Enabled && (c.Payout.Source != "cashback_wallet" || c.TieBreak != "submitted_at" || c.WinnerCount == nil || *c.WinnerCount < 1 || *c.WinnerCount > 100 || c.Payout.PerWinnerNIM < 1 || c.Payout.PoolNIM < 1 || c.Payout.PoolNIM > 10_000_000 || c.Payout.PerWinnerNIM > c.Payout.PoolNIM/int64(*c.WinnerCount)) {
 		return fmt.Errorf("automatic prizes require cashback_wallet, submitted_at, a bounded winner count and a sufficient integer-NIM pool")
 	}
@@ -258,6 +265,15 @@ func (s *Store) PutQuizCompetition(input QuizCompetition, create bool, now time.
 		}
 	}
 	input.Title = strings.TrimSpace(input.Title)
+	if input.CashbackReward != nil {
+		r := *input.CashbackReward
+		r.Code = strings.ToUpper(strings.TrimSpace(r.Code))
+		input.CashbackReward = &r
+		input.Payout = QuizPayoutConfig{}
+		if input.Prize.Title == "" {
+			input.Prize.Title = "Cashback code"
+		}
+	}
 	input.Prize.Title = strings.TrimSpace(input.Prize.Title)
 	input.StartsAt = input.StartsAt.UTC()
 	input.EndsAt = input.EndsAt.UTC()
@@ -309,6 +325,10 @@ func (s *Store) PutQuizCompetition(input QuizCompetition, create bool, now time.
 			status = "published"
 		}
 		result = QuizCompetition{ID: input.ID, Payout: input.Payout, TieBreak: input.TieBreak, Translations: input.Translations, Title: input.Title, Description: input.Description, Prize: input.Prize, StartsAt: input.StartsAt, EndsAt: input.EndsAt, Status: status, Questions: input.Questions, Participants: old.Participants, WinnerCount: input.WinnerCount, CreatedAt: created, UpdatedAt: now.UTC()}
+		result.CashbackReward = input.CashbackReward
+		if err := saveQuizCashbackDefinition(txn, result.CashbackReward); err != nil {
+			return err
+		}
 		if err := putQuizJSON(txn, quizKey(result.ID), result); err != nil {
 			return err
 		}
@@ -422,7 +442,7 @@ func (s *Store) StartQuiz(id, user string, now time.Time) (QuizCompetition, Quiz
 		if !errors.Is(err, ErrNotFound) {
 			return err
 		}
-		if c.Participants >= quizMaxParticipants {
+		if c.CashbackReward == nil && c.Participants >= quizMaxParticipants {
 			return ErrLimit
 		}
 		answers := make([]int, len(c.Questions))
@@ -451,7 +471,7 @@ func (s *Store) SaveQuizAnswers(id, user string, answers []int, submit bool, now
 		}
 		if a.SubmittedAt != nil {
 			if submit {
-				return nil
+				return grantQuizCashback(txn, c, a, now)
 			} // lost response is safe to retry, never rescores
 			return ErrQuizLocked
 		}
@@ -497,6 +517,9 @@ func (s *Store) SaveQuizAnswers(id, user string, answers []int, submit bool, now
 					a.Points += 1_000_000
 				}
 			}
+		}
+		if err := grantQuizCashback(txn, c, a, now); err != nil {
+			return err
 		}
 		return putQuizJSON(txn, quizAttemptKey(id, user), a)
 	})
@@ -651,7 +674,7 @@ func (s *Store) FinalizeQuizWinners(id string, winners []string, note string, no
 		if err != nil {
 			return err
 		}
-		if c.Payout.Enabled {
+		if c.Payout.Enabled || c.CashbackReward != nil {
 			return ErrQuizLocked
 		}
 		eligible, count := QuizEligibility(c, entries)
@@ -713,7 +736,7 @@ func (s *Store) ClaimQuizPrize(id, user, email string, now time.Time) (QuizAttem
 		if err := getJSON(txn, quizKey(id), &c); err != nil {
 			return err
 		}
-		if c.Payout.Enabled || c.Status != "finalized" || !QuizIsWinner(c, user) || QuizAwardTime(c, user) != nil {
+		if c.Payout.Enabled || c.CashbackReward != nil || c.Status != "finalized" || !QuizIsWinner(c, user) || QuizAwardTime(c, user) != nil {
 			return ErrQuizWinner
 		}
 		if err := getJSON(txn, quizAttemptKey(id, user), &a); err != nil {
@@ -743,7 +766,7 @@ func (s *Store) MarkQuizWinnerPrizeDelivered(id, user, note string, now time.Tim
 		if err := getJSON(txn, quizKey(id), &c); err != nil {
 			return err
 		}
-		if c.Payout.Enabled || c.Status != "finalized" || !QuizIsWinner(c, user) {
+		if c.Payout.Enabled || c.CashbackReward != nil || c.Status != "finalized" || !QuizIsWinner(c, user) {
 			return ErrQuizWinner
 		}
 		if QuizAwardTime(c, user) != nil {

@@ -1,3 +1,4 @@
+export type QuizCashbackReward = { code: string; cashback_bps: number; max_recipients: number; min_score_percent: number };
 export type QuizPayoutConfig = { enabled: boolean; source: "cashback_wallet"; pool_nim: number; per_winner_nim: number };
 export type QuizText = { title: string; description: string };
 export type QuizTranslations = Partial<Record<"en" | "tr" | "de" | "fr" | "es" | "pt", QuizText>>;
@@ -8,6 +9,7 @@ export type QuizQuestion = { translations?: Partial<Record<"en" | "tr" | "de" | 
 export type AdminQuizQuestion = QuizQuestion & { correct_index: number; correct_value?: number };
 export type QuizAttempt = { answers: number[]; score: number; total: number; started_at: string; submitted_at: string | null; prize_email?: string };
 export type QuizCompetition = {
+ cashback_reward?: QuizCashbackReward; cashback_unlocked?: boolean;
  payout?: QuizPayoutConfig; payouts?: {participant:string;status:string;amount_nim:number;memo:string;tx_hash:string;paid_at?:string}[];
  tie_break?: "submitted_at" | "";
  translations?: QuizTranslations;
@@ -19,6 +21,7 @@ export type QuizCompetition = {
   leaderboard?: { submitted_at?: string; rank?: number; participant: string; score: number; is_me: boolean; is_winner: boolean }[];
 };
 export type AdminQuiz = {
+ cashback_reward?: QuizCashbackReward; cashback_unlocked?: boolean;
  payout?: QuizPayoutConfig;
  tie_break?: "submitted_at" | "";
  translations?: QuizTranslations;
@@ -108,11 +111,14 @@ export function parseQuizImport(text: string): AdminQuiz {
   const start = date(raw.starts_at, now, 'starts_at');
   const end = date(raw.ends_at, new Date(Date.parse(start) + 7 * 86400000), 'ends_at');
   if (Date.parse(end) <= Date.parse(start) || Date.parse(end) - Date.parse(start) > 366 * 86400000) throw new Error('ends_at must follow starts_at, within 366 days.');
-  const prize = raw.prize;
+  const cashbackReward = (raw.cashback_reward ?? {code:'ILOVENIM',cashback_bps:100,max_recipients:0,min_score_percent:0}) as QuizCashbackReward;
+  if (cashbackReward && (typeof cashbackReward !== 'object' || !/^[A-Z0-9_-]{3,40}$/.test(cashbackReward.code) || !Number.isInteger(cashbackReward.cashback_bps) || cashbackReward.cashback_bps < 1 || cashbackReward.cashback_bps > 10000 || !Number.isSafeInteger(cashbackReward.max_recipients) || cashbackReward.max_recipients < 0 || !Number.isInteger(cashbackReward.min_score_percent) || cashbackReward.min_score_percent < 0 || cashbackReward.min_score_percent > 100)) throw new Error('Invalid cashback_reward: use a code, rate in basis points, max_recipients (0 = unlimited), and min_score_percent.');
+  if (cashbackReward) payout.enabled = false;
+  const prize = raw.prize || (cashbackReward ? {title:'Cashback code'} : undefined);
   if (!prize || typeof prize !== 'object' || Array.isArray(prize)) throw new Error('Include a prize object.');
   const image = field(prize.image_url, 'Prize image', 2048);
   if (image) { let url: URL; try { url = new URL(image); } catch { throw new Error('Prize image must be an HTTPS URL.'); } if (url.protocol !== 'https:' || url.username || url.password) throw new Error('Prize image must be an HTTPS URL without credentials.'); }
-  return { payout, tie_break: tieBreak, translations: textTranslations(raw.translations, 120, 2000), title: field(raw.title, 'Title', 120, true), description: field(raw.description, 'Description', 2000), winner_count: winnerCount, starts_at: start, ends_at: end, status: 'draft', questions,
+  return { cashback_reward: cashbackReward, payout, tie_break: tieBreak, translations: textTranslations(raw.translations, 120, 2000), title: field(raw.title, 'Title', 120, true), description: field(raw.description, 'Description', 2000), winner_count: winnerCount, starts_at: start, ends_at: end, status: 'draft', questions,
     prize: { translations: textTranslations(prize.translations, 140, 1000), title: field(prize.title, 'Prize title', 140, true), value: field(prize.value, 'Prize value', 40), description: field(prize.description, 'Prize description', 1000), image_url: image } };
 }
 

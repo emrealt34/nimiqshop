@@ -1,37 +1,11 @@
-# Nimiq quiz competitions
+# Cashback quizzes
 
-## Operator setup
+The authenticated `/quiz` page presents one question at a time and saves progress on the server. Admin → Quiz supports JSON import/export, translations, editing and explicit publication. See [the JSON configuration](quiz-json.md).
 
-Open `/admin?section=quiz` with the **separate operator session**. The system starts empty: it publishes no invented questions, prize or competition.
+Completing a quiz unlocks its configured cashback code for the completing account, subject to an optional score threshold and recipient cap. Participation is unlimited. Grants and cap increments commit atomically with submission; retries do not grant twice. A shared code cannot bypass account eligibility, and each account has one redemption through the existing checkout reservation lifecycle.
 
-1. Create a draft. Enter a title, optional description, start and end timestamps, and the promised prize (e.g. Amazon gift card / 5 USD). Enter country restrictions in the prize details. An optional HTTPS image uses the storefront's normal product tile.
-2. Add 1–50 questions, each with 2–6 distinct options and exactly one correct answer. All questions are manually authored by the operator.
-3. Set a custom period or use **End of today / End of this month**. The editor shows local browser time; storage and deadline enforcement use UTC on the server. There is no automatic recurring competition: copy a previous competition into a new period when needed.
-4. Publish. The server opens/closes participation at the configured times. Publishing freezes questions, prize and dates so earlier and later entrants are judged by the same rules. To replace published rules, cancel with a public reason and create/copy a new competition.
-5. After the end, open **Participants & award**. Each correct answer earns one point. Only submitted attempts count. Confirm the sole top scorer, or select a winner from tied top scorers. A lower scorer cannot be chosen. A competition with no completed entries can be closed without a winner. Display order is not a speed tiebreaker.
-6. Deliver the reward manually. The winner can privately provide a delivery email on `/quiz`; only that account and the operator can read it. The operator sees the winner's wallet address and email. After the external hand-off, **Mark manually delivered** records completion and an optional private reference. This operation sends **no money, gift-card code or email**.
+Authentication, CSRF checks, server deadlines and private answer keys apply. Submitted answers are immutable. Editing scoring preserves previous attempts in an archived version. Grants survive server restarts; database backup and restore remain necessary for storage failure recovery.
 
-## Participant flow and safeguards
+New cashback quizzes do not create NIM prize transfers or request a prize delivery email. Existing historical awards and queued payment obligations remain durable and retain the existing payout recovery mechanism.
 
-- `/quiz` is a normal Astro/React route with the site's existing light/dark kraft theme and navigation.
-- The page renders a login gate before showing competition data. **Every `/api/quiz` endpoint is protected by the existing wallet-session authentication middleware**, including list/detail reads. Mutating cookie requests use the existing CSRF checks and per-account write limiter.
-- Starting creates one transactionally unique attempt per competition/account in BadgerDB. Reloads and retried start requests resume the same attempt; they do not create a second entry. Progress is server-saved, and client writes are serialized.
-- Submission sends option indices, not a score. The server validates all indices and scores against its private questions for that competition version. Correct indices are never included in customer list/detail/start responses. The submitted attempt is immutable; a lost-response retry returns the same result.
-- Server time controls entry/submission deadlines. Drafts and cancelled competitions cannot be played. Only completed attempts can win.
-- This is **one attempt per account/wallet**, not a proof that each entrant is a unique human. Multiple-wallet/Sybil resistance and outside research are not prevented. No participation fee or wallet transfer is requested.
-- Other players are shown with pseudonymous participant labels, not full wallet addresses or emails. Prize delivery references remain operator-only.
-- Operator actions are audited. The explicit shop-reset preview includes quiz competitions, questions, indexes, attempts and delivery contacts; a confirmed full reset deletes them along with customer data.
-
-## Deployment / checks
-
-The frontend and Go backend must both be updated. Badger requires no SQL migration: the new `quiz:c:`, `quiz:ix:` and `quiz:a:` namespaces are created when the first draft/attempt is written.
-
-Regression coverage includes transactional one-attempt enforcement, resume/replay safety, server scoring, versioned rules, end boundaries, tied winner selection, manual delivery idempotency, authentication/privacy API checks and browser login/layout/quiz tests.
-
-## Automatic payouts and safe live editing
-
-See [quiz JSON](quiz-json.md) for the automatic NIM payout schema. At the deadline, winner selection and one deterministic payment obligation per winner are committed atomically. The existing cashback worker handles both queues with the same configured wallet. Prize payments remain separate from purchase cashback accounting, but are visible in the owner’s cashback history.
-
-A published competition can be edited before the automatic payout deadline. Changing questions/ranking after participants have entered archives the previous version and preserves its attempts; a fresh version opens with no inherited answers. Completed answers cannot be changed. Queued and paid prizes are immutable.
-
-See [payment recovery](payout-recovery.md) for crash, funding and duplicate-payment safeguards and testnet verification.
+Regression tests cover account gating, partial completion, duplicate submission, concurrent recipient caps, score thresholds, restart persistence, legacy conversion, real API checkout reservations and browser flows at mobile and desktop widths.

@@ -14,7 +14,7 @@ export function unratedPurchases(orders: unknown, quotes: unknown, now = Date.no
   for (const [kind, source] of [['quote', quotes], ['order', orders]] as const) {
     if (!Array.isArray(source)) continue;
     for (const row of source) {
-      if (!row || typeof row !== 'object' || row.test_mode) continue;
+      if (!row || typeof row !== 'object') continue;
       const id = String(row.id || row.quote_id || '');
       if (!id || !isDeliveredStatus(row.status)) continue;
       const key = row.supplier_order_id ? `supplier:${row.supplier_order_id}` : `${kind}:${id}`;

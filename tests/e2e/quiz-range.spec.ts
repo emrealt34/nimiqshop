@@ -34,11 +34,11 @@ for(const width of [320,1280]) {
    await expect.poll(()=>published).toBe(1);
    await expect(page.getByRole('button',{name:'Edit',exact:true})).toHaveCount(1);
    await page.getByRole('button',{name:'Edit',exact:true}).click();
-   await page.getByRole('checkbox',{name:'Automatically pay winners from the cashback wallet after the end date'}).check();
+   await page.getByLabel('Cashback rate (%)',{exact:true}).fill('4');
    await page.getByLabel('Ends',{exact:true}).fill('2026-11-11T12:00');
    await page.getByRole('button',{name:'Save changes',exact:true}).click();
    await expect.poll(()=>stored?.status).toBe('published');
-   expect(stored.payout).toEqual({enabled:true,source:'cashback_wallet',pool_nim:10000,per_winner_nim:2000});
+   expect(stored.cashback_reward.cashback_bps).toBe(400);expect(stored.payout.enabled).toBe(false);
    expect(Date.parse(stored.ends_at)).toBe(Date.parse('2026-11-11T09:00:00Z'));
 
    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);

@@ -33,6 +33,20 @@ func TestQuizAuthenticationPrivacyScoringAndManualAward(t *testing.T) {
 		t.Fatalf("create: %d %s", draft.status, draft.body)
 	}
 	id := draft.json(t)["id"].(string)
+	// Seed an already-existing legacy contest to retain regression coverage for
+	// historical manual awards. New admin-created quizzes use cashback codes.
+	legacy, err := s.h.Store.GetQuizCompetition(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if legacy.CashbackReward == nil {
+		t.Fatal("new admin quiz did not default to a cashback code")
+	}
+	legacy.CashbackReward = nil
+	if _, err = s.h.Store.PutQuizCompetition(legacy, false, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+
 	root := "/api/quiz/" + id
 	aroot := "/api/admin/quiz/" + id
 	if res := s.do("GET", root, nil, shopper); res.status != 404 {
@@ -195,6 +209,20 @@ func TestQuizRangePublicViewsAndIndependentMultipleWinnerClaims(t *testing.T) {
 		t.Fatalf("draft: %d %s", draft.status, draft.body)
 	}
 	id := draft.json(t)["id"].(string)
+	// Seed an already-existing legacy contest to retain regression coverage for
+	// historical manual awards. New admin-created quizzes use cashback codes.
+	legacy, err := s.h.Store.GetQuizCompetition(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if legacy.CashbackReward == nil {
+		t.Fatal("new admin quiz did not default to a cashback code")
+	}
+	legacy.CashbackReward = nil
+	if _, err = s.h.Store.PutQuizCompetition(legacy, false, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+
 	root := "/api/quiz/" + id
 	aroot := "/api/admin/quiz/" + id
 	if r := s.do("POST", aroot+"/publish", nil, admin); r.status != 200 {

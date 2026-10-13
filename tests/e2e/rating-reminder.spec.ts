@@ -41,7 +41,7 @@ for(const width of [320,390,1280]) {
    await expect(page.locator('.rating-flow .stars.picker')).toBeInViewport();
   });
   test('fresh delivery prompts on the next shop visit but never on the completed order page',async({page})=>{
-   const fresh={...delivered,delivered_at:new Date().toISOString(),updated_at:new Date().toISOString()};
+   const fresh={...delivered,test_mode:true,delivered_at:new Date().toISOString(),updated_at:new Date().toISOString()};
    await page.route('**/api/ratings/config',r=>r.fulfill({json:{enabled:true,comments_enabled:true}}));
    await page.route('**/api/orders',r=>r.fulfill({json:[]}));
    await page.route('**/api/quotes',r=>r.fulfill({json:[fresh]}));

@@ -88,6 +88,18 @@ const tr = {
     all: "Tüm alışverişleri gör",
   },
   quiz: {
+    cashbackIntro: "nimshop.io’nun işleyişini öğren, tek kullanımlık cashback kodunu aç.",
+    cashbackMinScore: "Gerekli puan: en az %{{score}}.",
+
+    cashbackRewardTitle: "Cashback kodu",
+    cashbackRewardRule: "Bu quizi tamamlayarak hesabında tek kullanımlık %{{rate}} cashback kodunu aç.",
+    cashbackUnlimited: "Kodu açabilecek hesap sayısı sınırsızdır.",
+    cashbackLimited: "Kodu şartları sağlayan ilk {{count}} hesap açabilir.",
+    cashbackUnlocked: "Kod hesabında kullanıma açıldı.",
+    cashbackNotUnlocked: "Kod bu hesapta açılmadı (puan şartı veya hesap sınırı).",
+    cashbackApply: "Cashback kodunu kullan",
+    cashbackApplied: "Cashback kodu uygulandı",
+
     prizePayment: 'Yarışma ödülü ödemesi',
     autoPrize: "Ödüller yarışma bittikten sonra cashback cüzdanından kazananların giriş yaptığı Nimiq cüzdanlarına otomatik ödenir.",
     timezone: "Tüm saatler Türkiye saatiyle (UTC+03:00).",

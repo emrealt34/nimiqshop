@@ -17,12 +17,13 @@ test('AI JSON creates only editable drafts and validates range answers and winne
   const example = parseQuizImport(await readFile(new URL('../docs/examples/shop-knowledge-quiz.json', import.meta.url), 'utf8'));
   assert.equal(example.questions.length, 10);
   assert.equal(example.winner_count, 5); assert.equal(example.tie_break, 'submitted_at');
-  assert.equal(example.prize.value, '10 000 NIM');
-  assert.deepEqual(example.payout,{enabled:true,source:'cashback_wallet',pool_nim:10000,per_winner_nim:2000});
+  assert.equal(example.prize.value, 'ILOVENIM');
+  assert.equal(example.payout.enabled,false);
+  assert.deepEqual(example.cashback_reward,{code:'ILOVENIM',cashback_bps:100,max_recipients:0,min_score_percent:0});
   assert.equal(Date.parse(example.ends_at),Date.parse('2026-11-11T09:00:00Z'));
   for(const payout of [{enabled:true,source:'other',pool_nim:10000,per_winner_nim:2000},{enabled:true,source:'cashback_wallet',pool_nim:1000,per_winner_nim:2000},{enabled:true,source:'cashback_wallet',pool_nim:10000,per_winner_nim:2000.5},{enabled:'true',source:'cashback_wallet',pool_nim:10000,per_winner_nim:2000}]) assert.throws(()=>parseQuizImport(JSON.stringify({...raw,tie_break:'submitted_at',payout})));
-  assert.throws(()=>parseQuizImport(JSON.stringify({...raw,winner_count:0,tie_break:'submitted_at',payout:example.payout})));
-  assert.throws(()=>parseQuizImport(JSON.stringify({...raw,tie_break:'',payout:example.payout})));
+  assert.throws(()=>parseQuizImport(JSON.stringify({...raw,winner_count:0,tie_break:'submitted_at',payout:{enabled:true,source:'cashback_wallet',pool_nim:10000,per_winner_nim:2000}})));
+  assert.throws(()=>parseQuizImport(JSON.stringify({...raw,tie_break:'',payout:{enabled:true,source:'cashback_wallet',pool_nim:10000,per_winner_nim:2000}})));
 
   assert.throws(() => parseQuizImport(JSON.stringify({ ...raw, tie_break: 'client_time' })));
   for (const lang of ['en','tr','de','fr','es','pt']) {

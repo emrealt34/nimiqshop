@@ -8,7 +8,7 @@ import { Icon } from './Icon';
 import { explorerUrl, shortTx } from '../../lib/chain';
 import { CFG } from '../../lib/config';
 import { Identicon } from './Identicon';
-import { fmtClock, fmtDate, fmtNIM } from '../../lib/format';
+import { fmtClock, fmtDate, fmtNIM, fmtDuration } from '../../lib/format';
 import { Clipboard } from '../../lib/clipboard';
 import { getNimRate, cachedNimRate, errorDetailLine } from '../../lib/api';
 import { nimAmountFor, nimFallbackText } from '../../lib/nim';
@@ -275,6 +275,15 @@ export function LiveClock({ className = '' }: { className?: string }) {
 export function StageTimeline({ stages, channel, usdt }: { stages?: any[]; channel?: 'email' | 'phone' | 'both' | 'none'; usdt?: boolean }) {
   const { t } = useT();
   const arr = Array.isArray(stages) ? stages : [];
+  const [, tick] = useState(0);
+  const processing = arr.some(stage => stage.id === 'supplier_processing' && stage.status === 'in_progress');
+  useEffect(() => {
+    if (!processing) return;
+    const timer = window.setInterval(() => tick(n => n + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [processing]);
+  const paid = Date.parse(arr.find(stage => stage.id === 'payment_settled')?.timestamp || '');
+  const delivered = Date.parse(arr.find(stage => stage.id === 'delivery_complete')?.timestamp || '');
   if (!arr.length) return <div className="empty small">{t('stage.noneYet')}</div>;
   return (
     <div className="timeline">
@@ -302,7 +311,9 @@ export function StageTimeline({ stages, channel, usdt }: { stages?: any[]; chann
             {/* EXACT time, to the second (owner, 2026-10-06: "6 saat önce
                 değil, 10 am tam saniyesi yazsın"). A step that is RUNNING has
                 no timestamp yet, so it shows a live clock instead of an age. */}
-            {st.timestamp ? (
+            {st.id === 'supplier_processing' && Number.isFinite(paid) && paid > 0 && (status === 'in_progress' || (status === 'completed' && Number.isFinite(delivered) && delivered >= paid)) ? (
+              <div className="tl-time"><span role={status === 'in_progress' ? 'timer' : undefined}>{fmtDuration(Math.max(0, ((status === 'in_progress' ? Date.now() : delivered) - paid) / 1000))}</span></div>
+            ) : st.timestamp ? (
               <div className="tl-time">
                 <ClockTime ts={st.timestamp} className={status === 'in_progress' ? 'live' : undefined} />
               </div>
