@@ -1908,6 +1908,7 @@ const en = {
   /* ---- nim ---- */
   /* The buyer's own NIM balance (wallet lookup strip). */
   wallet: {
+    stakeUnavailable: 'Staking amounts could not be read. Refresh to try again.',
     stakedLine: '{{staked}} NIM staked',
     partial: 'Some account balances could not be read. The displayed amount may be incomplete. Refresh to try again.',
     label: 'Your wallet',

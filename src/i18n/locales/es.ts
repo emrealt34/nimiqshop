@@ -1899,6 +1899,7 @@ const es = {
   /* ---- nim ---- */
   /* The buyer's own NIM balance (wallet lookup strip). */
   wallet: {
+    stakeUnavailable: 'No se pudieron consultar los importes en staking. Actualiza para reintentar.',
     stakedLine: '{{staked}} NIM en staking',
     partial: 'No se pudieron consultar algunos saldos. El importe mostrado puede estar incompleto. Actualiza para reintentar.',
     label: 'Tu cartera',

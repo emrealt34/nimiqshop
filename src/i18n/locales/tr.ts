@@ -1900,6 +1900,7 @@ const tr = {
   /* ---- nim ---- */
   /* The buyer's own NIM balance (wallet lookup strip). */
   wallet: {
+    stakeUnavailable: 'Stake miktarı okunamadı. Yenileyerek tekrar deneyin.',
     stakedLine: '{{staked}} NIM stake edilmiş',
     partial: 'Bazı adreslerin bakiyesi okunamadı. Gösterilen tutar eksik olabilir. Yenileyerek tekrar deneyin.',
     label: 'Cüzdanın',

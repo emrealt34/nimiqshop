@@ -680,6 +680,7 @@ export const listOrders = () => api('/orders', { auth: true });
  * app shows its owner.
  */
 export interface WalletBalanceResponse {
+  stake_available?: boolean;
   /** false when the backend could not answer — see `reason`. */
   available: boolean;
   /** no_wallet | rpc_unavailable | … */
@@ -695,6 +696,10 @@ export interface WalletBalanceResponse {
   cached?: boolean;
   observed_at?: string;
 }
+
+/** Public staking amounts, restricted to addresses already disclosed by Pay. */
+export const getWalletStake = (address: string, fresh = false) =>
+  api(`/wallet/stake?address=${encodeURIComponent(address)}${fresh ? '&fresh=1' : ''}`, { timeoutMs: 8000 });
 
 export const getWalletBalance = (opts: { fresh?: boolean } = {}) =>
   api(`/wallet/balance${opts.fresh ? '?fresh=1' : ''}`, {

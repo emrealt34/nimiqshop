@@ -36,7 +36,7 @@
  * figure is refreshed as soon as the live rate arrives, so it is never a stale
  * conversion of a fresh number.
  */
-import { getWalletBalance, getNimRate, cachedNimRate } from './api';
+import { getWalletBalance, getWalletStake, getNimRate, cachedNimRate } from './api';
 import { initNimiqMiniApp, getNimiqProvider, inNimiqPay, nimiqPayBalanceSupport } from './miniapp';
 import { getAddress, isAuthed, subscribeSession } from './session';
 import { classifyWalletError, readWalletError, type WalletErrorClass } from './walletErrors';
@@ -208,6 +208,7 @@ export interface WalletBalanceState {
   stale?: boolean;
   /** At least one known account could not be read; the amount is a lower bound. */
   partial?: boolean;
+  stakeUnavailable?: boolean;
   at?: number;
   failure?: WalletBalanceFailure;
   /** On-screen diagnostics for Nimiq Pay balance troubleshooting. */
@@ -248,6 +249,7 @@ function emit(next: WalletBalanceState): WalletBalanceState {
 /* ---------------- the reading itself ---------------- */
 
 interface ShopReading {
+  stakeKnown: boolean;
   luna: number;
   address: string;
   stakedNim: number;
@@ -300,6 +302,7 @@ async function shopReading(fresh = false): Promise<ShopReading> {
   const availableNim = luna / LUNA_PER_NIM;
   return {
     luna,
+    stakeKnown: res.stake_available !== false,
     address: String(res.address || ''),
     stakedNim,
     inactiveNim,
@@ -501,10 +504,39 @@ async function readBalance(force = false): Promise<WalletBalanceState> {
     }
   }
 
+  // Stake is public chain data. Read each known account even without a shop
+  // session, and reuse the session read only when its stake lookup succeeded.
+  let stakedNim = shop?.stakedNim || 0;
+  let inactiveNim = shop?.inactiveNim || 0;
+  let retiredNim = shop?.retiredNim || 0;
+  let stakeUnavailable = !!shop && !shop.stakeKnown;
+  let stakeNetwork = shop?.network || '';
+  if (host !== null && hostAddresses.length) {
+    stakedNim = inactiveNim = retiredNim = 0;
+    stakeUnavailable = false;
+    const stakes = await Promise.allSettled(hostAddresses.map(async account => {
+      if (shop?.stakeKnown && canonical(shop.address || sessionAddress) === account) return shop;
+      const result = await getWalletStake(account, force);
+      if (canonical(String(result?.address || '')) !== account) throw new Error('staking address mismatch');
+      const amounts = [result.staked_nim, result.inactive_nim, result.retired_nim];
+      if (amounts.some(value => typeof value !== 'number' || !Number.isFinite(value) || value < 0)) throw new Error('invalid staking amounts');
+      if (result.network !== 'mainnet' && result.network !== 'testnet') throw new Error('invalid staking network');
+      return { stakedNim: amounts[0], inactiveNim: amounts[1], retiredNim: amounts[2], network: result.network };
+    }));
+    for (const stake of stakes) {
+      if (stake.status === 'rejected') { stakeUnavailable = true; continue; }
+      if (stakeNetwork && stakeNetwork !== stake.value.network) { stakeUnavailable = true; continue; }
+      stakeNetwork = stake.value.network;
+      stakedNim += stake.value.stakedNim;
+      inactiveNim += stake.value.inactiveNim;
+      retiredNim += stake.value.retiredNim;
+    }
+  }
+
   if (host !== null && hostAddresses.length) address = hostAddresses[0];
   if (!address && shop?.address) address = shop.address;
   debugLines.push(`finalAddress=${address || '(none)'}`);
-  const base = { partial, address, network: shop?.network || '', hostBalance: hostSupport, debugLines };
+  const base = { partial, stakeUnavailable, address, network: stakeNetwork, hostBalance: hostSupport, debugLines };
 
   // Compare units only when both sources describe the same single account.
   // A multi-account total cannot be compared to the session account alone.
@@ -529,7 +561,7 @@ async function readBalance(force = false): Promise<WalletBalanceState> {
        gap between two reads: that gap is what produced a "staked" label for
        funds that were not staked. */
     const spendLuna = hostLuna;
-    const reportedStakeNim = shop.stakedNim + shop.inactiveNim + shop.retiredNim;
+    const reportedStakeNim = stakedNim + inactiveNim + retiredNim;
     const availableNim = spendLuna / LUNA_PER_NIM;
     /* The total is spendable plus the stake the backend reports, each once. */
     const totalNim = availableNim + reportedStakeNim;
@@ -538,9 +570,9 @@ async function readBalance(force = false): Promise<WalletBalanceState> {
       status: 'ready',
       luna: spendLuna,
       availableNim,
-      stakedNim: shop.stakedNim,
-      inactiveNim: shop.inactiveNim,
-      retiredNim: shop.retiredNim,
+      stakedNim,
+      inactiveNim,
+      retiredNim,
       totalNim,
       nim: availableNim,
       usd: 0,
@@ -556,17 +588,17 @@ async function readBalance(force = false): Promise<WalletBalanceState> {
     return withUsd(state);
   }
 
-  // HOST ONLY: not signed in to the shop, but the wallet can still answer. The
-  // host reports one figure (the address balance); staking is not visible here.
+  // HOST ONLY: liquid funds come from Pay; staking comes from public chain
+  // reads of those same accounts and never requires a shop session.
   if (host !== null) {
     const state: WalletBalanceState = {
       status: 'ready',
       luna: host,
       availableNim: host / LUNA_PER_NIM,
-      stakedNim: 0,
-      inactiveNim: 0,
-      retiredNim: 0,
-      totalNim: host / LUNA_PER_NIM,
+      stakedNim,
+      inactiveNim,
+      retiredNim,
+      totalNim: host / LUNA_PER_NIM + stakedNim + inactiveNim + retiredNim,
       nim: host / LUNA_PER_NIM,
       usd: 0,
       source: 'nimiq-pay',
@@ -583,9 +615,9 @@ async function readBalance(force = false): Promise<WalletBalanceState> {
       status: 'ready',
       luna: shop.luna,
       availableNim: shop.luna / LUNA_PER_NIM,
-      stakedNim: shop.stakedNim,
-      inactiveNim: shop.inactiveNim,
-      retiredNim: shop.retiredNim,
+      stakedNim,
+      inactiveNim,
+      retiredNim,
       totalNim: shop.totalNim,
       nim: shop.luna / LUNA_PER_NIM,
       usd: 0,

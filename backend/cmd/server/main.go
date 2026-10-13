@@ -1056,6 +1056,8 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 	// this on the open web, so the buyer can see what they can afford before a
 	// checkout starts. Session-scoped on purpose: no address parameter.
 	r.GET("/api/wallet/balance", authed(h.WalletBalance))
+	// Public chain stake amounts for addresses explicitly supplied by Nimiq Pay.
+	r.GET("/api/wallet/stake", tiered(tRefresh, h.PublicWalletStake))
 	r.GET("/api/orders/{id}", authed(h.GetOrder))
 	r.POST("/api/orders/{id}/refresh", authedTiered(aRefresh, h.RefreshOrder))
 	r.GET("/api/orders/{id}/support", authed(h.GetOrderSupport))

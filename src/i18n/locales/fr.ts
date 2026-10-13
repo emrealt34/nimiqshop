@@ -1899,6 +1899,7 @@ const fr = {
   /* ---- nim ---- */
   /* The buyer's own NIM balance (wallet lookup strip). */
   wallet: {
+    stakeUnavailable: 'Impossible de consulter les montants stakés. Actualisez pour réessayer.',
     stakedLine: '{{staked}} NIM stakés',
     partial: 'Certains soldes sont indisponibles. Le montant affiché peut être incomplet. Actualisez pour réessayer.',
     label: 'Votre portefeuille',

@@ -176,7 +176,9 @@ export async function mockApi(ctx: BrowserContext, opts: Partial<ApiOptions>, re
     if (o.mode === 'garbage') return route.fulfill({ status: 200, contentType: 'application/json', headers: cors(route), body: '<html>502 Bad Gateway</html>' });
     if (o.mode === 'empty') return route.fulfill({ status: 200, contentType: 'application/json', headers: cors(route), body: 'null' });
     if (o.mode === 'slow') await new Promise((r) => setTimeout(r, 2500));
-    const body = payload(apiPath, method, o) as any;
+    const body = apiPath === '/wallet/stake'
+      ? { address: url.searchParams.get('address'), staked_nim: 0, inactive_nim: 0, retired_nim: 0, network: 'mainnet' }
+      : payload(apiPath, method, o) as any;
     const status = body && typeof body === 'object' && '__status' in body ? body.__status : 200;
     return route.fulfill({ status, contentType: 'application/json', headers: cors(route), body: JSON.stringify(body) });
   };

@@ -197,3 +197,54 @@ func approx(a, b float64) bool { return math.Abs(a-b) < 1e-9 }
 func normaliseAddress(a string) string {
 	return strings.ToUpper(strings.ReplaceAll(strings.TrimSpace(a), " ", ""))
 }
+
+func TestPublicWalletStakeWithoutShopLogin(t *testing.T) {
+	var calls int64
+	rpc := chainStub(t, chainStubOptions{staking: true, calls: &calls})
+	s := bootStack(t, stackOptions{env: map[string]string{"NIMIQ_RPC_URL": rpc.URL}})
+	address := "NQ49N8MBXYCRXBUP404CKXKKL49MA7BTF082"
+	route := "/api/wallet/stake?address=" + address
+	res := s.do(http.MethodGet, route, nil, nil)
+	if res.status != 200 {
+		t.Fatalf("guest stake: %d %s", res.status, res.body)
+	}
+	j := res.json(t)
+	if str(j["address"]) != address || num(j["staked_nim"]) != 100 || num(j["inactive_nim"]) != 0.005 {
+		t.Fatalf("stake response: %v", j)
+	}
+	if _, exists := j["balance_nim"]; exists {
+		t.Fatal("stake endpoint must not read or return liquid funds")
+	}
+	first := atomic.LoadInt64(&calls)
+	if first != 1 {
+		t.Fatalf("wanted one fixed staking query, got %d", first)
+	}
+	if got := s.do(http.MethodGet, route, nil, nil); got.status != 200 {
+		t.Fatalf("cached: %d", got.status)
+	}
+	if atomic.LoadInt64(&calls) != first {
+		t.Fatal("cached guest read hit RPC again")
+	}
+	if got := s.do(http.MethodGet, route+"&fresh=1", nil, nil); got.status != 200 {
+		t.Fatalf("fresh: %d", got.status)
+	}
+	if atomic.LoadInt64(&calls) != first+1 {
+		t.Fatal("manual refresh did not bypass cache")
+	}
+	if got := s.do(http.MethodGet, "/api/wallet/stake?address=invalid", nil, nil); got.status != 400 {
+		t.Fatalf("invalid: %d", got.status)
+	}
+	if atomic.LoadInt64(&calls) != first+1 {
+		t.Fatal("invalid address reached RPC")
+	}
+}
+
+func TestPublicWalletStakeOutageDoesNotPretendZero(t *testing.T) {
+	rpc := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.Error(w, "unavailable", 503) }))
+	defer rpc.Close()
+	s := bootStack(t, stackOptions{env: map[string]string{"NIMIQ_RPC_URL": rpc.URL}})
+	res := s.do(http.MethodGet, "/api/wallet/stake?address=NQ49N8MBXYCRXBUP404CKXKKL49MA7BTF082", nil, nil)
+	if res.status != 502 {
+		t.Fatalf("outage: %d %s", res.status, res.body)
+	}
+}

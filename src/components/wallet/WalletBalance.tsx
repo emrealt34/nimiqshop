@@ -225,6 +225,9 @@ export function WalletBalance({
           so the strip says exactly that instead of silently showing the shop's
           own figure. Only inside Nimiq Pay — a plain browser has no wallet
           version to update, and the cache ('via-request') is fine either way. */}
+      {ready && state.stakeUnavailable && (
+        <span className="wal-note xs">{t('wallet.stakeUnavailable')}</span>
+      )}
       {ready && state.partial && (
         <span className="wal-note xs"><Icon name="info" size={12} /> {t('wallet.partial')}</span>
       )}

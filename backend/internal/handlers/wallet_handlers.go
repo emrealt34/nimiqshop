@@ -41,8 +41,8 @@ import (
  *
  * Inside Nimiq Pay the client prefers the host bridge (`getBalance(address)`,
  * Mini App SDK 0.2.1+) and cross-checks it against this endpoint. The address
- * always comes from the SESSION, never from a query parameter, so the shop can
- * never be used as an open "look up any address" proxy.
+ * for this endpoint comes from the SESSION. The separate public stake endpoint
+ * accepts validated Pay addresses and exposes only public staking amounts.
  */
 
 // balanceCacheTTL keeps a page-view storm off the public RPC. The figure is
@@ -50,11 +50,12 @@ import (
 const balanceCacheTTL = 20 * time.Second
 
 type walletBalanceEntry struct {
-	luna     int64
-	staked   int64
-	inactive int64
-	retired  int64
-	at       time.Time
+	stakeKnown bool
+	luna       int64
+	staked     int64
+	inactive   int64
+	retired    int64
+	at         time.Time
 }
 
 var (
@@ -124,17 +125,18 @@ func (h *Handlers) WalletBalance(ctx *fasthttp.RequestCtx) {
 	available := lunaToNIM(entry.luna)
 
 	writeJSON(ctx, fasthttp.StatusOK, map[string]interface{}{
-		"address":      address,
-		"available":    true,
-		"balance_luna": entry.luna,
-		"balance_nim":  available,
-		"staked_nim":   staked,
-		"inactive_nim": inactive,
-		"retired_nim":  retired,
-		"total_nim":    available + staked + inactive + retired,
-		"network":      h.walletNetwork(),
-		"cached":       cached,
-		"observed_at":  entry.at,
+		"address":         address,
+		"available":       true,
+		"balance_luna":    entry.luna,
+		"balance_nim":     available,
+		"staked_nim":      staked,
+		"stake_available": entry.stakeKnown,
+		"inactive_nim":    inactive,
+		"retired_nim":     retired,
+		"total_nim":       available + staked + inactive + retired,
+		"network":         h.walletNetwork(),
+		"cached":          cached,
+		"observed_at":     entry.at,
 	})
 }
 
@@ -172,13 +174,10 @@ func (h *Handlers) readWalletBalance(address string, fresh bool) (walletBalanceE
 	// nothing staked — which is exactly how a figure ends up disagreeing with
 	// Nimiq Pay, where the stake IS part of what the buyer sees. Two reads, two
 	// budgets, so the stake is missing only when the chain itself did not answer.
-	stakeCtx, cancelStake := context.WithTimeout(context.Background(), 6*time.Second)
-	defer cancelStake()
 	entry := walletBalanceEntry{luna: luna, at: now}
-	if staker, sErr := h.NIMRPC.GetStaker(stakeCtx, address); sErr == nil {
-		entry.staked = staker.Balance
-		entry.inactive = staker.InactiveBalance
-		entry.retired = staker.RetiredBalance
+	if stake, known := h.readWalletStake(address, fresh); known {
+		entry.stakeKnown = true
+		entry.staked, entry.inactive, entry.retired = stake.active, stake.inactive, stake.retired
 	}
 
 	walletCacheMu.Lock()
