@@ -48,6 +48,7 @@ type testStack struct {
 type stackOptions struct {
 	testMode bool
 	env      map[string]string
+	listener net.Listener
 }
 
 func bootStack(t *testing.T, opts stackOptions) *testStack {
@@ -89,7 +90,7 @@ func bootStack(t *testing.T, opts stackOptions) *testStack {
 		t.Fatalf("config.Validate: %v", err)
 	}
 
-	store, err := db.New(cfg.BadgerDir, db.Options{SyncWrites: false, ValueThresholdKB: cfg.BadgerValueThresholdKB})
+	store, err := db.New(cfg.BadgerDir, db.Options{SyncWrites: cfg.BadgerSyncWrites, ValueThresholdKB: cfg.BadgerValueThresholdKB})
 	if err != nil {
 		t.Fatalf("db.New: %v", err)
 	}
@@ -119,9 +120,12 @@ func bootStack(t *testing.T, opts stackOptions) *testStack {
 
 	r := buildRouter(h, cfg)
 	srv := &fasthttp.Server{Handler: r.Handler, ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second}
-	ln, err := net.Listen("tcp", loopback.HostPort("0"))
-	if err != nil {
-		t.Fatalf("listen: %v", err)
+	ln := opts.listener
+	if ln == nil {
+		ln, err = net.Listen("tcp", loopback.HostPort("0"))
+		if err != nil {
+			t.Fatalf("listen: %v", err)
+		}
 	}
 	go func() { _ = srv.Serve(ln) }()
 	t.Cleanup(func() { _ = srv.Shutdown() })

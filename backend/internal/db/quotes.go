@@ -15,6 +15,12 @@ import (
 	"nimiqshop/internal/stakeledger"
 )
 
+// HasCashbackPromotion also guards historical quotes whose ordinary base
+// rate was accidentally saved in the promotion-rate field without a code.
+func (q Quote) HasCashbackPromotion() bool {
+	return strings.TrimSpace(q.CashbackCode) != "" && q.CashbackCodeBps > 0
+}
+
 /* Quote state machine (Cryptorefills rail)
  *
  * States:

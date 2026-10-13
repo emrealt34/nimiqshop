@@ -199,6 +199,9 @@ func (h *Handlers) createQuoteInner(ctx *fasthttp.RequestCtx, userID string, req
 	if h.existingCheckout(ctx, userID, idempotencyKey, requestFP, purchaseFP, req.AckActiveCheckout) {
 		return
 	}
+	if req.CashbackCode == "" {
+		h.syncBuyerProfitOnDemand(userID)
+	}
 	cashbackView, err := h.resolveQuoteCashback(req.CashbackCode, userID)
 	if err != nil {
 		writeError(ctx, fasthttp.StatusBadRequest, err.Error())
@@ -427,7 +430,7 @@ func (h *Handlers) createQuoteInner(ctx *fasthttp.RequestCtx, userID string, req
 		GiftMessage:            gift.Message,
 		GifterIdenticonDataURI: req.GifterIdenticon,
 		CashbackCode:           cashbackView.Code,
-		CashbackCodeBps:        cashbackView.Bps,
+		CashbackCodeBps:        cashbackView.promotionBps(),
 		CashbackCodeMaxUSD:     cashbackView.PromoCapUSD,
 		Status:                 "order_creating",
 		// Provisional deadline while the supplier order is still being

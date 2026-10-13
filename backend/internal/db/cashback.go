@@ -226,7 +226,7 @@ func enqueueCashbackOnFulfill(tx *badger.Txn, q *Quote, stake StakerStake, ledge
 		return boostBps, e
 	}
 	switch {
-	case q.CashbackCodeBps > 0:
+	case q.HasCashbackPromotion():
 		// Exclusive promo code: replaces base on the (possibly capped)
 		// promo portion of the cart. No ledger boost stacks on the promo
 		// portion. If there is an over-cap remainder (cart > cap), the
@@ -293,7 +293,7 @@ func enqueueCashbackOnFulfill(tx *badger.Txn, q *Quote, stake StakerStake, ledge
 		// math collapses to the previous flat-rate behaviour.
 		var promoLuna int64
 		var overCapBaseLuna int64
-		usingCode := q.CashbackCodeBps > 0
+		usingCode := q.HasCashbackPromotion()
 		switch {
 		case usingCode:
 			promoLuna = cashback.AmountLuna(promoCapNIM, walletBps)

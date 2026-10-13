@@ -35,6 +35,13 @@ type quoteCashbackView struct {
 	UsesLeft int
 }
 
+func (v quoteCashbackView) promotionBps() int {
+	if v.Code == "" || v.Source != "code" {
+		return 0
+	}
+	return v.Bps
+}
+
 func envCashbackCodeRules(tableRaw string) ([]adminmodel.CashbackCodeRule, error) {
 	rewards, err := cashbackcode.Sorted(tableRaw)
 	if err != nil {
@@ -120,6 +127,10 @@ func (h *Handlers) resolveQuoteCashback(code string, userID string) (quoteCashba
 		if stake.Staked && bps > 0 {
 			src = "staker"
 		}
+		if boost := h.ledgerBoostBpsBestEffort(userID); boost > 0 {
+			bps += boost
+			src = "ledger"
+		}
 		return quoteCashbackView{Bps: bps, Source: src}, nil
 	}
 	rule, ok, err := h.lookupCashbackCodeRule(code)
@@ -179,12 +190,12 @@ func validatePromoOrderCap(view *quoteCashbackView, orderUSD float64) {
 }
 
 func applyQuoteCashbackFields(resp map[string]interface{}, q db.Quote, bps int) {
-	if q.CashbackCodeBps > 0 {
+	if q.HasCashbackPromotion() {
 		bps = q.CashbackCodeBps
 	}
 	resp["cashback_bps"] = bps
 	resp["cashback_percent"] = float64(bps) / 100.0
-	if q.CashbackCodeBps > 0 {
+	if q.HasCashbackPromotion() {
 		resp["cashback_source"] = "code"
 		resp["cashback_code"] = q.CashbackCode
 		resp["cashback_code_bps"] = q.CashbackCodeBps
@@ -234,18 +245,33 @@ func (h *Handlers) attachQuoteCashbackEstimate(resp map[string]interface{}, q db
 		bps, _ := h.buyerBaseBps(context.Background(), q.UserID)
 		view = quoteCashbackView{Bps: bps, Source: "base"}
 	}
-	if q.CashbackCodeBps > 0 {
+	if q.HasCashbackPromotion() {
 		view.Bps = q.CashbackCodeBps
 		view.Source = "code"
 		view.Code = q.CashbackCode
 		view.Exclusive = true
 	}
 	applyQuoteCashbackFields(resp, q, view.Bps)
-	if q.CashbackCodeBps <= 0 && view.Source == "staker" {
-		resp["cashback_source"] = "staker"
+	if !q.HasCashbackPromotion() {
+		resp["cashback_source"] = view.Source
 	}
 	if productNIM > 0 && view.Bps > 0 {
-		if luna := cashback.AmountLuna(productNIM, view.Bps); luna > 0 {
+		luna := cashback.AmountLuna(productNIM, view.Bps)
+		if !q.HasCashbackPromotion() {
+			baseBps, _ := h.buyerBaseBps(context.Background(), q.UserID)
+			luna = cashback.AmountLuna(productNIM, baseBps)
+			// Preview on a copy of the earned ledger: actual eligible-spend
+			// caps and remaining credit can lower the boost on a large cart.
+			// The fulfillment transaction remains the only debit operation.
+			if user, err := h.Store.GetUser(q.UserID); err == nil && q.NimUsdRate > 0 {
+				if ledger, ok, err := h.Store.ReadStakeLedger(user.NimiqAddress); err == nil && ok {
+					settings, _ := h.Store.GetAdminSettings(0)
+					_, boost := ledger.Purchase(float64(q.ProductUSD)/1_000_000, q.NimUsdRate, settings.EffectiveStakeCashback(), time.Now().UTC())
+					luna += int64(boost*100000 + 0.5)
+				}
+			}
+		}
+		if luna > 0 {
 			resp["estimated_cashback_nim"] = cashback.NIMFromLuna(luna)
 			resp["estimated_cashback_luna"] = luna
 		}

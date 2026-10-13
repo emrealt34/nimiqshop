@@ -114,6 +114,13 @@ func (h *Handlers) syncProfitOnDemand(ctx context.Context, addr string) {
 	}
 }
 
+// Refresh at checkout creation, not on every order-detail polling read.
+func (h *Handlers) syncBuyerProfitOnDemand(userID string) {
+	if user, err := h.Store.GetUser(userID); err == nil {
+		h.syncProfitOnDemand(context.Background(), user.NimiqAddress)
+	}
+}
+
 // ledgerView renders a wallet's ledger for the buyer-facing endpoints.
 // Dollar-first on purpose: "you have $X available", NIM in parentheses.
 func (h *Handlers) ledgerView(addr string) map[string]any {

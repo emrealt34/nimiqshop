@@ -1,0 +1,30 @@
+package main
+
+import (
+ "encoding/json"
+ "fmt"
+ "net"
+ "net/http"
+ "os"
+ "github.com/dgraph-io/badger/v4"
+ "nimiqbase/pool/internal/api"
+ "nimiqbase/pool/internal/config"
+ "nimiqbase/pool/internal/db"
+ "nimiqbase/pool/internal/nimiq"
+ "nimiqbase/pool/internal/nimiq/rpc"
+)
+
+func main() {
+ var f struct { Scope string `json:"scope"`; Backup string `json:"backup_path"`; RPC string `json:"rpc_url"`; Owner string `json:"pool_owner_address"`; Key string `json:"feed_key"` }
+ b,e:=os.ReadFile(os.Args[1]);if e!=nil {panic(e)};if e=json.Unmarshal(b,&f);e!=nil {panic(e)}
+ if f.Scope!="isolated-unit-albatross" {panic("wrong fixture scope")}
+ dir,e:=os.MkdirTemp("","earned-api-");if e!=nil {panic(e)};defer os.RemoveAll(dir)
+ raw,e:=badger.Open(badger.DefaultOptions(dir).WithLogger(nil));if e!=nil {panic(e)}
+ backup,e:=os.Open(f.Backup);if e!=nil {panic(e)}
+ if e=raw.Load(backup,16);e!=nil {panic(e)};if e=backup.Close();e!=nil {panic(e)};if e=raw.Close();e!=nil {panic(e)}
+ store,e:=db.Open(db.Options{Dir:dir,Quiet:true,SyncWrites:true});if e!=nil {panic(e)};defer store.Close()
+ client,e:=rpc.New(f.RPC,rpc.WithNetwork(nimiq.NetworkUnitAlbatross));if e!=nil {panic(e)}
+ handler:=api.New(&config.Config{ValidatorAddress:f.Owner,CashbackFeedAPIKey:f.Key,CashbackBaseBps:100,PoolFeePercentage:.05},store.Queries(),client)
+ listener,e:=net.Listen("tcp","127.0.0.1:0");if e!=nil {panic(e)}
+ fmt.Println("http://"+listener.Addr().String());if e=http.Serve(listener,handler);e!=nil {panic(e)}
+}

@@ -234,6 +234,9 @@ func (h *Handlers) createQuoteBatchInner(ctx *fasthttp.RequestCtx, userID string
 		return
 	}
 
+	if req.CashbackCode == "" {
+		h.syncBuyerProfitOnDemand(userID)
+	}
 	cashbackView, err := h.resolveQuoteCashback(req.CashbackCode, userID)
 	if err != nil {
 		writeError(ctx, fasthttp.StatusBadRequest, err.Error())
@@ -542,7 +545,7 @@ func (h *Handlers) createQuoteBatchInner(ctx *fasthttp.RequestCtx, userID string
 		// createQuoteInner's branch — the batch shares the semantics).
 		TestMode:           h.simulatedPaymentFor(userID),
 		CashbackCode:       cashbackView.Code,
-		CashbackCodeBps:    cashbackView.Bps,
+		CashbackCodeBps:    cashbackView.promotionBps(),
 		CashbackCodeMaxUSD: cashbackView.PromoCapUSD,
 		Status:             "order_creating",
 		ExpiresAt:          now.Add(cryptorefills.PaymentWindow - cryptorefills.PaymentSafetyBuffer), CreatedAt: now, UpdatedAt: now,
