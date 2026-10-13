@@ -1895,6 +1895,7 @@ const tr = {
   /* ---- nim ---- */
   /* The buyer's own NIM balance (wallet lookup strip). */
   wallet: {
+    partial: 'Bazı adreslerin bakiyesi okunamadı. Gösterilen tutar eksik olabilir. Yenileyerek tekrar deneyin.',
     label: 'Cüzdanın',
     loading: 'Bakiyen okunuyor…',
     available: 'Harcanabilir',

@@ -1903,6 +1903,7 @@ const en = {
   /* ---- nim ---- */
   /* The buyer's own NIM balance (wallet lookup strip). */
   wallet: {
+    partial: 'Some account balances could not be read. The displayed amount may be incomplete. Refresh to try again.',
     label: 'Your wallet',
     loading: 'Reading your balance…',
     available: 'Spendable',

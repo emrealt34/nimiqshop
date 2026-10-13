@@ -4039,3 +4039,10 @@ body { padding-bottom: 0; }
 .pt-card.pt-impact .pt-actions .btn:first-child { grid-column: auto; }
 .pt-card.pt-impact .pt-impact-empty { padding-block: 22px; }
 @media (max-width: 380px) { .pt-card.pt-impact .pt-actions { grid-template-columns: 1fr; } }
+
+/* Equal side tracks keep the footer barcode centered regardless of text length. */
+.footer .container { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) !important; }
+.footer .container > span:first-child { min-width: 0; }
+.footer .footer-barcode { justify-self: center; display: flex; align-items: center; }
+.footer .footer-barcode svg { display: block; }
+.footer .container .footer-links { justify-self: end; display: flex; align-items: center; justify-content: flex-end; }

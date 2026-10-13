@@ -729,7 +729,7 @@ export function ProductPage() {
       openSheet,
       targetNim: currentProductNIM(),
       availableNim: walletState.availableNim,
-      ready: walletState.status === 'ready',
+      ready: walletState.status === 'ready' && !walletState.partial,
     });
 
   const doAddToCart = () => {

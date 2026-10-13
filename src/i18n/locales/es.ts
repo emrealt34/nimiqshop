@@ -1894,6 +1894,7 @@ const es = {
   /* ---- nim ---- */
   /* The buyer's own NIM balance (wallet lookup strip). */
   wallet: {
+    partial: 'No se pudieron consultar algunos saldos. El importe mostrado puede estar incompleto. Actualiza para reintentar.',
     label: 'Tu cartera',
     loading: 'Leyendo tu saldo…',
     available: 'Disponible',

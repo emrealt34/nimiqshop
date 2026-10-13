@@ -206,6 +206,8 @@ export interface WalletBalanceState {
   unitCorrected?: boolean;
   /** True while a previous reading is on screen during a refresh. */
   stale?: boolean;
+  /** At least one known account could not be read; the amount is a lower bound. */
+  partial?: boolean;
   at?: number;
   failure?: WalletBalanceFailure;
   /** On-screen diagnostics for Nimiq Pay balance troubleshooting. */
@@ -409,13 +411,12 @@ async function readBalance(force = false): Promise<WalletBalanceState> {
     `session=${String(address || '(none)')}`,
   ];
 
-  // In Nimiq Pay the active account is authoritative. It may itself be an
-  // HTLC account, while the shop session still contains the ordinary wallet
-  // address used during login. Querying only the session address makes an
-  // active HTLC appear as 0 NIM and incorrectly opens the low-balance sheet.
-  // listAccounts() is already the account-selection primitive used by Pay
-  // login; use its active address for the host-side balance lookup only.
-  let hostAddresses = address ? [address] : [];
+  // Pay can expose an HTLC alongside the wallet used to sign in. Preserve
+  // both explicitly known accounts; neither account list replaces the other.
+  const canonical = (value: string) => value.replace(/\s+/g, '').toUpperCase();
+  const sessionAddress = canonical(address);
+  let partial = false;
+  let hostAddresses = isNimiqAddress(address) ? [sessionAddress] : [];
   if (hostAvailable) {
     try {
       const provider: any = (await initNimiqMiniApp()) || getNimiqProvider();
@@ -428,10 +429,11 @@ async function readBalance(force = false): Promise<WalletBalanceState> {
         // account the host explicitly returned: an HTLC account may be present
         // beside the ordinary account, and looking only at accounts[0] leaves
         // its balance out of the affordability check.
-        hostAddresses = Array.from(new Set(listed.length ? listed : hostAddresses));
+        hostAddresses = Array.from(new Set([...listed.map(canonical), ...hostAddresses]));
         debugLines.push(`providerAccounts=${hostAddresses.length ? hostAddresses.join(',') : '(none)'}`);
       }
     } catch (error) {
+      partial = true;
       debugLines.push(`listAccountsError=${error instanceof Error ? error.message : String(error)}`);
       // Account listing can be unavailable on older hosts; fall back to the
       // signed-in address and let the normal balance-support path report it.
@@ -473,6 +475,12 @@ async function readBalance(force = false): Promise<WalletBalanceState> {
           readings.push(r.value);
           debugLines.push(`acct${i}=${r.value} luna`);
         } else {
+          if (shop && canonical(shop.address || sessionAddress) === hostAddresses[i]) {
+            readings.push(shop.luna);
+            debugLines.push(`acct${i}=${shop.luna} luna (shop fallback)`);
+          } else {
+            partial = true;
+          }
           if (firstError === null) firstError = r.reason;
           debugLines.push(`acct${i}Error=${r.reason instanceof Error ? r.reason.message : String(r.reason)}`);
         }
@@ -496,16 +504,16 @@ async function readBalance(force = false): Promise<WalletBalanceState> {
   if (host !== null && hostAddresses.length) address = hostAddresses[0];
   if (!address && shop?.address) address = shop.address;
   debugLines.push(`finalAddress=${address || '(none)'}`);
-  const base = { address, network: shop?.network || '', hostBalance: hostSupport, debugLines };
+  const base = { partial, address, network: shop?.network || '', hostBalance: hostSupport, debugLines };
 
-  // BOTH: reconcile. The session wallet is the one the shop charges, so it wins
-  // any disagreement — but a clean five-orders-of-magnitude gap is a unit
-  // mistake, not a disagreement, and is corrected silently.
+  // Compare units only when both sources describe the same single account.
+  // A multi-account total cannot be compared to the session account alone.
   if (shop && host !== null) {
     /* NORMALISE THE UNIT FIRST. A host that reports NIM where the docs promise
        luna is off by 100,000 — the one disagreement that can be corrected from
        the data alone. */
-    const unitCorrected = looksLikeUnitMixUp(host, shop.luna);
+    const comparable = hostAddresses.length === 1 && hostAddresses[0] === canonical(shop.address || sessionAddress);
+    const unitCorrected = comparable && looksLikeUnitMixUp(host, shop.luna);
     const hostLuna = unitCorrected ? Math.round(host * UNIT_FACTOR) : host;
 
     /* WHICH FIGURE IS SPENDABLE. A Nimiq Pay payment (payLightningInvoice) is
@@ -538,7 +546,7 @@ async function readBalance(force = false): Promise<WalletBalanceState> {
       usd: 0,
       source: 'both',
       unitCorrected,
-      mismatch: differs,
+      mismatch: comparable && differs,
       hostNim: hostLuna / LUNA_PER_NIM,
       shopNim: shop.luna / LUNA_PER_NIM,
       at: Date.now(),

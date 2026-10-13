@@ -146,7 +146,7 @@ export function WalletBalance({
   const hasStake = stakedNim > 0.0000001;
 
   const verdict = (() => {
-    if (!ready || !(targetNim > 0)) return null;
+    if (!ready || state.partial || !(targetNim > 0)) return null;
     /* Affordability is decided on SPENDABLE NIM only (staked NIM cannot pay),
        and with the 1% cushion the shop keeps on every verdict — see
        the cushion (requiredNim): an exact comparison promises something the wallet's own fee
@@ -235,6 +235,9 @@ export function WalletBalance({
           so the strip says exactly that instead of silently showing the shop's
           own figure. Only inside Nimiq Pay — a plain browser has no wallet
           version to update, and the cache ('via-request') is fine either way. */}
+      {ready && state.partial && (
+        <span className="wal-note xs"><Icon name="info" size={12} /> {t('wallet.partial')}</span>
+      )}
       {ready && state.hostBalance === 'update-required' && (
         <span className="wal-note xs">
           <Icon name="info" size={12} /> {t('wallet.updatePay')}
