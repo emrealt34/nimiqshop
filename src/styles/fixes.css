@@ -4046,3 +4046,6 @@ body { padding-bottom: 0; }
 .footer .footer-barcode { justify-self: center; display: flex; align-items: center; }
 .footer .footer-barcode svg { display: block; }
 .footer .container .footer-links { justify-self: end; display: flex; align-items: center; justify-content: flex-end; }
+
+/* Only settled cashback is presented as incoming money. */
+.cb-row:not([data-payment-status="paid"]) .cb-row-amount { color: var(--ink-dim); }

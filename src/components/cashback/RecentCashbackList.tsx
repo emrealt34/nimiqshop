@@ -70,9 +70,9 @@ export function RecentCashbackRowView({ cb }: { cb: RecentCashbackRow }) {
   const name = cb.product_id || tr('cashback.rcOrderFallback');
   const bps = Number(cb.bps) || 0;
   const status = cashbackPaymentStatus(cb);
-  const statusLabel = { paid: tr('cashback.statPaid'), pending: tr('cashback.statPending'), confirming: tr('cashback.statusConfirming'), skipped: tr('cashback.statusSkipped'), simulated: tr('cashback.statusSimulated') }[status];
+  const statusLabel = { paid: tr('cashback.statPaid'), pending: tr('cashback.paymentPending'), confirming: tr('cashback.paymentConfirming'), skipped: tr('cashback.statusSkipped'), simulated: tr('cashback.statusSimulated') }[status];
   return (
-    <div className="cb-row">
+    <div className="cb-row" data-payment-status={status}>
       {cb.cashback_source === 'quiz_prize' ? <div className="cb-thumb"><Icon name="nimiq" size={32} /></div> : <CashbackThumb title={String(name)} country={cb.country} />}
       <div className="cb-row-main">
         <div className="small strong cb-row-title">
@@ -90,7 +90,7 @@ export function RecentCashbackRowView({ cb }: { cb: RecentCashbackRow }) {
         ) : null}
       </div>
       <div className="cb-row-right">
-        <div className="small strong cb-row-amount">+{fmtStakeNIM(Number(cb.amount_nim) || 0)} <NimUnitMark /></div>
+        <div className="small strong cb-row-amount">{status === 'paid' ? '+' : ''}{fmtStakeNIM(Number(cb.amount_nim) || 0)} <NimUnitMark /></div>
         {cb.tx_hash ? (
           <span className="mono xs faint" title={cb.tx_hash}>{explorerUrl(cb.tx_hash) ? <a href={explorerUrl(cb.tx_hash)!} target="_blank" rel="noopener noreferrer">{String(cb.tx_hash).slice(0, 10)}…</a> : String(cb.tx_hash).slice(0, 10)+'…'}</span>
         ) : (

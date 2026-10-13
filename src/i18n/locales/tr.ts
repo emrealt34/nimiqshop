@@ -682,6 +682,8 @@ const tr = {
   },
 
   cashback: {
+    paymentPending: 'Beklemede — henüz ödenmedi',
+    paymentConfirming: 'Zincir onayı bekleniyor — henüz ödenmedi',
     ledgerLoadError: 'Cashback ödemeleri yenilenemedi. Tekrar deneyin.',
     statusConfirming: 'Onay bekleniyor',
     statusSkipped: 'Ödeme yapılmayacak',
@@ -1185,7 +1187,7 @@ const tr = {
     copyAddress: 'Adresi kopyala',
     cashbackCard: 'NIM cashback',
     earnedNim: '{{amount}} NIM kazanıldı',
-    pendingNim: 'Son siparişlerden {{amount}} NIM yolda.',
+    pendingNim: 'Son siparişlerden {{amount}} NIM ödeme bekliyor; henüz ödenmedi.',
     cashbackRate: 'Cashback, ürünün NIM fiyatının %{{pct}}\'i kadardır ve teslimattan sonra bu cüzdana ödenir.',
     cashbackStakingText: 'Oranını gör, havuzumuzda stake et ve her ödemeyi takip et.',
     dailyLimits: 'Günlük limitler',
@@ -1837,7 +1839,7 @@ const tr = {
     stakeWithUs: 'Bizde stake et',
     loadingStake: 'Stake’iniz yükleniyor…',
     onThisOrder: 'Bu siparişin cashback’i:',
-    paidAfterDelivery: 'Teslimattan sonra ödenir · %{{pct}} cashback oranı',
+    paidAfterDelivery: 'Teslimattan sonra ödeme sırasına alınır · %{{pct}} cashback oranı',
     withStake: '**Stake ile: ≈ {{nim}} NIM** ({{pct}}) bu siparişte — daha fazla kazanmak için havuzumuzda NIM stake edin{{boost}}',
     withStakeBoostSuffix: ' — stake’iniz kazandıkça +%{{max}}’a kadar ekstra',
     unlockRate: '%{{pct}} staker oranını açmak için herhangi bir miktarda NIM stake edin{{more}}',

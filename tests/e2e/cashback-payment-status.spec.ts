@@ -22,6 +22,8 @@ for (const location of ['/cashback', '/profile']) {
       const row = page.locator('.cb-row').filter({ hasText: name });
       await expect(row).toContainText('Pending');
       await expect(row).not.toContainText('Paid');
+      await expect(row).toContainText('not yet paid');
+      await expect(row.locator('.cb-row-amount')).not.toContainText('+');
     }
     await expect(page.locator('.cb-row').filter({ hasText: 'Broadcast order' })).toContainText('Awaiting confirmation');
     if (location === '/cashback') {
@@ -30,6 +32,7 @@ for (const location of ['/cashback', '/profile']) {
     }
     {
       await expect(page.locator('.cb-row').filter({ hasText: 'Confirmed order' })).toContainText('Paid');
+      await expect(page.locator('.cb-row').filter({ hasText: 'Confirmed order' }).locator('.cb-row-amount')).toContainText('+10');
     }
   });
 }
@@ -64,4 +67,23 @@ test('cashback refresh reflects confirmed settlement and survives an API outage 
   await expect(page.getByText('Could not refresh cashback payments. Try again.')).toHaveCount(0);
   expect(calls).toBe(4);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test.describe('Turkish unpaid cashback copy', () => {
+  test.use({ lang: 'tr' });
+  test('queued cashback never claims it was sent or credits the amount as received', async ({ page }) => {
+    await page.route('**/api/account/limits**', route => route.fulfill({ json: {
+      daily_usd: 500, used_usd: 20, cashback: { paid_nim: 0, pending_nim: 10, cashback_percent: 1 },
+    } }));
+    await page.route('**/api/cashback/me**', route => route.fulfill({ json: {
+      totals: { paid_nim: 0, paid_count: 0, pending_nim: 10, pending_count: 1 },
+      cashbacks: [{ id: 'pending', product_id: 'Carrefour', amount_nim: 10, status: 'queued', status_label: 'Cashback gönderildi', tx_hash: 'c'.repeat(64) }],
+    } }));
+    await open(page, path('/profile'));
+    const row = page.locator('.cb-row').filter({ hasText: 'Carrefour' });
+    await expect(row).toContainText('Beklemede — henüz ödenmedi');
+    await expect(row).not.toContainText('gönderildi');
+    await expect(row.locator('.cb-row-amount')).not.toContainText('+');
+    await expect(page.getByText(/Son siparişlerden .* NIM ödeme bekliyor; henüz ödenmedi/)).toBeVisible();
+  });
 });

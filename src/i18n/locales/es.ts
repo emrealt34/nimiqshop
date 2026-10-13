@@ -681,6 +681,8 @@ const es = {
   },
 
   cashback: {
+    paymentPending: 'Pendiente — aún no pagado',
+    paymentConfirming: 'Esperando confirmación — aún no pagado',
     ledgerLoadError: 'No se pudieron actualizar los pagos de cashback. Inténtalo de nuevo.',
     statusConfirming: 'Esperando confirmación',
     statusSkipped: 'No se pagará',
@@ -1184,7 +1186,7 @@ const es = {
     copyAddress: 'Copiar dirección',
     cashbackCard: 'Cashback en NIM',
     earnedNim: '{{amount}} NIM ganados',
-    pendingNim: '{{amount}} NIM están en camino de pedidos recientes.',
+    pendingNim: '{{amount}} NIM de pedidos recientes están pendientes de pago.',
     cashbackRate: 'El cashback es el {{pct}}% del precio en NIM del producto y se paga a esta cartera tras la entrega.',
     cashbackStakingText: 'Consulta tu tasa, haz staking en nuestro pool y sigue cada pago.',
     dailyLimits: 'Límites diarios',
@@ -1836,7 +1838,7 @@ const es = {
     stakeWithUs: 'Haz stake con nosotros',
     loadingStake: 'Cargando tu stake…',
     onThisOrder: 'Cashback de este pedido:',
-    paidAfterDelivery: 'Pagado tras la entrega · tasa de cashback del {{pct}}',
+    paidAfterDelivery: 'El pago se pone en cola tras la entrega · tasa de cashback del {{pct}}',
     withStake: '**Con stake: ≈ {{nim}} NIM** ({{pct}}) en este pedido: haz stake de cualquier cantidad de NIM con nuestro pool para ganar más{{boost}}',
     withStakeBoostSuffix: ', con hasta +{{max}}% extra mientras tu stake rinde',
     unlockRate: 'Haz stake de cualquier cantidad de NIM para desbloquear la tasa de staker del {{pct}}{{more}}',

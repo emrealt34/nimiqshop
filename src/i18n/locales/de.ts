@@ -681,6 +681,8 @@ const de = {
   },
 
   cashback: {
+    paymentPending: 'Ausstehend — noch nicht ausgezahlt',
+    paymentConfirming: 'Bestätigung ausstehend — noch nicht ausgezahlt',
     ledgerLoadError: 'Cashback-Zahlungen konnten nicht aktualisiert werden. Bitte erneut versuchen.',
     statusConfirming: 'Bestätigung ausstehend',
     statusSkipped: 'Keine Auszahlung',
@@ -1184,7 +1186,7 @@ const de = {
     copyAddress: 'Adresse kopieren',
     cashbackCard: 'NIM-Cashback',
     earnedNim: '{{amount}} NIM verdient',
-    pendingNim: '{{amount}} NIM sind aus letzten Bestellungen unterwegs.',
+    pendingNim: '{{amount}} NIM aus aktuellen Bestellungen warten auf Auszahlung.',
     cashbackRate: 'Cashback beträgt {{pct}}% des NIM-Preises und wird nach der Lieferung an diese Wallet ausgezahlt.',
     cashbackStakingText: 'Sieh deinen Satz, stake im Pool und verfolge jede Auszahlung.',
     dailyLimits: 'Tageslimits',
@@ -1836,7 +1838,7 @@ const de = {
     stakeWithUs: 'Bei uns staken',
     loadingStake: 'Lade deinen Stake…',
     onThisOrder: 'Cashback für diese Bestellung:',
-    paidAfterDelivery: 'Nach der Lieferung ausgezahlt · {{pct}} Cashback-Rate',
+    paidAfterDelivery: 'Auszahlung wird nach Lieferung eingereiht · {{pct}} Cashback-Rate',
     withStake: '**Mit Stake: ≈ {{nim}} NIM** ({{pct}}) bei dieser Bestellung — stake beliebig viel NIM in unserem Pool, um mehr zu verdienen{{boost}}',
     withStakeBoostSuffix: ', mit bis zu +{{max}}% extra, während dein Stake Erträge bringt',
     unlockRate: 'Stake beliebig viel NIM, um die {{pct}} Staker-Rate freizuschalten{{more}}',
