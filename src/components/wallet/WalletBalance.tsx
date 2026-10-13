@@ -142,9 +142,6 @@ export function WalletBalance({
 
   if (state.status === 'unavailable' && !signInHint) return null;
 
-  const stakedNim = state.stakedNim + state.inactiveNim + state.retiredNim;
-  const hasStake = stakedNim > 0.0000001;
-
   const verdict = (() => {
     if (!ready || state.partial || !(targetNim > 0)) return null;
     /* Affordability is decided on SPENDABLE NIM only (staked NIM cannot pay),
@@ -209,18 +206,6 @@ export function WalletBalance({
       {variant !== 'card' && !ready && (
         <span className="wal-bal-label">
           <Icon name="wallet" size={14} /> {t('wallet.label')}
-        </span>
-      )}
-
-      {/* The reconciliation line. Without it the strip answers "how much NIM do
-          I have?" with the spendable figure and looks wrong to anyone counting
-          their stake. */}
-      {ready && hasStake && (
-        <span className="wal-total small faint">
-          {t('wallet.totalLine', {
-            total: nimText(state.totalNim),
-            staked: nimText(stakedNim),
-          })}
         </span>
       )}
 
