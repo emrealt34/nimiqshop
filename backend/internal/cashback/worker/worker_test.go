@@ -18,14 +18,15 @@ import (
 )
 
 type faultChain struct {
-	mu          sync.Mutex
-	height      int64
-	balance     int64
-	accepted    map[string]int64
-	wires       map[string]string
-	pushes      int
-	lostReply   bool
-	unavailable bool
+	mu                sync.Mutex
+	height            int64
+	balance           int64
+	accepted          map[string]int64
+	wires             map[string]string
+	pushes            int
+	lostReply         bool
+	unavailable       bool
+	lookupUnavailable bool
 }
 
 func (c *faultChain) serve(w http.ResponseWriter, r *http.Request) {
@@ -61,7 +62,11 @@ func (c *faultChain) serve(w http.ResponseWriter, r *http.Request) {
 		if block, ok := c.accepted[hash]; ok {
 			result = map[string]interface{}{"hash": hash, "blockNumber": block, "confirmations": 60, "executionResult": true}
 		} else {
-			problem = "Transaction not found: " + hash
+			if c.lookupUnavailable {
+				problem = "Internal error"
+			} else {
+				problem = "Transaction not found: " + hash
+			}
 		}
 	case "pushTransaction":
 		var raw string
@@ -454,4 +459,15 @@ func TestAbruptProcessExitAfterSignatureCommit(t *testing.T) {
 	}
 	runTicks(newWorker(WithQuizPayouts(reopened), rpc), 8)
 	assertPaidOnce(t, reopened, row.ID, chain)
+}
+
+func TestMissingHashRPCInternalErrorCannotBlockFirstPersistedSubmission(t *testing.T) {
+	store, _, row, chain, rpc := fixture(t)
+	chain.lookupUnavailable = true
+	runTicks(newWorker(WithQuizPayouts(store), rpc), 8)
+	assertPaidOnce(t, store, row.ID, chain)
+	// Retry after settlement and after the initial lookup error; no second
+	// payment identity or obligation is created.
+	runTicks(newWorker(WithQuizPayouts(store), rpc), 8)
+	assertPaidOnce(t, store, row.ID, chain)
 }

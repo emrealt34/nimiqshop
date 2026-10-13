@@ -193,7 +193,8 @@ func (w *Worker) confirm(ctx context.Context, cb db.Cashback) {
 	found, confirmed, err := w.RPC.GetTransactionByHash(cctx, cb.TxHash)
 	if err != nil {
 		_ = w.Store.FailCashbackSend(cb.ID, "confirmation unavailable: "+err.Error())
-		return // RPC disagreement / outage: stay broadcast, retry next tick
+		w.rebroadcast(ctx, cb) // retry only the already persisted bytes
+		return
 	}
 	if confirmed {
 		if err := w.Store.MarkCashbackPaid(cb.ID, cb.TxHash); err == nil {
@@ -315,7 +316,9 @@ func (w *Worker) rebroadcast(ctx context.Context, cb db.Cashback) {
 	found, confirmed, lookupErr := w.RPC.GetTransactionByHash(cctx, canonical)
 	if lookupErr != nil {
 		_ = w.Store.FailCashbackSend(cb.ID, "transaction lookup unavailable: "+lookupErr.Error())
-		return
+		// Unknown lookup is not proof of non-payment, so never replace the
+		// signature. Broadcasting these exact persisted bytes remains safe:
+		// it is the same transaction identity even if the first RPC reply was lost.
 	}
 	if found {
 		if err := w.Store.MarkCashbackBroadcast(cb.ID, canonical); err == nil && confirmed {
@@ -328,9 +331,9 @@ func (w *Worker) rebroadcast(ctx context.Context, cb db.Cashback) {
 	proof, expired, proofErr := w.RPC.ProvePayoutExpired(cctx, cb.SignedTxHex)
 	if proofErr != nil {
 		_ = w.Store.FailCashbackSend(cb.ID, "expiry proof unavailable: "+proofErr.Error())
-		return
+		// No proof means no replacement. The same signed tx may still be sent.
 	}
-	if expired {
+	if proofErr == nil && expired {
 		if err := w.Store.RetireExpiredPayout(cb.ID, cb.SignedTxHex, proof); err != nil {
 			log.Printf("cashback: expiry recovery deferred id=%s: %v", cb.ID, err)
 		}

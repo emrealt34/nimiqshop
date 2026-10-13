@@ -2,6 +2,7 @@ package poolstake
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -126,12 +127,12 @@ func TestStakeValuesAndCache(t *testing.T) {
 }
 
 func TestProfitContract(t *testing.T) {
-	for _, period := range []string{"", "last_month & extra"} {
+	for _, period := range []string{"", "last_day"} {
 		want := period
 		if want == "" {
 			want = "this_month"
 		}
-		c := fixtureClient(t, 200, `{"address":"NQ12ABCD","pool_fee_luna":123,"loyalty_days":2.5}`, func(r *http.Request) {
+		c := fixtureClient(t, 200, fmt.Sprintf(`{"address":"NQ12ABCD","period":%q,"from":"2026-09-01T00:00:00Z","to":"2026-09-02T00:00:00Z","pool_fee_luna":123,"stake_luna":10000000,"loyalty_days":2.5,"loyalty_multiplier":0.5}`, want), func(r *http.Request) {
 			if r.URL.Path != "/api/cashback/profit" || r.URL.Query().Get("address") != "NQ12ABCD" || r.URL.Query().Get("period") != want || r.Header.Get("X-Feed-Key") != "fixture-key" {
 				t.Errorf("profit contract: %v", r.URL)
 			}
@@ -257,5 +258,33 @@ func TestPool5xxStaysAnError(t *testing.T) {
 	c := fixtureClient(t, 503, `{}`, nil)
 	if _, err := c.Stake(context.Background(), "NQ73SE1XYRRFQ8NCDQCPHLJMNR858P7V2HPD"); err == nil {
 		t.Fatal("a 5xx is a real outage and must stay an error")
+	}
+}
+
+func TestProfitRejectsWrongWalletPeriodAndIncompleteAmounts(t *testing.T) {
+	base := map[string]any{"address": "NQ12ABCD", "period": "this_month", "from": "2026-09-01T00:00:00Z", "to": "2026-09-02T00:00:00Z", "pool_fee_luna": 123, "stake_luna": 10000000, "loyalty_days": 2.5, "loyalty_multiplier": 0.5}
+	for _, field := range []string{"address", "period", "pool_fee_luna", "stake_luna", "loyalty_multiplier", "from"} {
+		t.Run(field, func(t *testing.T) {
+			data := make(map[string]any)
+			for key, value := range base {
+				data[key] = value
+			}
+			switch field {
+			case "address":
+				data[field] = "NQOTHER"
+			case "period":
+				data[field] = "last_month"
+			case "from":
+				data[field] = "2026-09-10T00:00:00Z"
+			default:
+				delete(data, field)
+			}
+			body, _ := json.Marshal(data)
+			c := fixtureClient(t, 200, string(body), nil)
+			c.SetFeedKey("fixture-key")
+			if _, err := c.Profit(context.Background(), "NQ12ABCD", "this_month"); err == nil {
+				t.Fatal("invalid profit response accepted")
+			}
+		})
 	}
 }

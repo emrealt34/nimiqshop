@@ -151,7 +151,13 @@ func TestLiveNimiqTestnetPayoutRecovery(t *testing.T) {
 			break
 		}
 		if time.Now().After(deadline) {
-			t.Fatal("testnet payouts not finalized within four minutes")
+			for _, status := range []string{db.CashbackQueued, db.CashbackSending, db.CashbackBroadcast} {
+				rows, _ := store.ListCashbacksByStatus(status, 0)
+				for _, row := range rows {
+					t.Logf("TESTNET pending id=%s status=%s tx=%s last_error=%s", row.ID, row.Status, row.TxHash, row.LastError)
+				}
+			}
+			t.Fatalf("testnet payouts not finalized within four minutes (lost acknowledgement injected=%t)", dropped.Load())
 		}
 		time.Sleep(3 * time.Second)
 	}

@@ -1,6 +1,9 @@
 package db
 
 import (
+	"encoding/json"
+	"fmt"
+	"math"
 	"strconv"
 	"time"
 
@@ -112,12 +115,14 @@ func (s *Store) ObserveStakeLedger(address string, stakeLuna int64, now time.Tim
 // inactive are not lost. Pool resets/regressions never create a negative debit.
 func (s *Store) ApplyProfitSnapshot(address, month string, totalFeeLuna int64, nimUsd, loyaltyDays, loyaltyMultiplier float64, stakeLuna int64, now time.Time) (float64, error) {
 	address = canonicalStakeAddr(address)
-	if address == "" || month == "" || totalFeeLuna < 0 || nimUsd <= 0 {
-		return 0, nil
+	period, periodErr := time.Parse("2006-01", month)
+	if address == "" || periodErr != nil || period.Format("2006-01") != month || month > now.UTC().Format("2006-01") || totalFeeLuna < 0 || stakeLuna < 0 || nimUsd <= 0 || math.IsNaN(nimUsd) || math.IsInf(nimUsd, 0) || loyaltyDays < 0 || math.IsNaN(loyaltyDays) || math.IsInf(loyaltyDays, 0) || loyaltyMultiplier < 0 || loyaltyMultiplier > 1 || math.IsNaN(loyaltyMultiplier) || math.IsInf(loyaltyMultiplier, 0) {
+		return 0, fmt.Errorf("invalid pool profit snapshot")
 	}
 	p := s.stakeLedgerParams()
 	var credited float64
 	err := s.Update(func(tx *badger.Txn) error {
+		credited = 0
 		var l stakeledger.Ledger
 		err := getJSON(tx, stakeLedgerKey(address), &l)
 		if err != nil && err != ErrNotFound {
@@ -126,8 +131,15 @@ func (s *Store) ApplyProfitSnapshot(address, month string, totalFeeLuna int64, n
 		if err == ErrNotFound {
 			l = *stakeledger.New(address, 0, now)
 		}
-		previous := int64(0)
-		if l.ProfitMonth == month {
+		// Retain a high watermark for every month. A pool reset, late response,
+		// or replay of an older month cannot turn already consumed fees into
+		// a new balance. Seed the latest legacy snapshot during migration.
+		key := []byte("slp:" + address + ":" + month)
+		var previous int64
+		if e := getJSON(tx, key, &previous); e != nil && e != ErrNotFound {
+			return e
+		}
+		if l.ProfitMonth == month && l.ProfitLuna > previous {
 			previous = l.ProfitLuna
 		}
 		// NimiqBase is authoritative for both current stake and loyalty. A
@@ -140,8 +152,20 @@ func (s *Store) ApplyProfitSnapshot(address, month string, totalFeeLuna int64, n
 		} else if totalFeeLuna > previous {
 			credited = l.AccrueAuthoritative(float64(totalFeeLuna-previous)/100_000.0, nimUsd, loyaltyMultiplier, p, now)
 		}
-		l.ProfitMonth = month
-		l.ProfitLuna = totalFeeLuna
+		if totalFeeLuna > previous {
+			previous = totalFeeLuna
+		}
+		watermark, e := marshal(previous)
+		if e != nil {
+			return e
+		}
+		if e = tx.Set(key, watermark); e != nil {
+			return e
+		}
+		if month >= l.ProfitMonth {
+			l.ProfitMonth = month
+			l.ProfitLuna = previous
+		}
 		l.UpdatedAt = now.UTC()
 		raw, err := marshal(l)
 		if err != nil {
@@ -266,19 +290,25 @@ func (s *Store) SweepLedgers(now time.Time) (int, error) {
 }
 
 func scanAllLedgers(tx *badger.Txn, fn func(*stakeledger.Ledger) error) error {
-	return scanIndex(tx, []byte(prefixStakeLedger), 0, func(id string) error {
-		if id == "watermark" {
-			return nil
+	prefix := []byte(prefixStakeLedger)
+	options := badger.DefaultIteratorOptions
+	options.Prefix, options.PrefetchSize = prefix, 32
+	it := tx.NewIterator(options)
+	defer it.Close()
+	for it.Rewind(); it.ValidForPrefix(prefix); it.Next() {
+		item := it.Item()
+		if string(item.Key()) == prefixStakeLedger+"watermark" {
+			continue
 		}
 		var l stakeledger.Ledger
-		if err := getJSON(tx, stakeLedgerKey(id), &l); err != nil {
-			if err == ErrNotFound {
-				return nil
-			}
+		if err := item.Value(func(raw []byte) error { return json.Unmarshal(raw, &l) }); err != nil {
 			return err
 		}
-		return fn(&l)
-	})
+		if err := fn(&l); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // StakeLedgerRow is the admin table's per-wallet view (raw state; the

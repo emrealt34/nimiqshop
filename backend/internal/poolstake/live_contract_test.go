@@ -2,7 +2,10 @@ package poolstake
 
 import (
 	"context"
+	"math"
+	"nimiqshop/internal/db"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -99,4 +102,48 @@ func TestLivePoolContract(t *testing.T) {
 			t.Error("an invalid period must be refused, not credited on a guessed window")
 		}
 	})
+}
+
+// Runs against the actual NimiqBase HTTP handler and database, not a mocked
+// response. Explicit fixture env values prevent accidental assertions about
+// a production staker's changing revenue.
+func TestLivePoolProfitLedger(t *testing.T) {
+	base, address, expected := os.Getenv("POOL_LIVE_URL"), os.Getenv("POOL_LIVE_FUNDED_ADDRESS"), os.Getenv("POOL_LIVE_EXPECT_FEE_LUNA")
+	if base == "" || address == "" || expected == "" {
+		t.Skip("explicit local pool profit fixture not configured")
+	}
+	fee, err := strconv.ParseInt(expected, 10, 64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := New(base, 5*time.Second, 0)
+	client.SetFeedKey(os.Getenv("POOL_LIVE_FEED_KEY"))
+	p, err := client.Profit(context.Background(), address, "this_month")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.PoolFeeLuna != fee || p.StakeLuna <= 0 {
+		t.Fatalf("real pool contract %+v", p)
+	}
+	store, err := db.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	from, err := time.Parse(time.RFC3339, p.From)
+	if err != nil {
+		t.Fatal(err)
+	}
+	credit, err := store.ApplyProfitSnapshot(address, from.Format("2006-01"), p.PoolFeeLuna, .01, p.LoyaltyDays, p.LoyaltyMultiplier, p.StakeLuna, time.Now().UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := .8 * p.LoyaltyMultiplier * float64(fee) / 100000
+	if math.Abs(credit-want) > 1e-9 || credit > float64(fee)/100000 {
+		t.Fatalf("credit %v, pool-earned bound %v", credit, want)
+	}
+	again, err := store.ApplyProfitSnapshot(address, from.Format("2006-01"), p.PoolFeeLuna, .01, p.LoyaltyDays, p.LoyaltyMultiplier, p.StakeLuna, time.Now().UTC())
+	if err != nil || again != 0 {
+		t.Fatalf("same real pool profit credited twice %v %v", again, err)
+	}
 }

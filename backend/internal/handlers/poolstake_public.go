@@ -103,12 +103,14 @@ func (h *Handlers) syncProfitOnDemand(ctx context.Context, addr string) {
 	// not visit the shop; repeating it is harmless because totals are deltas.
 	if ok && l.ProfitMonth != "" && l.ProfitMonth != currentMonth {
 		if p, err := h.Pool.Profit(ctx, addr, "last_month"); err == nil {
-			month := now.AddDate(0, -1, 0).Format("2006-01")
+			from, _ := time.Parse(time.RFC3339, p.From)
+			month := from.Format("2006-01")
 			_, _ = h.Store.ApplyProfitSnapshot(addr, month, p.PoolFeeLuna, nimUsd, p.LoyaltyDays, p.LoyaltyMultiplier, p.StakeLuna, now)
 		}
 	}
 	if p, err := h.Pool.Profit(ctx, addr, "this_month"); err == nil {
-		_, _ = h.Store.ApplyProfitSnapshot(addr, currentMonth, p.PoolFeeLuna, nimUsd, p.LoyaltyDays, p.LoyaltyMultiplier, p.StakeLuna, now)
+		from, _ := time.Parse(time.RFC3339, p.From)
+		_, _ = h.Store.ApplyProfitSnapshot(addr, from.Format("2006-01"), p.PoolFeeLuna, nimUsd, p.LoyaltyDays, p.LoyaltyMultiplier, p.StakeLuna, now)
 	}
 }
 

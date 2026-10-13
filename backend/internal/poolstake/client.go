@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"net/http"
 	"net/url"
 	"strings"
@@ -232,6 +233,11 @@ func (c *Client) Profit(ctx context.Context, address, period string) (Profit, er
 	if period == "" {
 		period = "this_month"
 	}
+	switch period {
+	case "this_month", "last_month", "last_day", "last_year":
+	default:
+		return Profit{}, errors.New("poolstake: invalid profit period")
+	}
 	c.mu.Lock()
 	key := c.feedKey
 	c.mu.Unlock()
@@ -254,12 +260,39 @@ func (c *Client) Profit(ctx context.Context, address, period string) (Profit, er
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return Profit{}, fmt.Errorf("poolstake: profit returned %d", resp.StatusCode)
 	}
+	var payload json.RawMessage
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return Profit{}, fmt.Errorf("poolstake: bad profit response: %w", err)
+	}
 	var out Profit
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+	if err := json.Unmarshal(payload, &out); err != nil {
 		return Profit{}, fmt.Errorf("poolstake: bad profit response: %w", err)
 	}
 	if out.PoolFeeLuna < 0 {
 		return Profit{}, errors.New("poolstake: negative pool profit")
+	}
+	var required map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &required); err != nil {
+		return Profit{}, err
+	}
+	for _, field := range []string{"address", "period", "from", "to", "pool_fee_luna", "stake_luna", "loyalty_days", "loyalty_multiplier"} {
+		if len(required[field]) == 0 || string(required[field]) == "null" {
+			return Profit{}, fmt.Errorf("poolstake: missing profit field %s", field)
+		}
+	}
+	if CanonicalAddress(out.Address) != addr || out.Period != period {
+		return Profit{}, errors.New("poolstake: profit identity mismatch")
+	}
+	from, fromErr := time.Parse(time.RFC3339, out.From)
+	to, toErr := time.Parse(time.RFC3339, out.To)
+	if fromErr != nil || toErr != nil || from.After(to) || from.Location() != time.UTC || to.Location() != time.UTC {
+		return Profit{}, errors.New("poolstake: invalid profit window")
+	}
+	if out.StakeLuna < 0 || out.LoyaltyDays < 0 || math.IsNaN(out.LoyaltyDays) || math.IsInf(out.LoyaltyDays, 0) || out.LoyaltyMultiplier < 0 || out.LoyaltyMultiplier > 1 || math.IsNaN(out.LoyaltyMultiplier) || math.IsInf(out.LoyaltyMultiplier, 0) {
+		return Profit{}, errors.New("poolstake: invalid staking profit values")
+	}
+	if (period == "this_month" || period == "last_month") && (from.Day() != 1 || from.Hour() != 0 || from.Minute() != 0 || from.Second() != 0 || to.After(from.AddDate(0, 1, 0)) || (period == "last_month" && !to.Equal(from.AddDate(0, 1, 0)))) {
+		return Profit{}, errors.New("poolstake: invalid monthly profit window")
 	}
 	return out, nil
 }
