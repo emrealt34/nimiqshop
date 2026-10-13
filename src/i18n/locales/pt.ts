@@ -1770,7 +1770,7 @@ const pt = {
     breakdown: 'Detalhe do cashback',
     toWalletLabel: 'Para a minha carteira',
     shareHead: 'Partilhar em todo o lado',
-    shareHeadCopy: 'Transfira o cartão 1080×1350 ou partilhe-o com um toque.',
+    shareHeadCopy: 'Transfira o cartão 1080×1080 ou partilhe-o com um toque.',
     downloadPng: 'Transferir PNG',
     share: 'Partilhar',
     copiedNote: 'Texto + ligação copiados — cole onde quiser.',

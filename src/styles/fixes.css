@@ -4027,3 +4027,15 @@ body { padding-bottom: 0; }
 .cb-position-balances dt { font-size: .75rem; color: var(--muted); }
 .cb-position-balances dd { margin: 5px 0 0; font-weight: 800; overflow-wrap: anywhere; }
 @media (max-width: 480px) { .cb-position-balances { grid-template-columns: 1fr; gap: 8px; } .cb-position-balances > div { display: flex; justify-content: space-between; gap: 12px; } .cb-position-balances dd { margin: 0; } }
+
+/* Compact cashback receipt: one complete hero, two actions, no vacant columns. */
+.pt-card.pt-impact { max-width: 760px; margin-inline: auto; }
+.pt-card.pt-impact .pt-impact-summary { display: block; padding: var(--ic-x); border-bottom: none; }
+.pt-card.pt-impact .pt-impact-total-copy { box-sizing: border-box; width: 100%; min-height: 0; padding: clamp(22px, 4vw, 36px); text-align: center; }
+.pt-card.pt-impact .pt-impact-count-row { justify-content: center; align-items: center; gap: 16px; margin-block: 16px; }
+.pt-card.pt-impact .pt-impact-orders { justify-content: center; margin-top: 18px; }
+.pt-card.pt-impact .pt-impact-share-head { margin-top: 8px; margin-bottom: 16px; }
+.pt-card.pt-impact .pt-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 0; }
+.pt-card.pt-impact .pt-actions .btn:first-child { grid-column: auto; }
+.pt-card.pt-impact .pt-impact-empty { padding-block: 22px; }
+@media (max-width: 380px) { .pt-card.pt-impact .pt-actions { grid-template-columns: 1fr; } }

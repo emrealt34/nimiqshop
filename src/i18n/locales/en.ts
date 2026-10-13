@@ -1779,7 +1779,7 @@ const en = {
     breakdown: 'Cashback breakdown',
     toWalletLabel: 'To my wallet',
     shareHead: 'Share everywhere',
-    shareHeadCopy: 'Download the 1080×1350 card or share it with one tap.',
+    shareHeadCopy: 'Download the 1080×1080 card or share it with one tap.',
     downloadPng: 'Download PNG',
     share: 'Share',
     copiedNote: 'Share text + link copied — paste anywhere.',

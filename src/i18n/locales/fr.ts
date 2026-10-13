@@ -1770,7 +1770,7 @@ const fr = {
     breakdown: 'Répartition du cashback',
     toWalletLabel: 'Vers mon portefeuille',
     shareHead: 'Partager partout',
-    shareHeadCopy: 'Téléchargez la carte 1080×1350 ou partagez-la en un geste.',
+    shareHeadCopy: 'Téléchargez la carte 1080×1080 ou partagez-la en un geste.',
     downloadPng: 'Télécharger PNG',
     share: 'Partager',
     copiedNote: 'Texte + lien copiés — collez où vous voulez.',

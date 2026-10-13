@@ -32,8 +32,8 @@ for (const [width, height] of [[320, 640], [390, 844], [768, 1024], [1280, 800]]
           const r = i.getBoundingClientRect();
           return { natural: i.naturalWidth / i.naturalHeight, box: r.width / r.height, fit: getComputedStyle(i).objectFit, w: r.width };
         });
-        expect(Math.abs(img.natural - 0.8), 'cashback PNG is 4:5').toBeLessThan(0.02);
-        if (!['contain', 'scale-down'].includes(img.fit)) expect(Math.abs(img.box - 0.8), 'preview not stretched').toBeLessThan(0.02);
+        expect(Math.abs(img.natural - 1), 'cashback PNG is square').toBeLessThan(0.02);
+        if (!['contain', 'scale-down'].includes(img.fit)) expect(Math.abs(img.box - 1), 'preview not stretched').toBeLessThan(0.02);
         expect(img.w, 'preview has a visible size').toBeGreaterThan(60);
         expect(await page.evaluate(() => getComputedStyle(document.documentElement).overflow)).toBe('hidden');
       });

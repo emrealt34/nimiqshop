@@ -1770,7 +1770,7 @@ const de = {
     breakdown: 'Cashback-Aufteilung',
     toWalletLabel: 'An meine Wallet',
     shareHead: 'Überall teilen',
-    shareHeadCopy: 'Lade die 1080×1350-Karte herunter oder teile sie mit einem Tipp.',
+    shareHeadCopy: 'Lade die 1080×1080-Karte herunter oder teile sie mit einem Tipp.',
     downloadPng: 'PNG herunterladen',
     share: 'Teilen',
     copiedNote: 'Teilen-Text + Link kopiert — überall einfügen.',

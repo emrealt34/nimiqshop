@@ -1771,7 +1771,7 @@ const tr = {
     breakdown: 'Cashback dağılımı',
     toWalletLabel: 'Cüzdanıma',
     shareHead: 'Her yerde paylaş',
-    shareHeadCopy: '1080×1350 kartı indirin ya da tek dokunuşla paylaşın.',
+    shareHeadCopy: '1080×1080 kartı indirin ya da tek dokunuşla paylaşın.',
     downloadPng: 'PNG İndir',
     share: 'Paylaş',
     copiedNote: 'Paylaşım metni + bağlantı kopyalandı — istediğiniz yere yapıştırın.',

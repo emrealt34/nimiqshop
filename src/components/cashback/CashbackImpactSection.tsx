@@ -2,7 +2,7 @@ import { Skel, ErrorState } from '../ui/uiKit';
 import { friendlyApiMessage } from '../../lib/api';
 /**
  * CashbackImpactSection.tsx — public Cashback stats,
- * personal shareable Cashback receipt card (1080×1350 PNG export + native
+ * personal shareable Cashback receipt card (1080×1080 PNG export + native
  * sharing), and weekly/monthly/all-time Cashback Leaderboard on /cashback.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -148,8 +148,6 @@ export function CashbackImpactSection({
   const myPaid = Number(myTotals?.paid_nim || 0);
   const myPending = Number(myTotals?.pending_nim || 0);
   const myEarned = Number(myTotals?.earned_nim ?? (myPaid + myPending));
-  const myBurned = Number(myTotals?.burned_nim || 0);
-  const myWallet = Number(myTotals?.wallet_nim ?? Math.max(0, myEarned - myBurned));
   const myOrders = Number(myTotals?.orders ?? ((Number(myTotals?.paid_count) || 0) + (Number(myTotals?.pending_count) || 0)));
 
   const cleanUser = String(address || '').replace(/[\s-]/g, '').toUpperCase();
@@ -167,7 +165,6 @@ export function CashbackImpactSection({
   }, []);
 
   const myEarnedStr = fmtNimUser(myEarned);
-  const myWalletStr = fmtNimUser(myWallet);
 
   const shareText = useMemo(() => {
     return t('cashbackCard.shareCaption', {
@@ -204,7 +201,7 @@ export function CashbackImpactSection({
 
   const makeShareImage = async (): Promise<Blob> => {
     const W = 1080,
-      H = 1350;
+      H = 1080;
     const canvas = document.createElement('canvas');
     canvas.width = W;
     canvas.height = H;
@@ -215,7 +212,6 @@ export function CashbackImpactSection({
     const serif = 'FrauncesLocal, Georgia, serif';
     const kraft = '#E7DAC0';
     const paper = '#F6EFDC';
-    const recess = '#EFE4C6';
     const ink = '#4E3D28';
     const inkDim = '#7C6A4E';
     const inkFaint = '#9B8763';
@@ -399,125 +395,54 @@ export function CashbackImpactSection({
     ctx.strokeStyle = 'rgba(78,61,40,.06)';
     ctx.lineWidth = 1;
     for (let y = 0; y < H; y += 12) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(W, y);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
     }
-    fillRound(62, 62, 972, 1242, 18, 'rgba(78,61,40,.16)');
-    fillRound(54, 54, 972, 1242, 18, paper);
-    ctx.save();
-    roundRect(ctx, 54, 54, 972, 1242, 18);
-    ctx.clip();
-    ctx.fillStyle = stamp;
-    ctx.fillRect(54, 54, 972, 12);
-    ctx.restore();
-    strokeRound(54, 54, 972, 1242, 18, ink, 3);
+    fillRound(62, 62, 972, 972, 22, 'rgba(78,61,40,.16)');
+    fillRound(54, 54, 972, 972, 22, paper);
+    strokeRound(54, 54, 972, 972, 22, ink, 3);
+    ctx.save(); roundRect(ctx, 54, 54, 972, 972, 22); ctx.clip();
+    ctx.fillStyle = stamp; ctx.fillRect(54, 54, 972, 12); ctx.restore();
 
-    const serial = t('cashbackCard.canvasSerial');
-    const route = t('cashbackCard.canvasCashbackRoute');
-    const rightW = Math.min(300, Math.max(measure(serial, 14, 900), measure(route, 14, 900)));
-    const serialSize = fitSize(serial, rightW, 14, 900, font, 11);
-    const routeSize = fitSize(route, rightW, 14, 900, font, 11);
-    text(serial, R, 112, serialSize, inkFaint, 900, 'right');
-    text(route, R, 140, routeSize, green, 900, 'right');
-    const brandX = logo ? 170 : L;
-    if (logo) ctx.drawImage(logo, L, 94, 58, 58);
-    const brandMaxW = R - rightW - 28 - brandX;
-    const brandName = siteName().toUpperCase();
-    text(brandName, brandX, 127, fitSize(brandName, brandMaxW, 29, 900, serif, 16), ink, 900, 'left', serif);
-    const receipt = t('cashbackCard.canvasImpactReceipt');
-    text(receipt, brandX, 155, fitSize(receipt, brandMaxW, 16, 900, font, 11), inkFaint, 900);
-    dashed(190);
+    if (logo) ctx.drawImage(logo, L, 102, 62, 62);
+    const brandX = logo ? L + 82 : L;
+    text(siteName().toUpperCase(), brandX, 132, fitSize(siteName().toUpperCase(), 540, 32, 900, serif), ink, 900, 'left', serif);
+    text(t('cashbackCard.canvasImpactReceipt'), brandX, 164, fitSize(t('cashbackCard.canvasImpactReceipt'), 540, 16, 900), inkDim, 900);
+    text(upper(t('cashbackCard.canvasSerial')), R, 132, fitSize(upper(t('cashbackCard.canvasSerial')), 240, 15, 900), stamp, 900, 'right');
+    dashed(194);
 
-    const idMaxW = (avatar ? 884 - 24 : R) - L;
-    const yourCard = t('cashbackCard.canvasYourCard');
-    text(yourCard, L, 246, fitSize(yourCard, idMaxW, 18, 900, font, 12), inkFaint, 900);
-    const sub = fitBlock(t('cashbackCard.canvasCardSub'), idMaxW, 30, 800, 2, serif, 20);
-    let y = lines(sub.lines, L, 283, sub.size, Math.round(sub.size * 1.15), ink, 800, 'left', serif);
+    const ownerX = avatar ? L + 90 : L;
     if (avatar) {
-      fillRound(884, 214, 72, 72, 10, white);
-      ctx.drawImage(avatar, 890, 220, 60, 60);
-      strokeRound(884, 214, 72, 72, 10, ink, 2);
+      fillRound(L, 225, 64, 64, 12, white);
+      ctx.drawImage(avatar, L + 4, 229, 56, 56);
+      strokeRound(L, 225, 64, 64, 12, ink, 2);
     }
-    y = Math.max(y, 290);
+    text(t('cashbackCard.canvasYourCard'), ownerX, 248, fitSize(t('cashbackCard.canvasYourCard'), R - ownerX, 20, 900), inkFaint, 900);
+    const intro = fitBlock(t('cashbackCard.canvasCardSub'), R - ownerX, 27, 800, 2, serif, 20);
+    lines(intro.lines, ownerX, 285, intro.size, 32, ink, 800, 'left', serif);
 
-    const heroX = L,
-      heroW = CW,
-      padX = 38;
-    const innerW = heroW - padX * 2;
-    const heroTop = y + 30;
-    const contribution = t('cashbackCard.canvasContribution');
-    const earnedLabel = t('cashbackCard.canvasNimEarned');
-    const ordersLine = t('cashbackCard.cashbackOrder', { count: myOrders });
-    const labelIcon = 34,
-      labelGap = 14,
-      colGap = 44;
-    const labelMaxW = 360;
-    const fundedBlock = fitBlock(earnedLabel, labelMaxW - labelIcon - labelGap, 28, 900, 2, font, 20);
-    const fundedW = Math.max(...fundedBlock.lines.map((l) => measure(l, fundedBlock.size, 900))) + labelIcon + labelGap;
-    const ordersSize = fitSize(ordersLine, labelMaxW - labelIcon - labelGap, 20, 700, font, 15);
-    const labelBlockW = Math.max(fundedW, measure(ordersLine, ordersSize, 700) + labelIcon + labelGap);
-    let numSize = 152;
-    const sideBySideRoom = innerW - labelBlockW - colGap;
-    while (numSize > 96 && measure(myEarnedStr, numSize, 900, serif) > sideBySideRoom) numSize -= 2;
-    const sideBySide = measure(myEarnedStr, numSize, 900, serif) <= sideBySideRoom;
-    if (!sideBySide) numSize = fitSize(myEarnedStr, innerW, 152, 900, serif, 68);
-    const fundedLH = Math.round(fundedBlock.size * 1.12);
-    const labelBlockH = fundedLH * fundedBlock.lines.length + 12 + ordersSize;
-    const numTop = heroTop + 76;
-    const numBase = numTop + Math.round(numSize * 0.74);
-    const labelTop = sideBySide ? numBase - Math.round(numSize * 0.37) - Math.round(labelBlockH / 2) : numBase + 34;
-    const contentBottom = Math.max(numBase, labelTop + labelBlockH + 4);
-    const heroH = contentBottom - heroTop + 52;
-    const footBottom = 1214;
-    const tag = fitBlock(t('cashbackCard.canvasTagline'), CW, 18, 700, 2, font, 14);
-    const tagLH = Math.round(tag.size * 1.35);
-    const tagTop = footBottom - 58 - tagLH * (tag.lines.length - 1);
-    const footRule = tagTop - 124;
-    const tileH = 128;
-    const tileW = CW;
-    const projected = heroTop + heroH + 80 + tileH + 30 + 36;
-    const extra = Math.max(0, Math.min(34, (footRule - projected) / 3));
-    fillRound(heroX, heroTop, heroW, heroH, 14, green);
-    const cx = heroX + padX;
-    text(contribution, cx, heroTop + 50, fitSize(contribution, innerW, 15, 900, font, 11), 'rgba(255,246,232,.72)', 900);
-    text(myEarnedStr, cx - 4, numBase, numSize, white, 900, 'left', serif);
-    const labelX = sideBySide ? cx + measure(myEarnedStr, numSize, 900, serif) + colGap : cx;
-    drawNimiqMark(labelX, labelTop + Math.round((fundedLH - labelIcon) / 2), labelIcon, white);
-    const fx = labelX + labelIcon + labelGap;
-    const fundedLast = lines(fundedBlock.lines, fx, labelTop + fundedBlock.size, fundedBlock.size, fundedLH, white, 900);
-    text(ordersLine, fx, fundedLast + 12 + ordersSize + 4, ordersSize, 'rgba(255,246,232,.78)', 700);
-    y = heroTop + heroH;
+    // One earned amount is the focus; no empty destination or paid-cashback panel.
+    fillRound(L, 350, CW, 420, 22, green);
+    text(upper(t('cashbackCard.canvasContribution')), W / 2, 410, fitSize(upper(t('cashbackCard.canvasContribution')), CW - 80, 20, 900), 'rgba(255,246,232,.72)', 900, 'center');
+    drawNimiqMark(W / 2 - 26, 440, 52, white);
+    const amountSize = fitSize(myEarnedStr, CW - 90, 178, 900, serif, 54);
+    text(myEarnedStr, W / 2, 625, amountSize, white, 900, 'center', serif);
+    const earned = fitBlock(t('cashbackCard.canvasNimEarned'), CW - 100, 34, 900, 2, font, 24);
+    lines(earned.lines, W / 2, 690, earned.size, 40, white, 900, 'center');
 
-    const fpLabel = upper(t('cashbackCard.breakdown'));
-    text(fpLabel, L, y + extra + 56, fitSize(fpLabel, CW, 16, 900, font, 12), inkFaint, 900);
-    y += extra;
-    const tileTop = y + 80;
-    const drawTile = (tx: number, icon: string, label: string, val: string) => {
-      fillRound(tx, tileTop, tileW, tileH, 12, recess);
-      strokeRound(tx, tileTop, tileW, tileH, 12, 'rgba(78,61,40,.22)', 2);
-      fillRound(tx + 22, tileTop + 28, 52, 52, 10, icon === 'nimiq' ? green : 'rgba(47,85,64,.12)');
-      if (icon === 'nimiq') drawNimiqMark(tx + 35, tileTop + 41, 26, green);
-      else drawIcon(icon, tx + 35, tileTop + 41, 26, green, 2);
-      const txL = tx + 92,
-        txW = tileW - 112;
-      const cap = upper(label);
-      text(cap, txL, tileTop + 48, fitSize(cap, txW, 13, 900, font, 10), inkFaint, 900);
-      fillRound(txL - 4, tileTop + 68, 28, 28, 6, green);
-      drawNimiqMark(txL - 1, tileTop + 72, 22, ink);
-      const valueX = txL + 32;
-      text(val, valueX, tileTop + 94, fitSize(val, txW - 32, 34, 900, serif, 18), ink, 900, 'left', serif);
-    };
-    drawTile(L, 'wallet', t('cashbackCard.toWalletLabel'), myWalletStr);
-    y = tileTop + tileH + 30 + extra;
-
-    const host = siteName();
-    text(host, L, footBottom, fitSize(host, CW - 220, 26, 900, serif, 18), stamp, 900, 'left', serif);
-    lines(tag.lines, L, tagTop, tag.size, tagLH, inkDim, 700);
-    const from = upper(t('cashbackCard.canvasReceiptFrom'));
-    text(from, L, tagTop - 78, fitSize(from, CW, 13, 900, font, 10), inkFaint, 900);
-    dashed(Math.max(y + 36, footRule));
+    drawIcon('wallet', L, 808, 30, green);
+    const orders = t('cashbackCard.cashbackOrder', { count: myOrders });
+    text(orders, L + 46, 834, fitSize(orders, CW - 50, 25, 800), ink, 800);
+    dashed(874);
+    const tagline = fitBlock(t('cashbackCard.canvasTagline'), CW, 23, 700, 2, font, 17);
+    lines(tagline.lines, L, 924, tagline.size, 29, inkDim, 700);
+    text(siteName(), L, 995, 32, stamp, 900, 'left', serif);
+    // A short receipt mark finishes the lower edge instead of a large empty footer.
+    ctx.fillStyle = ink;
+    let barcodeX = R - 140;
+    for (let i = 0; i < 26; i++) {
+      const width = i % 3 === 0 ? 4 : 2;
+      ctx.fillRect(barcodeX, 972, width, 26); barcodeX += width + 2;
+    }
 
     return await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/png');
@@ -623,19 +548,6 @@ export function CashbackImpactSection({
                     {t('cashbackCard.destWallet')}
                   </span>
                 </div>
-              </div>
-            </div>
-
-            <div className="pt-impact-metrics-label">{t('cashbackCard.breakdown')}</div>
-            <div className="pt-impact-metrics">
-              <div className="pt-impact-metric">
-                <span className="pt-impact-metric-icon">
-                  <Icon name="wallet" size={20} />
-                </span>
-                <span>
-                  <small>{t('cashbackCard.toWalletLabel')}</small>
-                  <strong>{myWalletStr} <Icon name="nimiq" size={16} /></strong>
-                </span>
               </div>
             </div>
 
@@ -828,7 +740,7 @@ export function CashbackImpactSection({
               </button>
             </div>
             <div className="pt-overlay-preview">
-              <img src={shareImg} width={1080} height={1350} alt={t('cashbackCard.shareImgAlt', { site: siteName() })} />
+              <img src={shareImg} width={1080} height={1080} alt={t('cashbackCard.shareImgAlt', { site: siteName() })} />
             </div>
             <div className="pt-overlay-actions">
               <a className="btn btn-gold" href={shareImg} download="nimshop-cashback-card.png" onClick={downloadShareImage}>

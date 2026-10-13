@@ -9,7 +9,7 @@ import type { Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 
 type Drawn = { text: string; font: string; left: number; right: number; top: number; bottom: number };
-const PAPER = { left: 54 + 20, right: 1026 - 20, top: 54, bottom: 1296 - 20 };
+const PAPER = { left: 54 + 20, right: 1026 - 20, top: 54, bottom: 1026 - 20 };
 
 async function instrument(page: Page) {
   await page.addInitScript(() => {
@@ -17,7 +17,7 @@ async function instrument(page: Page) {
     const proto = CanvasRenderingContext2D.prototype;
     const fillText = proto.fillText;
     proto.fillText = function (this: CanvasRenderingContext2D, text: string, x: number, y: number, mw?: number) {
-      if (this.canvas.width === 1080 && this.canvas.height === 1350) {
+      if (this.canvas.width === 1080 && this.canvas.height === 1080) {
         const m = this.measureText(text);
         const left = this.textAlign === 'right' || this.textAlign === 'end' ? x - m.width : this.textAlign === 'center' ? x - m.width / 2 : x;
         const asc = m.actualBoundingBoxAscent || parseFloat(this.font.match(/(\d+(?:\.\d+)?)px/)?.[1] || '0') * 0.75;
@@ -29,7 +29,7 @@ async function instrument(page: Page) {
     proto.stroke = function (this: CanvasRenderingContext2D, ...a: any[]) { if (this.canvas.width === 1080 && a[0] instanceof Path2D) w.__strokes++; return (stroke as any).apply(this, a); };
     const drawImage = proto.drawImage;
     proto.drawImage = function (this: CanvasRenderingContext2D, image: CanvasImageSource, ...args: number[]) {
-      if (this.canvas.width === 1080 && this.canvas.height === 1350 && image instanceof HTMLImageElement) {
+      if (this.canvas.width === 1080 && this.canvas.height === 1080 && image instanceof HTMLImageElement) {
         w.__images.push({ src: image.src, width: image.naturalWidth, height: image.naturalHeight });
       }
       return (drawImage as any).call(this, image, ...args);
@@ -53,9 +53,9 @@ for (const lang of LANGS) {
       test('every string on the receipt, nothing overlaps, brand fonts', async ({ page }) => {
         await instrument(page);
         const img = await exportPng(page);
-        expect(await img.evaluate((i: HTMLImageElement) => [i.naturalWidth, i.naturalHeight])).toEqual([1080, 1350]);
+        expect(await img.evaluate((i: HTMLImageElement) => [i.naturalWidth, i.naturalHeight])).toEqual([1080, 1080]);
         const drawn: Drawn[] = await page.evaluate(() => (window as any).__drawn);
-        expect(drawn.length).toBeGreaterThan(15);
+        expect(drawn.length).toBeGreaterThanOrEqual(10);
         for (const d of drawn) {
           expect(d.left, `"${d.text}" left`).toBeGreaterThanOrEqual(PAPER.left - 1);
           expect(d.right, `"${d.text}" right`).toBeLessThanOrEqual(PAPER.right + 1);
@@ -75,7 +75,7 @@ for (const lang of LANGS) {
         // vector stroke count varies with the design and image fallbacks.
         const images: { src: string; width: number; height: number }[] = await page.evaluate(() => (window as any).__images);
         expect(images.some((i) => new URL(i.src).pathname.endsWith('/img/brand-icon-96.png'))).toBe(true);
-        expect(images.filter((i) => new URL(i.src).pathname.endsWith('/img/nimiq-hexagon.png')).length).toBeGreaterThanOrEqual(2);
+        expect(images.filter((i) => new URL(i.src).pathname.endsWith('/img/nimiq-hexagon.png')).length).toBeGreaterThanOrEqual(1);
         for (const image of images) {
           expect(image.width, 'drawn image decoded').toBeGreaterThan(0);
           expect(image.height, 'drawn image decoded').toBeGreaterThan(0);
