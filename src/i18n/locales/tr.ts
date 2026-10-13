@@ -682,6 +682,11 @@ const tr = {
   },
 
   cashback: {
+    ledgerLoadError: 'Cashback ödemeleri yenilenemedi. Tekrar deneyin.',
+    statusConfirming: 'Onay bekleniyor',
+    statusSkipped: 'Ödeme yapılmayacak',
+    statusSimulated: 'Simülasyon ödemesi',
+
     title: 'Cashback',
     subtitle: 'Her alışverişte NIM kazan.',
     calculator: 'Hesaplayıcı',
@@ -1895,6 +1900,7 @@ const tr = {
   /* ---- nim ---- */
   /* The buyer's own NIM balance (wallet lookup strip). */
   wallet: {
+    stakedLine: '{{staked}} NIM stake edilmiş',
     partial: 'Bazı adreslerin bakiyesi okunamadı. Gösterilen tutar eksik olabilir. Yenileyerek tekrar deneyin.',
     label: 'Cüzdanın',
     loading: 'Bakiyen okunuyor…',

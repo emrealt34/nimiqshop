@@ -209,6 +209,11 @@ export function WalletBalance({
         </span>
       )}
 
+      {ready && state.stakedNim + state.inactiveNim + state.retiredNim > 0 && (
+        <span className="wal-staked small faint">
+          {t('wallet.stakedLine', { staked: nimText(state.stakedNim + state.inactiveNim + state.retiredNim) })}
+        </span>
+      )}
       {showVerdict && verdict && (
         <span className={`wal-verdict ${verdict.ok ? 'ok' : 'short'}`}>
           <Icon name={verdict.ok ? 'check' : 'info'} size={13} /> {verdict.text}

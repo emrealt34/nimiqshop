@@ -1,3 +1,4 @@
+import { cashbackPaymentStatus } from '../../lib/cashbackStatus';
 /**
  * ProfilePage.tsx — React port of pages/profile.js: the signed-in user's
  * account view (wallet address, daily order + USD limits with live reset
@@ -92,7 +93,7 @@ export function ProfileView() {
     }
     try {
       const [L, cashback] = await Promise.all([getAccountLimits(), getMyCashback()]);
-      setRecentCashback(Array.isArray((cashback as any)?.cashbacks) ? (cashback as any).cashbacks.filter((r: any) => r.status === 'paid' && r.tx_hash && !String(r.tx_hash).startsWith('TEST')).slice(0, 5) : []);
+      setRecentCashback(Array.isArray((cashback as any)?.cashbacks) ? (cashback as any).cashbacks.filter((r: any) => cashbackPaymentStatus(r) !== 'simulated').slice(0, 5) : []);
       let resetsAt: number | null = null;
       if (L.resets_at) resetsAt = new Date(L.resets_at).getTime();
       if (resetsAt && L.server_now) {

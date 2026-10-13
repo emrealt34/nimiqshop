@@ -1,3 +1,4 @@
+import { cashbackPaymentStatus } from '../../lib/cashbackStatus';
 import { LoadingRows } from '../ui/uiKit';
 /**
  * AdminPage.tsx — React port of pages/admin.js: operator console for direct
@@ -433,10 +434,7 @@ function ResultBlock({ r }: { r: any }) {
 
 function cashbackPaidLabel(cb: any) {
   if (!cb) return 'not queued';
-  // Owner (2026-10-05): "paid" means the tx REALLY left the wallet — a queued
-  // or confirming row must never wear the paid badge.
-  if (cb.status === 'paid' && cb.tx_hash && !String(cb.tx_hash).startsWith('TEST')) return 'paid';
-  return cb.status || 'unknown';
+  return cashbackPaymentStatus(cb);
 }
 
 function CashbackRow({ cb, extraLeft, purchaseTx }: { cb: any; extraLeft?: string; purchaseTx?: string }) {

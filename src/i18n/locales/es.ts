@@ -681,6 +681,11 @@ const es = {
   },
 
   cashback: {
+    ledgerLoadError: 'No se pudieron actualizar los pagos de cashback. Inténtalo de nuevo.',
+    statusConfirming: 'Esperando confirmación',
+    statusSkipped: 'No se pagará',
+    statusSimulated: 'Pago simulado',
+
     title: 'Reembolso',
     subtitle: 'Gana NIM de vuelta en cada compra.',
     calculator: 'Calculadora',
@@ -1894,6 +1899,7 @@ const es = {
   /* ---- nim ---- */
   /* The buyer's own NIM balance (wallet lookup strip). */
   wallet: {
+    stakedLine: '{{staked}} NIM en staking',
     partial: 'No se pudieron consultar algunos saldos. El importe mostrado puede estar incompleto. Actualiza para reintentar.',
     label: 'Tu cartera',
     loading: 'Leyendo tu saldo…',

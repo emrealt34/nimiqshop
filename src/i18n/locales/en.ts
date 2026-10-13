@@ -690,6 +690,11 @@ const en = {
   },
 
   cashback: {
+    ledgerLoadError: 'Could not refresh cashback payments. Try again.',
+    statusConfirming: 'Awaiting confirmation',
+    statusSkipped: 'Not payable',
+    statusSimulated: 'Simulated payment',
+
     title: 'Cashback',
     subtitle: 'Earn NIM back on every purchase.',
     calculator: 'Calculator',
@@ -1903,6 +1908,7 @@ const en = {
   /* ---- nim ---- */
   /* The buyer's own NIM balance (wallet lookup strip). */
   wallet: {
+    stakedLine: '{{staked}} NIM staked',
     partial: 'Some account balances could not be read. The displayed amount may be incomplete. Refresh to try again.',
     label: 'Your wallet',
     loading: 'Reading your balance…',

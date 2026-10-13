@@ -1,3 +1,4 @@
+import { RecentCashbackList } from './RecentCashbackList';
 import { CashbackImpactSection } from './CashbackImpactSection';
 /**
  * CashbackPage.tsx — the buyer-facing "Cashback & staking" page (v2: single
@@ -274,6 +275,9 @@ export function CashbackView() {
   const watchRef = useRef<StakeWatch | null>(null);
   const [ledgerRaw, setLedger] = useState<MyCashback | null>(null);
   const [ledgerOwner, setLedgerOwner] = useState('');
+  const [ledgerBusy, setLedgerBusy] = useState(false);
+  const [ledgerError, setLedgerError] = useState(false);
+  const [ledgerRefresh, setLedgerRefresh] = useState(0);
   const ledger = ledgerOwner === positionOwner ? ledgerRaw : null;
   const [amount, setAmount] = useState<string>('10000000');
   const [busy, setBusy] = useState<StakeOp['kind'] | ''>('');
@@ -367,6 +371,8 @@ export function CashbackView() {
     }
     let alive = true;
     const owner = positionOwner;
+    setLedgerBusy(true);
+    setLedgerError(false);
     getMyCashback()
       .then((r) => {
         if (!alive || owner !== getUid() + ':' + getAddress().replace(/\s/g, '').toUpperCase()) return;
@@ -387,12 +393,13 @@ export function CashbackView() {
         } as MyCashback);
       })
       .catch(() => {
-        /* the ledger is a nice-to-have; the page still works without it */
-      });
+        if (alive) setLedgerError(true);
+      })
+      .finally(() => { if (alive) setLedgerBusy(false); });
     return () => {
       alive = false;
     };
-  }, [authed, positionOwner]);
+  }, [authed, positionOwner, ledgerRefresh]);
 
   useEffect(() => {
     watchRef.current?.stop();
@@ -816,6 +823,12 @@ export function CashbackView() {
           board comes next and the calculator closes the page. ONE component
           renders all three blocks so the order can never drift apart again. */}
       <CashbackImpactSection key={positionOwner || 'guest'} authed={authed === true} myTotals={ledger?.totals ?? null} between={rateStrip} />
+
+      {authed && <>
+        {ledgerError && <div className="alert info" role="status">{t('cashback.ledgerLoadError')}</div>}
+        {(!ledgerError || ledger) && <RecentCashbackList rows={ledger?.cashbacks ?? null} loading={!ledger} pageSize={3} />}
+        <button type="button" className="btn btn-sm btn-outline mt-2" disabled={ledgerBusy} onClick={() => setLedgerRefresh(value => value + 1)}>{t('common.refresh')}</button>
+      </>}
 
       {/* ------------------------------------------------------ calculator */}
       {/*

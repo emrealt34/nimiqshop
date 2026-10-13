@@ -22,6 +22,7 @@ for (const failSecond of [false, true]) {
     // The authenticated fixture also owns 800 staked NIM. The shopping
     // balance must stay liquid-only, like the host-only view.
     await expect(page.locator('.wal-card .wal-total')).toHaveCount(0);
+    await expect(page.locator('.wal-card .wal-staked')).toHaveText('800 NIM staked');
     await expect.poll(() => page.evaluate(() => Array.from(new Set((window as any).__balanceCalls)))).toEqual([
       'NQ49N8MBXYCRXBUP404CKXKKL49MA7BTF082', 'NQ0700000000000000000000000000000000',
     ]);

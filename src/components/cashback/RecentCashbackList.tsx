@@ -5,6 +5,7 @@
  * name + rate chip · status · +NIM · rate source / tx.
  */
 import React from 'react';
+import { cashbackPaymentStatus } from '../../lib/cashbackStatus';
 import { explorerUrl } from '../../lib/chain';
 import { Icon } from '../ui/Icon';
 import { BrandThumbStack } from '../ui/UnifiedThumb';
@@ -21,6 +22,8 @@ export type RecentCashbackRow = {
   bps?: number;
   status?: string;
   status_label?: string;
+  paid_at?: string | null;
+  test_mode?: boolean;
   cashback_source?: string;
   tx_hash?: string;
   memo?: string;
@@ -66,6 +69,8 @@ function CashbackThumb({ title, country }: { title: string; country?: string }) 
 export function RecentCashbackRowView({ cb }: { cb: RecentCashbackRow }) {
   const name = cb.product_id || tr('cashback.rcOrderFallback');
   const bps = Number(cb.bps) || 0;
+  const status = cashbackPaymentStatus(cb);
+  const statusLabel = { paid: tr('cashback.statPaid'), pending: tr('cashback.statPending'), confirming: tr('cashback.statusConfirming'), skipped: tr('cashback.statusSkipped'), simulated: tr('cashback.statusSimulated') }[status];
   return (
     <div className="cb-row">
       {cb.cashback_source === 'quiz_prize' ? <div className="cb-thumb"><Icon name="nimiq" size={32} /></div> : <CashbackThumb title={String(name)} country={cb.country} />}
@@ -76,7 +81,7 @@ export function RecentCashbackRowView({ cb }: { cb: RecentCashbackRow }) {
             {pctLabel(bps)}
           </span>}
         </div>
-        <div className="xs faint">{cb.status_label || cb.status || 'pending'}</div>
+        <div className="xs faint">{statusLabel}</div>
         {cb.memo && <div className="xs faint" style={{overflowWrap:'anywhere'}}>Memo: {cb.memo}</div>}
         {cb.purchase_tx ? (
           <div className="mono xs faint" title={cb.purchase_tx} style={{ wordBreak: 'break-all' }}>
