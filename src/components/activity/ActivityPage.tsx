@@ -434,6 +434,7 @@ function FeedItem({ it }: { it: any }) {
             <a className="strong truncate feed-title card-main-link" href={pagePath('/track?order=' + encodeURIComponent(it.id))}>{it.title}</a>
           </div>
           <div className="feed-side">
+            {it.test_mode && <span className="chip xs">{t('activity.testPayment')}</span>}
             {it.status ? <StatusBadge status={it.status} /> : null}
             <span className="xs faint feed-time"><ClockTime ts={it.time} /></span>
           </div>

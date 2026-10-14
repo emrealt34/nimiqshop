@@ -424,7 +424,7 @@ export function CashbackImpactSection({
     fillRound(L, 350, CW, 420, 22, green);
     text(upper(t('cashbackCard.canvasContribution')), W / 2, 410, fitSize(upper(t('cashbackCard.canvasContribution')), CW - 80, 20, 900), 'rgba(255,246,232,.72)', 900, 'center');
     drawNimiqMark(W / 2 - 26, 440, 52, white);
-    const amountSize = fitSize(myEarnedStr, CW - 90, 178, 900, serif, 54);
+    const amountSize = fitSize(myEarnedStr, CW - 90, 60, 900, serif, 20);
     text(myEarnedStr, W / 2, 625, amountSize, white, 900, 'center', serif);
     const earned = fitBlock(t('cashbackCard.canvasNimEarned'), CW - 100, 34, 900, 2, font, 24);
     lines(earned.lines, W / 2, 690, earned.size, 40, white, 900, 'center');

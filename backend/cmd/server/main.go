@@ -986,6 +986,8 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 	// which fires the real order email. The handler existed but the route was
 	// missing, so the operator's pay step answered 404 on the live site.
 	r.POST("/api/admin/test-pay", adminOnly(h.AdminTestPay))
+	r.GET("/api/admin/test-activity", adminOnly(h.AdminTestActivity))
+	r.POST("/api/admin/test-activity", adminOnly(h.AdminTestActivity))
 	r.GET("/api/admin/test-accounts", adminOnly(h.AdminListTestAccounts))
 	r.POST("/api/admin/test-accounts", adminOnly(h.AdminAddTestAccount))
 	r.DELETE("/api/admin/test-accounts/{address}", adminOnly(h.AdminRemoveTestAccount))

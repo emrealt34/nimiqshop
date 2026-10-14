@@ -1,6 +1,8 @@
 package db
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/dgraph-io/badger/v4"
@@ -12,6 +14,7 @@ import (
 // Zero MaxRecipients means unlimited accounts; every account has one redemption.
 type QuizCashbackReward struct {
 	Code            string `json:"code"`
+	CodeMode        string `json:"code_mode,omitempty"`
 	CashbackBps     int    `json:"cashback_bps"`
 	MaxRecipients   int    `json:"max_recipients"`
 	MinScorePercent int    `json:"min_score_percent"`
@@ -35,6 +38,9 @@ func quizGrantKey(code, user string) []byte {
 func validateQuizCashback(r *QuizCashbackReward) error {
 	if r == nil {
 		return nil
+	}
+	if r.CodeMode != "" && r.CodeMode != "shared" && r.CodeMode != "unique" {
+		return fmt.Errorf("code_mode must be shared or unique")
 	}
 	if err := cashbackcode.ValidateCode(r.Code); err != nil {
 		return err
@@ -81,7 +87,25 @@ func grantQuizCashback(tx *badger.Txn, c QuizCompetition, a QuizAttempt, now tim
 	if err := putQuizJSON(tx, quizCodeKey(r.Code), d); err != nil {
 		return err
 	}
-	return putQuizJSON(tx, quizGrantKey(r.Code, a.UserID), QuizCashbackGrant{Code: r.Code, CompetitionID: c.ID, GrantedAt: now.UTC()})
+	code := r.Code
+	if r.CodeMode == "unique" {
+		sum := sha256.Sum256([]byte(c.ID + ":" + a.UserID))
+		prefix := r.Code
+		if len(prefix) > 23 {
+			prefix = prefix[:23]
+		}
+		code = prefix + "-" + strings.ToUpper(hex.EncodeToString(sum[:8]))
+		individual := *r
+		individual.Code = code
+		if err := saveQuizCashbackDefinition(tx, &individual); err != nil {
+			return err
+		}
+	}
+	grant := QuizCashbackGrant{Code: code, CompetitionID: c.ID, GrantedAt: now.UTC()}
+	if err := putQuizJSON(tx, quizGrantKey(code, a.UserID), grant); err != nil {
+		return err
+	}
+	return putQuizJSON(tx, quizGrantKey(r.Code, a.UserID), grant)
 }
 func (s *Store) GetQuizCashbackReward(code string) (QuizCashbackReward, bool, error) {
 	var d quizCashbackDefinition
@@ -95,7 +119,13 @@ func (s *Store) QuizCashbackUnlocked(code, user string) bool {
 	if user == "" {
 		return false
 	}
-	return s.View(func(tx *badger.Txn) error { _, err := tx.Get(quizGrantKey(code, user)); return err }) == nil
+	var grant QuizCashbackGrant
+	return s.View(func(tx *badger.Txn) error { return getJSON(tx, quizGrantKey(code, user), &grant) }) == nil && grant.Code == strings.ToUpper(strings.TrimSpace(code))
+}
+func (s *Store) GetQuizCashbackGrant(code, user string) (QuizCashbackGrant, error) {
+	var g QuizCashbackGrant
+	err := s.View(func(tx *badger.Txn) error { return getJSON(tx, quizGrantKey(code, user), &g) })
+	return g, err
 }
 func (s *Store) HasQuizCashbackRewards() bool {
 	found := false

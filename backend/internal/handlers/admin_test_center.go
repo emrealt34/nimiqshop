@@ -644,3 +644,27 @@ func testQuoteView(store *db.Store, q db.Quote, applied []string) map[string]any
 	}
 	return out
 }
+
+// AdminTestActivity controls display only; simulated payments stay simulated.
+func (h *Handlers) AdminTestActivity(ctx *fasthttp.RequestCtx) {
+	if ctx.IsPost() {
+		var req struct {
+			Enabled *bool `json:"enabled"`
+		}
+		if err := readJSON(ctx, &req); err != nil || req.Enabled == nil {
+			writeError(ctx, 400, "enabled is required")
+			return
+		}
+		if err := h.Store.SetTestActivityVisible(*req.Enabled); err != nil {
+			writeError(ctx, 500, "could not update test activity visibility")
+			return
+		}
+		h.audit(adminIdentity(ctx).User.ID, "admin.test_activity", ctx, "enabled="+strconv.FormatBool(*req.Enabled))
+	}
+	enabled, err := h.Store.TestActivityVisible()
+	if err != nil {
+		writeError(ctx, 500, "could not read test activity visibility")
+		return
+	}
+	writeJSON(ctx, 200, map[string]any{"enabled": enabled})
+}

@@ -84,3 +84,52 @@ func TestPublicFeedRejectsOldAndNewTestQuotes(t *testing.T) {
 		}
 	}
 }
+
+func TestActivitySwitchShowsAndHidesSimulationsWithoutChangingPayments(t *testing.T) {
+	dir := t.TempDir()
+	s, err := New(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	q := Quote{ID: "test-switch", UserID: "buyer", TestMode: true, Status: "awaiting_payment"}
+	if err = s.CreateQuoteWithDailyLimits(q, 0, 0, time.Now().Add(-time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if err = s.CompleteQuoteWithFulfillment(q.ID, nil); err != nil {
+		t.Fatal(err)
+	}
+	if rows, err := s.ListFeedQuotes(10); err != nil || len(rows) != 0 {
+		t.Fatal("test visible by default", err)
+	}
+	for _, enabled := range []bool{true, false, true} {
+		if err = s.SetTestActivityVisible(enabled); err != nil {
+			t.Fatal(err)
+		}
+		rows, err := s.ListFeedQuotes(10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := 0
+		if enabled {
+			want = 1
+		}
+		if len(rows) != want {
+			t.Fatalf("toggle=%v rows=%d", enabled, len(rows))
+		}
+		stored, err := s.GetQuote(q.ID)
+		if err != nil || !stored.TestMode || stored.Status != "fulfilled" {
+			t.Fatal("toggle changed payment", err)
+		}
+	}
+	if err = s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s, err = New(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if enabled, err := s.TestActivityVisible(); err != nil || !enabled {
+		t.Fatal("setting lost after restart", err)
+	}
+}

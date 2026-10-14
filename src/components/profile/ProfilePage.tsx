@@ -1,8 +1,7 @@
-import { cashbackPaymentStatus } from '../../lib/cashbackStatus';
 /**
  * ProfilePage.tsx — React port of pages/profile.js: the signed-in user's
  * account view (wallet address, daily order + USD limits with live reset
- * countdown, NIM cashback summary).
+ * countdown and monthly spending limits).
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '../ui/Icon';
@@ -12,19 +11,15 @@ import { openLoginSheet } from '../shell/SiteShell';
 import { friendlyApiMessage, getAccountLimits } from '../../lib/api';
 import { isAuthed, getAddress } from '../../lib/session';
 import { useSession } from '../../lib/useSession';
-import { StakerCashbackCard } from '../staker/StakerCashback';
 import { inNimiqPay } from '../../lib/miniapp';
-import { fmtNIM, fmtUSD, formatWalletAddress, fmtCountdown } from '../../lib/format';
+import { fmtUSD, formatWalletAddress, fmtCountdown } from '../../lib/format';
 import { useInterval } from '../../lib/useInterval';
 import { useSheet, useToast } from '../AppProviders';
 import { KvSkeleton } from '../ui/uiKit';
 import { CopyButton, LockedSignInCard } from '../ui/uiKit';
-import { getMyCashback } from '../../lib/api';
-import { RecentCashbackList } from '../cashback/RecentCashbackList';
 import { useT } from '../../i18n';
 import { pagePath } from '../../lib/asset';
 
-type RecentCashback = { id?: string; quote_id?: string; product_id?: string; status?: string; status_label?: string; amount_nim?: number; bps?: number; cashback_source?: string; tx_hash?: string; purchase_tx?: string };
 
 type Limits = {
   resets_at?: string | null;
@@ -46,32 +41,8 @@ type Limits = {
   };
 };
 
-function cashbackCard(L: Limits, t: (k: string, v?: Record<string, string | number>) => string) {
-  const cb = L.cashback || {};
-  const paid = Number(cb.paid_nim) || 0;
-  const pending = Number(cb.pending_nim) || 0;
-  const pct = Number(cb.cashback_percent);
-  const pctLabel = Number.isFinite(pct) ? (Number.isInteger(pct) ? String(pct) : String(Number(pct.toFixed(2)))) : '0';
-  return (
-    <div className="card mt-2">
-      <div className="card-title">
-        <Icon name="wallet" size={16} />
-        <span>{t('accountPage.cashbackCard')}</span>
-      </div>
-      <div className="strong" style={{ fontSize: '1.35rem' }}>
-        {t('accountPage.earnedNim', { amount: fmtNIM(paid, 2) })}
-      </div>
-      {pending > 0 ? (
-        <div className="small muted mt-1">{t('accountPage.pendingNim', { amount: fmtNIM(pending, 2) })}</div>
-      ) : null}
-      <div className="small muted mt-1">{t('accountPage.cashbackRate', { pct: pctLabel })}</div>
-    </div>
-  );
-}
-
 export function ProfileView() {
   const { t } = useT();
-  const [recentCashback, setRecentCashback] = useState<RecentCashback[]>([]);
   const [state, setState] = useState<{ L: Limits | null; err: string; loading: boolean; resetsAt: number | null; tick: number }>({
     L: null,
     err: '',
@@ -87,13 +58,11 @@ export function ProfileView() {
 
   const load = useCallback(async () => {
     if (!isAuthed()) {
-      setRecentCashback([]);
       setState((s) => ({ ...s, L: null, loading: false }));
       return;
     }
     try {
-      const [L, cashback] = await Promise.all([getAccountLimits(), getMyCashback()]);
-      setRecentCashback(Array.isArray((cashback as any)?.cashbacks) ? (cashback as any).cashbacks.filter((r: any) => cashbackPaymentStatus(r) !== 'simulated').slice(0, 5) : []);
+      const L = await getAccountLimits();
       let resetsAt: number | null = null;
       if (L.resets_at) resetsAt = new Date(L.resets_at).getTime();
       if (resetsAt && L.server_now) {
@@ -218,20 +187,6 @@ export function ProfileView() {
           </div>
         </div>
 
-        <StakerCashbackCard />
-
-        <a className="card mt-2 mb-2" href={pagePath("/cashback")} style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
-          <div className="row between" style={{ alignItems: 'center', gap: 10 }}>
-            <div>
-              <div className="card-title" style={{ margin: 0 }}>
-                <Icon name="coins" size={16} /> {t('account.cashbackStaking')}
-              </div>
-              <div className="xs faint mt-1">{t('accountPage.cashbackStakingText')}</div>
-            </div>
-            <Icon name="chevron" size={18} />
-          </div>
-        </a>
-
         <div className="card">
           <div className="card-title">{t('accountPage.dailyLimits')}</div>
           <div className="row between mb-1" style={{ alignItems: 'baseline' }}>
@@ -271,9 +226,6 @@ export function ProfileView() {
           </div>
         </div>
 
-        {cashbackCard(L, t)}
-
-        <RecentCashbackList rows={recentCashback} />
       </div>
     </div>
   );

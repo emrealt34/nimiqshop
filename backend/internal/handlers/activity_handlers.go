@@ -310,13 +310,15 @@ func (h *Handlers) ListActivity(ctx *fasthttp.RequestCtx) {
 			title = strings.Join(batchTitles, " + ")
 		}
 		e := map[string]interface{}{
-			"type":      "cryptorefills_purchase",
-			"id":        q.ID,
-			"anonymous": q.Anonymous,
-			"time":      q.UpdatedAt,
-			"status":    q.Status,
-			"title":     title,
-			"usd":       q.ProductUSD.String(),
+			"type":                  "cryptorefills_purchase",
+			"test_mode":             q.TestMode,
+			"test_activity_visible": q.TestMode,
+			"id":                    q.ID,
+			"anonymous":             q.Anonymous,
+			"time":                  q.UpdatedAt,
+			"status":                q.Status,
+			"title":                 title,
+			"usd":                   q.ProductUSD.String(),
 			// The buyer's LOCAL face value (TRY 300, USD 100 etc.) — what they
 			// actually saw on the product page in their own currency. The activity
 			// feed renders this prominently so a viewer in Istanbul sees TRY
@@ -629,22 +631,24 @@ func (h *Handlers) TrackStatus(ctx *fasthttp.RequestCtx) {
 		// expose redemption data via a partner API and are owner/admin-only.
 
 		resp := map[string]interface{}{
-			"id":                q.ID,
-			"type":              "cryptorefills_purchase",
-			"anonymous":         q.Anonymous,
-			"status":            q.Status,
-			"nim":               q.EstimatedNIM,
-			"title":             publicTitle,
-			"country":           q.ProductCountry,
-			"usd":               q.ProductUSD.String(),
-			"created_at":        q.CreatedAt,
-			"updated_at":        q.UpdatedAt,
-			"stages":            quoteStages(q),
-			"paid_at":           q.PaidAt,
-			"delivered_at":      deliveryTimePointer(q.DeliveryTime()),
-			"face_value_totals": q.FaceValueTotals,
-			"face_label":        quoteFaceSummary(q),
-			"transactions":      payment,
+			"id":                    q.ID,
+			"type":                  "cryptorefills_purchase",
+			"test_mode":             q.TestMode,
+			"test_activity_visible": q.TestMode,
+			"anonymous":             q.Anonymous,
+			"status":                q.Status,
+			"nim":                   q.EstimatedNIM,
+			"title":                 publicTitle,
+			"country":               q.ProductCountry,
+			"usd":                   q.ProductUSD.String(),
+			"created_at":            q.CreatedAt,
+			"updated_at":            q.UpdatedAt,
+			"stages":                quoteStages(q),
+			"paid_at":               q.PaidAt,
+			"delivered_at":          deliveryTimePointer(q.DeliveryTime()),
+			"face_value_totals":     q.FaceValueTotals,
+			"face_label":            quoteFaceSummary(q),
+			"transactions":          payment,
 			// Delivery CHANNEL (not the address/number) so the public timeline
 			// can say "credit went to the number" instead of promising a code
 			// for a top-up. The target itself stays owner-only.

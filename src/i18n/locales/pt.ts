@@ -88,6 +88,7 @@ const pt = {
     all: "Ver todas as compras",
   },
   quiz: {
+    uniqueCodePending: "O teu código pessoal desbloqueia após concluíres o quiz",
     cashbackIntro: "Aprende como funciona nimshop.io e desbloqueia um código cashback de uso único.",
     cashbackMinScore: "Pontuação necessária: pelo menos {{score}}%.",
 
@@ -999,6 +1000,7 @@ const pt = {
   },
 
   activity: {
+    testPayment: "TESTE · simulação",
     title: 'Atividade pública',
     subtitle: 'Compras recentes na rede.',
     empty: 'Nenhuma atividade pública ainda.',

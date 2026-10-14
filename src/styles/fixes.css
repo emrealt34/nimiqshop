@@ -4049,3 +4049,9 @@ body { padding-bottom: 0; }
 
 /* Only settled cashback is presented as incoming money. */
 .cb-row:not([data-payment-status="paid"]) .cb-row-amount { color: var(--ink-dim); }
+
+/* Cashback earnings fit the surrounding receipt typography. */
+.pt-card.pt-impact .pt-impact-count { font-size: clamp(1.25rem, 6cqw, 2rem); line-height: 1.15; letter-spacing: -.025em; overflow-wrap: anywhere; white-space: normal; }
+.pt-card.pt-impact .pt-impact-count-row { gap: 10px; margin-block: 10px; }
+.pt-card.pt-impact .pt-impact-count-label { font-size: .875rem; }
+.pt-card.pt-impact .pt-impact-count-label > svg { width: 18px; height: 18px; }

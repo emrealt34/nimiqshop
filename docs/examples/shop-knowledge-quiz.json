@@ -636,6 +636,7 @@
   },
   "cashback_reward": {
     "code": "ILOVENIM",
+    "code_mode": "shared",
     "cashback_bps": 100,
     "max_recipients": 0,
     "min_score_percent": 0

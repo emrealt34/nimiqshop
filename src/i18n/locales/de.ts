@@ -88,6 +88,7 @@ const de = {
     all: "Alle Käufe ansehen",
   },
   quiz: {
+    uniqueCodePending: "Dein persönlicher Code wird nach Abschluss freigeschaltet",
     cashbackIntro: "Lerne nimshop.io kennen und schalte einen einmaligen Cashback-Code frei.",
     cashbackMinScore: "Erforderliche Punktzahl: mindestens {{score}}%.",
 
@@ -999,6 +1000,7 @@ const de = {
   },
 
   activity: {
+    testPayment: "TEST · simuliert",
     title: 'Öffentliche Aktivität',
     subtitle: 'Letzte Einkäufe im Netzwerk.',
     empty: 'Noch keine öffentliche Aktivität.',

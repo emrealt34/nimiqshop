@@ -9,11 +9,12 @@ import { LoadingRows } from '../ui/uiKit';
  * (Mailtrap) to the address you type. No money moves and the supplier is never
  * asked to fulfil anything: the payment and the delivery are simulated.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Icon } from '../ui/Icon';
 import { AlertBox } from '../ui/uiKit';
 import { useToast } from '../AppProviders';
 import {
+  adminTestActivity, adminSetTestActivity,
   adminTestPurchase,
   adminTestPay,
   adminTestQuote,
@@ -103,6 +104,11 @@ function describeError(e: unknown): string {
 
 export function AdminTestCenterPanel() {
   const { toast } = useToast();
+  const [showTests,setShowTests]=useState<boolean|null>(null);
+  const [visibilityBusy,setVisibilityBusy]=useState(false);
+  useEffect(()=>{void adminTestActivity().then(r=>setShowTests(!!r.enabled)).catch(e=>toast(describeError(e),'error'));},[toast]);
+  const toggleVisibility=async()=>{if(showTests===null)return;setVisibilityBusy(true);try{const r=await adminSetTestActivity(!showTests);setShowTests(!!r.enabled);toast(r.enabled?'Test payments are visible in Activity':'Test payments are hidden from Activity','success');}catch(e){toast(describeError(e),'error');}finally{setVisibilityBusy(false)}};
+
   const [country, setCountry] = useState('US');
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
@@ -309,6 +315,7 @@ export function AdminTestCenterPanel() {
         Mailtrap transport (sandbox or live, see the Mailtrap status above).
       </div>
 
+      <div className="card mb-2"><div className="row between" style={{flexWrap:'wrap',gap:12}}><div><strong>Test payments in public Activity</strong><p className="small muted">Display only. Entries keep a TEST label and do not count as real purchase volume.</p></div><button className="btn btn-outline" type="button" role="switch" aria-checked={showTests===true} disabled={showTests===null||visibilityBusy} onClick={()=>void toggleVisibility()}>{showTests?'Visible — hide':'Hidden — show'}</button></div></div>
       <div className="field">
         <label>Country (2-letter code)</label>
         <input className="input" type="text" maxLength={2} value={country} onChange={(e) => setCountry(e.target.value)} style={{ maxWidth: 120 }} />

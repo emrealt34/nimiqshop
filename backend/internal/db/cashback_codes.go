@@ -287,7 +287,8 @@ func ReserveCodeRedemption(tx *badger.Txn, code, userID, quoteID string, limits 
 	}
 	var quizReward quizCashbackDefinition
 	if err := getJSON(tx, quizCodeKey(code), &quizReward); err == nil {
-		if _, err := tx.Get(quizGrantKey(code, userID)); err != nil {
+		var grant QuizCashbackGrant
+		if err := getJSON(tx, quizGrantKey(code, userID), &grant); err != nil || grant.Code != code {
 			return &CodeLimitDetail{Code: code, Reason: "complete the quiz to unlock this account-only code", Limit: "quiz"}
 		}
 		limits.MaxUsesPerUser = 1

@@ -1,4 +1,4 @@
-export type QuizCashbackReward = { code: string; cashback_bps: number; max_recipients: number; min_score_percent: number };
+export type QuizCashbackReward = { code_mode?: 'shared' | 'unique'; code: string; cashback_bps: number; max_recipients: number; min_score_percent: number };
 export type QuizPayoutConfig = { enabled: boolean; source: "cashback_wallet"; pool_nim: number; per_winner_nim: number };
 export type QuizText = { title: string; description: string };
 export type QuizTranslations = Partial<Record<"en" | "tr" | "de" | "fr" | "es" | "pt", QuizText>>;
@@ -112,7 +112,7 @@ export function parseQuizImport(text: string): AdminQuiz {
   const end = date(raw.ends_at, new Date(Date.parse(start) + 7 * 86400000), 'ends_at');
   if (Date.parse(end) <= Date.parse(start) || Date.parse(end) - Date.parse(start) > 366 * 86400000) throw new Error('ends_at must follow starts_at, within 366 days.');
   const cashbackReward = (raw.cashback_reward ?? {code:'ILOVENIM',cashback_bps:100,max_recipients:0,min_score_percent:0}) as QuizCashbackReward;
-  if (cashbackReward && (typeof cashbackReward !== 'object' || !/^[A-Z0-9_-]{3,40}$/.test(cashbackReward.code) || !Number.isInteger(cashbackReward.cashback_bps) || cashbackReward.cashback_bps < 1 || cashbackReward.cashback_bps > 10000 || !Number.isSafeInteger(cashbackReward.max_recipients) || cashbackReward.max_recipients < 0 || !Number.isInteger(cashbackReward.min_score_percent) || cashbackReward.min_score_percent < 0 || cashbackReward.min_score_percent > 100)) throw new Error('Invalid cashback_reward: use a code, rate in basis points, max_recipients (0 = unlimited), and min_score_percent.');
+  if (cashbackReward && (typeof cashbackReward !== 'object' || (cashbackReward.code_mode !== undefined && !['shared','unique'].includes(cashbackReward.code_mode)) || !/^[A-Z0-9_-]{3,40}$/.test(cashbackReward.code) || !Number.isInteger(cashbackReward.cashback_bps) || cashbackReward.cashback_bps < 1 || cashbackReward.cashback_bps > 10000 || !Number.isSafeInteger(cashbackReward.max_recipients) || cashbackReward.max_recipients < 0 || !Number.isInteger(cashbackReward.min_score_percent) || cashbackReward.min_score_percent < 0 || cashbackReward.min_score_percent > 100)) throw new Error('Invalid cashback_reward: use a code, rate in basis points, max_recipients (0 = unlimited), and min_score_percent.');
   if (cashbackReward) payout.enabled = false;
   const prize = raw.prize || (cashbackReward ? {title:'Cashback code'} : undefined);
   if (!prize || typeof prize !== 'object' || Array.isArray(prize)) throw new Error('Include a prize object.');

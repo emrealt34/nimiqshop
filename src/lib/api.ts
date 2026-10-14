@@ -1082,3 +1082,6 @@ export const adminSetRatingComments = (enabled: boolean) =>
 export const adminHideRatingComment = (kind: 'order' | 'quote', id: string, hidden: boolean) =>
   api(`/admin/ratings/${kind}/${encodeURIComponent(id)}/hide`, { method: 'POST', body: { hidden } });
 export const adminGetOrder = (id: string) => api('/admin/orders/' + encodeURIComponent(id));
+
+export const adminTestActivity = () => api('/admin/test-activity');
+export const adminSetTestActivity = (enabled: boolean) => api('/admin/test-activity', {method:'POST',body:{enabled}});

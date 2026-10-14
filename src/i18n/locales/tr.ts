@@ -88,6 +88,7 @@ const tr = {
     all: "Tüm alışverişleri gör",
   },
   quiz: {
+    uniqueCodePending: "Kişisel kodun quiz tamamlanınca açılır",
     cashbackIntro: "nimshop.io’nun işleyişini öğren, tek kullanımlık cashback kodunu aç.",
     cashbackMinScore: "Gerekli puan: en az %{{score}}.",
 
@@ -1000,6 +1001,7 @@ const tr = {
   },
 
   activity: {
+    testPayment: "TEST · simülasyon",
     title: 'Herkese açık akış',
     subtitle: 'Ağdaki son alışverişler.',
     empty: 'Henüz herkese açık aktivite yok.',

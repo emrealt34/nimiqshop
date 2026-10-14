@@ -1,7 +1,7 @@
 import { test, expect, open } from './support/fixtures';
 import { path } from './support/data';
 
-for (const location of ['/cashback', '/profile']) {
+for (const location of ['/cashback']) {
   test(`cashback states follow the ledger, not stale paid labels or submitted hashes, on ${location}`, async ({ page }) => {
     const hash = 'a'.repeat(64);
     const paidAt = '2026-10-12T12:00:00Z';
@@ -79,11 +79,18 @@ test.describe('Turkish unpaid cashback copy', () => {
       totals: { paid_nim: 0, paid_count: 0, pending_nim: 10, pending_count: 1 },
       cashbacks: [{ id: 'pending', product_id: 'Carrefour', amount_nim: 10, status: 'queued', status_label: 'Cashback gönderildi', tx_hash: 'c'.repeat(64) }],
     } }));
-    await open(page, path('/profile'));
+    await open(page, path('/cashback'));
     const row = page.locator('.cb-row').filter({ hasText: 'Carrefour' });
     await expect(row).toContainText('Beklemede — henüz ödenmedi');
     await expect(row).not.toContainText('gönderildi');
     await expect(row.locator('.cb-row-amount')).not.toContainText('+');
-    await expect(page.getByText(/Son siparişlerden .* NIM ödeme bekliyor; henüz ödenmedi/)).toBeVisible();
   });
+});
+
+test('profile contains limits and wallet without staking or cashback sections',async({page,requests})=>{
+ await open(page,path('/profile'));
+ await expect(page.locator('.wallet-address')).toBeVisible();
+ await expect(page.locator('.cb-row')).toHaveCount(0);
+ await expect(page.locator('.staker-card')).toHaveCount(0);
+ expect(requests.filter(r=>r.includes('/api/cashback/me'))).toEqual([]);
 });

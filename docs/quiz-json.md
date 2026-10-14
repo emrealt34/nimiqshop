@@ -11,6 +11,7 @@ Upload or paste JSON in Admin → Quiz. Loading opens an editable draft; saving 
   "ends_at": "2026-11-11T12:00:00+03:00",
   "cashback_reward": {
     "code": "ILOVENIM",
+    "code_mode": "shared",
     "cashback_bps": 100,
     "max_recipients": 0,
     "min_score_percent": 0
@@ -21,6 +22,7 @@ Upload or paste JSON in Admin → Quiz. Loading opens an editable draft; saving 
 }
 ```
 
+- `code_mode`: `shared` uses the configured code for everyone; `unique` issues a different account-bound code after each qualifying completion. Omission defaults to shared. In unique mode, `code` is the prefix. Existing earned codes remain valid when settings change.
 - `cashback_bps`: 100 means 1%, 500 means 5%; valid range 1–10000.
 - `max_recipients`: accounts allowed to unlock the shared code. Zero means unlimited. Quiz participation is unlimited regardless of this cap.
 - `min_score_percent`: zero requires completion of every question; 100 requires a perfect score.

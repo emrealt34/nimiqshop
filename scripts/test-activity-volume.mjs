@@ -34,3 +34,9 @@ test('exact fake purchase IDs and simulations never inflate real activity volume
   assert.equal(activityVolumeNIM(visible, 0), 150);
   assert.equal(JSON.stringify(input), previous, 'cached API response is never mutated');
 });
+
+test('explicitly displayed tests retain their badge flag without affecting volume',()=>{
+ const shown={id:'shown-test',test_mode:true,test_activity_visible:true,nim:5000};
+ assert.deepEqual(publicActivityItems([shown]),[shown]);
+ assert.equal(activityVolumeNIM([shown,{nim:100}],0),100);
+});

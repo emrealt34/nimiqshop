@@ -96,6 +96,7 @@ const en = {
     all: "View all purchases",
   },
   quiz: {
+    uniqueCodePending: "Your personal code unlocks after completion",
     cashbackIntro: "Learn how nimshop.io works and unlock a single-use cashback code.",
     cashbackMinScore: "Required score: at least {{score}}%.",
 
@@ -1008,6 +1009,7 @@ const en = {
   },
 
   activity: {
+    testPayment: "TEST · simulated",
     title: 'Public activity',
     subtitle: 'Recent purchases across the network.',
     empty: 'No public activity yet.',

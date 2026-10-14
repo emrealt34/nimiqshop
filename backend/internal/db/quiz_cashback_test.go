@@ -225,3 +225,60 @@ func TestQuizCashbackConcurrentCap(t *testing.T) {
 		t.Fatalf("cap violated: %d grants", count)
 	}
 }
+
+func TestUniqueQuizCodesArePrivateStableAndSingleUse(t *testing.T) {
+	s, err := New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	now := time.Now().UTC()
+	c, err := s.PutQuizCompetition(QuizCompetition{Title: "Unique codes", CashbackReward: &QuizCashbackReward{Code: "ILOVENIM", CodeMode: "unique", CashbackBps: 500}, StartsAt: now.Add(-time.Minute), EndsAt: now.Add(time.Hour), Questions: []QuizQuestion{{Prompt: "Pick", Options: []string{"Yes", "No"}, CorrectIndex: 0}}}, true, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.PublishQuiz(c.ID, now); err != nil {
+		t.Fatal(err)
+	}
+	codes := map[string]string{}
+	for _, u := range []string{"a", "b"} {
+		if _, _, err = s.StartQuiz(c.ID, u, now); err != nil {
+			t.Fatal(err)
+		}
+		if _, err = s.SaveQuizAnswers(c.ID, u, []int{0}, true, now); err != nil {
+			t.Fatal(err)
+		}
+		g, err := s.GetQuizCashbackGrant("ILOVENIM", u)
+		if err != nil {
+			t.Fatal(err)
+		}
+		codes[u] = g.Code
+		deniedPrefix := s.Update(func(tx *badger.Txn) error {
+			return ReserveCodeRedemption(tx, "ILOVENIM", u, "prefix-attempt", CodeLimits{}, 0, now)
+		})
+		if deniedPrefix == nil {
+			t.Fatal("unique prefix reserved as a coupon")
+		}
+		if g.Code == "ILOVENIM" || !s.QuizCashbackUnlocked(g.Code, u) || s.QuizCashbackUnlocked("ILOVENIM", u) {
+			t.Fatal("unique prefix bypass or missing grant")
+		}
+		if _, err = s.SaveQuizAnswers(c.ID, u, []int{0}, true, now); err != nil {
+			t.Fatal(err)
+		}
+		again, err := s.GetQuizCashbackGrant("ILOVENIM", u)
+		if err != nil || again.Code != g.Code {
+			t.Fatal("retry changed code")
+		}
+	}
+	if codes["a"] == codes["b"] || s.QuizCashbackUnlocked(codes["a"], "b") {
+		t.Fatal("code leaked between accounts")
+	}
+	for i := 0; i < 2; i++ {
+		err = s.Update(func(tx *badger.Txn) error {
+			return ReserveCodeRedemption(tx, codes["a"], "a", fmt.Sprint(i), CodeLimits{}, 0, now)
+		})
+		if (i == 0 && err != nil) || (i == 1 && err == nil) {
+			t.Fatal("single use failed", err)
+		}
+	}
+}

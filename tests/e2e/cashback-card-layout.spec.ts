@@ -16,6 +16,7 @@ for (const width of [320, 768, 1280]) {
           const hero = card.querySelector('.pt-impact-total-copy')!.getBoundingClientRect();
           return hero.width / row.width;
         })).toBeGreaterThan(0.8);
+        expect(await card.locator('.pt-impact-count').evaluate(node=>parseFloat(getComputedStyle(node).fontSize))).toBeLessThanOrEqual(32);
         const actions = await card.locator('.pt-actions .btn').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().width));
         expect(Math.abs(actions[0] - actions[1])).toBeLessThan(2);
         const unusedFooter = await card.evaluate(card => card.getBoundingClientRect().bottom - card.querySelector('.pt-actions')!.getBoundingClientRect().bottom);
