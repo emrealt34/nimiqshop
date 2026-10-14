@@ -53,7 +53,7 @@ test('cashback refresh reflects confirmed settlement and survives an API outage 
   await open(page, path('/cashback'));
   const row = page.locator('.cb-row').filter({ hasText: 'Refresh order' });
   await expect(row).toContainText('Awaiting confirmation');
-  const refresh = page.locator('.cb-recent-card + button');
+  const refresh = page.locator('.cb-recent-card .cb-ledger-refresh');
   settled = true;
   await refresh.click();
   await expect(row).toContainText('Paid');

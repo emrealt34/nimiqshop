@@ -962,7 +962,7 @@ function OrderContent({ o, onChanged }: { o: any; onChanged: () => void }) {
   const detailTitle = detailThumbTitles.length > 1 ? detailThumbTitles.join(' + ') : productTitle;
 
   const statusRow = (
-    <div className="row between mb-2" style={{ flexWrap: 'wrap', gap: '12px' }}>
+    <div className="row between mb-2 order-summary-heading" style={{ flexWrap: 'wrap', gap: '12px' }}>
       <div>
         <div className="row" style={{ gap: '10px' }}>
           {detailThumbTitles.length > 1 ? (
@@ -1243,7 +1243,7 @@ function QuoteContent({ q, refund, fulfillment, onChanged }: { q: any; refund?: 
   };
 
   const statusRow = (
-    <div className="row between mb-2" style={{ flexWrap: 'wrap', gap: '12px' }}>
+    <div className="row between mb-2 order-summary-heading" style={{ flexWrap: 'wrap', gap: '12px' }}>
       <div>
         <div className="row" style={{ gap: '10px' }}>
           {quoteTitleParts.length > 1 ? (

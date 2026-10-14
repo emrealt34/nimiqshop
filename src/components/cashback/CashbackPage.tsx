@@ -825,9 +825,8 @@ export function CashbackView() {
       <CashbackImpactSection key={positionOwner || 'guest'} authed={authed === true} myTotals={ledger?.totals ?? null} between={rateStrip} />
 
       {authed && <>
-        {ledgerError && <div className="alert info" role="status">{t('cashback.ledgerLoadError')}</div>}
-        {(!ledgerError || ledger) && <RecentCashbackList rows={ledger?.cashbacks ?? null} loading={!ledger} pageSize={3} />}
-        <button type="button" className="btn btn-sm btn-outline mt-2" disabled={ledgerBusy} onClick={() => setLedgerRefresh(value => value + 1)}>{t('common.refresh')}</button>
+        {ledgerError && ledger && <div className="alert info" role="status">{t('cashback.ledgerLoadError')}</div>}
+        <RecentCashbackList rows={ledger?.cashbacks ?? null} loading={!ledger && !ledgerError} pageSize={3} emptyText={ledgerError ? t('cashback.ledgerLoadError') : undefined} headerAction={<button type="button" className="btn btn-sm btn-outline cb-ledger-refresh" disabled={ledgerBusy} onClick={() => setLedgerRefresh(value => value + 1)}><Icon name="refresh" size={14} />{t('common.refresh')}</button>} />
       </>}
 
       {/* ------------------------------------------------------ calculator */}

@@ -1436,7 +1436,7 @@ export function AdminContent() {
 
 function AdminHeader() {
   return (
-    <div className="row between mt-2" style={{ flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
+    <div className="row between mt-2 admin-page-header" style={{ flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
       <div>
         <h1 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Icon name="shield" size={24} /> Operator console
@@ -1453,7 +1453,7 @@ function AdminHeader() {
 
 export function AdminPage() {
   return (
-    <AppRoot activeKey="none">
+    <AppRoot activeKey="none" initialPath="/admin">
       <AdminContent />
     </AppRoot>
   );

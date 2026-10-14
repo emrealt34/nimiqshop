@@ -4099,3 +4099,31 @@ body { padding-bottom: 0; }
 .quiz-review-item dt { font-size: .75rem; color: var(--ink-dim); }
 .quiz-review-item dd { margin: 6px 0 0; font-size: .95rem; font-weight: 650; line-height: 1.5; }
 @media (max-width: 480px) { .quiz-review-heading h3 { flex-basis: calc(100% - 42px); } .quiz-review-item .chip { margin-left: 42px; } }
+
+/* The payment refresh belongs to its card header, including on phones. */
+.cb-payouts-head { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.cb-payouts-head > span:first-child { flex: 1 1 160px; min-width: 0; }
+.cb-payouts-head .cb-ledger-refresh { flex: 0 0 auto; margin-left: auto; letter-spacing: normal; text-transform: none; }
+
+/* Primary headings share an alignment; home keeps its own editorial layout. */
+#page-content[data-page]:not([data-page="/"]) h1 { text-align: center; justify-content: center; text-wrap: balance; letter-spacing: -.025em; font-size: clamp(1.65rem, 3vw, 2.3rem); line-height: 1.25; }
+#page-content[data-page]:not([data-page="/"]) h1 + :is(.lede,.muted),
+#page-content[data-page]:not([data-page="/"]) .container > .lede { text-align: center; max-width: 65ch; margin-inline: auto; line-height: 1.6; }
+#page-content .quiz-heading { flex-direction: column; align-items: center; gap: 10px; text-align: center; margin-block: 18px 28px; }
+#page-content .quiz-heading p { max-width: 60ch; margin-inline: auto; line-height: 1.6; }
+.activity-page .act-hero { display: block; position: relative; text-align: center; padding-inline: 100px; margin-block: 20px 24px; }
+.activity-page .act-title { justify-content: center; }
+.activity-page .activity-actions { position: absolute; inset-inline-end: 0; top: 0; }
+.orders-page .section-head { display: block; position: relative; padding-inline: 175px; text-align: center; }
+.orders-page .section-head h2 { justify-content: center; text-wrap: balance; font-size: clamp(1.65rem, 3vw, 2.3rem); }
+.orders-page .section-head > .row { position: absolute; inset-inline-end: 0; top: 0; max-width: 165px; justify-content: flex-end; flex-wrap: wrap; }
+.admin-page-header { position: relative; display: block; padding-inline: 150px; text-align: center; }
+.admin-page-header > a { position: absolute; inset-inline-end: 0; top: 0; }
+.order-summary-heading { flex-direction: column; align-items: center; text-align: center; }
+.order-summary-heading > div > .row { justify-content: center; flex-wrap: wrap; }
+@media (max-width: 760px) {
+  .activity-page .act-hero, .orders-page .section-head, .admin-page-header { padding-inline: 0; }
+  .activity-page .activity-actions, .orders-page .section-head > .row, .admin-page-header > a { position: static; margin-top: 12px; }
+  .activity-page .activity-actions { display: flex; justify-content: center; }
+  .orders-page .section-head > .row { max-width: none; justify-content: center; margin-inline: 0; }
+}

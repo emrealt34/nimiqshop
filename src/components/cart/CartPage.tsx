@@ -15,5 +15,5 @@ export function CartView() {
 }
 
 export function CartPage() {
-  return <AppRoot activeKey="shop"><CartView /></AppRoot>;
+  return <AppRoot activeKey="shop" initialPath="/cart"><CartView /></AppRoot>;
 }

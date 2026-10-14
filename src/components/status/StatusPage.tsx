@@ -68,7 +68,7 @@ export function StatusView() {
     <a className="btn btn-outline mt-2" href={run} target="_blank" rel="noopener noreferrer">{t('refreshStatus.actions')}</a>
   </section>;
 }
-export function StatusPage() { return <AppRoot activeKey="none"><StatusView /></AppRoot>; }
+export function StatusPage() { return <AppRoot activeKey="none" initialPath="/status"><StatusView /></AppRoot>; }
 
 function StatusSkeletonRow({ index }: { index: number }) {
   return <><dt><Skel w={index % 2 ? 120 : 150} h={14} /></dt><dd><Skel w="70%" h={14} /></dd></>;

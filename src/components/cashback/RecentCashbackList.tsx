@@ -129,6 +129,7 @@ export function RecentCashbackList({
   emptyText = tr('cashback.rcEmpty'),
   showCount = true,
   title = tr('cashback.recentTitle'),
+  headerAction,
 }: {
   rows: RecentCashbackRow[] | null | undefined;
   loading?: boolean;
@@ -137,6 +138,7 @@ export function RecentCashbackList({
   emptyText?: string;
   showCount?: boolean;
   title?: string;
+  headerAction?: React.ReactNode;
 }) {
   const list = rows || [];
   const [page, setPage] = React.useState(0); // 0-based, like <Pager>
@@ -152,6 +154,7 @@ export function RecentCashbackList({
             {tr('cashback.rcOrdersCount', { count: list.length })}
           </span>
         )}
+        {headerAction}
       </div>
       {loading && !rows ? (
         <div role="status" aria-busy="true" aria-label={tr('common.loading')}>

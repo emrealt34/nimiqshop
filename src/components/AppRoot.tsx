@@ -19,7 +19,7 @@ import { initFit } from '../lib/fitText';
  * order page). No banner, no parallel screen, no other chrome — owner's
  * contract: "test mode = the original, plus one button that fakes the
  * trigger". Operator-facing test tooling lives in the admin Test Center. */
-export function AppRoot({ activeKey, children }: { activeKey: ShellKey; children: ReactNode }) {
+export function AppRoot({ activeKey, initialPath, children }: { activeKey: ShellKey; initialPath?: string; children: ReactNode }) {
   // (No pre-hydration footer handling here any more: the pages are
   // server-rendered, so there is no empty-content frame to hide it for.)
   //
@@ -40,7 +40,7 @@ export function AppRoot({ activeKey, children }: { activeKey: ShellKey; children
   return (
     <I18nProvider>
       <CartProvider>
-        <Router initialKey={activeKey} shell={<SiteShell activeKey={activeKey} />} initialPage={children}
+        <Router initialKey={activeKey} initialPath={initialPath} shell={<SiteShell activeKey={activeKey} />} initialPage={children}
           wrap={(content) => <AppProviders>{content}</AppProviders>} />
       </CartProvider>
     </I18nProvider>

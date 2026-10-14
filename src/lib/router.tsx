@@ -448,7 +448,7 @@ export function Router({
 
   const content = <>
       {shell}
-      <div id="page-content" tabIndex={-1}>
+      <div id="page-content" data-page={loc.path} tabIndex={-1}>
         {/* keyed by path+query so a new ?id=… remounts the page and re-reads it */}
         <Fragment key={loc.path + loc.search}>{pageNode}</Fragment>
         <RouteFocus />
