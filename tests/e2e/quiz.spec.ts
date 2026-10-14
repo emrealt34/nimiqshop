@@ -218,3 +218,22 @@ test('an invalid submission acknowledgement retains the local draft and permits 
  await page.getByRole('button',{name:'Submit answers',exact:true}).click();await expect(page.locator('.quiz-result')).toContainText('2 / 2');
  expect(submits).toBe(2);
 });
+
+for (const width of [320,1280]) test(`completed quiz reviews correct, incorrect and numerical answers at ${width}px`,async({page})=>{
+ await page.setViewportSize({width,height:900});
+ const c={...baseCompetition,attempt:{answers:[1,0,19],score:1.99,total:3,started_at:new Date().toISOString(),submitted_at:new Date().toISOString()},question_count:3,cashback_reward:{code:'ILOVENIM',cashback_bps:100,max_recipients:0,min_score_percent:0},cashback_unlocked:true,review:[
+  {question:questions[0],answer:1,correct_answer:1,correct:true},
+  {question:questions[1],answer:0,correct_answer:1,correct:false},
+  {question:{id:'calc',type:'range',prompt:'2% of 1000 NIM?',options:[],min:0,max:100},answer:19,correct_answer:20,correct:false}
+ ]};
+ await page.route('**/api/quiz**',r=>r.fulfill({json:new URL(r.request().url()).pathname.endsWith('/quiz')?{items:[c]}:c}));
+ await open(page,path('/quiz'));
+ const review=page.locator('.quiz-review');await expect(review).toBeVisible();
+ await expect(review.locator('li')).toHaveCount(3);
+ await expect(review.locator('li').nth(0)).toContainText('Correct');
+ await expect(review.locator('li').nth(1)).toContainText('Incorrect');
+ await expect(review.locator('li').nth(1).locator('dd')).toHaveText(['Other','Nimiq Pay']);
+ await expect(review.locator('li').nth(2).locator('dd')).toHaveText(['19','20']);
+ await expect(page.locator('.quiz-question')).toHaveCount(0);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});

@@ -9,6 +9,7 @@ export type QuizQuestion = { translations?: Partial<Record<"en" | "tr" | "de" | 
 export type AdminQuizQuestion = QuizQuestion & { correct_index: number; correct_value?: number };
 export type QuizAttempt = { answers: number[]; score: number; total: number; started_at: string; submitted_at: string | null; prize_email?: string };
 export type QuizCompetition = {
+ review?: {question:QuizQuestion;answer:number;correct_answer:number;correct:boolean}[];
  cashback_reward?: QuizCashbackReward; cashback_unlocked?: boolean;
  payout?: QuizPayoutConfig; payouts?: {participant:string;status:string;amount_nim:number;memo:string;tx_hash:string;paid_at?:string}[];
  tie_break?: "submitted_at" | "";

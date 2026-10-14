@@ -156,6 +156,22 @@ func (h *Handlers) GetQuiz(ctx *fasthttp.RequestCtx) {
 		quizError(ctx, err)
 		return
 	}
+	// Only the completing account gets its review. Ranked prize solutions wait
+	// until closing so they cannot be shared to change an active competition.
+	if attempt, e := h.Store.GetQuizAttempt(c.ID, user); e == nil && attempt.SubmittedAt != nil && (c.CashbackReward != nil || !time.Now().UTC().Before(c.EndsAt)) {
+		review := []map[string]any{}
+		for i, q := range c.Questions {
+			if i >= len(attempt.Answers) {
+				break
+			}
+			correct := q.CorrectIndex
+			if q.Type == "range" && q.CorrectValue != nil {
+				correct = *q.CorrectValue
+			}
+			review = append(review, map[string]any{"question": map[string]any{"id": q.ID, "prompt": q.Prompt, "translations": q.Translations, "options": q.Options, "type": q.Type, "min": q.Min, "max": q.Max}, "answer": attempt.Answers[i], "correct_answer": correct, "correct": attempt.Answers[i] == correct})
+		}
+		view["review"] = review
+	}
 	if c.CashbackReward != nil {
 		view["leaderboard"] = []any{}
 		writeJSON(ctx, 200, view)

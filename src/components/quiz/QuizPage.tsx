@@ -238,6 +238,17 @@ export function QuizView() {
           </form>}
         </div>}
       </section>}
+      {completed && competition.review?.length ? <section className="card quiz-review" aria-labelledby="quiz-review-title">
+        <h2 id="quiz-review-title">{t('quiz.review')}</h2>
+        <ol>{competition.review.map(item => {
+          const q = localizeQuizQuestion(item.question, lang);
+          const answerText = (answer: number) => q.type === 'range' ? String(answer) : (q.options?.[answer] || '—');
+          return <li key={q.id} className="quiz-review-item" data-correct={item.correct}>
+            <div className="quiz-review-heading"><h3>{q.prompt}</h3><span className="chip">{t(item.correct ? 'quiz.correct' : 'quiz.incorrect')}</span></div>
+            <dl><div><dt>{t('quiz.yourAnswer')}</dt><dd>{answerText(item.answer)}</dd></div><div><dt>{t('quiz.correctAnswer')}</dt><dd>{answerText(item.correct_answer)}</dd></div></dl>
+          </li>;
+        })}</ol>
+      </section> : null}
       {questions && !completed && <form className="quiz-game" onSubmit={(e) => { e.preventDefault(); if (questionIndex === questions.length - 1) void finish(); else if (!busy && validAnswer(questions[questionIndex], answers[questionIndex])) setQuestionIndex(index => index + 1); }}>
         <div className="card quiz-step-header"><div className="quiz-step-top"><h2 id="quiz-step-title" ref={stepHeading} tabIndex={-1}>{t('quiz.step', { current: questionIndex + 1, total: questions.length })}</h2>{!competition.cashback_reward && competition.prize.value && <span className="quiz-step-prize"><Icon name="gift" size={15} />{competition.prize.value}</span>}</div><p className="small muted">{competition.title}</p><progress className="quiz-progress" value={answers.filter((a, i) => validAnswer(questions[i], a)).length} max={questions.length} aria-label={t('quiz.answered', { count: answers.filter((a, i) => validAnswer(questions[i], a)).length, total: questions.length })} /></div>
         {questions.slice(questionIndex, questionIndex + 1).map((q) => { const index = questionIndex; return <fieldset key={q.id} className="card quiz-question" disabled={busy || competition.phase !== 'live'}>

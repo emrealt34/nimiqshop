@@ -134,3 +134,75 @@ func TestUniqueQuizViewReturnsOnlyTheCompletingAccountsCode(t *testing.T) {
 		t.Fatal("prefix accepted as a coupon")
 	}
 }
+
+func TestQuizAnswerReviewIsPrivateAndOnlyRevealedAfterSubmission(t *testing.T) {
+	for _, cashback := range []bool{true, false} {
+		t.Run(map[bool]string{true: "cashback", false: "ranked"}[cashback], func(t *testing.T) {
+			s := bootStack(t, stackOptions{})
+			owner, _ := s.signIn()
+			other, _ := s.signIn()
+			now := time.Now().UTC()
+			correct := 20
+			c := db.QuizCompetition{Title: "Review quiz", Prize: db.QuizPrize{Title: "Test prize"}, StartsAt: now.Add(-time.Hour), EndsAt: now.Add(time.Hour), Questions: []db.QuizQuestion{{Prompt: "Choose NIM", Options: []string{"NIM", "BTC"}, CorrectIndex: 0}, {Type: "range", Prompt: "2% of 1000", Min: 0, Max: 100, CorrectValue: &correct}}}
+			if cashback {
+				c.CashbackReward = &db.QuizCashbackReward{Code: "REVIEW", CashbackBps: 100}
+			}
+			c, err := s.h.Store.PutQuizCompetition(c, true, now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err = s.h.Store.PublishQuiz(c.ID, now); err != nil {
+				t.Fatal(err)
+			}
+			path := "/api/quiz/" + c.ID
+			for _, headers := range []map[string]string{owner, other} {
+				r := s.do("GET", path, nil, headers)
+				if r.status != 200 || strings.Contains(string(r.body), `"review"`) || strings.Contains(string(r.body), `"correct_answer"`) {
+					t.Fatalf("premature answer disclosure: %d %s", r.status, r.body)
+				}
+			}
+			r := s.do("POST", path+"/start", map[string]any{}, owner)
+			if r.status != 200 || strings.Contains(string(r.body), `"correct_answer"`) || strings.Contains(string(r.body), `"correct_value"`) {
+				t.Fatalf("start disclosure: %d %s", r.status, r.body)
+			}
+			if r = s.do("POST", path+"/submit", map[string]any{"answers": []int{1, 19}}, owner); r.status != 200 {
+				t.Fatalf("submit: %d %s", r.status, r.body)
+			}
+			if !cashback {
+				r = s.do("GET", path, nil, owner)
+				if strings.Contains(string(r.body), `"review"`) {
+					t.Fatal("ranked solutions exposed before closing")
+				}
+				c, err = s.h.Store.GetQuizCompetition(c.ID)
+				if err != nil {
+					t.Fatal(err)
+				}
+				c.EndsAt = now.Add(-time.Minute)
+				if _, err = s.h.Store.PutQuizCompetition(c, false, now); err != nil {
+					t.Fatal(err)
+				}
+			}
+			r = s.do("GET", path, nil, owner)
+			if r.status != 200 {
+				t.Fatalf("review: %d %s", r.status, r.body)
+			}
+			rows, ok := r.json(t)["review"].([]any)
+			if !ok || len(rows) != 2 {
+				t.Fatalf("missing review: %s", r.body)
+			}
+			for i, expected := range []float64{0, 20} {
+				row := rows[i].(map[string]any)
+				if row["correct"] != false || row["correct_answer"] != expected || row["answer"] != []float64{1, 19}[i] {
+					t.Fatalf("wrong review: %+v", row)
+				}
+			}
+			r = s.do("GET", path, nil, other)
+			if strings.Contains(string(r.body), `"review"`) {
+				t.Fatal("review leaked to another account")
+			}
+			if r = s.do("GET", path, nil, nil); r.status != 401 {
+				t.Fatalf("guest review status %d", r.status)
+			}
+		})
+	}
+}
