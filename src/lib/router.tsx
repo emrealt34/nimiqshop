@@ -16,6 +16,7 @@
  * new-tab / middle clicks) falls through to the browser untouched.
  */
 import {
+  Component,
   createContext,
   Fragment,
   lazy,
@@ -242,6 +243,25 @@ function RouteFallback() {
   );
 }
 
+class RouteLoadBoundary extends Component<{children:ReactNode}, {error:Error|null}> {
+  state: {error:Error|null} = {error:null};
+  static getDerivedStateFromError(error:Error) { return {error}; }
+  componentDidCatch(error:Error) {
+    if (/dynamically imported|Importing a module|Loading chunk|Unable to preload CSS|module script.*failed/i.test(error.message)) {
+      // The destination is already in history. Fetch its current HTML once;
+      // its initial page does not use this boundary, preventing reload loops.
+      window.location.replace(window.location.href);
+    }
+  }
+  render() {
+    if (this.state.error) {
+      if (!/dynamically imported|Importing a module|Loading chunk|Unable to preload CSS|module script.*failed/i.test(this.state.error.message)) throw this.state.error;
+      return <RouteFallback />;
+    }
+    return this.props.children;
+  }
+}
+
 /** Designed dead-end for unknown routes — never a blank screen or silent Home. */
 function NotFound() {
   const { t } = useT();
@@ -415,9 +435,9 @@ export function Router({
   else {
     const Comp = route.comp;
     pageNode = (
-      <Suspense fallback={<RouteFallback />}>
+      <RouteLoadBoundary><Suspense fallback={<RouteFallback />}>
         <Comp />
-      </Suspense>
+      </Suspense></RouteLoadBoundary>
     );
   }
 

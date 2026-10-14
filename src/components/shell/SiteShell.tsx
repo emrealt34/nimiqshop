@@ -178,7 +178,12 @@ function CartButton() {
       aria-label={t('nav.cart')}
       style={{ position: 'relative' }}
       onClick={() => {
-        import('../cart/CartSheet').then((m) => m.openCartSheet({ openSheet }));
+        import('../cart/CartSheet').then((m) => m.openCartSheet({ openSheet })).catch(() => {
+          // An already open tab can reference a chunk removed by deployment.
+          // A fresh cart document restores the module while keeping the cart
+          // and applied code in storage, rather than leaving a dead button.
+          window.location.assign(pagePath('/cart'));
+        });
       }}
     >
       <Icon name="bag" size={20} />
