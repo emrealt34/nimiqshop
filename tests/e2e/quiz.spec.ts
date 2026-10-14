@@ -134,3 +134,31 @@ for(const width of [320,1280])test(`cashback code stays hidden until quiz comple
  await expect(page.locator('.quiz-earned-code')).toHaveCount(0);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
+
+for (const width of [320,1280]) test(`quiz stays visible during slow detail loading and confirmed completion at ${width}px`, async ({page}) => {
+ await page.setViewportSize({width,height:900});
+ let completed=false;let detailReads=0;
+ const attempt={answers:[1,1],score:2,total:2,started_at:new Date().toISOString(),submitted_at:null as string|null};
+ const c=()=>({...baseCompetition,cashback_reward:{code:completed?'ILOVENIM':'',cashback_bps:100,max_recipients:0,min_score_percent:0},cashback_unlocked:completed,attempt:completed?{...attempt,submitted_at:new Date().toISOString()}:null});
+ await page.route('**/api/quiz**',async route=>{
+  const action=new URL(route.request().url()).pathname;
+  if(action.endsWith('/quiz'))return route.fulfill({json:{items:[c()]}});
+  if(action.endsWith('/start'))return route.fulfill({json:{competition:c(),attempt,questions}});
+  detailReads++;
+  if(detailReads===1)await new Promise(resolve=>setTimeout(resolve,9000));
+  return route.fulfill({json:c()});
+ });
+ await open(page,path('/quiz'));
+ // The list already includes everything needed for the card. A slow detail
+ // request must not replace the loaded page with an empty content area.
+ await expect(page.locator('.quiz-contest')).toContainText(baseCompetition.title,{timeout:2000});
+ await page.getByRole('button',{name:'Start quiz',exact:true}).click();
+ await expect(page.locator('.quiz-question')).toBeVisible();
+ completed=true;
+ // Completion may be confirmed by refresh after a lost submit response or
+ // another tab. Keep its result visible even while questions remain in state.
+ await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+ await expect(page.locator('.quiz-result')).toContainText('2 / 2',{timeout:12000});
+ await expect(page.locator('.quiz-earned-code')).toContainText('ILOVENIM');
+ await expect(page.locator('.quiz-question')).toHaveCount(0);
+});

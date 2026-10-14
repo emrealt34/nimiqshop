@@ -38,7 +38,10 @@ export function QuizView() {
   const [selected, setSelected] = useState('');
   const [rawCompetition, setCompetition] = useState<QuizCompetition | null>(null);
   const [rawQuestions, setQuestions] = useState<QuizQuestion[] | null>(null);
-  const competition = rawCompetition ? localizeQuiz(rawCompetition, lang) : null;
+  // List responses already contain the selected quiz's public card and attempt.
+  // Keep that content visible while its detail/leaderboard request is pending.
+  const selectedCompetition = rawCompetition?.id === selected ? rawCompetition : items.find(item => item.id === selected);
+  const competition = selectedCompetition ? localizeQuiz(selectedCompetition, lang) : null;
   const questions = rawQuestions?.map(q => localizeQuizQuestion(q, lang)) || null;
   const [questionIndex, setQuestionIndex] = useState(0);
   const stepHeading = useRef<HTMLHeadingElement>(null);
@@ -114,7 +117,14 @@ export function QuizView() {
   });
   useEffect(() => {
     if (!rawQuestions) return;
-    const frame = requestAnimationFrame(() => { stepHeading.current?.focus({ preventScroll: true }); stepHeading.current?.scrollIntoView({ block: 'start', behavior: 'instant' }); });
+    const frame = requestAnimationFrame(() => {
+      const heading = stepHeading.current;
+      // A fast user can already be typing before this scheduled focus runs.
+      // Never steal focus from a question control and drop their next digit.
+      const active = document.activeElement;
+      if (active?.matches('input,button,select,textarea,a') && heading?.closest('form')?.contains(active)) return;
+      heading?.focus({ preventScroll: true }); heading?.scrollIntoView({ block: 'start', behavior: 'instant' });
+    });
     return () => cancelAnimationFrame(frame);
   }, [rawQuestions, questionIndex]);
 
@@ -166,14 +176,14 @@ export function QuizView() {
   const winnerNames = competition?.winners?.length ? competition.winners : competition?.winner ? [competition.winner] : [];
   return <div className="container quiz-page">
     <header className="quiz-heading"><Icon name="nimiq" size={30} /><div><h1>{t('quiz.title')}</h1><p className="muted small">{t('quiz.cashbackIntro')}</p></div></header>
-    {error && <div className="alert error" role="alert">{error}</div>}
-    {!loaded && <div className="card quiz-contest"><LoadingRows rows={8} /></div>}
+    {error && <div className="alert error" role="alert">{error}{selected && <button className="btn btn-outline btn-sm" type="button" disabled={busy} onClick={() => void perform(refresh)}>{t('quiz.refresh')}</button>}</div>}
+    {(!loaded || (selected && !competition && !error)) && <div className="card quiz-contest"><LoadingRows rows={8} /></div>}
     {loaded && items.length === 0 && !error && <div className="card quiz-gate"><Icon name="gift" size={32} /><h2>{t('quiz.empty')}</h2><p className="small muted">{t('quiz.emptyHint')}</p></div>}
     {items.length > 1 && !questions && <div className="field quiz-selector"><label htmlFor="quiz-select">{t('quiz.competition')}</label><select id="quiz-select" className="input" value={selected} disabled={busy || !!questions} onChange={(e) => setSelected(e.target.value)}>
       {items.map((c) => <option key={c.id} value={c.id}>{localizeQuiz(c, lang).title} · {t(PHASE_KEYS[c.phase])}</option>)}
     </select></div>}
     {competition && <>
-      {!questions && <section className="card quiz-contest">
+      {(!questions || completed) && <section className="card quiz-contest">
         <div className="row between"><h2>{competition.title}</h2><span className={`chip quiz-phase-${competition.phase}`}>{t(PHASE_KEYS[competition.phase])}</span></div>
         {competition.description && <p className="small">{competition.description}</p>}
         {competition.cashback_reward ? <div className="quiz-cashback-reward">
