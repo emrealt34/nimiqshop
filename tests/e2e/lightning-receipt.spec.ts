@@ -1,7 +1,8 @@
 import { test, expect, open } from './support/fixtures';
 import { path } from './support/data';
 
-const hash = '66687aadf862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925';
+// Public SHA-256 digest of the all-zero test preimage below, never a credential.
+const hash = '66687aadf862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925'; // DevSkim: ignore DS173237
 const purchase = { id: 'lightning-test', type: 'cryptorefills_purchase', title: 'Carrefour', product_id: 'Carrefour', country: 'FR', coin: 'BTC', network: 'Lightning', coin_amount: '0.00012', lightning_payment_hash: hash,
   status: 'fulfilled', created_at: '2026-10-11T12:00:00Z', updated_at: '2026-10-11T12:00:00Z', time: '2026-10-11T12:00:00Z', quantity: 1, product_usd: 10, usd: 10, nim: 40000 };
 const receipt = { payment_hash: hash, amount_btc: '0.00012', confirmed: true, confirmed_at: '2026-10-11T12:00:00Z' };

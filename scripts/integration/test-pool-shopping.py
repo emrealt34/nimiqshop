@@ -23,7 +23,8 @@ with tempfile.TemporaryDirectory(prefix=".earned-api-", dir=pool) as folder:
     server = subprocess.Popen([str(task / "fixture"), str(fixture)], stdout=subprocess.PIPE, text=True)
     try:
         url = server.stdout.readline().strip()
-        if not url.startswith("http://127.0.0.1:"):
+        # This integration fixture must stay on loopback; reject remote endpoints.
+        if not url.startswith("http://127.0.0.1:"):  # DevSkim: ignore DS162092
             raise RuntimeError("actual earned API failed to start")
         data = json.loads(fixture.read_text())
         data["pool_url"] = url

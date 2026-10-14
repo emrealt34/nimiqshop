@@ -23,7 +23,8 @@ with tempfile.TemporaryDirectory(prefix=".contract-fixture-", dir=pool) as task:
     server = subprocess.Popen([str(binary)], stdout=subprocess.PIPE, text=True)
     try:
         url = server.stdout.readline().strip()
-        if not url.startswith("http://127.0.0.1:"):
+        # This integration fixture must stay on loopback; reject remote endpoints.
+        if not url.startswith("http://127.0.0.1:"):  # DevSkim: ignore DS162092
             raise RuntimeError("local fixture did not start")
         env = dict(os.environ, POOL_LIVE_URL=url, POOL_LIVE_FEED_KEY="contract-fixture-only",
                    POOL_LIVE_FUNDED_ADDRESS="NQ20 TSB0 DFSM UH9C 15GQ GAGJ TTE4 D3MA 859E",
