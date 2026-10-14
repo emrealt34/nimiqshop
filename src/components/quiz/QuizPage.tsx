@@ -239,12 +239,12 @@ export function QuizView() {
         </div>}
       </section>}
       {completed && competition.review?.length ? <section className="card quiz-review" aria-labelledby="quiz-review-title">
-        <h2 id="quiz-review-title">{t('quiz.review')}</h2>
-        <ol>{competition.review.map(item => {
+        <div className="quiz-review-top"><h2 id="quiz-review-title">{t('quiz.review')}</h2><div className="quiz-review-summary"><span>{competition.review.filter(item => item.correct).length} {t('quiz.correct')}</span><span>{competition.review.filter(item => !item.correct).length} {t('quiz.incorrect')}</span></div></div>
+        <ol role="list">{competition.review.map((item, index) => {
           const q = localizeQuizQuestion(item.question, lang);
           const answerText = (answer: number) => q.type === 'range' ? String(answer) : (q.options?.[answer] || '—');
           return <li key={q.id} className="quiz-review-item" data-correct={item.correct}>
-            <div className="quiz-review-heading"><h3>{q.prompt}</h3><span className="chip">{t(item.correct ? 'quiz.correct' : 'quiz.incorrect')}</span></div>
+            <div className="quiz-review-heading"><span className="quiz-review-number" aria-hidden="true">{index + 1}</span><h3>{q.prompt}</h3><span className="chip"><span aria-hidden="true">{item.correct ? '✓' : '×'}</span> {t(item.correct ? 'quiz.correct' : 'quiz.incorrect')}</span></div>
             <dl><div><dt>{t('quiz.yourAnswer')}</dt><dd>{answerText(item.answer)}</dd></div><div><dt>{t('quiz.correctAnswer')}</dt><dd>{answerText(item.correct_answer)}</dd></div></dl>
           </li>;
         })}</ol>
