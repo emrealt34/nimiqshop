@@ -49,12 +49,13 @@ export function QuizView() {
   const [saving, setSaving] = useState<'saved' | 'saving' | 'failed'>('saved');
   const [email, setEmail] = useState('');
   const progressQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const revision = useRef(0);
   const mounted = useRef(true);
   const operation = useRef(false);
   const scope = useRef(0);
 
-  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; if (saveTimer.current) clearTimeout(saveTimer.current); }; }, []);
   useEffect(() => {
     let alive = true;
     if (!authed) { setItems([]); setSelected(''); setCompetition(null); setQuestions(null); setLoaded(false); return; }
@@ -80,6 +81,7 @@ export function QuizView() {
   useEffect(() => {
     let alive = true;
     scope.current++; revision.current++; setQuestions(null); setAnswers([]); setQuestionIndex(0); setCompetition(null); setError(''); setSaving('saved');
+    if (saveTimer.current) clearTimeout(saveTimer.current);
     if (!authed || !selected) return;
     getQuiz(selected).then((c) => { if (alive) { setCompetition(c); setEmail(c.attempt?.prize_email || ''); } })
       .catch((err) => { if (alive) setError(friendlyApiMessage(err, t('quiz.requestFailed'))); });
@@ -120,14 +122,22 @@ export function QuizView() {
     const next = answers.map((old, i) => i === index ? answer : old);
     setAnswers(next); setSaving('saving');
     const version = ++revision.current;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
     if (questions && next.some((value, i) => value !== -1 && !validAnswer(questions[i], value))) { setSaving('failed'); return; }
     const id = selected;
     const attemptScope = scope.current;
     // Serialize writes: a slow response for an older choice must not overwrite
     // a newer choice on the server. Submission waits for this queue too.
-    progressQueue.current = progressQueue.current.catch(() => {}).then(() => { if (mounted.current && scope.current === attemptScope) return saveQuizProgress(id, next); })
-      .then(() => { if (mounted.current && version === revision.current) setSaving('saved'); })
-      .catch(() => { if (mounted.current && version === revision.current) setSaving('failed'); });
+    // Typing or dragging a slider can produce many intermediate values. Save
+    // only the latest after a short pause instead of building a request backlog.
+    saveTimer.current = setTimeout(() => {
+      saveTimer.current = null;
+      progressQueue.current = progressQueue.current.catch(() => {}).then(() => {
+        if (mounted.current && scope.current === attemptScope && version === revision.current) return saveQuizProgress(id, next);
+      })
+        .then(() => { if (mounted.current && scope.current === attemptScope && version === revision.current) setSaving('saved'); })
+        .catch(() => { if (mounted.current && scope.current === attemptScope && version === revision.current) setSaving('failed'); });
+    }, 300);
   };
   const finish = () => perform(async () => {
     if (!questions || questionIndex !== questions.length - 1 || saving !== 'saved' || answers.some((answer, index) => !validAnswer(questions[index], answer))) return;

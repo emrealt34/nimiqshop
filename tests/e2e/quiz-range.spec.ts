@@ -129,6 +129,31 @@ for (const width of [320, 1280]) {
    await page.getByRole('button',{name:'Submit answers',exact:true}).click();await expect(page.locator('.quiz-result')).toContainText('3 / 3');await expect(page.locator('.quiz-leaderboard time')).toHaveAttribute('datetime',attempt.submitted_at);expect(submissions).toBe(1);
    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   });
+  test('rapid numerical input saves the final value once and a stalled save can be retried', async ({page}) => {
+   const question={id:'calc',type:'range',prompt:'2% of 1000 NIM?',options:[],min:0,max:100};
+   const attempt={answers:[-1],score:0,total:1,started_at:new Date().toISOString(),submitted_at:null};
+   const competition={id:'save-queue',title:'Cashback calculation',description:'',prize:{title:'Cashback code'},cashback_reward:{code:'',cashback_bps:100,max_recipients:0,min_score_percent:0},starts_at:new Date(Date.now()-60000).toISOString(),ends_at:new Date(Date.now()+3600000).toISOString(),phase:'live',question_count:1,participants:1,attempt:null,leaderboard:[]};
+   const saves:number[][]=[];
+   await page.route('**/api/quiz**',async route=>{
+    const action=new URL(route.request().url()).pathname;
+    if(action.endsWith('/start'))return route.fulfill({json:{competition,attempt,questions:[question]}});
+    if(action.endsWith('/answers')){
+     const answers=route.request().postDataJSON().answers;saves.push(answers);
+     if(saves.length===1){await new Promise(resolve=>setTimeout(resolve,9000));return route.abort().catch(()=>{});}
+     attempt.answers=answers;return route.fulfill({json:attempt});
+    }
+    return route.fulfill({json:action.endsWith('/quiz')?{items:[competition]}:competition});
+   });
+   await open(page,path('/quiz'));await page.getByRole('button',{name:'Start quiz',exact:true}).click();
+   await page.locator('#quiz-range-calc').pressSequentially('20',{delay:25});
+   await expect.poll(()=>saves.length).toBe(1);expect(saves[0]).toEqual([20]);
+   await expect(page.getByRole('button',{name:'Retry saving',exact:true})).toBeVisible({timeout:12000});
+   await expect(page.getByRole('button',{name:'Submit answers',exact:true})).toBeDisabled();
+   await expect(page.locator('#quiz-range-calc')).toHaveValue('20');
+   await page.getByRole('button',{name:'Retry saving',exact:true}).click();
+   await expect(page.getByRole('button',{name:'Submit answers',exact:true})).toBeEnabled();
+   expect(saves).toEqual([[20],[20]]);expect(attempt.answers).toEqual([20]);
+  });
  });
 }
 

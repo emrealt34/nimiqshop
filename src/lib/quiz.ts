@@ -36,7 +36,7 @@ export type AdminQuizEntry = { user_id: string; address: string; submitted_at?: 
 export const listQuizzes = async (): Promise<QuizCompetition[]> => (await api('/quiz', { auth: true })).items || [];
 export const getQuiz = async (id: string): Promise<QuizCompetition> => await api(`/quiz/${encodeURIComponent(id)}`, { auth: true }) as QuizCompetition;
 export const startQuiz = async (id: string): Promise<{ competition: QuizCompetition; attempt: QuizAttempt; questions: QuizQuestion[] }> => await api(`/quiz/${encodeURIComponent(id)}/start`, { method: 'POST', auth: true }) as { competition: QuizCompetition; attempt: QuizAttempt; questions: QuizQuestion[] };
-export const saveQuizProgress = (id: string, answers: number[]) => api(`/quiz/${encodeURIComponent(id)}/answers`, { method: 'PUT', auth: true, body: { answers } });
+export const saveQuizProgress = (id: string, answers: number[]) => api(`/quiz/${encodeURIComponent(id)}/answers`, { method: 'PUT', auth: true, body: { answers }, timeoutMs: 8000 });
 export const submitQuiz = async (id: string, answers: number[]): Promise<QuizAttempt> => await api(`/quiz/${encodeURIComponent(id)}/submit`, { method: 'POST', auth: true, body: { answers } }) as QuizAttempt;
 export const claimQuizPrize = (id: string, email: string) => api(`/quiz/${encodeURIComponent(id)}/claim`, { method: 'POST', auth: true, body: { email } });
 
