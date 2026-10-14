@@ -161,7 +161,7 @@ const pt = {
     player: "Participante {{participant}}",
     refresh: "Atualizar",
     answered: "{{count}} / {{total}} perguntas respondidas",
-    saving: "A guardar as escolhas…",
+    saving: "A sincronizar as tuas respostas… Podes continuar.",
     saved: "Escolhas guardadas — podes retomar a tentativa",
     saveFailed: "Não foi possível guardar as últimas escolhas. O envio tentará novamente com as respostas atuais.",
     submitWarning: "O envio é definitivo. Confere as respostas antes de confirmar.",

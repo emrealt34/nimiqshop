@@ -161,7 +161,7 @@ const de = {
     player: "Teilnehmer {{participant}}",
     refresh: "Aktualisieren",
     answered: "{{count}} / {{total}} Fragen beantwortet",
-    saving: "Auswahl wird gespeichert…",
+    saving: "Deine Antworten werden synchronisiert… Du kannst fortfahren.",
     saved: "Auswahl gespeichert — dein Versuch kann fortgesetzt werden",
     saveFailed: "Die letzte Auswahl konnte nicht gespeichert werden. Beim Absenden werden deine aktuellen Antworten erneut übertragen.",
     submitWarning: "Die Abgabe ist endgültig. Prüfe deine Antworten vor der Bestätigung.",

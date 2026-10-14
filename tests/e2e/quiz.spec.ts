@@ -39,7 +39,7 @@ test.describe('quiz participant flow @smoke', () => {
       if (action.endsWith('/answers')) { attempt.answers = route.request().postDataJSON().answers; return route.fulfill({ json: attempt }); }
       if (action.endsWith('/submit')) {
         expect(route.request().postDataJSON()).toEqual({ answers: [1, 1] });
-        submitted++; attempt = { ...attempt, score: 2, submitted_at: new Date().toISOString() };
+        submitted++; attempt = { ...attempt, answers: route.request().postDataJSON().answers, score: 2, submitted_at: new Date().toISOString() };
         return route.fulfill({ json: attempt });
       }
       return route.fulfill({ json: competition() });
@@ -161,4 +161,60 @@ for (const width of [320,1280]) test(`quiz stays visible during slow detail load
  await expect(page.locator('.quiz-result')).toContainText('2 / 2',{timeout:12000});
  await expect(page.locator('.quiz-earned-code')).toContainText('ILOVENIM');
  await expect(page.locator('.quiz-question')).toHaveCount(0);
+});
+
+for (const width of [320,1280]) test(`failed autosave never blocks quiz navigation, local resume or final submission at ${width}px`, async ({page}) => {
+ await page.setViewportSize({width,height:900});
+ let attempt:any={answers:[-1,-1],score:0,total:2,started_at:new Date().toISOString(),submitted_at:null};let submits=0;let saves=0;
+ const c=()=>({...baseCompetition,attempt,cashback_reward:{code:attempt.submitted_at?'ILOVENIM':'',cashback_bps:100,max_recipients:0,min_score_percent:0},cashback_unlocked:!!attempt.submitted_at});
+ await page.route('**/api/quiz**',async route=>{
+  const action=new URL(route.request().url()).pathname;
+  if(action.endsWith('/quiz'))return route.fulfill({json:{items:[c()]}});
+  if(action.endsWith('/start'))return route.fulfill({json:{competition:c(),attempt,questions}});
+  if(action.endsWith('/answers')){
+   saves++;
+   if(saves===1)return route.fulfill({status:429,json:{error:'rate limit exceeded'}});
+   await new Promise(resolve=>setTimeout(resolve,9000));
+   return route.fulfill({status:409,json:{error:'quiz attempt already submitted'}}).catch(()=>{});
+  }
+  if(action.endsWith('/submit')){submits++;expect(route.request().postDataJSON().answers).toEqual([1,1]);attempt={...attempt,answers:[1,1],score:2,submitted_at:new Date().toISOString()};return route.fulfill({json:attempt});}
+  return route.fulfill({json:c()});
+ });
+ await open(page,path('/quiz'));await page.getByRole('button',{name:'Resume attempt',exact:true}).click();
+ await page.getByRole('radio',{name:'NIM',exact:true}).check();
+ await expect(page.getByRole('button',{name:'Retry saving',exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Next question',exact:true})).toBeEnabled();
+ await page.getByRole('button',{name:'Next question',exact:true}).click();
+ await expect(page.locator('#quiz-step-title')).toHaveText('Question 2 / 2');
+ await page.reload();await page.getByRole('button',{name:'Resume attempt',exact:true}).click();
+ await expect(page.locator('#quiz-step-title')).toHaveText('Question 2 / 2');
+ await page.getByRole('button',{name:'Previous question',exact:true}).click();
+ await expect(page.getByRole('radio',{name:'NIM',exact:true})).toBeChecked();
+ await page.getByRole('button',{name:'Next question',exact:true}).click();
+ await page.getByRole('radio',{name:'Nimiq Pay',exact:true}).check();
+ await expect.poll(()=>saves).toBe(2);
+ await page.getByRole('button',{name:'Submit answers',exact:true}).click();
+ await expect(page.locator('.quiz-result')).toContainText('2 / 2');
+ await expect(page.locator('.quiz-earned-code')).toContainText('ILOVENIM');expect(submits).toBe(1);
+ expect(await page.evaluate(()=>Object.keys(localStorage).filter(k=>k.startsWith('nimshop.quiz.draft:')).length)).toBe(0);
+});
+
+test('an invalid submission acknowledgement retains the local draft and permits retry',async({page})=>{
+ let attempt:any={answers:[-1,-1],score:0,total:2,started_at:new Date().toISOString(),submitted_at:null};let submits=0;
+ const c=()=>({...baseCompetition,attempt});
+ await page.route('**/api/quiz**',route=>{
+  const action=new URL(route.request().url()).pathname;
+  if(action.endsWith('/quiz'))return route.fulfill({json:{items:[c()]}});
+  if(action.endsWith('/start'))return route.fulfill({json:{competition:c(),attempt,questions}});
+  if(action.endsWith('/answers'))return route.fulfill({json:attempt});
+  if(action.endsWith('/submit')){submits++;if(submits===1)return route.fulfill({json:{}});attempt={...attempt,answers:[1,1],score:2,submitted_at:new Date().toISOString()};return route.fulfill({json:attempt});}
+  return route.fulfill({json:c()});
+ });
+ await open(page,path('/quiz'));await page.getByRole('button',{name:'Resume attempt',exact:true}).click();
+ await page.getByRole('radio',{name:'NIM',exact:true}).check();await page.getByRole('button',{name:'Next question',exact:true}).click();
+ await page.getByRole('radio',{name:'Nimiq Pay',exact:true}).check();await page.getByRole('button',{name:'Submit answers',exact:true}).click();
+ await expect(page.getByRole('alert')).toBeVisible();await expect(page.locator('.quiz-result')).toHaveCount(0);
+ expect(await page.evaluate(()=>Object.keys(localStorage).filter(k=>k.startsWith('nimshop.quiz.draft:')).length)).toBe(1);
+ await page.getByRole('button',{name:'Submit answers',exact:true}).click();await expect(page.locator('.quiz-result')).toContainText('2 / 2');
+ expect(submits).toBe(2);
 });

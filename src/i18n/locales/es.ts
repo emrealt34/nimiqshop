@@ -161,7 +161,7 @@ const es = {
     player: "Participante {{participant}}",
     refresh: "Actualizar",
     answered: "{{count}} / {{total}} preguntas respondidas",
-    saving: "Guardando tus elecciones…",
+    saving: "Sincronizando tus respuestas… Puedes continuar.",
     saved: "Elecciones guardadas — puedes continuar tu intento",
     saveFailed: "No se pudieron guardar las últimas elecciones. Al enviar se reintentará con tus respuestas actuales.",
     submitWarning: "El envío es definitivo. Revisa tus respuestas antes de confirmar.",

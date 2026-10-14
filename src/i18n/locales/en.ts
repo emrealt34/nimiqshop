@@ -169,7 +169,7 @@ const en = {
     player: "Participant {{participant}}",
     refresh: "Refresh",
     answered: "{{count}} / {{total}} questions answered",
-    saving: "Saving your choices…",
+    saving: "Syncing your choices… You can continue.",
     saved: "Choices saved — your attempt can be resumed",
     saveFailed: "Could not save the latest choices. Submission will retry with your current answers.",
     submitWarning: "Submission is final. Check your answers before confirming.",

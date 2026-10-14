@@ -6,6 +6,7 @@ import { openLoginSheet } from '../shell/SiteShell';
 import { Icon } from '../ui/Icon';
 import { UnifiedThumb } from '../ui/UnifiedThumb';
 import { useSession } from '../../lib/useSession';
+import { getUid } from '../../lib/session';
 import { applyCashbackCode } from '../../lib/cashbackCode';
 import { friendlyApiMessage } from '../../lib/api';
 import { explorerUrl, shortTx } from '../../lib/chain';
@@ -53,12 +54,21 @@ export function QuizView() {
   const [email, setEmail] = useState('');
   const progressQueue = useRef<Promise<unknown>>(Promise.resolve());
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const draftKey = useRef('');
+  const draftQuestions = useRef<string[]>([]);
   const revision = useRef(0);
   const mounted = useRef(true);
   const operation = useRef(false);
   const scope = useRef(0);
 
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; if (saveTimer.current) clearTimeout(saveTimer.current); }; }, []);
+  useEffect(() => {
+    if (saving !== 'saving') return;
+    // WebViews can pause AbortSignal's active-time clock. The UI must still
+    // leave its syncing state; navigation and final submission stay usable.
+    const timer = setTimeout(() => setSaving('failed'), 10000);
+    return () => clearTimeout(timer);
+  }, [saving, answers]);
   useEffect(() => {
     let alive = true;
     if (!authed) { setItems([]); setSelected(''); setCompetition(null); setQuestions(null); setLoaded(false); return; }
@@ -85,6 +95,7 @@ export function QuizView() {
     let alive = true;
     scope.current++; revision.current++; setQuestions(null); setAnswers([]); setQuestionIndex(0); setCompetition(null); setError(''); setSaving('saved');
     if (saveTimer.current) clearTimeout(saveTimer.current);
+    draftKey.current = ''; draftQuestions.current = [];
     if (!authed || !selected) return;
     getQuiz(selected).then((c) => { if (alive) { setCompetition(c); setEmail(c.attempt?.prize_email || ''); } })
       .catch((err) => { if (alive) setError(friendlyApiMessage(err, t('quiz.requestFailed'))); });
@@ -111,8 +122,16 @@ export function QuizView() {
     if (!mounted.current || version !== scope.current) return;
     setCompetition(game.competition);
     if (game.attempt.submitted_at) { await refresh(); return; }
-    setQuestions(game.questions); setAnswers(game.attempt.answers);
-    const unanswered = game.questions.findIndex((q, index) => !validAnswer(q, game.attempt.answers[index]));
+    draftKey.current = `nimshop.quiz.draft:${getUid()}:${selected}:${game.attempt.started_at}`;
+    draftQuestions.current = game.questions.map(q => q.id);
+    let resumed = game.attempt.answers;
+    try {
+      const draft = JSON.parse(localStorage.getItem(draftKey.current) || 'null');
+      if (draft && JSON.stringify(draft.questions) === JSON.stringify(draftQuestions.current) && Array.isArray(draft.answers) && draft.answers.length === game.questions.length && draft.answers.every((a: unknown) => Number.isInteger(a))) resumed = draft.answers;
+    } catch { /* Storage unavailable: server progress still works. */ }
+    setQuestions(game.questions); setAnswers(resumed);
+    setSaving(JSON.stringify(resumed) === JSON.stringify(game.attempt.answers) ? 'saved' : 'failed');
+    const unanswered = game.questions.findIndex((q, index) => !validAnswer(q, resumed[index]));
     setQuestionIndex(unanswered < 0 ? Math.max(0, game.questions.length - 1) : unanswered);
   });
   useEffect(() => {
@@ -130,6 +149,7 @@ export function QuizView() {
 
   const choose = (index: number, answer: number) => {
     const next = answers.map((old, i) => i === index ? answer : old);
+    try { localStorage.setItem(draftKey.current, JSON.stringify({questions: draftQuestions.current, answers: next.map(a => Number.isInteger(a) ? a : -1)})); } catch { /* Private mode: keep the in-memory answers. */ }
     setAnswers(next); setSaving('saving');
     const version = ++revision.current;
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -137,7 +157,7 @@ export function QuizView() {
     const id = selected;
     const attemptScope = scope.current;
     // Serialize writes: a slow response for an older choice must not overwrite
-    // a newer choice on the server. Submission waits for this queue too.
+    // a newer choice on the server before final submission.
     // Typing or dragging a slider can produce many intermediate values. Save
     // only the latest after a short pause instead of building a request backlog.
     saveTimer.current = setTimeout(() => {
@@ -150,11 +170,17 @@ export function QuizView() {
     }, 300);
   };
   const finish = () => perform(async () => {
-    if (!questions || questionIndex !== questions.length - 1 || saving !== 'saved' || answers.some((answer, index) => !validAnswer(questions[index], answer))) return;
+    if (!questions || questionIndex !== questions.length - 1 || answers.some((answer, index) => !validAnswer(questions[index], answer))) return;
     const version = scope.current;
-    await progressQueue.current.catch(() => {});
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    revision.current++;
+    // Submit the full current answer set independently of background saves.
+    // The backend atomically finalizes it and rejects all subsequent progress
+    // writes, so a delayed autosave cannot overwrite a completed attempt.
     if (!mounted.current || version !== scope.current) return;
-    await submitQuiz(selected, answers);
+    const confirmed = await submitQuiz(selected, answers);
+    if (!confirmed.submitted_at || JSON.stringify(confirmed.answers) !== JSON.stringify(answers)) throw new Error(t('quiz.requestFailed'));
+    try { localStorage.removeItem(draftKey.current); } catch { /* Storage unavailable. */ }
     if (mounted.current && version === scope.current) { setQuestions(null); await refresh(); toast(t('quiz.submitted'), 'success'); }
   });
 
@@ -212,7 +238,7 @@ export function QuizView() {
           </form>}
         </div>}
       </section>}
-      {questions && !completed && <form className="quiz-game" onSubmit={(e) => { e.preventDefault(); if (questionIndex === questions.length - 1) void finish(); else if (!busy && saving === 'saved' && validAnswer(questions[questionIndex], answers[questionIndex])) setQuestionIndex(index => index + 1); }}>
+      {questions && !completed && <form className="quiz-game" onSubmit={(e) => { e.preventDefault(); if (questionIndex === questions.length - 1) void finish(); else if (!busy && validAnswer(questions[questionIndex], answers[questionIndex])) setQuestionIndex(index => index + 1); }}>
         <div className="card quiz-step-header"><div className="quiz-step-top"><h2 id="quiz-step-title" ref={stepHeading} tabIndex={-1}>{t('quiz.step', { current: questionIndex + 1, total: questions.length })}</h2>{!competition.cashback_reward && competition.prize.value && <span className="quiz-step-prize"><Icon name="gift" size={15} />{competition.prize.value}</span>}</div><p className="small muted">{competition.title}</p><progress className="quiz-progress" value={answers.filter((a, i) => validAnswer(questions[i], a)).length} max={questions.length} aria-label={t('quiz.answered', { count: answers.filter((a, i) => validAnswer(questions[i], a)).length, total: questions.length })} /></div>
         {questions.slice(questionIndex, questionIndex + 1).map((q) => { const index = questionIndex; return <fieldset key={q.id} className="card quiz-question" disabled={busy || competition.phase !== 'live'}>
           <legend className="quiz-question-legend">{index + 1}. {q.prompt}</legend><h3 className="quiz-question-title" aria-hidden="true">{q.prompt}</h3>
@@ -221,8 +247,8 @@ export function QuizView() {
         <div className="card quiz-submit"><p className="small">{t('quiz.answered', { count: answers.filter((a, i) => validAnswer(questions[i], a)).length, total: questions.length })}</p><p className="xs muted" role="status">{saving === 'saving' ? t('quiz.saving') : saving === 'failed' ? t('quiz.saveFailed') : t('quiz.saved')}</p>{questionIndex === questions.length - 1 && <p className="small">{t('quiz.submitWarning')}</p>}
           {saving === 'failed' && validAnswer(questions[questionIndex], answers[questionIndex]) && <button className="btn btn-outline" type="button" disabled={busy} onClick={() => choose(questionIndex, answers[questionIndex])}>{t('quiz.retrySave')}</button>}
           <div className="row quiz-step-actions">
-            {questionIndex > 0 && <button className="btn btn-outline" type="button" disabled={busy || saving !== 'saved'} onClick={() => setQuestionIndex(index => index - 1)}>{t('quiz.previous')}</button>}
-            {questionIndex < questions.length - 1 ? <button className="btn btn-gold" type="button" disabled={busy || competition.phase !== 'live' || saving !== 'saved' || !validAnswer(questions[questionIndex], answers[questionIndex])} onClick={() => setQuestionIndex(index => index + 1)}>{t('quiz.next')}</button> : <button className="btn btn-gold" type="submit" disabled={busy || competition.phase !== 'live' || saving !== 'saved' || answers.some((a, i) => !validAnswer(questions[i], a))}>{busy ? t('common.loading') : t('quiz.submit')}</button>}
+            {questionIndex > 0 && <button className="btn btn-outline" type="button" disabled={busy} onClick={() => setQuestionIndex(index => index - 1)}>{t('quiz.previous')}</button>}
+            {questionIndex < questions.length - 1 ? <button className="btn btn-gold" type="button" disabled={busy || competition.phase !== 'live' || !validAnswer(questions[questionIndex], answers[questionIndex])} onClick={() => setQuestionIndex(index => index + 1)}>{t('quiz.next')}</button> : <button className="btn btn-gold" type="submit" disabled={busy || competition.phase !== 'live' || answers.some((a, i) => !validAnswer(questions[i], a))}>{busy ? t('common.loading') : t('quiz.submit')}</button>}
           </div>
         </div>
       </form>}

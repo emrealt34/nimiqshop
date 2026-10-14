@@ -161,7 +161,7 @@ const tr = {
     player: "Katılımcı {{participant}}",
     refresh: "Yenile",
     answered: "{{count}} / {{total}} soru cevaplandı",
-    saving: "Seçimlerin kaydediliyor…",
+    saving: "Seçimlerin eşitleniyor… Sonraki soruya geçebilirsin.",
     saved: "Seçimler kaydedildi — denemene devam edebilirsin",
     saveFailed: "Son seçimler kaydedilemedi. Gönderirken mevcut cevapların tekrar iletilecek.",
     submitWarning: "Gönderim kesindir. Onaylamadan önce cevaplarını kontrol et.",

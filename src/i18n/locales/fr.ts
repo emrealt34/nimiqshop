@@ -161,7 +161,7 @@ const fr = {
     player: "Participant {{participant}}",
     refresh: "Actualiser",
     answered: "{{count}} / {{total}} questions répondues",
-    saving: "Enregistrement de vos choix…",
+    saving: "Synchronisation de tes réponses… Tu peux continuer.",
     saved: "Choix enregistrés — vous pouvez reprendre votre tentative",
     saveFailed: "Les derniers choix n’ont pas pu être enregistrés. L’envoi réessaiera avec vos réponses actuelles.",
     submitWarning: "L’envoi est définitif. Vérifiez vos réponses avant de confirmer.",

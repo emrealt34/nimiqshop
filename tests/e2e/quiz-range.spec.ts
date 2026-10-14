@@ -100,7 +100,7 @@ for (const width of [320, 1280]) {
     if(!action||action==='/')return route.fulfill({json:{items:[c()]}});
     if(action.endsWith('/start')){attempt ||= {answers:[-1,-1,-1],score:0,total:3,started_at:new Date().toISOString(),submitted_at:null};return route.fulfill({json:{competition:c(),attempt,questions}});}
     if(action.endsWith('/answers')){if(rejectNextSave){rejectNextSave=false;return route.fulfill({status:500,json:{error:'Temporary save failure'}});}attempt.answers=route.request().postDataJSON().answers;return route.fulfill({json:attempt});}
-    if(action.endsWith('/submit')){submissions++;expect(route.request().postDataJSON().answers).toEqual([0,20,1]);attempt={...attempt,score:3,submitted_at:new Date().toISOString()};return route.fulfill({json:attempt});}
+    if(action.endsWith('/submit')){submissions++;expect(route.request().postDataJSON().answers).toEqual([0,20,1]);attempt={...attempt,answers:route.request().postDataJSON().answers,score:3,submitted_at:new Date().toISOString()};return route.fulfill({json:attempt});}
     return route.fulfill({json:c()});
    });
    await open(page,path('/quiz'));await page.getByRole('button',{name:'Start quiz',exact:true}).click();
@@ -110,7 +110,7 @@ for (const width of [320, 1280]) {
    await expect(page.getByRole('button',{name:'Next question',exact:true})).toBeDisabled();
    await page.getByRole('radio',{name:'100 NIM',exact:true}).check();
    await expect(page.getByRole('button',{name:'Retry saving',exact:true})).toBeVisible();
-   await expect(page.getByRole('button',{name:'Next question',exact:true})).toBeDisabled();
+   await expect(page.getByRole('button',{name:'Next question',exact:true})).toBeEnabled();
    await page.getByRole('button',{name:'Retry saving',exact:true}).click();
    await expect(page.getByRole('button',{name:'Next question',exact:true})).toBeEnabled();
    await page.getByRole('button',{name:'Next question',exact:true}).click();
@@ -148,10 +148,11 @@ for (const width of [320, 1280]) {
    await page.locator('#quiz-range-calc').pressSequentially('20',{delay:25});
    await expect.poll(()=>saves.length).toBe(1);expect(saves[0]).toEqual([20]);
    await expect(page.getByRole('button',{name:'Retry saving',exact:true})).toBeVisible({timeout:12000});
-   await expect(page.getByRole('button',{name:'Submit answers',exact:true})).toBeDisabled();
+   await expect(page.getByRole('button',{name:'Submit answers',exact:true})).toBeEnabled();
    await expect(page.locator('#quiz-range-calc')).toHaveValue('20');
    await page.getByRole('button',{name:'Retry saving',exact:true}).click();
    await expect(page.getByRole('button',{name:'Submit answers',exact:true})).toBeEnabled();
+   await expect.poll(()=>saves.length).toBe(2);
    expect(saves).toEqual([[20],[20]]);expect(attempt.answers).toEqual([20]);
   });
  });
