@@ -78,6 +78,7 @@ func (h *Handlers) quizView(c db.QuizCompetition, user string) (map[string]any, 
 			payouts = append(payouts, map[string]any{"participant": quizParticipant(row.UserID), "status": row.Status, "amount_nim": float64(row.AmountLuna) / 100_000, "memo": row.Memo, "tx_hash": row.TxHash, "paid_at": row.PaidAt})
 		}
 	}
+	prize := c.Prize
 	reward := c.CashbackReward
 	unlocked := false
 	if reward != nil {
@@ -88,9 +89,15 @@ func (h *Handlers) quizView(c db.QuizCompetition, user string) (map[string]any, 
 			unlocked = true
 		}
 	}
+	if reward != nil && !unlocked {
+		hidden := *reward
+		hidden.Code = ""
+		reward = &hidden
+		prize.Value = ""
+	}
 	return map[string]any{
 		"payouts": payouts,
-		"id":      c.ID, "payout": c.Payout, "cashback_reward": reward, "cashback_unlocked": unlocked, "tie_break": c.TieBreak, "translations": c.Translations, "title": c.Title, "description": c.Description, "prize": c.Prize,
+		"id":      c.ID, "payout": c.Payout, "cashback_reward": reward, "cashback_unlocked": unlocked, "tie_break": c.TieBreak, "translations": c.Translations, "title": c.Title, "description": c.Description, "prize": prize,
 		"starts_at": c.StartsAt, "ends_at": c.EndsAt, "phase": quizPhase(c, time.Now().UTC()),
 		"question_count": len(c.Questions), "participants": c.Participants, "attempt": mine,
 		"winner": quizParticipant(c.WinnerUserID), "winners": winners, "winner_count": db.QuizWinnerLimit(c), "has_ranges": hasRanges, "is_winner": db.QuizIsWinner(c, user),

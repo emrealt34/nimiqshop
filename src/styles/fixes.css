@@ -4055,3 +4055,25 @@ body { padding-bottom: 0; }
 .pt-card.pt-impact .pt-impact-count-row { gap: 10px; margin-block: 10px; }
 .pt-card.pt-impact .pt-impact-count-label { font-size: .875rem; }
 .pt-card.pt-impact .pt-impact-count-label > svg { width: 18px; height: 18px; }
+
+/* A readable quiz introduction and a reward revealed only after completion. */
+.quiz-page { max-width: 900px; margin-inline: auto; }
+.quiz-heading { margin-bottom: 24px; }
+.quiz-heading h1 { font-size: clamp(1.5rem, 3vw, 2.25rem); line-height: 1.2; }
+.quiz-contest { padding: clamp(18px, 4vw, 32px); }
+.quiz-contest > .row { align-items: flex-start; flex-wrap: wrap; gap: 12px; }
+.quiz-contest > .row h2 { margin: 0; max-width: 100%; font-size: clamp(1.35rem, 2.5vw, 1.8rem); line-height: 1.25; }
+.quiz-cashback-reward { padding: 20px; margin: 24px 0; border: 1px solid var(--line); border-radius: var(--r-l); background: var(--surface-2); }
+.quiz-reward-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.quiz-reward-heading > div { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.quiz-reward-heading h3 { margin: 0; font-size: 1.1rem; }
+.quiz-reward-icon { display: inline-flex; color: var(--gold-600); }
+.quiz-reward-rate { font-size: 1.8rem; line-height: 1; flex: none; }
+.quiz-cashback-reward > p { margin: 14px 0 0; line-height: 1.6; }
+.quiz-reward-terms { margin-top: 12px; font-size: .8rem; color: var(--ink-dim); }
+.quiz-reward-terms p { margin: 6px 0 0; }
+.quiz-earned-code { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 16px; }
+.quiz-earned-code code { padding: 10px 14px; border: 1px dashed var(--line); border-radius: var(--r-m); font-size: 1rem; font-weight: 800; overflow-wrap: anywhere; min-width: 0; }
+.quiz-contest .quiz-facts { padding-block: 16px; border-block: 1px dashed var(--line); gap: 18px; }
+.quiz-contest .quiz-facts dt { margin-bottom: 5px; }
+@media (max-width: 480px) { .quiz-cashback-reward { padding: 16px; } .quiz-earned-code { align-items: stretch; flex-direction: column; } }

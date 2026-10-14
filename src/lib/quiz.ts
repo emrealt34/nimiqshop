@@ -110,7 +110,7 @@ export function parseQuizImport(text: string): AdminQuiz {
   };
   const start = date(raw.starts_at, now, 'starts_at');
   const end = date(raw.ends_at, new Date(Date.parse(start) + 7 * 86400000), 'ends_at');
-  if (Date.parse(end) <= Date.parse(start) || Date.parse(end) - Date.parse(start) > 366 * 86400000) throw new Error('ends_at must follow starts_at, within 366 days.');
+  if (Date.parse(end) <= Date.parse(start) || Date.parse(end) - Date.parse(start) > 2 * 366 * 86400000) throw new Error('ends_at must follow starts_at, within two years.');
   const cashbackReward = (raw.cashback_reward ?? {code:'ILOVENIM',cashback_bps:100,max_recipients:0,min_score_percent:0}) as QuizCashbackReward;
   if (cashbackReward && (typeof cashbackReward !== 'object' || (cashbackReward.code_mode !== undefined && !['shared','unique'].includes(cashbackReward.code_mode)) || !/^[A-Z0-9_-]{3,40}$/.test(cashbackReward.code) || !Number.isInteger(cashbackReward.cashback_bps) || cashbackReward.cashback_bps < 1 || cashbackReward.cashback_bps > 10000 || !Number.isSafeInteger(cashbackReward.max_recipients) || cashbackReward.max_recipients < 0 || !Number.isInteger(cashbackReward.min_score_percent) || cashbackReward.min_score_percent < 0 || cashbackReward.min_score_percent > 100)) throw new Error('Invalid cashback_reward: use a code, rate in basis points, max_recipients (0 = unlimited), and min_score_percent.');
   if (cashbackReward) payout.enabled = false;

@@ -167,8 +167,12 @@ func validateQuiz(c QuizCompetition) error {
 	if !validQuizText(c.Title, 1, 120) || !validQuizText(c.Description, 0, 2000) || !validQuizText(c.Prize.Title, 1, 140) || !validQuizText(c.Prize.Value, 0, 40) || !validQuizText(c.Prize.Description, 0, 1000) {
 		return fmt.Errorf("quiz title/prize or description is missing or too long")
 	}
-	if c.StartsAt.IsZero() || c.EndsAt.IsZero() || !c.EndsAt.After(c.StartsAt) || c.EndsAt.Sub(c.StartsAt) > 366*24*time.Hour {
-		return fmt.Errorf("set a start and end time, no more than 366 days apart")
+	maxDuration := 366 * 24 * time.Hour
+	if c.CashbackReward != nil {
+		maxDuration = 2 * 366 * 24 * time.Hour
+	}
+	if c.StartsAt.IsZero() || c.EndsAt.IsZero() || !c.EndsAt.After(c.StartsAt) || c.EndsAt.Sub(c.StartsAt) > maxDuration {
+		return fmt.Errorf("set a valid start and end time within the supported quiz duration")
 	}
 	if c.Prize.ImageURL != "" {
 		u, err := url.Parse(c.Prize.ImageURL)

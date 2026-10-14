@@ -630,7 +630,7 @@
   },
   "tie_break": "submitted_at",
   "starts_at": "2026-10-12T15:25:00+03:00",
-  "ends_at": "2026-11-11T12:00:00+03:00",
+  "ends_at": "2027-10-14T12:00:00+03:00",
   "payout": {
     "enabled": false
   },

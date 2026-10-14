@@ -124,7 +124,7 @@ func TestUniqueQuizViewReturnsOnlyTheCompletingAccountsCode(t *testing.T) {
 		t.Fatal("personal code missing")
 	}
 	theirs := s.do("GET", "/api/quiz/"+c.ID, nil, other)
-	if strings.Contains(string(theirs.body), code) || theirs.json(t)["cashback_unlocked"] != false {
+	if strings.Contains(string(theirs.body), code) || strings.Contains(string(theirs.body), "PERSONAL") || theirs.json(t)["cashback_unlocked"] != false {
 		t.Fatal("personal code exposed to another account")
 	}
 	if r := s.do("GET", "/api/cashback/code?code="+code, nil, auth); r.status != 200 {

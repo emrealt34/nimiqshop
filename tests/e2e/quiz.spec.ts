@@ -120,7 +120,17 @@ test('completed cashback quiz unlocks a code without a prize pool or ranking',as
  const c={...baseCompetition,cashback_reward:{code:'ILOVENIM',code_mode:'unique',cashback_bps:500,max_recipients:0,min_score_percent:0},cashback_unlocked:true,attempt:{answers:[1,1],score:2,total:2,started_at:new Date().toISOString(),submitted_at:new Date().toISOString()}};
  await page.route('**/api/quiz**',r=>r.fulfill({json:r.request().url().endsWith('/quiz')?{items:[c]}:c}));
  await open(page,path('/quiz'));
- await expect(page.locator('.quiz-prize')).toContainText('ILOVENIM · 5%');
+ await expect(page.locator('.quiz-cashback-reward')).toContainText('ILOVENIM');
  await expect(page.locator('.quiz-leaderboard')).toHaveCount(0);
- await expect(page.locator('.quiz-prize button')).toBeVisible();
+ await expect(page.locator('.quiz-earned-code button')).toBeVisible();
+});
+
+for(const width of [320,1280])test(`cashback code stays hidden until quiz completion at ${width}px`,async({page})=>{
+ await page.setViewportSize({width,height:900});
+ const c={...baseCompetition,cashback_reward:{code:'ILOVENIM',code_mode:'shared',cashback_bps:100,max_recipients:0,min_score_percent:0},cashback_unlocked:false};
+ await page.route('**/api/quiz**',r=>r.fulfill({json:r.request().url().endsWith('/quiz')?{items:[c]}:c}));
+ await open(page,path('/quiz'));await expect(page.locator('.quiz-cashback-reward')).toBeVisible();
+ await expect(page.locator('.quiz-contest')).not.toContainText('ILOVENIM');
+ await expect(page.locator('.quiz-earned-code')).toHaveCount(0);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
