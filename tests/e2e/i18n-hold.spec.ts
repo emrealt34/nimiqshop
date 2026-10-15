@@ -121,6 +121,8 @@ test.describe('returning visitor', () => {
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => document.documentElement.getAttribute('data-i18n-ready') === 'tr', null, { timeout: 20_000 });
 
+    // Readiness precedes the two animation frames that release the paint hold.
+    await page.waitForFunction(() => !document.documentElement.hasAttribute('data-i18n-hold'));
     const boot = await page.evaluate(() => ({ heldEver: (window as any).__heldEver, frames: (window as any).__boot }));
     expect(boot.heldEver, 'cached visits still protect the English server markup').toBe(true);
     expect(await page.getAttribute('html', 'data-i18n-hold'), 'hold releases after translation').toBeNull();

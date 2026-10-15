@@ -7,7 +7,7 @@ import { test, expect, open, overflowingChildren, clippedText, hasHorizontalScro
 import { LANGS, path } from './support/data';
 
 const CARD = 'section.pt-impact';
-const ROWS = ['.pt-impact-metrics-label', '.pt-impact-metrics', '.pt-impact-status', '.pt-impact-share-head', '.pt-actions'];
+const ROWS = ['.pt-impact-bar', '.pt-impact-summary', '.pt-impact-share-head', '.pt-actions'];
 
 for (const preference of ['cashback', 'burn'] as const) {
   for (const width of [320, 390, 768, 1280]) {
@@ -24,9 +24,11 @@ for (const preference of ['cashback', 'burn'] as const) {
           expect(await hasHorizontalScroll(page)).toBe(false);
           const edges = await page.evaluate(({ card, sels }) => sels.map((s) => {
             const el = document.querySelector(card)!.querySelector(s); if (!el) return null;
-            const r = el.getBoundingClientRect(); return { s, left: Math.round(r.left), right: Math.round(r.right) };
+            // Compare content edges: the header/summary use padding; share/actions use margins.
+            const r = el.getBoundingClientRect(), css = getComputedStyle(el);
+            return { s, left: Math.round(r.left + parseFloat(css.paddingLeft)), right: Math.round(r.right - parseFloat(css.paddingRight)) };
           }).filter(Boolean) as { s: string; left: number; right: number }[], { card: CARD, sels: ROWS });
-          expect(edges.length).toBeGreaterThanOrEqual(4);
+          expect(edges.map((edge) => edge.s)).toEqual(ROWS);
           for (const e of edges) expect(Math.abs(e.left - edges[0].left), `${e.s} left edge`).toBeLessThanOrEqual(1);
           const right = edges.find((e) => e.s === '.pt-actions')!.right;
           for (const e of edges.filter((x) => x.s !== '.pt-impact-share-head')) expect(Math.abs(e.right - right), `${e.s} right edge`).toBeLessThanOrEqual(1);

@@ -4114,9 +4114,10 @@ body { padding-bottom: 0; }
 .activity-page .act-hero { display: block; position: relative; text-align: center; padding-inline: 100px; margin-block: 20px 24px; }
 .activity-page .act-title { justify-content: center; }
 .activity-page .activity-actions { position: absolute; inset-inline-end: 0; top: 0; }
-.orders-page .section-head { display: block; position: relative; padding-inline: 175px; text-align: center; }
-.orders-page .section-head h2 { justify-content: center; text-wrap: balance; font-size: clamp(1.65rem, 3vw, 2.3rem); }
-.orders-page .section-head > .row { position: absolute; inset-inline-end: 0; top: 0; max-width: 165px; justify-content: flex-end; flex-wrap: wrap; }
+/* Equal side tracks center the title; in-flow actions reserve their full height. */
+.orders-page .section-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr); align-items: center; gap: 12px; text-align: center; }
+.orders-page .section-head h2 { grid-column: 2; justify-content: center; text-wrap: balance; font-size: clamp(1.65rem, 3vw, 2.3rem); }
+.orders-page .section-head > .row { grid-column: 3; justify-self: end; max-width: 165px; justify-content: flex-end; flex-wrap: wrap; }
 .admin-page-header { position: relative; display: block; padding-inline: 150px; text-align: center; }
 .admin-page-header > a { position: absolute; inset-inline-end: 0; top: 0; }
 .order-summary-heading { flex-direction: column; align-items: center; text-align: center; }
@@ -4125,5 +4126,6 @@ body { padding-bottom: 0; }
   .activity-page .act-hero, .orders-page .section-head, .admin-page-header { padding-inline: 0; }
   .activity-page .activity-actions, .orders-page .section-head > .row, .admin-page-header > a { position: static; margin-top: 12px; }
   .activity-page .activity-actions { display: flex; justify-content: center; }
+  .orders-page .section-head { display: block; }
   .orders-page .section-head > .row { max-width: none; justify-content: center; margin-inline: 0; }
 }
