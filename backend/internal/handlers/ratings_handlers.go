@@ -18,6 +18,7 @@ Flow:
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"strings"
 	"time"
@@ -282,17 +283,23 @@ func (h *Handlers) submitRating(ctx *fasthttp.RequestCtx, kind string) {
 
 // findRatingTx looks through the buyer's most recent transactions for the one
 // that pays the shop with this exact memo. Transactions already used for a
-// rating are skipped. The scan is bounded (20 history entries, 5 candidate
+// rating are skipped. The scan is bounded (100 history entries, 5 candidate
 // lookups per request) because every request costs RPC calls.
 func (h *Handlers) findRatingTx(ctx context.Context, buyer, memo string) (nimiq.TxDetail, bool, error) {
-	txs, err := h.RatingRPC.GetTransactionsByAddress(ctx, buyer, 20, "")
+	txs, err := h.RatingRPC.GetTransactionsByAddress(ctx, buyer, 100, "")
 	if err != nil {
 		return nimiq.TxDetail{}, false, err
 	}
 	shop := nimiq.NormalizeAddress(h.RatingRecipient)
+	expectedData := hex.EncodeToString([]byte(memo))
 	checked := 0
 	for _, t := range txs {
 		if nimiq.NormalizeAddress(t.To) != shop || t.Value != ratings.PriceLuna {
+			continue
+		}
+		// History includes memo bytes on current RPCs. Skip unrelated 1-Luna
+		// payments before spending the limited detail-lookup budget.
+		if t.RecipientData != nil && !strings.EqualFold(*t.RecipientData, expectedData) {
 			continue
 		}
 		if h.Store.RatingTxUsed(t.Hash) {

@@ -71,6 +71,7 @@ export function RatingFlow({
   const [stars, setStars] = useState(ratingStars(current.stars) ?? 0);
   const [comment, setComment] = useState(current.comment || '');
   const [phase, setPhase] = useState<'idle' | 'signing' | 'waiting' | 'saved'>('idle');
+  const [pendingSubmission, setPendingSubmission] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const mounted = useRef(true);
 
@@ -87,6 +88,7 @@ export function RatingFlow({
   useEffect(() => {
     const pending = readPendingRating(kind, id);
     if (!pending) return;
+    setPendingSubmission(!!pending.submitted);
     setStars(pending.stars);
     setComment(pending.comment);
     setPhase('waiting');
@@ -94,12 +96,18 @@ export function RatingFlow({
       .then((res) => {
         clearPendingRating();
         if (!mounted.current) return;
+        setPendingSubmission(false);
         setPhase('saved');
         onSaved?.(res);
       })
       .catch((err) => {
         if (!mounted.current) return;
-        if (!readPendingRating(kind, id)?.submitted) clearPendingRating();
+        if (err instanceof RatingError && err.code === 'pending') {
+          // A redirect may finish before the wallet can return its hash.
+          // Retain that uncertain submission and only retry chain verification.
+          markPendingRatingSubmitted(kind, id);
+          setPendingSubmission(true);
+        } else if (!readPendingRating(kind, id)?.submitted) clearPendingRating();
         setPhase('idle');
         setError(messageFor(err, t));
       });
@@ -120,7 +128,7 @@ export function RatingFlow({
       setPhase('waiting');
       try {
         const result = await awaitRatingSaved(kind, id, { stars: pending.stars, comment: pending.comment, tx_hash: pending.hash });
-        clearPendingRating(); setPhase('saved'); onSaved?.(result);
+        clearPendingRating(); setPendingSubmission(false); setPhase('saved'); onSaved?.(result);
       } catch (err) { setPhase('idle'); setError(messageFor(err, t)); }
       return;
     }
@@ -144,16 +152,20 @@ export function RatingFlow({
     try {
       const paid = await payRatingIntent(intent);
       markPendingRatingSubmitted(kind, id, paid.hash);
+      setPendingSubmission(true);
       if (!mounted.current) return;
       setPhase('waiting');
       const res = await awaitRatingSaved(kind, id, { stars, comment: c, tx_hash: paid.hash });
       clearPendingRating();
       if (!mounted.current) return;
+      setPendingSubmission(false);
       setPhase('saved');
       onSaved?.(res);
     } catch (err) {
       if (err instanceof RatingError && err.code === 'pending') {
-        // Keep the pending entry: the rating saves itself once the chain confirms.
+        // An uncertain wallet outcome must only retry verification, never payment.
+        markPendingRatingSubmitted(kind, id, err.hash);
+        setPendingSubmission(true);
         if (mounted.current) {
           setPhase('idle');
           setError(t('rating.pendingTimeout'));
@@ -181,7 +193,7 @@ export function RatingFlow({
     <div className="rating-flow">
       <div className="small muted mb-1">{t('rating.intro')}</div>
       <div className="row" style={{ gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-        <StarPicker size={26} value={stars} disabled={busy} onSelect={(n) => { setStars(n); setError(null); }} />
+        <StarPicker size={26} value={stars} disabled={busy || pendingSubmission} onSelect={(n) => { setStars(n); setError(null); }} />
       </div>
 
       <label className="small strong mt-2" htmlFor={`rating-comment-${id}`} style={{ display: 'block' }}>
@@ -194,7 +206,7 @@ export function RatingFlow({
         autoComplete="off"
         spellCheck={false}
         value={comment}
-        disabled={busy || (cfg !== null && !cfg.comments_enabled)}
+        disabled={busy || pendingSubmission || (cfg !== null && !cfg.comments_enabled)}
         placeholder={t('rating.commentPlaceholder')}
         aria-invalid={problem ? true : undefined}
         aria-describedby={`rating-comment-help-${id}`}
@@ -220,12 +232,13 @@ export function RatingFlow({
       <button
         className="btn btn-gold btn-block mt-2"
         type="button"
-        disabled={busy || ratingStars(stars) === null || !!hint || unchanged || limitReached || !cfg?.enabled}
+        disabled={busy || (!pendingSubmission && (ratingStars(stars) === null || !!hint || unchanged || limitReached)) || !cfg?.enabled}
         onClick={submit}
       >
         <span className="btn-label">
           {phase === 'signing' ? t('rating.signing')
-            : current.rated ? t('rating.submitChange') : t('rating.submit')}
+            : pendingSubmission ? t('rating.checkStatus')
+              : current.rated ? t('rating.submitChange') : t('rating.submit')}
         </span>
       </button>
       {current.rated && current.edits > 0 ? (
@@ -240,6 +253,7 @@ export function RatingFlow({
 function messageFor(err: unknown, t: Translator): string {
   if (err instanceof RatingError) {
     if (err.code === 'cancelled') return t('rating.cancelled');
+    if (err.code === 'pending') return t('rating.pendingTimeout');
     if (err.code === 'unavailable') return t('rating.updateNimiqPay');
     return t('rating.failed');
   }

@@ -45,6 +45,7 @@ func TestVerifyTxWaitsForInclusion(t *testing.T) {
 	const shop = "NQ07000000000000000000000000000000000000"
 	d := goodTx()
 	d.Mined = false
+	d.Success = false // pending RPC transactions do not have an execution result
 	if err := VerifyTx(d, buyer, shop, "5 ok"); !errors.Is(err, ErrPending) {
 		t.Fatalf("unmined: err = %v, want ErrPending", err)
 	}

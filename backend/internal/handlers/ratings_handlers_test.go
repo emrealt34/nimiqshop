@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -29,9 +30,11 @@ const (
 // fakeChain is a JSON-RPC stand-in for the Nimiq node. It answers the two
 // methods the rating verifier uses, in the wrapped shape the live RPC returns.
 type fakeChain struct {
-	mu      sync.Mutex
-	txs     map[string]map[string]interface{} // hash -> getTransactionByHash payload
-	history []map[string]interface{}          // getTransactionsByAddress payload
+	mu           sync.Mutex
+	txs          map[string]map[string]interface{} // hash -> getTransactionByHash payload
+	history      []map[string]interface{}          // getTransactionsByAddress payload
+	detailCalls  int
+	historyLimit int
 }
 
 func (f *fakeChain) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -45,11 +48,14 @@ func (f *fakeChain) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var data interface{}
 	switch req.Method {
 	case "getTransactionByHash":
+		f.detailCalls++
 		if d, ok := f.txs[req.Params[0].(string)]; ok {
 			data = d
 		}
 	case "getTransactionsByAddress":
-		data = f.history
+		f.historyLimit = int(req.Params[1].(float64))
+		n := min(len(f.history), f.historyLimit)
+		data = f.history[:n]
 	}
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"jsonrpc": "2.0",
@@ -251,6 +257,7 @@ func TestUnconfirmedOrUnknownTransactionIsPending(t *testing.T) {
 	}
 	// Known but still in the mempool.
 	e.chain.txs[hash] = tx(hash, testBuyer, testShop, 1, "3", false)
+	delete(e.chain.txs[hash], "executionResult") // execution is unknown until inclusion
 	if status, out := call(t, e.h.RateOrder, "buyer", "o1", map[string]interface{}{"stars": 3, "tx_hash": hash}); status != 202 {
 		t.Fatalf("mempool tx: %d %v, want 202", status, out)
 	}
@@ -351,5 +358,41 @@ func TestAdminCanHideCommentsAndSwitchThemOff(t *testing.T) {
 	}
 	if status, _ := call(t, e.h.RatingIntentOrder, "buyer", "o2", map[string]interface{}{"stars": 4}); status != 200 {
 		t.Fatalf("stars-only while off: %d, want 200", status)
+	}
+}
+
+// A legacy host may not return a hash. Unrelated memo payments must not
+// consume all five detail lookups or hide the real review past entry twenty.
+func TestRatingDiscoverySkipsUnrelatedMemosWithinBoundedHistory(t *testing.T) {
+	e := newRatingEnv(t)
+	for i := 0; i < 35; i++ {
+		hash := fmt.Sprintf("%064x", i+1)
+		e.chain.history = append(e.chain.history, tx(hash, testBuyer, testShop, 1, "5 unrelated", true))
+	}
+	hash := strings.Repeat("ab", 32)
+	proof := tx(hash, testBuyer, testShop, 1, "5 excellent", true)
+	e.chain.history = append(e.chain.history, proof)
+	e.chain.txs[hash] = proof
+	status, out := call(t, e.h.RateOrder, "buyer", "o1", map[string]interface{}{"stars": 5, "comment": "excellent"})
+	if status != 200 || out["rating_tx"] != hash {
+		t.Fatalf("rating recovery: %d %v", status, out)
+	}
+	if e.chain.historyLimit != 100 || e.chain.detailCalls != 1 {
+		t.Fatalf("unbounded or wasted lookups: limit=%d details=%d", e.chain.historyLimit, e.chain.detailCalls)
+	}
+}
+
+func TestRatingDiscoveryStillVerifiesHistoryMemoAgainstTransaction(t *testing.T) {
+	e := newRatingEnv(t)
+	hash := strings.Repeat("ab", 32)
+	e.chain.history = []map[string]interface{}{tx(hash, testBuyer, testShop, 1, "5 excellent", true)}
+	e.chain.txs[hash] = tx(hash, testOther, testShop, 1, "5 excellent", true)
+	status, _ := call(t, e.h.RateOrder, "buyer", "o1", map[string]interface{}{"stars": 5, "comment": "excellent"})
+	if status != 202 {
+		t.Fatalf("unverified history accepted: %d", status)
+	}
+	state, _ := e.store.GetRatingState(db.RatingKindOrder, "o1", "buyer")
+	if state.Rated {
+		t.Fatal("history metadata must never establish a rating")
 	}
 }

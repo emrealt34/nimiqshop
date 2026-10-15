@@ -31,12 +31,16 @@ func VerifyTx(d nimiq.TxDetail, buyer, shop, memo string) error {
 	if d.From != nimiq.NormalizeAddress(buyer) ||
 		d.To != nimiq.NormalizeAddress(shop) ||
 		d.Value != PriceLuna ||
-		string(d.Data) != memo ||
-		!d.Success {
+		string(d.Data) != memo {
 		return ErrNotThisRating
 	}
 	if !d.Mined {
 		return ErrPending
+	}
+	// Mempool responses have no execution result yet; only mined execution
+	// can establish success or failure. Neither case bypasses memo/owner checks.
+	if !d.Success {
+		return ErrNotThisRating
 	}
 	return nil
 }

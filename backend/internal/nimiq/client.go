@@ -153,13 +153,14 @@ func (c *Client) requireURLs() error {
 // (shape verified live against rpc.nimiqwatch.com). Nimiq amounts are in Luna
 // (1 NIM = 100000 Luna); we convert to NIM.
 type Transaction struct {
-	Hash          string `json:"hash"`
-	From          string `json:"from"`
-	To            string `json:"to"`
-	Value         int64  `json:"value"` // Luna
-	BlockHeight   int64  `json:"blockNumber"`
-	Timestamp     int64  `json:"timestamp"`
-	Confirmations int64  `json:"confirmations"`
+	RecipientData *string `json:"recipientData"` // optional memo hex for bounded rating discovery
+	Hash          string  `json:"hash"`
+	From          string  `json:"from"`
+	To            string  `json:"to"`
+	Value         int64   `json:"value"` // Luna
+	BlockHeight   int64   `json:"blockNumber"`
+	Timestamp     int64   `json:"timestamp"`
+	Confirmations int64   `json:"confirmations"`
 }
 
 func (t Transaction) ValueNIM() float64 {

@@ -12,14 +12,17 @@ import { inNimiqPay, initNimiqMiniApp } from './miniapp';
 import { sendRatingWithHub } from './hub';
 import { classifyWalletError } from './walletErrors';
 import { getUid } from './session';
+import { cleanComment } from './ratingComment';
 import { ratingStars } from './ratingStars';
 
 export class RatingError extends Error {
   /** 'cancelled' | 'unavailable' | 'failed' | 'pending' | 'refused' */
   code: string;
-  constructor(code: string, message: string) {
+  hash?: string;
+  constructor(code: string, message: string, hash?: string) {
     super(message);
     this.code = code;
+    this.hash = hash;
   }
 }
 
@@ -110,8 +113,11 @@ export async function payRatingIntent(intent: RatingIntent): Promise<{ hash?: st
         data: intent.memo,
       });
       if (res && typeof res === 'object' && 'error' in (res as object)) throw res;
-      // Nimiq Pay returns the serialized transaction, not a hash. The shop finds it by memo.
-      return {};
+      // Current providers return a transaction hash. Preserve it so confirmation
+      // never depends on finding this payment in a short wallet-history window.
+      // Older hosts without a hash can still recover through the memo scan.
+      const hash = typeof res === 'string' ? res : res?.hash;
+      return { hash: typeof hash === 'string' && /^[0-9a-f]{64}$/i.test(hash) ? hash.toLowerCase() : undefined };
     }
     return await sendRatingWithHub({
       recipient: intent.recipient,
@@ -121,6 +127,12 @@ export async function payRatingIntent(intent: RatingIntent): Promise<{ hash?: st
     });
   } catch (err) {
     if (err instanceof RatingError) throw err;
+    const outcome = err as { type?: string; data?: { hash?: string } } | null;
+    if (outcome?.type === 'TRANSACTION_OUTCOME_UNKNOWN') {
+      const hash = outcome.data?.hash;
+      throw new RatingError('pending', 'uncertain-wallet-submission',
+        typeof hash === 'string' && /^[0-9a-f]{64}$/i.test(hash) ? hash.toLowerCase() : undefined);
+    }
     const cls = classifyWalletError(err);
     if (cls === 'denied') throw new RatingError('cancelled', 'cancelled');
     throw new RatingError('failed', String((err as Error)?.message || cls));
@@ -137,23 +149,31 @@ export async function awaitRatingSaved(
   kind: RatingKind,
   id: string,
   body: RatingBody,
-  { attempts = 3, delayMs = 2000 }: { attempts?: number; delayMs?: number } = {},
+  { attempts = 30, delayMs = 2000 }: { attempts?: number; delayMs?: number } = {},
 ): Promise<any> {
-  const limit = Math.max(1, Math.min(3, attempts));
-  for (let i = 0; i < limit; i++) {
+  const limit = Math.max(1, Math.min(30, attempts));
+  const deadline = Date.now() + 90_000;
+  for (let i = 0; i < limit && Date.now() < deadline; i++) {
     let res: any;
     try {
       res = await submitRating(kind, id, body);
     } catch (err) {
       if (err instanceof ApiError && err.status === 503) {
-        await sleep(delayMs);
+        if (i + 1 < limit && Date.now() < deadline) await sleep(delayMs);
         continue;
       }
       throw err;
     }
     if (res && res.status === 'pending') {
-      await sleep(delayMs);
+      if (i + 1 < limit && Date.now() < deadline) await sleep(delayMs);
       continue;
+    }
+    // A successful HTTP response alone must not discard an unsaved review.
+    if (ratingStars(res?.rating) !== ratingStars(body.stars)
+      || res?.comment !== cleanComment(body.comment || '')
+      || typeof res?.rating_tx !== 'string' || !/^[0-9a-f]{64}$/i.test(res.rating_tx)
+      || (body.tx_hash && res.rating_tx.toLowerCase() !== body.tx_hash.toLowerCase())) {
+      throw new RatingError('pending', 'unverified-acknowledgement');
     }
     return res;
   }
