@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -394,5 +395,32 @@ func TestRatingDiscoveryStillVerifiesHistoryMemoAgainstTransaction(t *testing.T)
 	state, _ := e.store.GetRatingState(db.RatingKindOrder, "o1", "buyer")
 	if state.Rated {
 		t.Fatal("history metadata must never establish a rating")
+	}
+}
+
+func TestRatingIntentPersistsAssociationBeforeWalletPayment(t *testing.T) {
+	e := newRatingEnv(t)
+	status, _ := call(t, e.h.RatingIntentOrder, "buyer", "o1", map[string]interface{}{"stars": 5, "comment": "excellent"})
+	if status != 200 {
+		t.Fatalf("intent: %d", status)
+	}
+	key := db.RatingIntentKey(testBuyer, testShop, "5 excellent")
+	intent, err := e.store.GetRatingIntent(key)
+	if err != nil || intent.ID != "o1" || intent.UserID != "buyer" {
+		t.Fatalf("reservation missing: %+v %v", intent, err)
+	}
+	status, _ = call(t, e.h.CancelRatingIntentOrder, "other", "o1", map[string]interface{}{"stars": 5, "comment": "excellent"})
+	if status != 200 && status != 409 {
+		t.Fatalf("unexpected cancellation response: %d", status)
+	}
+	if _, err := e.store.GetRatingIntent(key); err != nil {
+		t.Fatal("other wallet cancelled purchase intent")
+	}
+	status, _ = call(t, e.h.CancelRatingIntentOrder, "buyer", "o1", map[string]interface{}{"stars": 5, "comment": "excellent"})
+	if status != 200 {
+		t.Fatalf("owner cancellation: %d", status)
+	}
+	if _, err := e.store.GetRatingIntent(key); !errors.Is(err, db.ErrNotFound) {
+		t.Fatal("explicitly declined wallet intent remains active")
 	}
 }

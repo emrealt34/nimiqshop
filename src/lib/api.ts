@@ -808,6 +808,8 @@ function validatedRatingBody(body: RatingBody): RatingBody {
 }
 export const ratingIntent = async (kind: RatingKind, id: string, body: RatingBody) =>
   api(`${ratingBase(kind, id)}/rating/intent`, { method: 'POST', body: validatedRatingBody(body), auth: true });
+export const cancelRatingIntent = (kind: RatingKind, id: string, body: RatingBody) =>
+  api(`${ratingBase(kind, id)}/rating/intent`, { method: 'DELETE', body: validatedRatingBody(body), auth: true, quiet: true });
 export const submitRating = async (kind: RatingKind, id: string, body: RatingBody) =>
   api(`${ratingBase(kind, id)}/rate`, { method: 'POST', body: validatedRatingBody(body), auth: true });
 export const rateOrder = (id: string, body: RatingBody) => submitRating('order', id, body);

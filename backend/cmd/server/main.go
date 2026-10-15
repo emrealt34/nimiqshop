@@ -36,6 +36,7 @@ import (
 	"nimiqshop/internal/notification"
 	"nimiqshop/internal/poolstake"
 	"nimiqshop/internal/presence"
+	"nimiqshop/internal/ratingwatch"
 	"nimiqshop/internal/safe"
 	"nimiqshop/internal/settlement"
 	"nimiqshop/internal/stakeledger"
@@ -408,6 +409,7 @@ func main() {
 			h.RatingRPC = nimiq.NewClient(cfg.NimiqRPCURL, cfg.NimiqRPCURL2)
 			h.RatingRecipient = cbAddr
 			h.RatingFeeLuna = int64(cfg.NotifyWalletFeeLuna)
+			(&ratingwatch.Worker{Store: store, RPC: h.RatingRPC, Recipient: cbAddr}).Run(ctx)
 			log.Printf("ratings: on-chain star ratings enabled (pay cashback wallet %s, fee %d Luna)", cbAddr, cfg.NotifyWalletFeeLuna)
 		} else {
 			log.Printf("ratings: cashback address could not be derived, star ratings disabled: %v", err)
@@ -1034,6 +1036,7 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 	r.GET("/api/quotes", authed(h.ListUserQuotes))
 	r.GET("/api/quotes/{id}", authed(h.GetUserQuote))
 	r.POST("/api/quotes/{id}/rating/intent", authedTiered(aWrite, h.RatingIntentQuote))
+	r.DELETE("/api/quotes/{id}/rating/intent", authedTiered(aWrite, h.CancelRatingIntentQuote))
 	r.POST("/api/quotes/{id}/rate", authedTiered(aWrite, h.RateQuote))
 
 	// Catalog (public, no auth needed to browse)
@@ -1124,6 +1127,7 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 	// Star ratings are signed and paid by the buyer (1 Luna + fee to the shop
 	// wallet). The intent returns the memo to sign; rate verifies the chain.
 	r.POST("/api/orders/{id}/rating/intent", authedTiered(aWrite, h.RatingIntentOrder))
+	r.DELETE("/api/orders/{id}/rating/intent", authedTiered(aWrite, h.CancelRatingIntentOrder))
 	r.POST("/api/orders/{id}/rate", authedTiered(aWrite, h.RateOrder))
 	r.GET("/api/account/limits", authed(h.GetAccountLimits))
 	// Wallet-memo channel controls (opt-out).

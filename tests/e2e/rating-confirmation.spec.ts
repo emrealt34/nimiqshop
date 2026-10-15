@@ -108,3 +108,26 @@ test('uncertain wallet submission checks the known hash without requesting payme
   expect(bodies).toEqual([{ stars: 5, comment: 'excellent', tx_hash: hash }]);
   expect(await page.evaluate(() => localStorage.getItem('e2e.rating.payments'))).toBe('1');
 });
+
+test('explicit wallet cancellation releases only its server rating intent', async ({ page }) => {
+  await page.addInitScript(({ ADDRESS }) => {
+    (window as any).nimiq = { listAccounts: async () => [ADDRESS], sendBasicTransactionWithData: async () => { throw { type: 'PERMISSION_DENIED' }; } };
+  }, { ADDRESS });
+  await page.route('**/api/ratings/config', r => r.fulfill({ json: { enabled: true, comments_enabled: true } }));
+  const cancelled: any[] = [];
+  await page.route('**/rating/intent', r => {
+    if (r.request().method() === 'DELETE') {
+      cancelled.push(r.request().postDataJSON());
+      return r.fulfill({ json: { cancelled: true } });
+    }
+    return r.fulfill({ json: { memo: '5 excellent', recipient: ADDRESS, value_luna: 1, fee_luna: 1 } });
+  });
+  await open(page, path('/order?id=o1'));
+  const form = page.locator('.rating-flow');
+  await form.locator('.star-btn').last().click();
+  await form.locator('input').fill('excellent');
+  await form.locator('button.btn-gold').click();
+  await expect(form.getByRole('alert')).toHaveText('Cancelled in your wallet. Nothing was charged.');
+  expect(cancelled).toEqual([{ stars: 5, comment: 'excellent' }]);
+  expect(await page.evaluate(key => localStorage.getItem(key), pendingKey)).toBe(null);
+});

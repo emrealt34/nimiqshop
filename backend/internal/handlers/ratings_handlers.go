@@ -143,8 +143,11 @@ func (h *Handlers) ratingIntent(ctx *fasthttp.RequestCtx, kind string) {
 		writeError(ctx, fasthttp.StatusBadRequest, err.Error())
 		return
 	}
-	memo, _, _, ok := h.prepareRating(ctx, kind, id, userID, req)
+	memo, _, buyer, ok := h.prepareRating(ctx, kind, id, userID, req)
 	if !ok {
+		return
+	}
+	if !h.rememberRatingIntent(ctx, kind, id, userID, buyer, memo) {
 		return
 	}
 	writeJSON(ctx, fasthttp.StatusOK, map[string]interface{}{
@@ -186,6 +189,10 @@ func (h *Handlers) submitRating(ctx *fasthttp.RequestCtx, kind string) {
 	}
 	memo, st, buyer, ok := h.prepareRating(ctx, kind, id, userID, req)
 	if !ok {
+		return
+	}
+
+	if !h.rememberRatingIntent(ctx, kind, id, userID, buyer, memo) {
 		return
 	}
 
@@ -237,6 +244,7 @@ func (h *Handlers) submitRating(ctx *fasthttp.RequestCtx, kind string) {
 		return
 	}
 	agg, err := h.Store.ApplyRating(db.RatingWrite{
+		IntentKey:  db.RatingIntentKey(buyer, h.RatingRecipient, memo),
 		Kind:       kind,
 		ID:         id,
 		UserID:     userID,
@@ -403,4 +411,51 @@ func (h *Handlers) AdminHideRatingComment(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	writeJSON(ctx, fasthttp.StatusOK, map[string]interface{}{"kind": kind, "id": id, "hidden": req.Hidden})
+}
+
+// Persist before returning a wallet intent: a disconnected buyer is no longer
+// needed after broadcasting. A memo shared by two purchases is reserved once.
+func (h *Handlers) rememberRatingIntent(ctx *fasthttp.RequestCtx, kind, id, userID, buyer, memo string) bool {
+	intent := db.RatingIntent{Key: db.RatingIntentKey(buyer, h.RatingRecipient, memo), Kind: kind, ID: id, UserID: userID, Buyer: buyer, Recipient: h.RatingRecipient, CreatedAt: time.Now().UTC()}
+	if err := h.Store.SaveRatingIntent(intent); err != nil {
+		if errors.Is(err, db.ErrRatingIntentBusy) {
+			writeError(ctx, 409, err.Error())
+		} else {
+			writeError(ctx, 503, "could not persist rating intent")
+		}
+		return false
+	}
+	return true
+}
+
+// Cancel is used only after the wallet explicitly declined payment.
+func (h *Handlers) CancelRatingIntentOrder(ctx *fasthttp.RequestCtx) {
+	h.cancelRatingIntent(ctx, db.RatingKindOrder)
+}
+func (h *Handlers) CancelRatingIntentQuote(ctx *fasthttp.RequestCtx) {
+	h.cancelRatingIntent(ctx, db.RatingKindQuote)
+}
+func (h *Handlers) cancelRatingIntent(ctx *fasthttp.RequestCtx, kind string) {
+	id, _ := ctx.UserValue("id").(string)
+	userID := middleware.UserID(ctx)
+	req, err := decodeRatingRequest(ctx.PostBody())
+	if err != nil {
+		writeError(ctx, 400, err.Error())
+		return
+	}
+	memo, err := ratings.Memo(req.Stars, req.Comment)
+	if err != nil {
+		writeError(ctx, 400, err.Error())
+		return
+	}
+	addrs, err := h.Store.UserAddresses([]string{userID})
+	if err != nil || addrs[userID] == "" {
+		writeError(ctx, 503, "could not load wallet")
+		return
+	}
+	if err := h.Store.CancelRatingIntent(db.RatingIntentKey(addrs[userID], h.RatingRecipient, memo), kind, id, userID); err != nil {
+		writeError(ctx, 409, "could not cancel rating intent")
+		return
+	}
+	writeJSON(ctx, 200, map[string]bool{"cancelled": true})
 }

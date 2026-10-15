@@ -66,6 +66,7 @@ type RatingState struct {
 
 // RatingWrite is one accepted on-chain rating.
 type RatingWrite struct {
+	IntentKey  string // optional durable reservation consumed in the rating commit
 	Kind       string
 	ID         string
 	UserID     string
@@ -149,6 +150,19 @@ func (s *Store) ApplyRating(w RatingWrite) (RatingAggregate, error) {
 		return agg, ErrConflict
 	}
 	err := s.Update(func(txn *badger.Txn) error {
+		if w.IntentKey != "" {
+			var intent RatingIntent
+			if err := getJSON(txn, ratingIntentKey(w.IntentKey), &intent); err != nil {
+				return err
+			}
+			memo := string(rune('0' + w.Stars))
+			if w.Comment != "" {
+				memo += " " + w.Comment
+			}
+			if intent.Kind != w.Kind || intent.ID != w.ID || intent.UserID != w.UserID || RatingIntentKey(intent.Buyer, intent.Recipient, memo) != w.IntentKey {
+				return ErrConflict
+			}
+		}
 		st, owner, err := loadRatingRecord(txn, w.Kind, w.ID)
 		if err != nil {
 			return err
@@ -217,6 +231,11 @@ func (s *Store) ApplyRating(w RatingWrite) (RatingAggregate, error) {
 		}
 		if err := saveAggregate(txn, agg); err != nil {
 			return err
+		}
+		if w.IntentKey != "" {
+			if err := txn.Delete(ratingIntentKey(w.IntentKey)); err != nil {
+				return err
+			}
 		}
 		return upsertRecentComment(txn, RatingComment{Kind: w.Kind, ID: w.ID,
 			Stars: w.Stars, Comment: w.Comment, At: now})

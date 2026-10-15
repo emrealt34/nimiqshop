@@ -8,7 +8,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { useT, type Translator } from '../../i18n';
-import { ApiError, getRatingComments, getRatingConfig, ratingIntent, type RatingKind } from '../../lib/api';
+import { ApiError, cancelRatingIntent, getRatingComments, getRatingConfig, ratingIntent, type RatingKind } from '../../lib/api';
 import {
   awaitRatingSaved,
   clearPendingRating,
@@ -162,6 +162,10 @@ export function RatingFlow({
       setPhase('saved');
       onSaved?.(res);
     } catch (err) {
+      if (err instanceof RatingError && err.code === 'cancelled') {
+        // Only an explicit wallet refusal releases the durable reservation.
+        await cancelRatingIntent(kind, id, { stars, comment: c }).catch(() => undefined);
+      }
       if (err instanceof RatingError && err.code === 'pending') {
         // An uncertain wallet outcome must only retry verification, never payment.
         markPendingRatingSubmitted(kind, id, err.hash);
@@ -261,6 +265,7 @@ function messageFor(err: unknown, t: Translator): string {
     const msg = err.message || '';
     if (err.code === 'INVALID_RATING_STARS' || /(?:stars?|rating) must be.*(?:integer|1.*5)/i.test(msg)) return t('rating.pickStars');
     if (err.status === 401 || /sign in/i.test(msg)) return t('rating.notSignedIn');
+    if (/finish the pending rating for your other purchase/i.test(msg)) return t('rating.pendingOtherPurchase');
     if (/already saved/i.test(msg)) return t('rating.alreadySaved');
     if (/maximum number/i.test(msg)) return t('rating.limit');
     if (/switched off/i.test(msg)) return t('rating.commentsOff');
