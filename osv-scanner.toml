@@ -1,77 +1,46 @@
-# OSV-Scanner configuration.
+# OSV-Scanner configuration for the manifests in THIS directory (the repo root),
+# which today means package-lock.json.
 #
 # An entry here is a documented exception, not a mute button: it must name a
-# real reason and an expiry date, after which the scanner fails again and the
-# exception has to be re-justified (or removed, because upstream patched it).
+# real reason and an expiry date, after which the scanner reports the finding
+# again and the exception has to be re-justified (or removed, because upstream
+# patched it).
 #
-# Three rules worth stating explicitly, because all three have already been got
-# wrong in this repo once:
+# Four rules worth stating explicitly, because all four have already been got
+# wrong in this repo:
 #
-#   1. `exit code 1` from the scan step means a REAL FINDING. "has unused
-#      ignores" is only a warning: the 2026-10-11 job logged that exact line and
-#      still exited 0, and osv-scanner's documented return codes agree (0 = no
+#   1. THIS FILE ONLY COVERS THE ROOT DIRECTORY. osv-scanner loads a config from
+#      the directory of each scanned manifest and does not propagate it to child
+#      directories, so nothing here applies to .github/semgrep-requirements.txt
+#      or to backend/go.mod. Those directories carry their own osv-scanner.toml
+#      (.github/osv-scanner.toml exists today). Putting an exception here for a
+#      finding that lives in a subdirectory does nothing at all — the entry is
+#      reported as unused and the finding stays in the output.
+#   2. `exit code 1` from the scan step means a REAL FINDING. "has unused
+#      ignores" is only a warning: the 2026-10-11 job logged that line and still
+#      exited 0, and osv-scanner's documented return codes agree (0 = no
 #      vulnerabilities, 1 = vulnerabilities or findings). Do not chase the
 #      warning when the job is red.
-#   2. The finding itself is NOT echoed in the job log, because the step runs
+#   3. The finding itself is NOT echoed in the job log, because the step runs
 #      with `--format=sarif --output=osv-results.sarif` and writes results to a
 #      file. Download the `osv-security-report` artifact before concluding
-#      anything from the log alone.
-#   3. `id` is matched by exact string comparison against the ID the scanner
-#      reports (config.ShouldIgnore does `e.ID == vulnID`), and OSV can carry one
-#      issue under two records. This one is reported as CVE-2026-59951 with
-#      GHSA-84m7-p3x7-pcfv as its alias; an entry naming only the GHSA filtered
-#      nothing and the scan stayed red (the SARIF artifact came back byte-for-byte
-#      the same size). Both IDs are therefore listed below, and whichever one does
-#      not fire on a given run shows up as a harmless unused ignore.
+#      anything from the log alone — it also names the manifest, which is what
+#      tells you which directory's config has to carry the exception.
+#   4. `id` is compared against the ID the scanner reports, and an ignore also
+#      covers that vulnerability's aliases. Verified locally with the v2.6.0
+#      binary: naming either CVE-2026-59951 or its GHSA-84m7-p3x7-pcfv alias
+#      filtered the very same finding, exit 0 both ways. So ONE entry is enough —
+#      listing both makes the second show up as an unused ignore, because the
+#      first match consumes the finding. Prefer the ID exactly as it appears in
+#      the SARIF output.
 #
 # See also scripts/audit-gate.mjs, which keeps the equivalent exception list for
-# `npm audit`. Those two lists have to agree about *npm* advisories. They are not
-# mirrors of each other: the entries below are PyPI packages that `npm audit`
-# never sees, so they deliberately have no counterpart there.
-
-[[IgnoredVulns]]
-id = "CVE-2026-59951"
-ignoreUntil = 2026-12-31 # re-check on every semgrep bump; retire when its mcp pin moves
-reason = """
-MCP Python SDK retains StreamableHTTP session entries without an idle expiry or
-an aggregate session-count limit, so a client that can reach the endpoint can
-grow server memory without bound until restart (availability only: CVSS 4.0
-VA:L, no confidentiality or integrity impact). Published 2026-10-14, fixed in
-mcp 1.30.0 and 2.2.0.
-
-There is nothing to upgrade to. mcp reaches this tree only as semgrep's own hard
-pin `mcp==1.29.0`, and every semgrep release newer than the pinned 1.178.0 still
-carries that exact pin (1.179.0, 1.180.0 and the current 1.181.0 of 2026-10-14
-all declare `mcp==1.29.0`). Bumping mcp on its own is not available either:
-.github/semgrep-requirements.txt is a hash-pinned closure installed with
-`pip install --require-hashes`, so a version semgrep does not allow makes the
-install unresolvable and breaks the Semgrep workflow.
-
-Not reachable in anything this project ships. The requirements file is installed
-only inside the Semgrep GitHub Actions job, on an ephemeral runner; the product
-is a static Astro build on Cloudflare Pages plus a Go binary on Railway, with no
-Python runtime and no MCP server deployed anywhere. The vulnerable code is the
-stateful StreamableHTTP *server* session table — stateless HTTP, stdio and SSE
-transports are unaffected — and CI invokes semgrep as a CLI scanner rather than
-running it as a network-facing MCP server.
-
-Retire this entry and its GHSA twin below the moment semgrep's mcp pin reaches
-1.30.0 (then regenerate the closure with the pip-compile command at the top of
-.github/semgrep-requirements.txt), or if the advisory is withdrawn.
-"""
-
-[[IgnoredVulns]]
-id = "GHSA-84m7-p3x7-pcfv"
-ignoreUntil = 2026-12-31 # same fuse as CVE-2026-59951 above
-reason = """
-GitHub Security Advisory form of CVE-2026-59951 (mcp, unbounded StreamableHTTP
-session accumulation) — same issue, same justification, same fuse; see the entry
-above for the full argument. Listed separately because osv-scanner matches `id`
-by exact string comparison against whichever record ID it happens to report, and
-OSV carries this issue under both a CVE-converted record and the GHSA record. If
-this entry is ever reported as an unused ignore, that only means the scanner
-keyed on the CVE form for that run; it is a warning, not a failure.
-"""
+# `npm audit`. Those two lists have to agree about *npm* advisories — which are
+# exactly the ones this root file can act on. They are not mirrors of each other:
+# exceptions for other ecosystems belong next to their own manifest and have no
+# counterpart in the npm gate.
+#
+# No exceptions are currently outstanding for the root manifests.
 
 # Retired 2026-10-17 — GHSA-ch52-4w7c-c8xp (CVE-2026-93748, http-cache-semantics
 # <= 4.2.0, max-stale cross-user cache disclosure). Added on 2026-10-03 when
@@ -79,15 +48,18 @@ keyed on the CVE form for that run; it is a warning, not a failure.
 # package-lock.json has carried 4.3.0 since 2026-10-06 and OSV's range for the
 # advisory ends at last_affected 4.2.0, so nothing in the tree matches it any
 # more and the ignore went unused. Removed here and, to keep the npm gates in
-# agreement, from ALLOWED in scripts/audit-gate.mjs. Do not re-add it unless a
-# version below 4.3.0 returns to the tree.
+# agreement, from ALLOWED in scripts/audit-gate.mjs. `npm audit` now reports zero
+# advisories across the whole tree. Do not re-add it unless a version below
+# 4.3.0 returns to the lockfile.
 
-# Template for a new exception:
+# Template for a new exception (put it in the directory of the manifest that
+# triggers it, not necessarily here):
 #
 # [[IgnoredVulns]]
-# id = "GHSA-xxxx-xxxx-xxxx"   # use the ID exactly as osv-scanner reports it
+# id = "GHSA-xxxx-xxxx-xxxx"   # exactly as osv-scanner reports it in the SARIF
 # ignoreUntil = YYYY-MM-DD
 # reason = """
-# What the vulnerability is, why it cannot be fixed by upgrading yet, why it is
-# not reachable in the shipped artifact, and what event should retire this entry.
+# What the vulnerability is, which manifest pulls the package in, why it cannot
+# be fixed by upgrading yet, why it is not reachable in the shipped artifact, and
+# what event should retire this entry.
 # """
