@@ -217,7 +217,12 @@ func isNoStaker(err error) bool {
 	if !errors.As(err, &rpcErr) {
 		return false
 	}
-	msg := strings.ToLower(rpcErr.Message)
+	// Detail, not Message: a live NimiqWatch node answers an address that has
+	// never staked with {"message":"Internal error","data":"No staker with
+	// address: …"}. Matching Message alone reads that as an outage, so
+	// /api/poolstake/position 502'd for every non-staker and the chain fallback
+	// behind the pool reported "rpc unavailable" instead of a definitive no.
+	msg := strings.ToLower(rpcErr.Detail())
 	for _, needle := range []string{
 		"no staker",
 		"not a staker",

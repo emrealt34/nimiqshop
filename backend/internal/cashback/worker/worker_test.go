@@ -104,7 +104,13 @@ func (c *faultChain) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	if problem != "" {
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{"jsonrpc": "2.0", "id": 1, "error": map[string]interface{}{"code": -32603, "message": problem}})
+		// The LIVE node's error shape, verified against rpc.nimiqwatch.com and
+		// rpc.testnet.nimiqwatch.com on 2026-10-17: a GENERIC
+		// {"code":-32603,"message":"Internal error"} with the actual reason in
+		// "data". Stubbing the reason into "message" is what let the string
+		// matching in getTxOne / ProvePayoutExpired look correct in tests while
+		// failing against every real node.
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"jsonrpc": "2.0", "id": 1, "error": map[string]interface{}{"code": -32603, "message": "Internal error", "data": problem}})
 		return
 	}
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{"jsonrpc": "2.0", "id": 1, "result": map[string]interface{}{"data": result, "metadata": nil}})

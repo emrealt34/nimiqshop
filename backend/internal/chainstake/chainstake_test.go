@@ -27,9 +27,14 @@ func rpcServer(t *testing.T, payload map[string]any, errMsg string, calls *int64
 		atomic.AddInt64(calls, 1)
 		w.Header().Set("Content-Type", "application/json")
 		if errMsg != "" {
+			// The LIVE node's shape: a generic "Internal error" message with the
+			// reason in "data". An address that has never staked answers
+			// {"message":"Internal error","data":"No staker with address: NQ…"}
+			// on both mainnet and testnet, so a stub that puts the reason in
+			// "message" hides every bug in the matching code.
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"jsonrpc": "2.0", "id": 1,
-				"error": map[string]any{"code": -32603, "message": errMsg},
+				"error": map[string]any{"code": -32603, "message": "Internal error", "data": errMsg},
 			})
 			return
 		}

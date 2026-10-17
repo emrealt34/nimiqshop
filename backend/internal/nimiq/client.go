@@ -77,15 +77,60 @@ type rpcResponse struct {
 	Error  *struct {
 		Code    int    `json:"code"`
 		Message string `json:"message"`
+		// Data carries the node's actual explanation. NimiqWatch-style nodes
+		// (rpc.nimiqwatch.com, rpc.testnet.nimiqwatch.com) answer every
+		// "this thing does not exist" case as a GENERIC
+		// {"code":-32603,"message":"Internal error"} and put the reason here:
+		//
+		//	"data":"No staker with address: NQ41 10U9 …"
+		//	"data":"Transaction not found: 3f2a…"
+		//
+		// Verified live against mainnet and testnet on 2026-10-17. Dropping
+		// this field made every string match below fail against a real node,
+		// which turned "has never staked" and "not on chain yet" into "the RPC
+		// is down" — see RPCError.Detail.
+		Data string `json:"data"`
 	} `json:"error"`
 }
 
 type RPCError struct {
 	Code    int
 	Message string
+	// Data is the node's specific reason when it reports a generic message.
+	// It is part of the error text so logs say what actually happened.
+	Data string
 }
 
-func (e *RPCError) Error() string { return fmt.Sprintf("nimiq rpc error %d: %s", e.Code, e.Message) }
+func (e *RPCError) Error() string {
+	if strings.TrimSpace(e.Data) == "" {
+		return fmt.Sprintf("nimiq rpc error %d: %s", e.Code, e.Message)
+	}
+	return fmt.Sprintf("nimiq rpc error %d: %s (%s)", e.Code, e.Message, strings.TrimSpace(e.Data))
+}
+
+// Detail is everything the node said, for substring matching: the generic
+// message plus the specific reason. Match on this instead of Message — a real
+// NimiqWatch node puts "No staker with address: …" or "Transaction not found: …"
+// in Data and leaves Message as "Internal error", so Message-only matching
+// silently never fires in production while looking correct against a stub.
+func (e *RPCError) Detail() string {
+	if e == nil {
+		return ""
+	}
+	return strings.TrimSpace(strings.TrimSpace(e.Message) + " " + strings.TrimSpace(e.Data))
+}
+
+// ReasonIs reports whether the node's answer IS this exact reason, in either
+// field. Nodes differ in which one they use, and a caller that must distinguish
+// "does not exist" from "lookup failed" cannot afford to guess wrong.
+func (e *RPCError) ReasonIs(reason string) bool {
+	if e == nil {
+		return false
+	}
+	want := strings.TrimSpace(reason)
+	return strings.EqualFold(strings.TrimSpace(e.Message), want) ||
+		strings.EqualFold(strings.TrimSpace(e.Data), want)
+}
 
 // callURL posts one JSON-RPC request. NimiqWatch-style endpoints (rpc.nimiqwatch.com,
 // rpc.testnet.nimiqwatch.com) wrap every result as {"data": <payload>,
@@ -120,7 +165,7 @@ func (c *Client) callURL(ctx context.Context, baseURL, method string, params []i
 		return fmt.Errorf("decode rpc response from %s: %w", baseURL, err)
 	}
 	if rr.Error != nil {
-		return &RPCError{Code: rr.Error.Code, Message: rr.Error.Message}
+		return &RPCError{Code: rr.Error.Code, Message: rr.Error.Message, Data: rr.Error.Data}
 	}
 	if out != nil {
 		if len(rr.Result) == 0 {
@@ -426,7 +471,10 @@ func (c *Client) getTxOne(ctx context.Context, baseURL, hash string) (found bool
 	}
 	if err := c.callURL(ctx, baseURL, "getTransactionByHash", []interface{}{hash}, &raw); err != nil {
 		var rpcErr *RPCError
-		if errors.As(err, &rpcErr) && strings.EqualFold(strings.TrimSpace(rpcErr.Message), "Transaction not found: "+hash) {
+		// "Not found" is a definitive answer, not an outage: the caller has to
+		// be able to tell "never mined" from "the RPC could not be asked".
+		// ReasonIs checks both fields because a live node reports it in Data.
+		if errors.As(err, &rpcErr) && rpcErr.ReasonIs("Transaction not found: "+hash) {
 			return false, false, nil
 		}
 		return false, false, err
