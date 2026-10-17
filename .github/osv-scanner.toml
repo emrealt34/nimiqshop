@@ -1,0 +1,51 @@
+# OSV-Scanner configuration for the manifests in THIS directory.
+#
+# osv-scanner loads a config from the directory of each scanned manifest and does
+# not propagate it, so the repo-root osv-scanner.toml covers package-lock.json
+# only — never .github/semgrep-requirements.txt and never backend/go.mod. An
+# exception for the mcp advisory placed at the root was reported as an "unused
+# ignore" on 2026-10-17 while the finding stayed in the SARIF output, because the
+# root config was simply never consulted for this file. Verified locally with the
+# v2.6.0 release binary and the exact CI command: with this file present the scan
+# exits 0 and filters the finding; with it deleted the scan exits 1 and reports
+# `mcp@1.29.0` again.
+#
+# An entry here is a documented exception, not a mute button: it must name a real
+# reason and an expiry date, after which the scanner reports the finding again and
+# the exception has to be re-justified (or deleted, because upstream fixed it).
+# The root osv-scanner.toml carries the full policy and how to read a red scan.
+
+[[IgnoredVulns]]
+id = "CVE-2026-59951"
+ignoreUntil = 2026-12-31 # re-check on every semgrep bump; retire when its mcp pin moves
+reason = """
+mcp 1.29.0, pulled in by semgrep-requirements.txt in this directory. The MCP
+Python SDK retains StreamableHTTP session entries without an idle expiry or an
+aggregate session-count limit, so a client that can reach the endpoint can grow
+server memory without bound until restart (availability only: CVSS 4.0 VA:L, no
+confidentiality or integrity impact). Published 2026-10-14, fixed in mcp 1.30.0
+and 2.2.0. OSV also carries this issue as GHSA-84m7-p3x7-pcfv; osv-scanner
+reports the CVE-converted record and matches an ignore by that ID or by an alias,
+so this single entry covers both (naming both was tried and the second entry is
+then flagged as an unused ignore, because the first match consumes the finding).
+
+There is nothing to upgrade to. mcp reaches this tree only as semgrep's own hard
+pin `mcp==1.29.0`, and every semgrep release newer than the pinned 1.178.0 still
+carries that exact pin (1.179.0, 1.180.0 and the current 1.181.0 of 2026-10-14
+all declare `mcp==1.29.0`). Bumping mcp on its own is not available either:
+semgrep-requirements.txt is a hash-pinned closure installed with
+`pip install --require-hashes`, so a version semgrep does not allow makes the
+install unresolvable and breaks the Semgrep workflow.
+
+Not reachable in anything this project ships. This requirements file is installed
+only inside the Semgrep GitHub Actions job, on an ephemeral runner; the product
+is a static Astro build on Cloudflare Pages plus a Go binary on Railway, with no
+Python runtime and no MCP server deployed anywhere. The vulnerable code is the
+stateful StreamableHTTP *server* session table — stateless HTTP, stdio and SSE
+transports are unaffected — and CI invokes semgrep as a CLI scanner rather than
+running it as a network-facing MCP server.
+
+Retire this entry the moment semgrep's mcp pin reaches 1.30.0 (then regenerate
+the closure with the pip-compile command at the top of semgrep-requirements.txt),
+or if the advisory is withdrawn.
+"""

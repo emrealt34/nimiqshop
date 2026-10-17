@@ -16,20 +16,16 @@ import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
 // Each entry: advisory URL -> { reason, reviewBy, package }.
-// Keep this list SHORT. An entry here is a promise to re-check it.
+// Keep this list SHORT. An entry here is a promise to re-check it — and unlike
+// osv-scanner.toml, this gate does not fail when a promise goes stale, so the
+// re-check has to happen by hand. Retire an entry the moment the advisory stops
+// matching the lockfile; osv-scanner.toml keeps the matching retirement note.
+//
+// Retired 2026-10-17 — GHSA-ch52-4w7c-c8xp (http-cache-semantics <= 4.2.0):
+// 4.3.0 has been locked since 2026-10-06, so the exception had nothing left to
+// cover. It was removed from osv-scanner.toml too, where leaving it in place
+// made the scan fail with "unused ignores".
 export const ALLOWED = new Map([
-  [
-    'https://github.com/advisories/GHSA-ch52-4w7c-c8xp',
-    {
-      package: 'http-cache-semantics',
-      reviewBy: '2027-01-31',
-      reason:
-        'No patched release exists (npm latest is 4.2.0, the advisory covers <= 4.2.0 and ' +
-        'declares first_patched_version: none). Reachable only through astro\u2019s build-time ' +
-        'HTTP cache; the shipped artifact is static HTML/CSS/JS and never runs this code. ' +
-        'Re-check when 4.2.1+ ships and bump via overrides.',
-    },
-  ],
   [
     'https://github.com/advisories/GHSA-68fv-2mgg-jv7q',
     {
