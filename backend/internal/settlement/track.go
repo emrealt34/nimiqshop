@@ -220,11 +220,10 @@ func (w *OrderTracker) tick(ctx context.Context) {
 		return
 	}
 	// Priority: delivering > payment_received > payment_started >
-	// awaiting_payment. Within a class, keep DB order (newest first).
+	// awaiting_payment > background reconciliation. Within a class, keep DB
+	// order (newest first).
 	sortQuotesByPriority(due)
-	if len(due) > MaxPollsPerTick {
-		due = due[:MaxPollsPerTick]
-	}
+	due = capPollPass(due)
 	for _, q := range due {
 		if ctx.Err() != nil {
 			return
@@ -285,6 +284,17 @@ func (w *OrderTracker) markDue(q db.Quote, now time.Time) bool {
 	return true
 }
 
+// lateMoneyReconcileInterval is the cadence for a quote the shop expired on
+// its own clock and is still re-asking the supplier about (see
+// db.LateMoneyReconcileWindow). Owner, 2026-10-17: "expired olsa bile 6
+// saatte bir bak expired olanlara 3 gün boyunca".
+//
+// It is the least urgent class in the tracker: slow enough that days of
+// abandoned carts cannot consume the poll budget a buyer on the pay screen
+// needs, and short enough that a payment the supplier confirms late is still
+// picked up inside the window (72h / 6h ≈ 12 chances per quote).
+const lateMoneyReconcileInterval = 6 * time.Hour
+
 // pollIntervalFor is the adaptive schedule. Fresh awaiting_payment orders
 // poll fast (the customer is actively on the payment page and the webhook
 // may not be configured), then decay as the order ages. Paid orders poll
@@ -295,32 +305,88 @@ func pollIntervalFor(q db.Quote, now time.Time) time.Duration {
 		return 8 * time.Second
 	case cryptorefills.QuotePaidReceived, cryptorefills.QuotePaidStarted, cryptorefills.QuoteAwaitingPay:
 		return 10 * time.Second
+	case cryptorefills.QuoteExpired, cryptorefills.QuoteFailed:
+		if q.PaymentObserved {
+			return 60 * time.Second // real money to reconcile: keep it tight
+		}
+		return lateMoneyReconcileInterval
 	default:
 		return 60 * time.Second // manual/legacy expiry reconciliation, not a pay prompt
 	}
 }
 
-// sortQuotesByPriority orders due quotes so delivery-adjacent states are
-// always polled before waiting-for-money states within the capped batch.
-func sortQuotesByPriority(qs []db.Quote) {
-	rank := func(s string) int {
-		switch s {
-		case cryptorefills.QuoteDelivering:
-			return 0
-		case cryptorefills.QuotePaidReceived:
-			return 1
-		case cryptorefills.QuotePaidStarted:
-			return 2
-		default:
-			return 3
-		}
+// pollRank orders one tracker pass. Lower is more urgent.
+//
+// The live payment states (0-3) are quotes a human is waiting on right now.
+// The background states (4-5) are reconciliation rows that NeedsSupplierPoll
+// keeps alive for a long time — manual_review forever, expired/failed until
+// their late-money window closes. They are PERMANENT RESIDENTS of the tracked
+// set, which is why they must rank below every live state: with one shared
+// rank the oldest residents filled the whole per-pass cap and a buyer who had
+// just paid was truncated out of every pass.
+func pollRank(status string) int {
+	switch status {
+	case cryptorefills.QuoteDelivering:
+		return 0
+	case cryptorefills.QuotePaidReceived:
+		return 1
+	case cryptorefills.QuotePaidStarted:
+		return 2
+	case cryptorefills.QuoteAwaitingPay:
+		return 3
+	case cryptorefills.QuoteManualReview:
+		return 4
+	default: // expired / failed reconciliation
+		return 5
 	}
-	// Insertion sort: the slice is tiny (≤ MaxOrders).
+}
+
+// livePollRank is the highest rank that a human is actively waiting on.
+const livePollRank = 3
+
+// sortQuotesByPriority is a stable sort by pollRank, so the DB's
+// newest-first order is preserved inside each class.
+func sortQuotesByPriority(qs []db.Quote) {
+	// Insertion sort: the slice is tiny (≤ MaxOrders) and stability matters.
 	for i := 1; i < len(qs); i++ {
-		for j := i; j > 0 && rank(qs[j].Status) < rank(qs[j-1].Status); j-- {
+		for j := i; j > 0 && pollRank(qs[j].Status) < pollRank(qs[j-1].Status); j-- {
 			qs[j], qs[j-1] = qs[j-1], qs[j]
 		}
 	}
+}
+
+// capPollPass applies MaxPollsPerTick WITHOUT letting background
+// reconciliation starve a live purchase.
+//
+// A plain `due[:MaxPollsPerTick]` over a rank-sorted slice is not enough on
+// its own: ranks 0-3 can legitimately be empty for a whole pass while dozens
+// of expired/manual rows are due, and the next pass can be the one where the
+// buyer's payment finally needs observing. Live rows are therefore served
+// first and background rows only take whatever is left over — and, so a large
+// resident backlog can never push a live row out either, live rows are taken
+// first regardless of how many background rows are waiting.
+func capPollPass(due []db.Quote) []db.Quote {
+	if len(due) <= MaxPollsPerTick {
+		return due
+	}
+	out := make([]db.Quote, 0, MaxPollsPerTick)
+	for _, q := range due {
+		if pollRank(q.Status) <= livePollRank {
+			out = append(out, q)
+			if len(out) == MaxPollsPerTick {
+				return out
+			}
+		}
+	}
+	for _, q := range due {
+		if pollRank(q.Status) > livePollRank {
+			out = append(out, q)
+			if len(out) == MaxPollsPerTick {
+				return out
+			}
+		}
+	}
+	return out
 }
 
 // creationRecoveryGrace bounds how long a LIVE process may hold an

@@ -31,8 +31,9 @@ import {
   adminResetStakeLedger,
   adminListQuotes,
   adminGetOrder,
+  adminSyncOrder,
 } from '../../lib/api';
-import { fmtNIM, formatWalletAddress } from '../../lib/format';
+import { fmtDate, fmtNIM, fmtNum, fmtUSD, formatWalletAddress } from '../../lib/format';
 import { siteName } from '../../lib/config';
 import { orderedCountries } from '../../lib/countries';
 import { CopyButton, AlertBox } from '../ui/uiKit';
@@ -211,16 +212,24 @@ function OperatorSignInSheet({ onSuccess }: { onSuccess: () => void }) {
 
 function StatusCard({ status }: { status: any }) {
   // Mailtrap is the ONE mail transport: no SMTP client and no SMS sender
-  // exist any more, so this is the whole channel status.
+  // exist any more. The supplier webhook is the other channel that matters
+  // operationally: it is what lets Cryptorefills push a state change instead
+  // of waiting for the next poll, and — on a deployment that idle-sleeps —
+  // the only thing that wakes the tracker up when a payment lands.
   const emailOn = status?.email?.enabled;
+  const wh = status?.webhook;
+  const whOn = !!wh?.enabled;
   return (
     <div className="card mt-2">
       <div className="card-title">
         <Icon name="pulse" size={14} />
-        <span>Mail status</span>
+        <span>Mail &amp; supplier webhook status</span>
       </div>
       <div className="row" style={{ gap: '12px', flexWrap: 'wrap' }}>
         {badge('Mailtrap ' + (emailOn ? 'READY' : 'OFF'), emailOn, emailOn ? `${status.email.sandbox ? 'SANDBOX · ' : ''}from ${status.email.from || '?'}` : 'set MAILTRAP_API_TOKEN + MAILTRAP_FROM_EMAIL in .env')}
+        {badge('Supplier webhook ' + (whOn ? 'READY' : 'OFF'), whOn,
+          whOn ? 'Cryptorefills can push order state here'
+            : 'polling only — the tracker must reach every order itself')}
       </div>
       {emailOn && status?.email?.sandbox ? (
         <div className="alert warn mt-2" style={{ marginBottom: 0 }}>
@@ -228,6 +237,63 @@ function StatusCard({ status }: { status: any }) {
           <div className="small">Mailtrap runs in SANDBOX mode — emails are captured in the test inbox, never delivered. Unset MAILTRAP_USE_SANDBOX to go live.</div>
         </div>
       ) : null}
+      <WebhookSetup wh={wh} on={whOn} />
+    </div>
+  );
+}
+
+/**
+ * WebhookSetup — the two-step webhook install, with the exact URL to copy.
+ *
+ * The webhook is ACCOUNT-MANAGED: Cryptorefills publishes no
+ * self-registration endpoint and the create-order payload carries no
+ * callback field, so the URL has to be handed to the partner account by a
+ * human. That is why this card exists — the operator needs the precise
+ * string, not a description of it.
+ *
+ * A leaked key is bounded by design: the handler treats the body as an
+ * untrusted trigger and always re-GETs the order through the queued client,
+ * so the worst a forged call can do is ask for a re-check.
+ */
+function WebhookSetup({ wh, on }: { wh: any; on: boolean }) {
+  const url = String(wh?.url || '');
+  const base = String(wh?.base_url || '');
+  if (on && url) {
+    return (
+      <div className="mt-2" style={{ marginBottom: 0 }}>
+        <div className="row between" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div className="mono xs" data-testid="webhook-url" style={{ overflowWrap: 'anywhere' }}>{url}</div>
+          <CopyButton getText={url} label="Copy webhook URL" />
+        </div>
+        <div className="xs faint mt-1">
+          Give Cryptorefills this exact URL for the partner account. It embeds the shared
+          secret, so treat it like a password — and rotate CRYPTOREFILLS_WEBHOOK_KEY if it
+          is ever pasted somewhere it should not have been.
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="alert warn mt-2" style={{ marginBottom: 0 }}>
+      <Icon name="info" size={16} />
+      <div className="small">
+        <div className="strong">Supplier webhook is not configured — polling is the only rail.</div>
+        <ol style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+          <li>
+            Add two variables to the backend deployment
+            {wh?.key_set ? ' (the key is set but PUBLIC_WEBHOOK_BASE_URL is missing — the server refuses to start in that state)' : ''}:
+            {' '}<span className="mono">CRYPTOREFILLS_WEBHOOK_KEY</span> (at least 32 characters —
+            {' '}<span className="mono">openssl rand -hex 32</span>) and
+            {' '}<span className="mono">PUBLIC_WEBHOOK_BASE_URL</span> (the public HTTPS backend base, no trailing slash
+            {base ? `, currently ${base}` : ', e.g. https://shopapi.nimiqbase.com'}).
+          </li>
+          <li>
+            Restart, come back here and copy the URL this card now shows, then ask Cryptorefills
+            to register it for the partner account. The callback path is
+            {' '}<span className="mono">/api/webhooks/cryptorefills?key=&lt;KEY&gt;</span>.
+          </li>
+        </ol>
+      </div>
     </div>
   );
 }
@@ -1007,11 +1073,12 @@ function OrdersPanel() {
   const [err, setErr] = useState('');
   // Paged like the rest of the console: 5 orders per page.
   const [page, setPage] = useState(0);
-  useEffect(() => {
+  const reload = useCallback(() => {
     adminListQuotes(50)
       .then((d) => setRows(d.quotes || []))
       .catch((e) => setErr((e as Error).message || 'Could not load orders'));
   }, []);
+  useEffect(() => { reload(); }, [reload]);
   if (!rows && !err) return <div className="card mt-2"><div className="card-title">Orders</div><LoadingRows /></div>;
   if (err) return <div className="card mt-2"><div className="card-title">Orders</div><div className="alert error"><div className="small">{err}</div></div></div>;
   const ORDERS_PAGE_SIZE = 5;
@@ -1037,7 +1104,14 @@ function OrdersPanel() {
           {shown.map((q: any, i: number) => (
             <div key={from + i}>
               <CashbackRow cb={q.cashback} purchaseTx={q.lightning_funding_hint || q.lightning_chain_proof?.funding_tx || ''} extraLeft={(q.test_mode ? '🧪 TEST · ' : '') + (q.product_id || 'item') + ' · ' + (q.status || '') + (q.id ? ' · ' + String(q.id).slice(0, 8) : '')} />
+              {/* How much this purchase is worth — the operator's first
+                  question about any stuck row. */}
+              <OrderMoneyRow q={q} />
               {q.lightning_payment_hash ? <div className="xs mono" style={{ overflowWrap: 'anywhere' }}>Lightning invoice hash: {q.lightning_payment_hash}</div> : null}
+              {/* Recovery row: re-ask the supplier first (the only upstream
+                  path an operator has for a stuck purchase), then inspect what
+                  was stored locally. */}
+              <SupplierSyncButton id={q.id} onSynced={reload} />
               <PaymentInspectionButton id={q.id} />
               {/* Contact the buyer entered for this order (the same values the supplier request is built from). Admin-only view; never logged. */}
               <div className="xs mt-1" style={{ paddingBottom: 8, display: 'flex', flexWrap: 'wrap', gap: 12 }} data-testid="order-contact">
@@ -1457,6 +1531,111 @@ export function AdminPage() {
       <AdminContent />
     </AppRoot>
   );
+}
+
+/**
+ * OrderMoneyRow — what this purchase is actually worth.
+ *
+ * The Orders panel showed the product name, the local status and the
+ * cashback, but never the money: an operator looking at a stuck
+ * "Amazon · awaiting_payment" row could not tell whether the buyer was
+ * trying to spend €10 or €500 — which is the first question when deciding
+ * how urgently to sync it (owner, 2026-10-17: "amazon fr görüyom ne
+ * kadarlık almaya çalıştığını görmüyom").
+ *
+ * No new backend field and no payment secret: everything here already comes
+ * back from adminQuoteView. The invoice/address itself is deliberately NOT
+ * rendered — a payable BOLT11 has no business on an operator screen.
+ */
+function OrderMoneyRow({ q }: { q: any }) {
+  // adminQuoteView renders product_usd through money.Micros.String(), so on
+  // THIS endpoint it is a decimal DOLLAR string ("120.000000"), while the
+  // customer endpoints serialise the same json field as raw micro-USD
+  // (an int64, no custom marshaller). Both shapes are handled explicitly so
+  // the row can never be off by a factor of 1e6.
+  const rawUsd = q?.product_usd;
+  const usd = typeof rawUsd === 'string' ? parseFloat(rawUsd) : Number(rawUsd) / 1e6;
+  const qty = Number(q?.quantity) || 0;
+  const coinAmount = String(q?.coin_amount || '').trim();
+  const nim = Number(q?.estimated_nim) || 0;
+  // `denomination` is already the face LABEL ("25 EUR"); `product_value` only
+  // adds information on a range product, where the label says "range" and the
+  // number is the amount the buyer actually picked.
+  const face = String(q?.denomination || '').trim();
+  const faceText = /^range$/i.test(face) && Number(q?.product_value) > 0
+    ? `range (${fmtNum(q.product_value)})`
+    : face;
+  const expiry = Date.parse(q?.payment_expiry || q?.expires_at || '');
+  const lapsed = Number.isFinite(expiry) && expiry <= Date.now();
+  const cell = (label: string, value: string, mono = false) => (
+    <span className="xs">
+      <span className="faint">{label}: </span>
+      <span className={mono ? 'mono' : 'strong'} style={{ overflowWrap: 'anywhere' }}>{value}</span>
+    </span>
+  );
+  return (
+    <div className="row mt-1" data-testid="order-money"
+      style={{ gap: 12, flexWrap: 'wrap', alignItems: 'baseline' }}>
+      {cell('Order value', Number.isFinite(usd) && usd > 0
+        ? fmtUSD(usd) + (qty > 1 ? ` × ${qty}` : '')
+        : '—')}
+      {q?.denomination ? cell('Face', faceText) : null}
+      {coinAmount ? cell('Buyer pays', `${coinAmount} ${String(q?.coin || '').toUpperCase()}`
+        + (q?.network ? ` · ${q.network}` : ''), true) : null}
+      {nim > 0 ? cell('NIM', `${fmtNIM(nim)} NIM`) : null}
+      {cell('Supplier', `${q?.supplier_status || '—'} → ${q?.status || '—'}`, true)}
+      {Number.isFinite(expiry)
+        ? cell('Payment window', `${fmtDate(new Date(expiry))}${lapsed ? ' · lapsed' : ' · open'}`)
+        : null}
+    </div>
+  );
+}
+
+/**
+ * SupplierSyncButton — the operator's recovery path for a purchase that is
+ * stuck in `awaiting_payment` (or locally `expired`) even though the buyer
+ * says they paid.
+ *
+ * Why it has to exist: every customer-facing endpoint deliberately only
+ * re-reads local state ("Reading an order never triggers a supplier poll"),
+ * so the ONLY things that move a quote forward are the settlement tracker and
+ * the supplier webhook. When the webhook is not configured and the tracker
+ * has not got to this row yet, an operator with a paying customer on the
+ * phone had no button at all — the fix was a curl against
+ * POST /api/admin/orders/{id}/sync that nothing in the UI called.
+ *
+ * It is safe to click and cannot invent an outcome: the backend re-GETs the
+ * supplier without cache and applies the same conditional transition the
+ * tracker does, so the row can only move to a state the supplier actually
+ * reported. Test-center quotes and quotes with no supplier id are refused
+ * upstream, and that refusal is shown verbatim.
+ */
+function SupplierSyncButton({ id, onSynced }: { id: string; onSynced?: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [result, setResult] = useState<{ status: string; supplier_status: string } | null>(null);
+  return <div className="mt-1" style={{ display: 'inline-block', marginRight: 8 }}>
+    <button type="button" className="btn btn-outline btn-sm" disabled={busy}
+      data-testid="supplier-sync"
+      onClick={async () => {
+        setBusy(true); setError(''); setResult(null);
+        try {
+          const q: any = await adminSyncOrder(id);
+          setResult({ status: String(q?.status || ''), supplier_status: String(q?.supplier_status || '') });
+          onSynced?.();
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Could not reach the supplier');
+        } finally { setBusy(false); }
+      }}>
+      {busy ? 'Asking supplier…' : 'Sync with supplier'}
+    </button>
+    {error ? <div role="alert" className="xs">{error}</div> : null}
+    {result ? (
+      <div className="xs mono" data-testid="supplier-sync-result" style={{ overflowWrap: 'anywhere' }}>
+        supplier says {result.supplier_status || '—'} → local {result.status || '—'}
+      </div>
+    ) : null}
+  </div>;
 }
 
 function PaymentInspectionButton({ id }: { id: string }) {
