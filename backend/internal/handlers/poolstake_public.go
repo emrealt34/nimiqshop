@@ -117,9 +117,13 @@ func (h *Handlers) syncProfitOnDemand(ctx context.Context, addr string) {
 // Refresh at checkout creation, not on every order-detail polling read.
 func (h *Handlers) syncBuyerProfitOnDemand(userID string) {
 	if user, err := h.Store.GetUser(userID); err == nil {
-		// Profit accrues to the wallet that stakes, which is the linked one
-		// when this account proved ownership of a separate staking wallet.
-		h.syncProfitOnDemand(context.Background(), user.EffectiveStakeAddress())
+		// Profit accrues to the wallets that stake: every linked staking
+		// wallet plus the sign-in address. Syncing only the primary would
+		// leave the others' ledger books stale, and their boosts are part of
+		// the same rate.
+		for _, address := range user.EarningStakeAddresses() {
+			h.syncProfitOnDemand(context.Background(), address)
+		}
 	}
 }
 
@@ -174,15 +178,22 @@ func (h *Handlers) ledgerBoostBpsBestEffort(userID string) int {
 	if nimUsd <= 0 {
 		return 0
 	}
-	// The ledger is keyed by the EARNING address — that is where the
-	// fulfillment path writes it — so read it from the same wallet or a linked
-	// staker's boost would always come back as zero here.
-	l, ok, err := h.Store.ReadStakeLedger(user.EffectiveStakeAddress())
-	if err != nil || !ok {
-		return 0
-	}
+	// The ledger is keyed by EARNING address — that is where the fulfillment
+	// path writes it — so this sums the books of every wallet that earns for
+	// the account (ledgerBoostBpsAllInTx / ApplyLedgerPurchaseAllInTx use the
+	// same rule when they pay). Reading only the primary wallet would show a
+	// buyer with three staking wallets a third of the boost they actually get.
 	settings, _ := h.Store.GetAdminSettings(0)
-	return stakeledger.BoostBps(&l, nimUsd, settings.EffectiveStakeCashback())
+	params := settings.EffectiveStakeCashback()
+	total := 0
+	for _, address := range user.EarningStakeAddresses() {
+		l, ok, err := h.Store.ReadStakeLedger(address)
+		if err != nil || !ok {
+			continue
+		}
+		total += stakeledger.BoostBps(&l, nimUsd, params)
+	}
+	return total
 }
 
 // bestNIMUSD is a best-effort price for display: the warm oracle snapshot
@@ -282,62 +293,50 @@ func (h *Handlers) poolStakeMeFor(ctx *fasthttp.RequestCtx, user db.User) {
 	writeJSON(ctx, fasthttp.StatusOK, resp)
 }
 
-// buildStakeMeView renders a buyer's standing for the wallet that actually
-// earns their cashback: a staking wallet whose ownership they proved by
-// linking it, otherwise the address they signed in with.
+// stakeWalletView is ONE earning wallet's resolved standing: what the pool,
+// the chain and the durable local observation each said about it, plus the
+// ledger book that wallet has earned on its own.
+type stakeWalletView struct {
+	Address         string
+	Staked          bool
+	StakeLuna       int64
+	Source          string // pool | chain | local_watch | pool_error | ""
+	OtherValidator  string
+	OtherStakeNIM   float64
+	StakedSince     time.Time
+	LockedDays      int
+	CheckedAt       time.Time
+	FromCache       bool
+	CheckError      string
+	ChainCheckError string
+	BoostBps        int
+	Ledger          map[string]any
+	Linked          bool
+	LinkedAt        time.Time
+}
+
+// resolveStakeWallet asks about a single wallet with the ladder the shop has
+// always used — pool, then the durable local observation, then the chain — and
+// advances that wallet's own loyalty and ledger clocks.
 //
-// That distinction is the whole point of the linked-stake-wallet feature. A
-// shop account IS an address (FindOrCreateUserByAddress creates one account per
-// wallet), so a buyer who stakes from their regular wallet but checks out
-// through Nimiq Pay signs in as a *different* account that has never staked and
-// earns the base rate — while the stake they are proud of sits one wallet over.
-// Both addresses are reported so no page has to guess which one it is showing.
-//
-// ok=false means the admin settings could not be read; callers turn that into
-// the standard store error response.
-func (h *Handlers) buildStakeMeView(ctx *fasthttp.RequestCtx, user db.User) (map[string]any, bool) {
-	address := user.EffectiveStakeAddress()
-	resp := map[string]any{
-		"address": address,
-		// The wallet this account signed in with, and the wallet the cashback
-		// is earned from. Identical unless a staking wallet is linked.
-		"account_address":         user.NimiqAddress,
-		"stake_address_linked":    user.HasLinkedStakeAddress(),
-		"stake_address_linked_at": user.StakeAddressLinkedAt,
-		"staked":                  false,
-		"stake_luna":              int64(0),
-		"stake_nim":               0.0,
-		"staker_program_enabled":  h.stakeProgramEnabled(),
-		"pool_validator_address":  h.Cfg.PoolValidatorAddress,
-		"checked_at":              time.Time{},
-	}
-
-	settings, err := h.Store.GetAdminSettings(0)
-	if err != nil {
-		return nil, false
-	}
-	operatorBase := settings.EffectiveCashbackBps()
-	base := operatorBase
-	poolBase := 0
-
-	var stakeLuna int64
-	staked := false
-	lockedDays := 0
-
-	if h.Cfg.PoolAPIURL != "" && h.Pool != nil && address != "" {
+// It deliberately knows nothing about rates. The staker base is an account-level
+// number (counted once, however many wallets earn), so it is applied by
+// buildStakeMeView after the whole set has been resolved.
+func (h *Handlers) resolveStakeWallet(ctx *fasthttp.RequestCtx, address string) stakeWalletView {
+	view := stakeWalletView{Address: address}
+	if address != "" && h.Cfg.PoolAPIURL != "" && h.Pool != nil {
 		st, err := h.poolStake(ctx, address)
 		switch err {
 		case nil:
-			staked, stakeLuna = st.Staked, st.StakeLuna
-			resp["stake_source"] = "pool"
+			view.Staked, view.StakeLuna = st.Staked, st.StakeLuna
+			view.Source = "pool"
 			// A cached "not staked" answer can race a fresh delegation.
 			// Prefer our durable local pending/positive observation until
 			// the pool has indexed the new stake.
-			if !staked {
+			if !view.Staked {
 				if cached := h.Store.CachedStakerStake(address, time.Now().UTC()); cached.Staked {
-					staked, stakeLuna = cached.Staked, cached.StakeLuna
-					st.BaseBps = cached.BaseBps
-					resp["stake_source"] = "local_watch"
+					view.Staked, view.StakeLuna = cached.Staked, cached.StakeLuna
+					view.Source = "local_watch"
 				}
 			}
 			// THE chain fallback. The pool's index is a database on the
@@ -345,62 +344,53 @@ func (h *Handlers) buildStakeMeView(ctx *fasthttp.RequestCtx, user db.User) (map
 			// chain, seconds old. When the pool says "no staker" but the
 			// chain shows this address delegating to OUR validator, the
 			// buyer IS staked and must not be shown (or paid) a zero rate.
-			if !staked {
+			if !view.Staked {
 				if cs, cerr := h.chainStake(ctx, address); cerr == nil && cs.Staked {
-					staked, stakeLuna = true, cs.StakeLuna
-					resp["stake_source"] = "chain"
-					log.Printf("poolstake: chain confirms a %s NIM delegation to %s that the pool did not report; using the chain",
-						fmtNIM(cs.StakeLuna), h.Cfg.PoolValidatorAddress)
+					view.Staked, view.StakeLuna = true, cs.StakeLuna
+					view.Source = "chain"
+					log.Printf("poolstake: chain confirms a %s NIM delegation to %s that the pool did not report for %s; using the chain",
+						fmtNIM(cs.StakeLuna), h.Cfg.PoolValidatorAddress, poolstake.CanonicalAddress(address))
 				} else if cerr != nil {
-					resp["chain_check_error"] = "rpc unavailable"
+					view.ChainCheckError = "rpc unavailable"
 				} else if cs.Elsewhere {
 					// Staked with ANOTHER validator: the page offers to move it.
-					resp["other_validator"] = cs.Delegation
-					resp["other_stake_nim"] = float64(cs.ElsewhereLuna) / lunaPerNIM
+					view.OtherValidator = cs.Delegation
+					view.OtherStakeNIM = float64(cs.ElsewhereLuna) / lunaPerNIM
 				}
 			}
-			// Pool answers only whether they are staked. The rate is the
-			// admin-panel staker base (default 1%).
-			poolBase = 0
-			if staked {
-				poolBase = settings.EffectiveStakerCashbackBps()
-			}
-			base = db.StakerStake{Staked: staked, StakeLuna: stakeLuna, BaseBps: poolBase}.EffectiveBaseBps(operatorBase)
-			resp["checked_at"] = st.CheckedAt
-			resp["from_cache"] = st.FromCache
-			// Advance both clocks: the v1 watch (staked_since display) and
-			// the ledger's stake-weighted age (dilute on increase, pro-rata
-			// shrink on decrease). A pool outage leaves them as-is.
+			view.CheckedAt = st.CheckedAt
+			view.FromCache = st.FromCache
+			// Advance both clocks for THIS wallet: the v1 watch
+			// (staked_since display) and the ledger's stake-weighted age
+			// (dilute on increase, pro-rata shrink on decrease). A pool
+			// outage leaves them as-is.
 			now := time.Now().UTC()
-			watch, werr := h.Store.ObserveStake(address, stakeLuna, now)
+			watch, werr := h.Store.ObserveStake(address, view.StakeLuna, now)
 			if werr == nil {
-				_ = h.Store.ObserveStakeLedger(address, stakeLuna, now)
+				_ = h.Store.ObserveStakeLedger(address, view.StakeLuna, now)
 			}
-			if staked {
-				resp["staked_since"] = watch.FirstSeenAt
-				lockedDays = watch.LockedDays(now)
+			if view.Staked {
+				view.StakedSince = watch.FirstSeenAt
+				view.LockedDays = watch.LockedDays(now)
 			}
 		default:
 			// Never downgrade a known/freshly announced staker during an
 			// outage. The durable local snapshot is only a fallback; a
 			// later authoritative pool response can still replace it.
-			resp["stake_check_error"] = "pool unavailable"
-			resp["stake_source"] = "pool_error"
+			view.CheckError = "pool unavailable"
+			view.Source = "pool_error"
 			// The chain is a second, independent source: while the pool is
 			// unreachable it still answers whether the delegation exists.
 			if cs, cerr := h.chainStake(ctx, address); cerr == nil && cs.Staked {
-				staked, stakeLuna = true, cs.StakeLuna
-				resp["stake_source"] = "chain"
-				delete(resp, "stake_check_error")
-				log.Printf("poolstake: pool unreachable; chain confirms a %s NIM delegation to %s",
-					fmtNIM(cs.StakeLuna), h.Cfg.PoolValidatorAddress)
+				view.Staked, view.StakeLuna = true, cs.StakeLuna
+				view.Source = "chain"
+				view.CheckError = ""
+				log.Printf("poolstake: pool unreachable; chain confirms a %s NIM delegation to %s for %s",
+					fmtNIM(cs.StakeLuna), h.Cfg.PoolValidatorAddress, poolstake.CanonicalAddress(address))
 			} else if cached := h.Store.CachedStakerStake(address, time.Now().UTC()); cached.Staked {
-				staked, stakeLuna = true, cached.StakeLuna
-				poolBase = settings.EffectiveStakerCashbackBps()
-				cached.BaseBps = poolBase
-				base = cached.EffectiveBaseBps(operatorBase)
-				resp["from_cache"] = true
-				resp["stake_source"] = "local_watch"
+				view.Staked, view.StakeLuna = true, cached.StakeLuna
+				view.FromCache = true
+				view.Source = "local_watch"
 			}
 		}
 	}
@@ -408,30 +398,217 @@ func (h *Handlers) buildStakeMeView(ctx *fasthttp.RequestCtx, user db.User) (map
 	// The page needs fresh numbers now, so refresh this address only. No
 	// background scan and no requests for unrelated stakers.
 	h.syncProfitOnDemand(ctx, address)
-	ledger := h.ledgerView(address)
-	ledgerBps, _ := ledger["boost_bps"].(int)
-	totalBps := base + ledgerBps
+	view.Ledger = h.ledgerView(address)
+	if bps, ok := view.Ledger["boost_bps"].(int); ok {
+		view.BoostBps = bps
+	}
+	return view
+}
+
+// buildStakeMeView renders a buyer's TOTAL standing across every wallet that
+// earns their cashback: the address they signed in with plus each staking
+// wallet they linked after proving ownership of it.
+//
+// That distinction is the whole point of the linked-stake-wallet feature. A
+// shop account IS an address (FindOrCreateUserByAddress creates one account per
+// wallet), so a buyer who stakes from their regular wallet but checks out
+// through Nimiq Pay signs in as a *different* account that has never staked and
+// earns the base rate — while the stake they are proud of sits one wallet over.
+// Buyers also split a stake over several wallets, so the link is a list and the
+// stakes behind it are summed.
+//
+// The aggregation rules, which the whole feature stands or falls on:
+//
+//   - stake is SUMMED across earning wallets, so 100 + 150 + 50 NIM in three
+//     wallets earns exactly what 300 NIM in one wallet earns;
+//   - the staker BASE is applied ONCE per account. It is a flat rate, not a
+//     per-wallet entitlement: three wallets must not triple it;
+//   - the ledger boost is summed, because each wallet's book was earned by that
+//     wallet's own stake and is capped by it (ApplyLedgerPurchaseAllInTx debits
+//     them the same way at payout, so the preview and the money agree);
+//   - loyalty is the LONGEST streak and staked_since the EARLIEST, so linking a
+//     new wallet never resets the age of an old one;
+//   - payouts are unaffected: cashback goes to the sign-in wallet, always.
+//
+// ok=false means the admin settings could not be read; callers turn that into
+// the standard store error response.
+func (h *Handlers) buildStakeMeView(ctx *fasthttp.RequestCtx, user db.User) (map[string]any, bool) {
+	settings, err := h.Store.GetAdminSettings(0)
+	if err != nil {
+		return nil, false
+	}
+	operatorBase := settings.EffectiveCashbackBps()
+	stakerBase := settings.EffectiveStakerCashbackBps()
+
+	primary := user.EffectiveStakeAddress()
+	earning := user.EarningStakeAddresses()
+	linkedAt := make(map[string]time.Time, len(user.StakeAddresses))
+	for _, link := range user.LinkedStakeWallets() {
+		linkedAt[poolstake.CanonicalAddress(link.Address)] = link.LinkedAt
+	}
+
+	views := make([]stakeWalletView, 0, len(earning))
+	var stakeLuna int64
+	var boostBps int
+	var lockedDays int
+	var stakedSince time.Time
+	var otherValidator string
+	var otherStakeNIM float64
+	staked := false
+	failed := 0
+	chainFailed := 0
+	primaryView := stakeWalletView{}
+
+	for _, address := range earning {
+		view := h.resolveStakeWallet(ctx, address)
+		canonical := poolstake.CanonicalAddress(address)
+		if at, ok := linkedAt[canonical]; ok {
+			view.Linked = true
+			view.LinkedAt = at
+		}
+		views = append(views, view)
+		if address == primary {
+			primaryView = view
+		}
+		if view.CheckError != "" {
+			failed++
+		}
+		if view.ChainCheckError != "" {
+			chainFailed++
+		}
+		stakeLuna += view.StakeLuna
+		boostBps += view.BoostBps
+		if view.Staked {
+			staked = true
+			if view.LockedDays > lockedDays {
+				lockedDays = view.LockedDays
+			}
+			if stakedSince.IsZero() || (!view.StakedSince.IsZero() && view.StakedSince.Before(stakedSince)) {
+				stakedSince = view.StakedSince
+			}
+		}
+		// The first wallet staking elsewhere is the one the page offers to
+		// move; the per-wallet list below names all of them.
+		if otherValidator == "" && view.OtherValidator != "" {
+			otherValidator = view.OtherValidator
+			otherStakeNIM = view.OtherStakeNIM
+		}
+	}
+
+	resp := map[string]any{
+		// The wallet the rate card names. With several linked wallets this is
+		// the one linked first; the total below covers all of them and
+		// stake_addresses lists every wallet individually.
+		"address": primary,
+		// The wallet this account signed in with — and the wallet cashback is
+		// always PAID to, however many wallets earn it.
+		"account_address":         user.NimiqAddress,
+		"stake_address_linked":    user.HasLinkedStakeAddress(),
+		"stake_address_linked_at": user.StakeAddressLinkedAt(primary),
+		"stake_addresses":         stakeAddressList(views),
+		"earning_addresses":       earning,
+		"linked_wallet_limit":     db.MaxLinkedStakeAddresses,
+		"staked":                  false,
+		"stake_luna":              int64(0),
+		"stake_nim":               0.0,
+		"staker_program_enabled":  h.stakeProgramEnabled(),
+		"pool_validator_address":  h.Cfg.PoolValidatorAddress,
+		"checked_at":              primaryView.CheckedAt,
+		"from_cache":              primaryView.FromCache,
+	}
+	if primaryView.Source != "" {
+		resp["stake_source"] = aggregateSource(views, primaryView.Source)
+	}
+	if failed == len(views) && failed > 0 {
+		resp["stake_check_error"] = "pool unavailable"
+	}
+	if chainFailed == len(views) && chainFailed > 0 {
+		resp["chain_check_error"] = "rpc unavailable"
+	}
+	if otherValidator != "" {
+		resp["other_validator"] = otherValidator
+		resp["other_stake_nim"] = otherStakeNIM
+	}
+
+	// THE base rule, applied once for the account: staked anywhere (any
+	// amount, any wallet) → the staker base; not staked → the operator's
+	// universal base (0 by default). The higher of the two wins so a promo
+	// never pays a staker less than a non-staker.
+	poolBase := 0
+	if staked {
+		poolBase = stakerBase
+	}
+	base := db.StakerStake{Staked: staked, StakeLuna: stakeLuna, BaseBps: poolBase}.EffectiveBaseBps(operatorBase)
+	totalBps := base + boostBps
+	// stakerBaseApplied: the pool's staker base is what this buyer earns
+	// (it beat the operator's universal base). Drives base_source/boosted.
+	stakerBaseApplied := staked && poolBase > 0 && poolBase > operatorBase
 
 	resp["staked"] = staked
 	resp["stake_luna"] = stakeLuna
 	resp["stake_nim"] = float64(stakeLuna) / lunaPerNIM
 	resp["base_bps"] = base
 	resp["base_percent"] = float64(base) / 100.0
-	// stakerBaseApplied: the pool's staker base is what this buyer earns
-	// (it beat the operator's universal base). Drives base_source/boosted.
-	stakerBaseApplied := staked && poolBase > 0 && poolBase > operatorBase
 	resp["base_source"] = map[bool]string{true: "pool_staker", false: "operator"}[stakerBaseApplied]
 	resp["staker_base_bps"] = h.poolStakerBaseBps(ctx)
-	resp["boost_bps"] = ledgerBps
-	resp["boost_percent"] = float64(ledgerBps) / 100.0
+	resp["boost_bps"] = boostBps
+	resp["boost_percent"] = float64(boostBps) / 100.0
 	resp["cashback_bps"] = totalBps
 	resp["cashback_percent"] = float64(totalBps) / 100.0
-	resp["boosted"] = ledgerBps > 0 || stakerBaseApplied
-	resp["ledger"] = ledger
+	resp["boosted"] = boostBps > 0 || stakerBaseApplied
+	// The ledger card describes the PRIMARY wallet; the per-wallet boosts that
+	// make up boost_bps are in stake_addresses. One merged book would be a
+	// different (and less honest) artefact — see ApplyLedgerPurchaseAllInTx.
+	resp["ledger"] = primaryView.Ledger
 	if staked {
 		resp["loyalty_days"] = lockedDays
+		if !stakedSince.IsZero() {
+			resp["staked_since"] = stakedSince
+		}
 	}
 	return resp, true
+}
+
+// stakeAddressList is the per-wallet breakdown the cashback page renders: which
+// wallets earn, how much each holds, what each one's own book adds, and which
+// (if any) still stakes with somebody else.
+func stakeAddressList(views []stakeWalletView) []map[string]any {
+	out := make([]map[string]any, 0, len(views))
+	for _, view := range views {
+		row := map[string]any{
+			"address":      view.Address,
+			"linked":       view.Linked,
+			"staked":       view.Staked,
+			"stake_nim":    float64(view.StakeLuna) / lunaPerNIM,
+			"boost_bps":    view.BoostBps,
+			"loyalty_days": view.LockedDays,
+		}
+		if !view.LinkedAt.IsZero() {
+			row["linked_at"] = view.LinkedAt
+		}
+		if view.Source != "" {
+			row["source"] = view.Source
+		}
+		if view.OtherValidator != "" {
+			row["other_validator"] = view.OtherValidator
+			row["other_stake_nim"] = view.OtherStakeNIM
+		}
+		out = append(out, row)
+	}
+	return out
+}
+
+// aggregateSource names where the total came from. "mixed" is the honest answer
+// when wallets disagree (one from the pool, another confirmed on chain): the
+// per-wallet rows carry the detail, and inventing a single source would claim a
+// confidence the shop does not have.
+func aggregateSource(views []stakeWalletView, primary string) string {
+	for _, view := range views {
+		if view.Source != "" && view.Source != primary {
+			return "mixed"
+		}
+	}
+	return primary
 }
 
 // PoolStakeRefresh drops the cached pool answer for the signed-in buyer and
@@ -449,19 +626,31 @@ func (h *Handlers) PoolStakeRefresh(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	// Refresh the wallet that earns this account's cashback, which is the
-	// linked staking wallet when there is one — refreshing the sign-in address
-	// instead would leave a linked staker's numbers stale.
-	address := user.EffectiveStakeAddress()
-	h.Pool.Forget(address)
-	st, err := h.poolStake(ctx, address)
-	if err != nil {
+	// Refresh EVERY wallet that earns this account's cashback, not just the
+	// primary: the buyer may have just staked (or moved a delegation) in any of
+	// them, and the total on the page is the sum of all of them.
+	addresses := user.EarningStakeAddresses()
+	for _, address := range addresses {
+		h.Pool.Forget(address)
+	}
+	now := time.Now().UTC()
+	asked := 0
+	for _, address := range addresses {
+		st, err := h.poolStake(ctx, address)
+		if err != nil {
+			// One unreachable wallet must not fail the whole refresh — the
+			// view below still renders what the others answered, plus the
+			// honest stake_check_error when none of them could be asked.
+			continue
+		}
+		asked++
+		watch, _ := h.Store.ObserveStake(address, st.StakeLuna, now)
+		_ = h.Store.ObserveStakeLedger(address, st.StakeLuna, now)
+		_ = watch
+	}
+	if asked == 0 {
 		writeError(ctx, fasthttp.StatusBadGateway, "could not reach the staking pool")
 		return
 	}
-	now := time.Now().UTC()
-	watch, _ := h.Store.ObserveStake(address, st.StakeLuna, now)
-	_ = h.Store.ObserveStakeLedger(address, st.StakeLuna, now)
-	_ = watch
 	h.poolStakeMeFor(ctx, user)
 }

@@ -37,20 +37,34 @@ type User struct {
 	LastCountry string    `json:"last_country,omitempty"`
 	LastSeenAt  time.Time `json:"last_seen_at,omitempty"`
 
-	// StakeAddress is an OPTIONAL second wallet this account proved control
-	// of (signed message) and that verifiably stakes with the operator's
-	// validator. It exists because the account identity is a single address:
-	// a shopper who staked from their regular wallet and then signs in
-	// through Nimiq Pay lands on a DIFFERENT address, so their stake — and
-	// the cashback boost it funds — would be invisible to the shop.
+	// StakeAddresses are the OPTIONAL extra wallets this account proved
+	// control of (signed message) and that verifiably stake with the
+	// operator's validator. They exist because the account identity is a
+	// single address: a shopper who staked from their regular wallet and
+	// then signs in through Nimiq Pay lands on a DIFFERENT address, so their
+	// stake — and the cashback boost it funds — would be invisible to the
+	// shop. Buyers split a stake over several wallets just as often, so the
+	// link is a list, capped at MaxLinkedStakeAddresses.
 	//
-	// It changes which address the STAKE is read from (pool lookup, loyalty
-	// clocks, ledger). It never changes who gets paid: cashback still goes to
-	// NimiqAddress, the wallet the buyer signed in with. Empty means "no
-	// link" and every code path must fall back to NimiqAddress, which is what
-	// User.EffectiveStakeAddress does.
-	StakeAddress         string    `json:"stake_address,omitempty"`
-	StakeAddressLinkedAt time.Time `json:"stake_address_linked_at,omitempty"`
+	// They change which addresses the STAKE is read from (pool lookup,
+	// loyalty clocks, ledger) and those stakes are SUMMED: every wallet the
+	// buyer proved ownership of counts toward the one cashback rate. The
+	// staker base is applied once per account, never once per wallet.
+	//
+	// They never change who gets paid: cashback still goes to NimiqAddress,
+	// the wallet the buyer signed in with. The sign-in wallet is not stored
+	// here — it always earns — so an empty list means "only my own wallet",
+	// which is what User.EarningStakeAddresses spells out.
+	StakeAddresses []StakeAddressLink `json:"stake_addresses,omitempty"`
+}
+
+// StakeAddressLink is one wallet linked to an account as an earning wallet:
+// the address plus the moment ownership was proven. LinkedAt is what the UI
+// shows ("linked 3 days ago") and what orders the list, so the primary
+// earning wallet stays stable instead of jumping around between reads.
+type StakeAddressLink struct {
+	Address  string    `json:"address"`
+	LinkedAt time.Time `json:"linked_at"`
 }
 
 // Order was the `orders` table.

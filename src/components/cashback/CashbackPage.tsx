@@ -67,6 +67,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AppRoot } from '../AppRoot';
 import { Icon } from '../ui/Icon';
 import { StakePositionCard } from './StakePositionCard';
+import { LinkedStakeWallet } from './LinkedStakeWallet';
 import { useStakePosition, type StakePosition } from '../../lib/stakePosition';
 import { getUid, getAddress } from '../../lib/session';
 import { CashbackCalculator } from './CashbackCalculator';
@@ -418,6 +419,16 @@ export function CashbackView() {
     const fresh = await refreshPosition();
     if (fresh && pending && positionKey(fresh) !== pending.before) savePending(null);
   }
+  /**
+   * Linking or unlinking a staking wallet changes WHICH wallet every stake and
+   * ledger read describes, so both views have to be re-read: the rate card and
+   * the on-chain position now answer for a different address.
+   */
+  async function refreshAfterLinkChange() {
+    const fresh = await refreshMyStake();
+    if (fresh) { setMineOwner(positionOwner); setMine(fresh); }
+    await recheckPosition();
+  }
   // The universal base (non-stakers; 0 by default) and the pool's staker
   // base (any positive stake). Both come from the API — the pool's number,
   // verbatim. There is no local fallback: what the pool publishes is what
@@ -703,6 +714,9 @@ export function CashbackView() {
   const stakeFooter = (
     <div id="cb-stake-form">
       {authed && <StakePositionCard position={position} loading={positionLoading || (!position && !positionError)} error={positionError} pool={validator} busy={!!busy || !!pending} onRefresh={() => { void recheckPosition(); }} onMove={doMove} onWallet={showWalletRedirect} />}
+      {/* "Which wallet earns my cashback?" — the question a buyer who stakes from
+          one wallet and pays from another cannot answer from the rate alone. */}
+      {authed && <LinkedStakeWallet mine={mine} onChanged={() => { void refreshAfterLinkChange(); }} />}
       {pending && <div className="alert info" role="status">{t('stakePosition.pending')} <code style={{ overflowWrap: 'anywhere' }}>{pending.hash}</code><button className="btn btn-sm" onClick={() => { void recheckPosition(); }} disabled={positionLoading}>{t('common.refresh')}</button><button className="btn btn-sm btn-outline" onClick={showWalletRedirect}>{t('stakePosition.manageWallet')}</button></div>}
       {err && !showStakeForm && <div className="alert error" role="alert">{err}</div>}
       {!showStakeForm ? null : (

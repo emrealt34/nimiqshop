@@ -49,9 +49,13 @@ func (h *Handlers) CashbackMe(ctx *fasthttp.RequestCtx) {
 	}
 
 	// This response displays the ledger, therefore this is one of the few
-	// useful moments to refresh the signed-in wallet's cumulative pool profit.
-	// Refresh the wallet that earns: a linked staking wallet when there is one.
-	h.syncProfitOnDemand(ctx, user.EffectiveStakeAddress())
+	// useful moments to refresh cumulative pool profit — for every wallet that
+	// earns, not just the primary: the boost shown below is the sum of their
+	// books.
+	earning := user.EarningStakeAddresses()
+	for _, address := range earning {
+		h.syncProfitOnDemand(ctx, address)
+	}
 
 	sum, err := h.Store.GetUserCashbackSummary(userID)
 	if err != nil {
@@ -154,12 +158,19 @@ func (h *Handlers) CashbackMe(ctx *fasthttp.RequestCtx) {
 			"preference":    sum.LastDest,
 		},
 		"cashbacks": out,
-		"ledger":    h.ledgerView(user.EffectiveStakeAddress()),
-		// Which wallet this account's cashback is earned from. Identical to
-		// the sign-in address unless a staking wallet is linked; the page shows
+		// The ledger card describes the PRIMARY earning wallet; the boost that
+		// actually applies to an order is the sum over all of them, which is
+		// what ledger_boost_bps reports.
+		"ledger": h.ledgerView(user.EffectiveStakeAddress()),
+		// Which wallets this account's cashback is earned from. Identical to
+		// the sign-in address unless staking wallets are linked; the page shows
 		// both so the buyer never has to guess.
 		"account_address":        user.NimiqAddress,
 		"stake_address":          user.EffectiveStakeAddress(),
+		"stake_addresses":        earning,
+		"linked_stake_addresses": linkedStakeRows(user),
+		"linked_wallet_limit":    db.MaxLinkedStakeAddresses,
+		"ledger_boost_bps":       h.ledgerBoostBpsBestEffort(userID),
 		"stake_address_linked":   user.HasLinkedStakeAddress(),
 		"staker_program_enabled": h.stakeProgramEnabled(),
 		"stake_cashback":         h.stakeCashbackView(),

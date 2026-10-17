@@ -347,6 +347,11 @@ export function HomePage() {
                 onClick={() => {
                   openInNimiqPay(() => setShowPayInstall(true));
                 }}
+                /* Paul (buyer, 2026-10-17) read "Open in Nimiq Pay" as the only
+                   door to cashback, and the hero title said the same thing. It
+                   is a shortcut, nothing more: say so on the button itself. */
+                title={t('home.openInPayHint')}
+                aria-label={`${t('home.openInPay')} — ${t('home.openInPayHint')}`}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
               >
                 <Icon name="nimiq" size={20} />
@@ -354,6 +359,9 @@ export function HomePage() {
               </button>
             )}
           </div>
+          {/* Cashback is earned by STAKING, not by the app you pay with — the one
+              thing the hero used to get wrong. Stated where the confusion starts. */}
+          <p className="hero-any-rail" style={{ marginTop: 14, maxWidth: '34rem', opacity: 0.9 }}>{t('home.cashbackAnyRail')}</p>
         </div>
         <aside className="kf-pkg" aria-label={t('home.packageAria')}>
           <div className="kf-pkg-head">

@@ -34,6 +34,28 @@ func ledgerBoostBpsInTx(tx *badger.Txn, address string, nimUsd float64, p stakel
 	return stakeledger.BoostBps(&l, nimUsd, p)
 }
 
+// ledgerBoostBpsAllInTx is the read-only twin of ApplyLedgerPurchaseAllInTx:
+// what would this purchase earn from ALL of a buyer's earning wallets, without
+// debiting any of them. Used to show the rate before the fulfillment
+// transaction opens, so the preview and the payout cannot disagree about how
+// many wallets are behind the number.
+func ledgerBoostBpsAllInTx(tx *badger.Txn, addresses []string, nimUsd float64, p stakeledger.Params) int {
+	if nimUsd <= 0 {
+		return 0
+	}
+	total := 0
+	seen := make(map[string]bool, len(addresses))
+	for _, address := range addresses {
+		addr := canonicalStakeAddr(address)
+		if addr == "" || seen[addr] {
+			continue
+		}
+		seen[addr] = true
+		total += ledgerBoostBpsInTx(tx, address, nimUsd, p)
+	}
+	return total
+}
+
 const (
 	CashbackQueued    = "queued"
 	CashbackSending   = "sending"
@@ -191,11 +213,15 @@ func enqueueCashbackOnFulfill(tx *badger.Txn, q *Quote, stake StakerStake, ledge
 	//	              would see past rewards land in a wallet they no longer
 	//	              control.
 	var user User
-	stakeAddr := ""
+	var stakeAddrs []string
 	accountAddr := ""
 	if e := getJSON(tx, userKey(q.UserID), &user); e == nil {
 		accountAddr = user.NimiqAddress
-		stakeAddr = user.EffectiveStakeAddress()
+		// EVERY wallet that earns for this account: the one they signed in
+		// with plus each linked staking wallet. Their stakes were already
+		// summed into `stake` by AggregateStakerStake, and their ledger books
+		// are debited and summed below — one purchase, several books, one rate.
+		stakeAddrs = user.EarningStakeAddresses()
 	}
 
 	// The base is the operator's call: staked (any amount) → the staker
@@ -223,10 +249,7 @@ func enqueueCashbackOnFulfill(tx *badger.Txn, q *Quote, stake StakerStake, ledge
 	// there is no price, no ledger, or an empty book — the base rate then
 	// stands on its own. Never guesses: a missing P means no boost.
 	nimUsd := q.NimUsdRate
-	boostBps := 0
-	if stakeAddr != "" && nimUsd > 0 {
-		boostBps = ledgerBoostBpsInTx(tx, stakeAddr, nimUsd, ledgerParams)
-	}
+	boostBps := ledgerBoostBpsAllInTx(tx, stakeAddrs, nimUsd, ledgerParams)
 
 	// Resolve the payout. walletBps is the rate applied to the product's NIM
 	// price (paid from the shop wallet); the boost part is the exact ledger
@@ -239,7 +262,7 @@ func enqueueCashbackOnFulfill(tx *badger.Txn, q *Quote, stake StakerStake, ledge
 	boostLuna := int64(0)
 	debitLedger := func() (int, error) {
 		var e error
-		boostLuna, boostBps, e = ApplyLedgerPurchaseInTx(tx, stakeAddr, float64(q.ProductUSD)/1_000_000, nimUsd, ledgerParams, now)
+		boostLuna, boostBps, e = ApplyLedgerPurchaseAllInTx(tx, stakeAddrs, float64(q.ProductUSD)/1_000_000, nimUsd, ledgerParams, now)
 		return boostBps, e
 	}
 	switch {

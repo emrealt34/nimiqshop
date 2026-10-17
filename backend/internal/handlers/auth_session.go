@@ -136,7 +136,11 @@ func (h *Handlers) AuthSession(ctx *fasthttp.RequestCtx) {
 			"stake_address": user.EffectiveStakeAddress(),
 		},
 		"stake_address_linked": user.HasLinkedStakeAddress(),
-		"expires_at":           expiresAt,
+		// Every wallet whose stake earns for this account (sign-in wallet
+		// first, then the linked ones). Their stakes are summed into one rate;
+		// payouts still go to nimiq_address.
+		"stake_addresses": user.EarningStakeAddresses(),
+		"expires_at":      expiresAt,
 		// Echoing the CSRF cookie lets a page that lost its in-memory copy (a
 		// hard reload mid-session) recover it without re-authenticating.
 		"csrf_token": csrf,

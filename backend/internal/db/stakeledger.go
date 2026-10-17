@@ -256,6 +256,42 @@ func ApplyLedgerPurchaseInTx(tx *badger.Txn, address string, xUSD, nimUsd float6
 	return luna, bps, nil
 }
 
+// ApplyLedgerPurchaseAllInTx debits EVERY earning wallet's own book for one
+// purchase and sums what they pay out.
+//
+// Why per wallet and not one merged book: each ledger is a stake-weighted
+// account of what one delegation earned, with its own eligible-spend cap, its
+// own dilution on increase and its own pro-rata shrink on withdrawal. Merging
+// them would let a fresh wallet spend credit its stake has not earned yet, and
+// would make unlinking a wallet retroactively rewrite a book the buyer can see.
+// Summing the results keeps every cap honest while the buyer still experiences
+// ONE rate: three wallets that each afford 40 Luna pay 120, and no wallet can
+// pay more than its own book holds.
+//
+// It runs inside the caller's fulfillment transaction, so a conflict retries
+// the whole set together — two wallets can never end up debited for different
+// attempts at the same order.
+func ApplyLedgerPurchaseAllInTx(tx *badger.Txn, addresses []string, xUSD, nimUsd float64, p stakeledger.Params, now time.Time) (boostLuna int64, boostBps int, err error) {
+	if xUSD <= 0 || nimUsd <= 0 {
+		return 0, 0, nil
+	}
+	seen := make(map[string]bool, len(addresses))
+	for _, address := range addresses {
+		addr := canonicalStakeAddr(address)
+		if addr == "" || seen[addr] {
+			continue
+		}
+		seen[addr] = true
+		luna, bps, e := ApplyLedgerPurchaseInTx(tx, address, xUSD, nimUsd, p, now)
+		if e != nil {
+			return 0, 0, e
+		}
+		boostLuna += luna
+		boostBps += bps
+	}
+	return boostLuna, boostBps, nil
+}
+
 // StakeLedgerParamsForTx resolves the live normalized params. Call it
 // BEFORE opening the fulfillment transaction so the txn body reads one
 // stable value.

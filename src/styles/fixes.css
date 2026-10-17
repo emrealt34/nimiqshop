@@ -4028,6 +4028,14 @@ body { padding-bottom: 0; }
 .cb-position-balances dd { margin: 5px 0 0; font-weight: 800; overflow-wrap: anywhere; }
 @media (max-width: 480px) { .cb-position-balances { grid-template-columns: 1fr; gap: 8px; } .cb-position-balances > div { display: flex; justify-content: space-between; gap: 12px; } .cb-position-balances dd { margin: 0; } }
 
+/* Linked staking wallets card (LinkedStakeWallet). Its own class names: the
+   .cb-position rules above belong to the stake position card and must not
+   restyle this one. */
+.cb-linked-wallet { padding-bottom: 18px; margin-bottom: 18px; border-bottom: 1px dashed var(--line); }
+.cb-linked-wallet h3 { margin: 0; }
+.cb-link-note { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--muted) 10%, transparent); }
+.cb-link-note > svg { flex: none; margin-top: 2px; }
+
 /* Compact cashback receipt: one complete hero, two actions, no vacant columns. */
 .pt-card.pt-impact { max-width: 760px; margin-inline: auto; }
 .pt-card.pt-impact .pt-impact-summary { display: block; padding: var(--ic-x); border-bottom: none; }

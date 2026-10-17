@@ -11,35 +11,98 @@ import (
 	"nimiqshop/internal/nimiq"
 )
 
-// EffectiveStakeAddress is the ONE place that answers "whose stake earns this
-// account's cashback?". It is the linked stake wallet when the account has one
-// and the login address otherwise, so a buyer who staked from a regular wallet
-// and shops through Nimiq Pay is still recognised as a staker.
+// MaxLinkedStakeAddresses bounds how many EXTRA wallets one account may link.
+// Each earning wallet costs a pool and/or chain lookup on every rate read, so
+// this is a latency and abuse bound as much as a product rule; five linked
+// wallets plus the sign-in wallet already covers a buyer who splits a stake
+// over a hardware wallet, a phone and a couple of old addresses.
+const MaxLinkedStakeAddresses = 5
+
+// ErrTooManyStakeAddresses is what AddStakeAddress returns once the cap is
+// reached. The handler turns it into a 409 that names the limit, because
+// "could not link" would send the buyer to support for a rule they can act on
+// themselves (unlink a wallet they no longer use).
+var ErrTooManyStakeAddresses = errors.New("stake wallet limit reached")
+
+// LinkedStakeWallets returns the wallets this account proved control of, in
+// link order, canonicalised and deduplicated. The sign-in address is filtered
+// out even if a caller stored it: it always earns, so keeping it in the list
+// would double-count its stake and show the buyer a "link" they never made.
+func (u User) LinkedStakeWallets() []StakeAddressLink {
+	own := canonicalStakeAddr(u.NimiqAddress)
+	out := make([]StakeAddressLink, 0, len(u.StakeAddresses))
+	seen := make(map[string]bool, len(u.StakeAddresses))
+	for _, link := range u.StakeAddresses {
+		addr := canonicalStakeAddr(link.Address)
+		if addr == "" || addr == own || seen[addr] {
+			continue
+		}
+		seen[addr] = true
+		out = append(out, StakeAddressLink{Address: nimiq.NormalizeAddress(link.Address), LinkedAt: link.LinkedAt})
+	}
+	return out
+}
+
+// EarningStakeAddresses is the ONE place that answers "whose stake earns this
+// account's cashback?". It is the wallet the buyer signed in with, followed by
+// every linked staking wallet — deduplicated, own address first so the primary
+// never changes when a wallet is added or removed.
 //
 // Every stake read in the shop (pool lookup, chain verification, loyalty
-// clocks, the single ledger) must go through this. Reading NimiqAddress
-// directly is how a linked wallet gets silently ignored — and the failure mode
-// is invisible: the buyer simply earns the base rate forever.
+// clocks, the ledger, the post-delivery re-ask) must go through this. Reading
+// NimiqAddress directly is how a linked wallet gets silently ignored, and the
+// failure mode is invisible: the buyer simply earns the base rate forever.
 //
-// It never affects the payout recipient. Cashback is paid to NimiqAddress, the
-// wallet the buyer authenticated with; a link only says where the stake lives.
+// The stakes behind these addresses are SUMMED into one rate (see
+// Store.aggregateStakerStake) while the staker base is applied ONCE per
+// account. It never affects the payout recipient: cashback is paid to
+// NimiqAddress, the wallet the buyer authenticated with. A link says where the
+// stake lives, never where money goes.
+func (u User) EarningStakeAddresses() []string {
+	out := make([]string, 0, len(u.StakeAddresses)+1)
+	if own := strings.TrimSpace(u.NimiqAddress); own != "" {
+		out = append(out, own)
+	}
+	for _, link := range u.LinkedStakeWallets() {
+		out = append(out, link.Address)
+	}
+	return out
+}
+
+// EffectiveStakeAddress is the PRIMARY earning wallet: the first linked
+// staking wallet when the account has one, otherwise the sign-in address.
+//
+// Use it where a single address has to be named — the label on a card, an
+// admin row, a cache key — and EarningStakeAddresses wherever stake is READ or
+// cashback is COMPUTED. Naming one wallet of several as "the" stake is fine;
+// summing only one of them is not.
 func (u User) EffectiveStakeAddress() string {
-	if addr := strings.TrimSpace(u.StakeAddress); addr != "" {
-		return addr
+	if links := u.LinkedStakeWallets(); len(links) > 0 {
+		return links[0].Address
 	}
 	return u.NimiqAddress
 }
 
-// HasLinkedStakeAddress reports whether the account's stake is read from a
-// wallet other than the one it signed in with. The UI uses it to say which
-// address is earning, and the admin console to show why a rate came out the way
-// it did.
+// HasLinkedStakeAddress reports whether any wallet other than the sign-in
+// wallet earns for this account. The UI uses it to say which addresses are
+// earning, and the admin console to show why a rate came out the way it did.
 func (u User) HasLinkedStakeAddress() bool {
-	addr := strings.TrimSpace(u.StakeAddress)
-	return addr != "" && canonicalStakeAddr(addr) != canonicalStakeAddr(u.NimiqAddress)
+	return len(u.LinkedStakeWallets()) > 0
 }
 
-// SetStakeAddress links a second wallet to an existing account.
+// StakeAddressLinkedAt returns when a wallet was linked, or the zero time when
+// it is not linked to this account.
+func (u User) StakeAddressLinkedAt(address string) time.Time {
+	want := canonicalStakeAddr(address)
+	for _, link := range u.LinkedStakeWallets() {
+		if canonicalStakeAddr(link.Address) == want {
+			return link.LinkedAt
+		}
+	}
+	return time.Time{}
+}
+
+// AddStakeAddress links another earning wallet to an existing account.
 //
 // The caller is responsible for the two proofs that make this safe, and this
 // method deliberately refuses to guess either of them:
@@ -50,10 +113,11 @@ func (u User) HasLinkedStakeAddress() bool {
 //     operator's validator, otherwise linking buys nothing and only confuses
 //     the buyer about which wallet earns.
 //
-// Linking the address the account already logs in with is allowed and is a
-// no-op normalisation: it clears the link rather than storing a duplicate, so
-// HasLinkedStakeAddress stays honest.
-func (s *Store) SetStakeAddress(userID, address string, now time.Time) (User, error) {
+// Adding an address that is already linked (or that IS the sign-in address) is
+// a successful no-op that returns the current record, so a double click or a
+// re-link after a page refresh cannot fail the buyer. Exceeding
+// MaxLinkedStakeAddresses returns ErrTooManyStakeAddresses.
+func (s *Store) AddStakeAddress(userID, address string, now time.Time) (User, error) {
 	var user User
 	if strings.TrimSpace(userID) == "" {
 		return user, errors.New("user id required")
@@ -62,20 +126,27 @@ func (s *Store) SetStakeAddress(userID, address string, now time.Time) (User, er
 		return user, err
 	}
 	normalized := nimiq.NormalizeAddress(address)
+	want := canonicalStakeAddr(normalized)
 
 	err := s.Update(func(txn *badger.Txn) error {
 		if err := getJSON(txn, userKey(userID), &user); err != nil {
 			return err
 		}
-		if canonicalStakeAddr(normalized) == canonicalStakeAddr(user.NimiqAddress) {
-			// Same wallet: nothing to link. Clearing keeps the record clean
-			// instead of storing an address that duplicates the identity.
-			user.StakeAddress = ""
-			user.StakeAddressLinkedAt = time.Time{}
-		} else {
-			user.StakeAddress = normalized
-			user.StakeAddressLinkedAt = now.UTC()
+		if want == canonicalStakeAddr(user.NimiqAddress) {
+			return nil // the sign-in wallet always earns; nothing to store
 		}
+		for _, link := range user.LinkedStakeWallets() {
+			if canonicalStakeAddr(link.Address) == want {
+				return nil // already linked: idempotent
+			}
+		}
+		if len(user.LinkedStakeWallets()) >= MaxLinkedStakeAddresses {
+			return ErrTooManyStakeAddresses
+		}
+		user.StakeAddresses = append(user.LinkedStakeWallets(), StakeAddressLink{
+			Address:  normalized,
+			LinkedAt: now.UTC(),
+		})
 		blob, err := marshal(user)
 		if err != nil {
 			return err
@@ -85,12 +156,51 @@ func (s *Store) SetStakeAddress(userID, address string, now time.Time) (User, er
 	return user, err
 }
 
-// ClearStakeAddress removes the link, putting the account back to reading its
-// stake from the wallet it signs in with. The ledger and loyalty clocks are
-// keyed by address and are left untouched on purpose: they are a record of what
-// was observed for that wallet, and unlinking must not rewrite history or
-// forfeit cashback that was already earned and queued.
-func (s *Store) ClearStakeAddress(userID string) (User, error) {
+// RemoveStakeAddress unlinks ONE earning wallet; the rest keep earning and the
+// sign-in wallet always does. The ledger and loyalty clocks are keyed by
+// address and are left untouched on purpose: they record what was observed for
+// that wallet, and unlinking must not rewrite history or forfeit cashback that
+// was already earned and queued. Returns ErrNotFound when the account never
+// linked that wallet, so a stale UI cannot report a success it did not cause.
+func (s *Store) RemoveStakeAddress(userID, address string) (User, error) {
+	var user User
+	if strings.TrimSpace(userID) == "" {
+		return user, errors.New("user id required")
+	}
+	want := canonicalStakeAddr(address)
+	if want == "" {
+		return user, ErrNotFound
+	}
+	err := s.Update(func(txn *badger.Txn) error {
+		if err := getJSON(txn, userKey(userID), &user); err != nil {
+			return err
+		}
+		kept := make([]StakeAddressLink, 0, len(user.StakeAddresses))
+		removed := false
+		for _, link := range user.LinkedStakeWallets() {
+			if canonicalStakeAddr(link.Address) == want {
+				removed = true
+				continue
+			}
+			kept = append(kept, link)
+		}
+		if !removed {
+			return ErrNotFound
+		}
+		user.StakeAddresses = kept
+		blob, err := marshal(user)
+		if err != nil {
+			return err
+		}
+		return txn.Set(userKey(user.ID), blob)
+	})
+	return user, err
+}
+
+// ClearStakeAddresses unlinks every wallet, putting the account back to
+// earning from the wallet it signs in with. As with RemoveStakeAddress this
+// changes future reads only — ledger entries and queued cashback stay put.
+func (s *Store) ClearStakeAddresses(userID string) (User, error) {
 	var user User
 	if strings.TrimSpace(userID) == "" {
 		return user, errors.New("user id required")
@@ -99,8 +209,7 @@ func (s *Store) ClearStakeAddress(userID string) (User, error) {
 		if err := getJSON(txn, userKey(userID), &user); err != nil {
 			return err
 		}
-		user.StakeAddress = ""
-		user.StakeAddressLinkedAt = time.Time{}
+		user.StakeAddresses = nil
 		blob, err := marshal(user)
 		if err != nil {
 			return err
@@ -134,9 +243,11 @@ func (s *Store) GetUserByStakeAddress(address string) (User, error) {
 			if e := item.Value(func(value []byte) error { return unmarshal(value, &u) }); e != nil {
 				return nil // skip an unreadable row rather than failing the lookup
 			}
-			if canonicalStakeAddr(u.StakeAddress) == want {
-				found = u
-				return stop
+			for _, link := range u.LinkedStakeWallets() {
+				if canonicalStakeAddr(link.Address) == want {
+					found = u
+					return stop
+				}
 			}
 			return nil
 		})

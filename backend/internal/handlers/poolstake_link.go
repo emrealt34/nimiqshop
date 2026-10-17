@@ -26,10 +26,13 @@ he picks there. Because a shop account IS an address
 from a different wallet means a different account: no stake, base rate only, and
 no way for him to tell the two apart from the UI.
 
-So an account may name ONE additional wallet — the one that stakes — after
-proving ownership of it with a Hub signature, exactly the same proof that signs
-him in. From then on the stake, the ledger and the cashback rate are all read
-from that wallet, while payouts still go to the wallet he authenticated with.
+So an account may name additional wallets — the ones that stake — after proving
+ownership of each with a Hub signature, exactly the same proof that signs him
+in. Buyers split a stake over several wallets (hardware, phone, an old address),
+so the link is a LIST capped at db.MaxLinkedStakeAddresses. From then on the
+stakes of all of them are summed into one rate — with the staker base counted
+once per account, never once per wallet — while payouts still go to the wallet
+he authenticated with.
 
 What is deliberately NOT true:
   - Cashback never depended on the payment rail. It is granted from the stake
@@ -38,7 +41,10 @@ What is deliberately NOT true:
     convenience, not an eligibility rule.
   - Linking is not a way to earn from someone else's stake: the signature is
     verified with nimiq.VerifySignedMessage, which checks that the public key
-    derives to the claimed address. No key, no link.
+    derives to the claimed address. No key, no link — for any of the wallets.
+  - Linking more wallets cannot multiply the base rate. Stakes and ledger
+    boosts add up; the flat staker base is applied once (buildStakeMeView and
+    db.AggregateStakerStake both encode that rule).
   - Linking does not rewrite history. Past ledger entries stay under the address
     that earned them; only reads from now on follow the linked wallet.
 */
@@ -51,6 +57,12 @@ What is deliberately NOT true:
 func stakeLinkMessage(siteName, accountAddress, stakeAddress, nonce string) string {
 	return siteName + " link stake wallet " + stakeAddress + " to account " + accountAddress + ": " + nonce
 }
+
+// stakeWalletLimitMessage is the refusal a buyer gets once their account links
+// db.MaxLinkedStakeAddresses wallets. It names the limit AND the way out
+// (unlink a wallet they no longer use), because a bare "could not link" would
+// send them to support for a rule they can act on themselves.
+const stakeWalletLimitMessage = "that account already links the maximum number of staking wallets; unlink one first"
 
 // linkUser loads the signed-in account or answers 401 and reports false.
 func (h *Handlers) linkUser(ctx *fasthttp.RequestCtx) (db.User, bool) {
@@ -98,6 +110,25 @@ func (h *Handlers) StakeAddressChallenge(ctx *fasthttp.RequestCtx) {
 		writeError(ctx, fasthttp.StatusConflict,
 			"that is the wallet this account signed in with; it already earns your cashback")
 		return
+	}
+
+	// Refuse before making the buyer sign anything: at the cap there is no
+	// signature that could succeed, and a wallet-signing round trip that ends
+	// in an error is the worst place to discover a rule. Re-linking a wallet
+	// that is already on the list is still allowed (it is a no-op), so a
+	// refresh or a double click never fails.
+	if links := user.LinkedStakeWallets(); len(links) >= db.MaxLinkedStakeAddresses {
+		already := false
+		for _, link := range links {
+			if poolstake.CanonicalAddress(link.Address) == poolstake.CanonicalAddress(stakeAddress) {
+				already = true
+				break
+			}
+		}
+		if !already {
+			writeError(ctx, fasthttp.StatusConflict, stakeWalletLimitMessage)
+			return
+		}
 	}
 
 	nonce, err := auth.NewNonce()
@@ -218,19 +249,25 @@ func (h *Handlers) StakeAddressLink(ctx *fasthttp.RequestCtx) {
 	}
 
 	now := time.Now().UTC()
-	linked, err := h.Store.SetStakeAddress(user.ID, stakeAddress, now)
-	if err != nil {
+	linked, err := h.Store.AddStakeAddress(user.ID, stakeAddress, now)
+	switch {
+	case errors.Is(err, db.ErrTooManyStakeAddresses):
+		writeError(ctx, fasthttp.StatusConflict, stakeWalletLimitMessage)
+		return
+	case err != nil:
 		log.Printf("poolstake: could not link stake wallet %s to account %s: %v",
 			poolstake.CanonicalAddress(stakeAddress), user.ID, err)
 		writeError(ctx, fasthttp.StatusInternalServerError, "could not link the staking wallet")
 		return
 	}
-	log.Printf("poolstake: account %s now earns from linked stake wallet %s (%s NIM via %s)",
-		user.ID, poolstake.CanonicalAddress(stakeAddress), fmtNIM(stakeLuna), source)
+	log.Printf("poolstake: account %s now earns from %d wallet(s), latest %s (%s NIM via %s)",
+		user.ID, len(linked.EarningStakeAddresses()), poolstake.CanonicalAddress(stakeAddress), fmtNIM(stakeLuna), source)
 
 	// Seed the watch/ledger clocks for the new earning address so the loyalty
 	// age and the stake-weighted ledger start from this moment instead of
-	// waiting for the next page view. Best-effort by design.
+	// waiting for the next page view. Best-effort by design. Each wallet keeps
+	// its OWN book: summing them into one would let a fresh wallet spend credit
+	// its stake has not earned.
 	if watch, werr := h.Store.ObserveStake(stakeAddress, stakeLuna, now); werr == nil {
 		_ = h.Store.ObserveStakeLedger(stakeAddress, stakeLuna, now)
 		_ = watch
@@ -241,8 +278,10 @@ func (h *Handlers) StakeAddressLink(ctx *fasthttp.RequestCtx) {
 
 // DELETE /api/poolstake/stake-address
 //
-// Drop the link: the account's own wallet earns again. Existing ledger entries
-// are untouched — unlinking changes where future reads come from, not history.
+// Drop a link. With ?address=NQ… it unlinks THAT wallet and the rest keep
+// earning; without it, every linked wallet is dropped and the account earns
+// from the wallet it signs in with again. Existing ledger entries are untouched
+// either way — unlinking changes where future reads come from, not history.
 func (h *Handlers) StakeAddressUnlink(ctx *fasthttp.RequestCtx) {
 	user, ok := h.linkUser(ctx)
 	if !ok {
@@ -253,27 +292,65 @@ func (h *Handlers) StakeAddressUnlink(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	cleared, err := h.Store.ClearStakeAddress(user.ID)
-	if err != nil {
-		log.Printf("poolstake: could not unlink the stake wallet of account %s: %v", user.ID, err)
+	target := strings.TrimSpace(string(ctx.QueryArgs().Peek("address")))
+	var (
+		cleared db.User
+		err     error
+	)
+	if target == "" {
+		cleared, err = h.Store.ClearStakeAddresses(user.ID)
+	} else {
+		if verr := nimiq.ValidateAddress(target); verr != nil {
+			writeError(ctx, fasthttp.StatusBadRequest, "malformed nimiq address")
+			return
+		}
+		cleared, err = h.Store.RemoveStakeAddress(user.ID, target)
+	}
+	switch {
+	case errors.Is(err, db.ErrNotFound):
+		// A stale page can offer to unlink a wallet that was already dropped.
+		// Say so instead of reporting a success this request did not cause.
+		writeError(ctx, fasthttp.StatusConflict, "that wallet is not linked to this account")
+		return
+	case err != nil:
+		log.Printf("poolstake: could not unlink stake wallet %q of account %s: %v",
+			poolstake.CanonicalAddress(target), user.ID, err)
 		writeError(ctx, fasthttp.StatusInternalServerError, "could not unlink the staking wallet")
 		return
 	}
-	log.Printf("poolstake: account %s unlinked its stake wallet; earning from %s again",
-		user.ID, poolstake.CanonicalAddress(cleared.NimiqAddress))
+	if target == "" {
+		log.Printf("poolstake: account %s unlinked every stake wallet; earning from %s again",
+			user.ID, poolstake.CanonicalAddress(cleared.NimiqAddress))
+	} else {
+		log.Printf("poolstake: account %s unlinked stake wallet %s; %d earning wallet(s) left",
+			user.ID, poolstake.CanonicalAddress(target), len(cleared.EarningStakeAddresses()))
+	}
 	h.writeLinkResult(ctx, cleared, "")
 }
 
 // writeLinkResult answers a link/unlink with the new state plus the full
 // refreshed standing, so the cashback page can re-render in one step.
 func (h *Handlers) writeLinkResult(ctx *fasthttp.RequestCtx, user db.User, stakeSource string) {
+	links := user.LinkedStakeWallets()
+	linkRows := make([]map[string]any, 0, len(links))
+	for _, link := range links {
+		linkRows = append(linkRows, map[string]any{
+			"address":   link.Address,
+			"linked_at": link.LinkedAt,
+		})
+	}
 	resp := map[string]any{
-		"linked":                  user.HasLinkedStakeAddress(),
-		"account_address":         user.NimiqAddress,
-		"stake_address":           user.StakeAddress,
-		"stake_address_linked_at": user.StakeAddressLinkedAt,
-		// The address every stake/ledger/cashback read now follows.
+		"linked":              user.HasLinkedStakeAddress(),
+		"account_address":     user.NimiqAddress,
+		"stake_addresses":     linkRows,
+		"linked_count":        len(links),
+		"linked_wallet_limit": db.MaxLinkedStakeAddresses,
+		// The primary wallet the rate card names, and every address whose stake
+		// is summed into the rate.
+		"stake_address":           user.EffectiveStakeAddress(),
+		"stake_address_linked_at": user.StakeAddressLinkedAt(user.EffectiveStakeAddress()),
 		"effective_stake_address": user.EffectiveStakeAddress(),
+		"earning_addresses":       user.EarningStakeAddresses(),
 	}
 	if stakeSource != "" {
 		resp["stake_source"] = stakeSource
