@@ -126,12 +126,31 @@ test('automatic metadata writes have a per-page budget and keep exhausted record
   } finally { globalThis.fetch = savedFetch; client._setSessionGetter(() => 'buyer'); }
 });
 
-test('review confirmation cannot poll more than three times or resubmit a wallet transaction', async () => {
+/*
+ * The confirmation loop is bounded twice over: a hard attempt cap (30, the
+ * value the shipped default and tests/e2e/rating-confirmation.spec.ts both
+ * assert) and a 90-second wall-clock deadline. A caller cannot raise the cap
+ * by passing a bigger `attempts`, and every one of those calls is the SAME
+ * idempotent "save my review" POST — the wallet is never asked to sign a
+ * second transaction while the chain catches up.
+ */
+test('review confirmation cannot poll without bound or resubmit a wallet transaction', async () => {
+  const savedFetch = globalThis.fetch;
+  const urls = [];
+  globalThis.fetch = async (url) => { urls.push(String(url)); return Response.json({ status: 'pending' }); };
+  try {
+    await assert.rejects(client.awaitRatingSaved('order', 'pending-review', { stars: 5, comment: 'excellent' }, { attempts: 1000, delayMs: 0 }), error => error.code === 'pending');
+    assert.equal(urls.length, 30, 'a caller-supplied attempts value must be clamped to the shipped cap');
+    assert.ok(urls.every(url => url.endsWith('/rate')), 'every retry is the save call, never another payment');
+  } finally { globalThis.fetch = savedFetch; }
+});
+
+test('review confirmation uses the same bound when the caller passes nothing', async () => {
   const savedFetch = globalThis.fetch;
   let calls = 0;
   globalThis.fetch = async () => { calls++; return Response.json({ status: 'pending' }); };
   try {
-    await assert.rejects(client.awaitRatingSaved('order', 'pending-review', { stars: 5, comment: 'excellent' }, { attempts: 1000, delayMs: 0 }), error => error.code === 'pending');
-    assert.equal(calls, 3);
+    await assert.rejects(client.awaitRatingSaved('quote', 'pending-review', { stars: 4, comment: 'good' }, { delayMs: 0 }), error => error.code === 'pending');
+    assert.equal(calls, 30);
   } finally { globalThis.fetch = savedFetch; }
 });
