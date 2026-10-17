@@ -4,18 +4,67 @@
 # real reason and an expiry date, after which the scanner fails again and the
 # exception has to be re-justified (or removed, because upstream patched it).
 #
-# See also scripts/audit-gate.mjs — the npm audit job carries the same single
-# exception so the two gates agree.
+# Two rules worth stating explicitly, because both have already been got wrong
+# here once:
+#
+#   1. An exception that stops matching anything must be DELETED, not kept as
+#      documentation. osv-scanner prints "<config> has unused ignores: <id>" for
+#      it (a warning, not a failure — the 2026-10-11 job logged that line and
+#      still exited 0). The retirement is recorded in this comment block instead,
+#      because why an entry disappeared matters as much as why it was there.
+#   2. A failure of the scan step means a real finding was written to the SARIF
+#      output, which the job log does NOT echo because of `--format=sarif
+#      --output=`. Read the `osv-security-report` artifact before concluding
+#      anything from the log alone.
+#
+# See also scripts/audit-gate.mjs, which keeps the equivalent exception list for
+# `npm audit`. Those two lists have to agree about *npm* advisories. They are not
+# mirrors of each other: the entry below is a PyPI package that `npm audit` never
+# sees, so it deliberately has no counterpart there.
 
 [[IgnoredVulns]]
-id = "GHSA-ch52-4w7c-c8xp"
-ignoreUntil = 2027-01-31 # re-check when http-cache-semantics 4.2.1+ ships
+id = "GHSA-84m7-p3x7-pcfv"
+ignoreUntil = 2026-12-31 # re-check on every semgrep bump; retire when its mcp pin moves
 reason = """
-CVE-2026-93748 (http-cache-semantics <= 4.2.0, max-stale cross-user cache
-disclosure). No patched release exists: npm's latest is 4.2.0 and the
-advisory declares first_patched_version: none, so there is nothing to
-upgrade to. It arrives only through astro's build-time dependency tree; the
-deployed artifact is a static Astro build (HTML/CSS/JS) that never runs an
-HTTP cache. Dependabot carries the same alert (open, unfixable) as the
-permanent reminder. Remove this entry the moment a fixed release exists.
+CVE-2026-59951 (MCP Python SDK, unbounded session accumulation in the
+StreamableHTTP transport -> resource exhaustion; CVSS 3.1 A:H with no
+confidentiality or integrity impact). Published 2026-10-15, fixed in mcp 1.30.0.
+
+There is nothing to upgrade to. mcp reaches this tree only as semgrep's own
+hard pin `mcp==1.29.0`, and every semgrep release newer than the pinned 1.178.0
+still carries that exact pin (1.179.0, 1.180.0 and the current 1.181.0 of
+2026-10-14 all declare `mcp==1.29.0`). Bumping mcp alone in
+.github/semgrep-requirements.txt is not an option either: that file is a
+hash-pinned closure installed with `pip install --require-hashes`, so an mcp
+version semgrep does not allow makes the install unresolvable and breaks the
+Semgrep workflow.
+
+Not reachable in anything this project ships. The requirements file is installed
+only inside the Semgrep GitHub Actions job, on an ephemeral runner; the product
+is a static Astro build on Cloudflare Pages plus a Go binary on Railway, with no
+Python runtime and no MCP server deployed anywhere. The vulnerable code is the
+StreamableHTTP *server* transport's session table, and CI invokes semgrep as a
+CLI scanner rather than running it as a network-facing MCP server.
+
+Retire this entry the moment semgrep's mcp pin reaches 1.30.0 (then regenerate
+the closure with the pip-compile command at the top of
+.github/semgrep-requirements.txt), or if the advisory is withdrawn.
 """
+
+# Retired 2026-10-17 — GHSA-ch52-4w7c-c8xp (CVE-2026-93748, http-cache-semantics
+# <= 4.2.0, max-stale cross-user cache disclosure). Added on 2026-10-03 when
+# npm's latest was 4.2.0 and the advisory declared no patched release.
+# package-lock.json has carried 4.3.0 since 2026-10-06 and OSV's range for the
+# advisory ends at last_affected 4.2.0, so the ignore went unused. Removed here
+# and, to keep the npm gates in agreement, from ALLOWED in scripts/audit-gate.mjs.
+# Do not re-add it unless a version below 4.3.0 returns to the tree.
+
+# Template for a new exception:
+#
+# [[IgnoredVulns]]
+# id = "GHSA-xxxx-xxxx-xxxx"
+# ignoreUntil = YYYY-MM-DD
+# reason = """
+# What the vulnerability is, why it cannot be fixed by upgrading yet, why it is
+# not reachable in the shipped artifact, and what event should retire this entry.
+# """
