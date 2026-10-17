@@ -132,6 +132,29 @@ func LapsedUnpaidInvoice(q Quote, now time.Time) bool {
 // one request cannot decide on two different clocks.
 func BlocksNewPurchase(q Quote) bool { return BlocksNewPurchaseAt(q, time.Now().UTC()) }
 
+// LateMoneyReconcileWindow is how long a quote the shop expired ON ITS OWN
+// CLOCK keeps being offered to the supplier poller.
+//
+// A local expiry is not evidence that nothing was charged (see PaymentGrace
+// and the quoteTransitions comment: "A local timer is not evidence of payment
+// failure. Reconcile late money."). Yet NeedsSupplierPoll used to answer
+// `false` for exactly that quote — `expired` was polled only when money had
+// ALREADY been observed, and money can only be observed by polling. So the
+// sweep and the poll gate combined into a one-way door:
+//
+//	payment lands → poller was asleep / backed off / breaker-open / starved
+//	              → window lapses → SweepExpiredQuotes marks it expired
+//	              → NeedsSupplierPoll() == false → the supplier is NEVER asked
+//	              → a paid order is forgotten forever.
+//
+// Railway's idle-sleep and the tracker's own circuit breaker (up to 15 min)
+// both make that reachable in production. The window is bounded so an
+// abandoned cart does not become a permanent resident of the poll set, and
+// these rows poll at the slowest cadence and the lowest priority (see
+// pollIntervalFor / pollRank) so they can never take budget from a buyer who
+// is on the pay screen right now.
+const LateMoneyReconcileWindow = 24 * time.Hour
+
 // NeedsSupplierPoll answers a DIFFERENT question from BlocksNewPurchase and
 // must not be derived from it: "is there any supplier state left to
 // reconcile?" A lapsed-but-unpaid quote no longer blocks a new purchase, yet
@@ -146,11 +169,24 @@ func (q Quote) NeedsSupplierPoll() bool {
 	case "order_creating", "awaiting_payment", "payment_started", "payment_received", "delivering", "manual_review":
 		return true
 	case "expired":
-		return q.PaymentObserved
+		return q.PaymentObserved || q.withinLateMoneyReconcile(time.Now().UTC())
 	case "failed":
+		// A supplier-side PaymentSetupFailed never produced a payable
+		// invoice, so no late money can land on it: nothing to reconcile.
 		return q.PaymentObserved || !strings.EqualFold(q.SupplierStatus, cryptorefills.StatusPaymentSetupFailed)
 	}
 	return false
+}
+
+// withinLateMoneyReconcile reports whether a locally-settled quote is still
+// inside its late-money window. A quote with no known deadline at all cannot
+// be windowed, so it is not re-polled — it never had a payment window to miss.
+func (q Quote) withinLateMoneyReconcile(now time.Time) bool {
+	deadline := q.PaymentDeadline()
+	if deadline.IsZero() {
+		return false
+	}
+	return now.Before(deadline.Add(LateMoneyReconcileWindow))
 }
 
 func (q Quote) CanPay(now time.Time) bool {

@@ -724,10 +724,18 @@ func (s *Store) ListQuotesByStatuses(statuses []string, limit int) ([]Quote, err
 		}
 		return nil
 	})
-	// Newest-waiting first: sort by UpdatedAt ascending.
+	// Newest-waiting first: sort by UpdatedAt DESCENDING.
+	//
+	// This direction is load-bearing, not cosmetic. The settlement tracker
+	// documents "within a class, keep DB order (newest first)" and then
+	// truncates the pass to MaxPollsPerTick. The previous selection sort
+	// produced the ASCENDING order (oldest first) while claiming otherwise,
+	// so the quote a buyer was actively paying sat at the END of the list
+	// and was truncated out of every pass once a handful of older rows were
+	// due — a paid order that never left awaiting_payment.
 	for i := 0; i < len(out); i++ {
 		for j := i + 1; j < len(out); j++ {
-			if out[j].UpdatedAt.Before(out[i].UpdatedAt) {
+			if out[j].UpdatedAt.After(out[i].UpdatedAt) {
 				out[i], out[j] = out[j], out[i]
 			}
 		}
