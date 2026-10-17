@@ -1323,9 +1323,32 @@ func (h *Handlers) AdminNotificationStatus(ctx *fasthttp.RequestCtx) {
 			}
 		}
 	}
+	// Supplier webhook: the fulfillment acceleration path, and the only thing
+	// that wakes an idle-sleeping deployment (Railway sleepApplication) when
+	// an order changes state upstream.
+	//
+	// It is ACCOUNT-MANAGED: Cryptorefills' public API guide documents no
+	// self-registration field and CreateOrder carries no callback parameter,
+	// so the operator has to hand this exact URL to the partner account.
+	// Surfacing it here is what makes that possible without reading config.go
+	// and hand-assembling the query string.
+	//
+	// The URL embeds the shared secret. That is deliberate and bounded: this
+	// endpoint is admin-session-only over HTTPS, the secret is already a
+	// deployment variable the same operator can read, and the webhook handler
+	// treats the body as an untrusted trigger anyway (it always re-GETs the
+	// order through the queued client, so a leaked key buys an unauthenticated
+	// "please re-check this order" call, not a forged state).
+	webhook := map[string]any{
+		"enabled":  h.Cfg.CRWebhookKey != "" && h.Cfg.PublicWebhookBaseURL != "",
+		"key_set":  h.Cfg.CRWebhookKey != "",
+		"base_url": h.Cfg.PublicWebhookBaseURL,
+		"url":      h.WebhookURLFor("", ""),
+	}
 	writeJSON(ctx, fasthttp.StatusOK, map[string]any{
 		"email":        email,
 		"gift_enabled": h.Mail != nil && h.Mail.Enabled(),
+		"webhook":      webhook,
 	})
 }
 
