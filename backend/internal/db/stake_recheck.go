@@ -145,7 +145,19 @@ func (s *Store) RunStakeRechecks(now time.Time) (resolved, expired int) {
 		if st.Staked && st.StakeLuna > 0 {
 			_, _ = s.ObserveStake(rc.Address, st.StakeLuna, now)
 			_ = s.ObserveStakeLedger(rc.Address, st.StakeLuna, now)
-			if _, err := s.ReconcileStakerCashback(rc.Address, st, now); err == nil {
+			// User-scoped on purpose. rc.Address is the EARNING address, and
+			// for a linked staking wallet that is not an account address at
+			// all — resolving the user from it returns ErrNotFound, the repair
+			// never runs, and the buyer keeps the base rate with no error
+			// anywhere. Only rows that carry no user id (none are written any
+			// more) fall back to the address form.
+			var rerr error
+			if rc.UserID != "" {
+				_, rerr = s.ReconcileStakerCashbackForUser(rc.UserID, st, now)
+			} else {
+				_, rerr = s.ReconcileStakerCashback(rc.Address, st, now)
+			}
+			if rerr == nil {
 				_ = s.ClearStakeRecheck(rc.QuoteID)
 				resolved++
 			}

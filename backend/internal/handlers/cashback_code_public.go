@@ -282,7 +282,7 @@ func (h *Handlers) attachQuoteCashbackEstimate(resp map[string]interface{}, q db
 			// caps and remaining credit can lower the boost on a large cart.
 			// The fulfillment transaction remains the only debit operation.
 			if user, err := h.Store.GetUser(q.UserID); err == nil && q.NimUsdRate > 0 {
-				if ledger, ok, err := h.Store.ReadStakeLedger(user.NimiqAddress); err == nil && ok {
+				if ledger, ok, err := h.Store.ReadStakeLedger(user.EffectiveStakeAddress()); err == nil && ok {
 					settings, _ := h.Store.GetAdminSettings(0)
 					_, boost := ledger.Purchase(float64(q.ProductUSD)/1_000_000, q.NimUsdRate, settings.EffectiveStakeCashback(), time.Now().UTC())
 					luna += int64(boost*100000 + 0.5)

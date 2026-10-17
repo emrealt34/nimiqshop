@@ -36,6 +36,21 @@ type User struct {
 	LastIP      string    `json:"last_ip,omitempty"`
 	LastCountry string    `json:"last_country,omitempty"`
 	LastSeenAt  time.Time `json:"last_seen_at,omitempty"`
+
+	// StakeAddress is an OPTIONAL second wallet this account proved control
+	// of (signed message) and that verifiably stakes with the operator's
+	// validator. It exists because the account identity is a single address:
+	// a shopper who staked from their regular wallet and then signs in
+	// through Nimiq Pay lands on a DIFFERENT address, so their stake — and
+	// the cashback boost it funds — would be invisible to the shop.
+	//
+	// It changes which address the STAKE is read from (pool lookup, loyalty
+	// clocks, ledger). It never changes who gets paid: cashback still goes to
+	// NimiqAddress, the wallet the buyer signed in with. Empty means "no
+	// link" and every code path must fall back to NimiqAddress, which is what
+	// User.EffectiveStakeAddress does.
+	StakeAddress         string    `json:"stake_address,omitempty"`
+	StakeAddressLinkedAt time.Time `json:"stake_address_linked_at,omitempty"`
 }
 
 // Order was the `orders` table.

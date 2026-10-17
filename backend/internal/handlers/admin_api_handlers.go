@@ -296,7 +296,7 @@ func (h *Handlers) AdminListUsers(ctx *fasthttp.RequestCtx) {
 				rowBase = st.EffectiveBaseBps(baseBps)
 			}
 		}
-		rate := h.adminLiveCashbackRate(row.NimiqAddress, rowBase)
+		rate := h.adminLiveCashbackRate(row.EffectiveStakeAddress(), rowBase)
 		for k, v := range rate {
 			view[k] = v
 		}
@@ -397,11 +397,17 @@ func (h *Handlers) AdminUserDetail(ctx *fasthttp.RequestCtx) {
 	}
 	paidLuna, pendingLuna, paidCount, pendingCount, _ := h.Store.UserCashbackTotals(user.ID)
 	baseBps, stake := h.buyerBaseBps(ctx, user.ID)
-	liveRate := h.adminLiveCashbackRate(user.NimiqAddress, baseBps)
+	// The console has to show the wallet that actually earns, and say when
+	// that is not the account's sign-in wallet: otherwise "why is this
+	// customer's rate X?" has no answer in the UI.
+	earningAddr := user.EffectiveStakeAddress()
+	liveRate := h.adminLiveCashbackRate(earningAddr, baseBps)
 	liveRate["staked"] = stake.Staked
 	liveRate["stake_nim"] = float64(stake.StakeLuna) / lunaPerNIM
-	h.syncProfitOnDemand(ctx, user.NimiqAddress)
-	ledger := h.ledgerView(user.NimiqAddress)
+	liveRate["stake_address"] = earningAddr
+	liveRate["stake_address_linked"] = user.HasLinkedStakeAddress()
+	h.syncProfitOnDemand(ctx, earningAddr)
+	ledger := h.ledgerView(earningAddr)
 
 	cbs, _ := h.Store.ListCashbacksByUser(user.ID, 80)
 	cbViews := make([]map[string]any, 0, len(cbs))

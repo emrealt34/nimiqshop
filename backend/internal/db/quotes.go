@@ -497,7 +497,10 @@ func (s *Store) quoteBuyerAddress(quoteID string) string {
 		if err := getJSON(tx, userKey(q.UserID), &u); err != nil {
 			return err
 		}
-		addr = u.NimiqAddress
+		// The re-ask exists to catch a stake the pool had not indexed yet, so
+		// it has to ask about the wallet that earns — the linked staking
+		// wallet when the account has one.
+		addr = u.EffectiveStakeAddress()
 		return nil
 	})
 	return addr
@@ -520,7 +523,7 @@ func (s *Store) resolveStakerStake(quoteID string) StakerStake {
 		return StakerStake{}
 	}
 
-	var address string
+	var address, userID string
 	err := s.View(func(tx *badger.Txn) error {
 		var q Quote
 		if err := getJSON(tx, quoteKey(quoteID), &q); err != nil {
@@ -533,7 +536,12 @@ func (s *Store) resolveStakerStake(quoteID string) StakerStake {
 		if err := getJSON(tx, userKey(q.UserID), &u); err != nil {
 			return err
 		}
-		address = u.NimiqAddress
+		userID = u.ID
+		// The wallet that EARNS this quote's cashback: the linked staking
+		// wallet when the account proved ownership of one, otherwise the
+		// address it signed in with. Payouts still go to the account wallet
+		// (see enqueueCashbackOnFulfill).
+		address = u.EffectiveStakeAddress()
 		return nil
 	})
 	if err != nil || address == "" {
@@ -554,7 +562,7 @@ func (s *Store) resolveStakerStake(quoteID string) StakerStake {
 		// positive observation is eligible, and the normal ledger caps still
 		// apply. A later authoritative zero is what can clear it.
 		if cached := s.CachedStakerStake(address, now); cached.Staked {
-			_, _ = s.ReconcileStakerCashback(address, cached, now)
+			_, _ = s.ReconcileStakerCashbackForUser(userID, cached, now)
 			return cached
 		}
 		return StakerStake{}
@@ -582,7 +590,7 @@ func (s *Store) resolveStakerStake(quoteID string) StakerStake {
 	// If an earlier fulfillment happened while the pool was unreachable,
 	// upgrade its still-unpaid base row now. This is idempotent and survives a
 	// process restart because the row itself is the durable recovery queue.
-	_, _ = s.ReconcileStakerCashback(address, resolved, now)
+	_, _ = s.ReconcileStakerCashbackForUser(userID, resolved, now)
 	return resolved
 }
 
@@ -601,7 +609,9 @@ func (s *Store) UserStakerStake(ctx context.Context, userID string) StakerStake 
 		if err := getJSON(tx, userKey(userID), &u); err != nil {
 			return err
 		}
-		address = u.NimiqAddress
+		// Same earning-address rule as the fulfillment path: a linked staking
+		// wallet wins, otherwise the sign-in address.
+		address = u.EffectiveStakeAddress()
 		return nil
 	})
 	if err != nil || address == "" {
@@ -618,7 +628,7 @@ func (s *Store) UserStakerStake(ctx context.Context, userID string) StakerStake 
 		// the last positive observation to showing a known staker as zero;
 		// this is display/promise preservation only, not a new entitlement.
 		if cached := s.CachedStakerStake(address, now); cached.Staked {
-			_, _ = s.ReconcileStakerCashback(address, cached, now)
+			_, _ = s.ReconcileStakerCashbackForUser(userID, cached, now)
 			return cached
 		}
 		return StakerStake{}
@@ -636,7 +646,7 @@ func (s *Store) UserStakerStake(ctx context.Context, userID string) StakerStake 
 	}
 	_ = s.ObserveStakeLedger(address, stakeLuna, now)
 	resolved := StakerStake{StakeLuna: stakeLuna, Staked: true, LockedDays: lockedDays, BaseBps: st.BaseBps}
-	_, _ = s.ReconcileStakerCashback(address, resolved, now)
+	_, _ = s.ReconcileStakerCashbackForUser(userID, resolved, now)
 	return resolved
 }
 

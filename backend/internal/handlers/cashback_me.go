@@ -50,7 +50,8 @@ func (h *Handlers) CashbackMe(ctx *fasthttp.RequestCtx) {
 
 	// This response displays the ledger, therefore this is one of the few
 	// useful moments to refresh the signed-in wallet's cumulative pool profit.
-	h.syncProfitOnDemand(ctx, user.NimiqAddress)
+	// Refresh the wallet that earns: a linked staking wallet when there is one.
+	h.syncProfitOnDemand(ctx, user.EffectiveStakeAddress())
 
 	sum, err := h.Store.GetUserCashbackSummary(userID)
 	if err != nil {
@@ -152,8 +153,14 @@ func (h *Handlers) CashbackMe(ctx *fasthttp.RequestCtx) {
 			"orders":        sum.PaidCount + sum.PendingCount,
 			"preference":    sum.LastDest,
 		},
-		"cashbacks":              out,
-		"ledger":                 h.ledgerView(user.NimiqAddress),
+		"cashbacks": out,
+		"ledger":    h.ledgerView(user.EffectiveStakeAddress()),
+		// Which wallet this account's cashback is earned from. Identical to
+		// the sign-in address unless a staking wallet is linked; the page shows
+		// both so the buyer never has to guess.
+		"account_address":        user.NimiqAddress,
+		"stake_address":          user.EffectiveStakeAddress(),
+		"stake_address_linked":   user.HasLinkedStakeAddress(),
 		"staker_program_enabled": h.stakeProgramEnabled(),
 		"stake_cashback":         h.stakeCashbackView(),
 	})

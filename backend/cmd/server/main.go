@@ -1106,6 +1106,15 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 	// Public validator name + logo (Nimiq validators registry, cached upstream).
 	r.GET("/api/poolstake/validator", wrap(publicCached(3600, 86400, h.ValidatorInfo)))
 	r.POST("/api/poolstake/refresh", authedTiered(aPool, h.PoolStakeRefresh))
+	// Linking a staking wallet to the signed-in account. A shop account IS an
+	// address (one account per wallet), so a buyer who stakes from his regular
+	// wallet but checks out through Nimiq Pay signs in as a different account
+	// that has never staked. These three endpoints let him prove ownership of
+	// the staking wallet — same Hub signature as login, on a purpose-scoped
+	// challenge — and have his rate follow it.
+	r.POST("/api/poolstake/stake-address/challenge", authedTiered(aPool, h.StakeAddressChallenge))
+	r.POST("/api/poolstake/stake-address", authedTiered(aPool, h.StakeAddressLink))
+	r.DELETE("/api/poolstake/stake-address", authedTiered(aPool, h.StakeAddressUnlink))
 	// The buyer just broadcast a stake to our pool; the pool has NOT indexed
 	// it yet. Record the pending note so the fulfillment path never pays a
 	// real staker the base rate during the index-latency window.

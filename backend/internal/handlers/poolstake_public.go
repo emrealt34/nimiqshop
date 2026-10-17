@@ -117,7 +117,9 @@ func (h *Handlers) syncProfitOnDemand(ctx context.Context, addr string) {
 // Refresh at checkout creation, not on every order-detail polling read.
 func (h *Handlers) syncBuyerProfitOnDemand(userID string) {
 	if user, err := h.Store.GetUser(userID); err == nil {
-		h.syncProfitOnDemand(context.Background(), user.NimiqAddress)
+		// Profit accrues to the wallet that stakes, which is the linked one
+		// when this account proved ownership of a separate staking wallet.
+		h.syncProfitOnDemand(context.Background(), user.EffectiveStakeAddress())
 	}
 }
 
@@ -172,7 +174,10 @@ func (h *Handlers) ledgerBoostBpsBestEffort(userID string) int {
 	if nimUsd <= 0 {
 		return 0
 	}
-	l, ok, err := h.Store.ReadStakeLedger(user.NimiqAddress)
+	// The ledger is keyed by the EARNING address — that is where the
+	// fulfillment path writes it — so read it from the same wallet or a linked
+	// staker's boost would always come back as zero here.
+	l, ok, err := h.Store.ReadStakeLedger(user.EffectiveStakeAddress())
 	if err != nil || !ok {
 		return 0
 	}
@@ -264,25 +269,52 @@ func (h *Handlers) PoolStakeMe(ctx *fasthttp.RequestCtx) {
 		writeError(ctx, fasthttp.StatusUnauthorized, "session expired")
 		return
 	}
-	h.poolStakeMeFor(ctx, user.NimiqAddress)
+	h.poolStakeMeFor(ctx, user)
 }
 
 // poolStakeMeFor is the shared body of PoolStakeMe and PoolStakeRefresh.
-func (h *Handlers) poolStakeMeFor(ctx *fasthttp.RequestCtx, address string) {
+func (h *Handlers) poolStakeMeFor(ctx *fasthttp.RequestCtx, user db.User) {
+	resp, ok := h.buildStakeMeView(ctx, user)
+	if !ok {
+		adminStoreError(ctx)
+		return
+	}
+	writeJSON(ctx, fasthttp.StatusOK, resp)
+}
+
+// buildStakeMeView renders a buyer's standing for the wallet that actually
+// earns their cashback: a staking wallet whose ownership they proved by
+// linking it, otherwise the address they signed in with.
+//
+// That distinction is the whole point of the linked-stake-wallet feature. A
+// shop account IS an address (FindOrCreateUserByAddress creates one account per
+// wallet), so a buyer who stakes from their regular wallet but checks out
+// through Nimiq Pay signs in as a *different* account that has never staked and
+// earns the base rate — while the stake they are proud of sits one wallet over.
+// Both addresses are reported so no page has to guess which one it is showing.
+//
+// ok=false means the admin settings could not be read; callers turn that into
+// the standard store error response.
+func (h *Handlers) buildStakeMeView(ctx *fasthttp.RequestCtx, user db.User) (map[string]any, bool) {
+	address := user.EffectiveStakeAddress()
 	resp := map[string]any{
-		"address":                address,
-		"staked":                 false,
-		"stake_luna":             int64(0),
-		"stake_nim":              0.0,
-		"staker_program_enabled": h.stakeProgramEnabled(),
-		"pool_validator_address": h.Cfg.PoolValidatorAddress,
-		"checked_at":             time.Time{},
+		"address": address,
+		// The wallet this account signed in with, and the wallet the cashback
+		// is earned from. Identical unless a staking wallet is linked.
+		"account_address":         user.NimiqAddress,
+		"stake_address_linked":    user.HasLinkedStakeAddress(),
+		"stake_address_linked_at": user.StakeAddressLinkedAt,
+		"staked":                  false,
+		"stake_luna":              int64(0),
+		"stake_nim":               0.0,
+		"staker_program_enabled":  h.stakeProgramEnabled(),
+		"pool_validator_address":  h.Cfg.PoolValidatorAddress,
+		"checked_at":              time.Time{},
 	}
 
 	settings, err := h.Store.GetAdminSettings(0)
 	if err != nil {
-		adminStoreError(ctx)
-		return
+		return nil, false
 	}
 	operatorBase := settings.EffectiveCashbackBps()
 	base := operatorBase
@@ -399,7 +431,7 @@ func (h *Handlers) poolStakeMeFor(ctx *fasthttp.RequestCtx, address string) {
 	if staked {
 		resp["loyalty_days"] = lockedDays
 	}
-	writeJSON(ctx, fasthttp.StatusOK, resp)
+	return resp, true
 }
 
 // PoolStakeRefresh drops the cached pool answer for the signed-in buyer and
@@ -417,15 +449,19 @@ func (h *Handlers) PoolStakeRefresh(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	h.Pool.Forget(user.NimiqAddress)
-	st, err := h.poolStake(ctx, user.NimiqAddress)
+	// Refresh the wallet that earns this account's cashback, which is the
+	// linked staking wallet when there is one — refreshing the sign-in address
+	// instead would leave a linked staker's numbers stale.
+	address := user.EffectiveStakeAddress()
+	h.Pool.Forget(address)
+	st, err := h.poolStake(ctx, address)
 	if err != nil {
 		writeError(ctx, fasthttp.StatusBadGateway, "could not reach the staking pool")
 		return
 	}
 	now := time.Now().UTC()
-	watch, _ := h.Store.ObserveStake(user.NimiqAddress, st.StakeLuna, now)
-	_ = h.Store.ObserveStakeLedger(user.NimiqAddress, st.StakeLuna, now)
+	watch, _ := h.Store.ObserveStake(address, st.StakeLuna, now)
+	_ = h.Store.ObserveStakeLedger(address, st.StakeLuna, now)
 	_ = watch
-	h.poolStakeMeFor(ctx, user.NimiqAddress)
+	h.poolStakeMeFor(ctx, user)
 }

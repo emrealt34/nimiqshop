@@ -174,11 +174,28 @@ func enqueueCashbackOnFulfill(tx *badger.Txn, q *Quote, stake StakerStake, ledge
 	}
 	now := time.Now().UTC()
 
-	// Buyer address (needed for the ledger; also the default payout recipient).
+	// TWO wallets can matter here, and using one variable for both is exactly
+	// what made a linked staking wallet impossible before this split:
+	//
+	//	stakeAddr   — the wallet whose stake and loyalty ledger EARN the
+	//	              cashback. It is the linked staking wallet when the
+	//	              account proved ownership of one, otherwise the sign-in
+	//	              address. The ledger boost is keyed by it because that is
+	//	              the wallet the delegation (and therefore the book)
+	//	              belongs to.
+	//	accountAddr — the wallet the buyer authenticated with, and therefore
+	//	              the default payout RECIPIENT. Payouts deliberately do not
+	//	              follow the link: sending cashback to a wallet this
+	//	              session never signed in from would move funds on the
+	//	              strength of a link alone, and a buyer who unlink/relinks
+	//	              would see past rewards land in a wallet they no longer
+	//	              control.
 	var user User
-	addr := ""
+	stakeAddr := ""
+	accountAddr := ""
 	if e := getJSON(tx, userKey(q.UserID), &user); e == nil {
-		addr = user.NimiqAddress
+		accountAddr = user.NimiqAddress
+		stakeAddr = user.EffectiveStakeAddress()
 	}
 
 	// The base is the operator's call: staked (any amount) → the staker
@@ -193,7 +210,7 @@ func enqueueCashbackOnFulfill(tx *badger.Txn, q *Quote, stake StakerStake, ledge
 	if dest != CashbackDestBurn {
 		dest = CashbackDestWallet
 	}
-	recipientAddr := addr
+	recipientAddr := accountAddr
 	if dest == CashbackDestBurn {
 		if strings.TrimSpace(enrich.BurnAddr) != "" {
 			recipientAddr = strings.TrimSpace(enrich.BurnAddr)
@@ -207,8 +224,8 @@ func enqueueCashbackOnFulfill(tx *badger.Txn, q *Quote, stake StakerStake, ledge
 	// stands on its own. Never guesses: a missing P means no boost.
 	nimUsd := q.NimUsdRate
 	boostBps := 0
-	if addr != "" && nimUsd > 0 {
-		boostBps = ledgerBoostBpsInTx(tx, addr, nimUsd, ledgerParams)
+	if stakeAddr != "" && nimUsd > 0 {
+		boostBps = ledgerBoostBpsInTx(tx, stakeAddr, nimUsd, ledgerParams)
 	}
 
 	// Resolve the payout. walletBps is the rate applied to the product's NIM
@@ -222,7 +239,7 @@ func enqueueCashbackOnFulfill(tx *badger.Txn, q *Quote, stake StakerStake, ledge
 	boostLuna := int64(0)
 	debitLedger := func() (int, error) {
 		var e error
-		boostLuna, boostBps, e = ApplyLedgerPurchaseInTx(tx, addr, float64(q.ProductUSD)/1_000_000, nimUsd, ledgerParams, now)
+		boostLuna, boostBps, e = ApplyLedgerPurchaseInTx(tx, stakeAddr, float64(q.ProductUSD)/1_000_000, nimUsd, ledgerParams, now)
 		return boostBps, e
 	}
 	switch {
@@ -352,11 +369,33 @@ func enqueueCashbackOnFulfill(tx *badger.Txn, q *Quote, stake StakerStake, ledge
 // bought during an outage": once the stake is observed later, the missing
 // staker portion becomes a normal queued cashback amount and goes through the
 // existing exactly-once payout worker.
+//
+// The address form resolves the account from the address it is given, which is
+// only correct while earning address == account address. Callers that already
+// hold a user id must use ReconcileStakerCashbackForUser: with a linked staking
+// wallet the earning address is by definition NOT an account address, so this
+// lookup would return ErrNotFound and the repair would silently never happen —
+// the buyer would keep the base rate forever with no error anywhere.
 func (s *Store) ReconcileStakerCashback(address string, stake StakerStake, now time.Time) (int, error) {
 	if canonicalStakeAddr(address) == "" || !stake.Staked || stake.BaseBps <= 0 {
 		return 0, nil
 	}
 	u, err := s.GetUserByAddress(address)
+	if err != nil {
+		return 0, err
+	}
+	return s.ReconcileStakerCashbackForUser(u.ID, stake, now)
+}
+
+// ReconcileStakerCashbackForUser is the user-scoped core of the same repair.
+// Payout recipients keep pointing at the account's own wallet (u.NimiqAddress),
+// never at the linked staking wallet: the link decides what a buyer EARNS, not
+// where the shop sends money.
+func (s *Store) ReconcileStakerCashbackForUser(userID string, stake StakerStake, now time.Time) (int, error) {
+	if strings.TrimSpace(userID) == "" || !stake.Staked || stake.BaseBps <= 0 {
+		return 0, nil
+	}
+	u, err := s.GetUser(userID)
 	if err != nil {
 		return 0, err
 	}

@@ -195,6 +195,14 @@ func (s *testStack) signIn() (map[string]string, string) {
 	if err != nil {
 		s.t.Fatal(err)
 	}
+	return s.signInAs(pub, priv)
+}
+
+// signInAs runs the same Hub login dance with a caller-supplied key. Tests that
+// need to keep the private key — the stake-wallet link flow signs a SECOND
+// message with a second wallet — use this instead of signIn.
+func (s *testStack) signInAs(pub ed25519.PublicKey, priv ed25519.PrivateKey) (map[string]string, string) {
+	s.t.Helper()
 	address, err := nimiq.AddressFromPublicKey(pub)
 	if err != nil {
 		s.t.Fatal(err)
