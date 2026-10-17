@@ -1084,6 +1084,19 @@ export const adminSetRatingComments = (enabled: boolean) =>
 export const adminHideRatingComment = (kind: 'order' | 'quote', id: string, hidden: boolean) =>
   api(`/admin/ratings/${kind}/${encodeURIComponent(id)}/hide`, { method: 'POST', body: { hidden } });
 export const adminGetOrder = (id: string) => api('/admin/orders/' + encodeURIComponent(id));
+/**
+ * Re-ask the supplier about one purchase and apply the conditional transition.
+ *
+ * This is the operator's recovery path for an order that is sitting in
+ * `awaiting_payment` (or `expired`) even though the buyer says they paid: the
+ * customer-facing endpoints deliberately only re-read local state, so this is
+ * the one button that goes upstream. It is safe to click — the backend uses a
+ * cache-bypassing GET plus the same conditional transition the tracker uses,
+ * so it can only ever move the quote to a state the supplier actually
+ * reported. It refuses test-center quotes and quotes with no supplier id.
+ */
+export const adminSyncOrder = (id: string) =>
+  api('/admin/orders/' + encodeURIComponent(id) + '/sync', { method: 'POST', body: {}, timeoutMs: 30000 });
 
 export const adminTestActivity = () => api('/admin/test-activity');
 export const adminSetTestActivity = (enabled: boolean) => api('/admin/test-activity', {method:'POST',body:{enabled}});

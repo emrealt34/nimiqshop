@@ -31,6 +31,7 @@ import {
   adminResetStakeLedger,
   adminListQuotes,
   adminGetOrder,
+  adminSyncOrder,
 } from '../../lib/api';
 import { fmtNIM, formatWalletAddress } from '../../lib/format';
 import { siteName } from '../../lib/config';
@@ -1007,11 +1008,12 @@ function OrdersPanel() {
   const [err, setErr] = useState('');
   // Paged like the rest of the console: 5 orders per page.
   const [page, setPage] = useState(0);
-  useEffect(() => {
+  const reload = useCallback(() => {
     adminListQuotes(50)
       .then((d) => setRows(d.quotes || []))
       .catch((e) => setErr((e as Error).message || 'Could not load orders'));
   }, []);
+  useEffect(() => { reload(); }, [reload]);
   if (!rows && !err) return <div className="card mt-2"><div className="card-title">Orders</div><LoadingRows /></div>;
   if (err) return <div className="card mt-2"><div className="card-title">Orders</div><div className="alert error"><div className="small">{err}</div></div></div>;
   const ORDERS_PAGE_SIZE = 5;
@@ -1038,6 +1040,10 @@ function OrdersPanel() {
             <div key={from + i}>
               <CashbackRow cb={q.cashback} purchaseTx={q.lightning_funding_hint || q.lightning_chain_proof?.funding_tx || ''} extraLeft={(q.test_mode ? '🧪 TEST · ' : '') + (q.product_id || 'item') + ' · ' + (q.status || '') + (q.id ? ' · ' + String(q.id).slice(0, 8) : '')} />
               {q.lightning_payment_hash ? <div className="xs mono" style={{ overflowWrap: 'anywhere' }}>Lightning invoice hash: {q.lightning_payment_hash}</div> : null}
+              {/* Recovery row: re-ask the supplier first (the only upstream
+                  path an operator has for a stuck purchase), then inspect what
+                  was stored locally. */}
+              <SupplierSyncButton id={q.id} onSynced={reload} />
               <PaymentInspectionButton id={q.id} />
               {/* Contact the buyer entered for this order (the same values the supplier request is built from). Admin-only view; never logged. */}
               <div className="xs mt-1" style={{ paddingBottom: 8, display: 'flex', flexWrap: 'wrap', gap: 12 }} data-testid="order-contact">
@@ -1457,6 +1463,53 @@ export function AdminPage() {
       <AdminContent />
     </AppRoot>
   );
+}
+
+/**
+ * SupplierSyncButton — the operator's recovery path for a purchase that is
+ * stuck in `awaiting_payment` (or locally `expired`) even though the buyer
+ * says they paid.
+ *
+ * Why it has to exist: every customer-facing endpoint deliberately only
+ * re-reads local state ("Reading an order never triggers a supplier poll"),
+ * so the ONLY things that move a quote forward are the settlement tracker and
+ * the supplier webhook. When the webhook is not configured and the tracker
+ * has not got to this row yet, an operator with a paying customer on the
+ * phone had no button at all — the fix was a curl against
+ * POST /api/admin/orders/{id}/sync that nothing in the UI called.
+ *
+ * It is safe to click and cannot invent an outcome: the backend re-GETs the
+ * supplier without cache and applies the same conditional transition the
+ * tracker does, so the row can only move to a state the supplier actually
+ * reported. Test-center quotes and quotes with no supplier id are refused
+ * upstream, and that refusal is shown verbatim.
+ */
+function SupplierSyncButton({ id, onSynced }: { id: string; onSynced?: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [result, setResult] = useState<{ status: string; supplier_status: string } | null>(null);
+  return <div className="mt-1" style={{ display: 'inline-block', marginRight: 8 }}>
+    <button type="button" className="btn btn-outline btn-sm" disabled={busy}
+      data-testid="supplier-sync"
+      onClick={async () => {
+        setBusy(true); setError(''); setResult(null);
+        try {
+          const q: any = await adminSyncOrder(id);
+          setResult({ status: String(q?.status || ''), supplier_status: String(q?.supplier_status || '') });
+          onSynced?.();
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Could not reach the supplier');
+        } finally { setBusy(false); }
+      }}>
+      {busy ? 'Asking supplier…' : 'Sync with supplier'}
+    </button>
+    {error ? <div role="alert" className="xs">{error}</div> : null}
+    {result ? (
+      <div className="xs mono" data-testid="supplier-sync-result" style={{ overflowWrap: 'anywhere' }}>
+        supplier says {result.supplier_status || '—'} → local {result.status || '—'}
+      </div>
+    ) : null}
+  </div>;
 }
 
 function PaymentInspectionButton({ id }: { id: string }) {
