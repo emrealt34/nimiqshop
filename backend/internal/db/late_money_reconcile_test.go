@@ -76,3 +76,29 @@ func TestLateMoneyReconcileIsTheSlowestClass(t *testing.T) {
 		t.Fatal("test setup: no supplier state was asserted yet")
 	}
 }
+
+// TestLateMoneyWindowIsThreeDays pins the owner's contract: an expired order
+// keeps being re-asked about for THREE DAYS. A supplier can hold an order in
+// its own waiting/manual state far longer than the shop's local payment
+// window, and the shop has no way to predict when it will move.
+func TestLateMoneyWindowIsThreeDays(t *testing.T) {
+	if LateMoneyReconcileWindow != 72*time.Hour {
+		t.Fatalf("late-money window = %s, want 72h (owner: \"3 gün boyunca\")", LateMoneyReconcileWindow)
+	}
+	now := time.Now().UTC()
+	deadline := now.Add(-71 * time.Hour) // still inside, barely
+	q := Quote{
+		ID: "q-day3", Status: "expired", SupplierOrderID: "CR-late",
+		PaymentExpiry: deadline, ExpiresAt: deadline,
+	}
+	if !q.NeedsSupplierPoll() {
+		t.Fatal("a quote expired almost three days ago must still be reconciled")
+	}
+	past := Quote{
+		ID: "q-day4", Status: "expired", SupplierOrderID: "CR-late",
+		PaymentExpiry: now.Add(-73 * time.Hour), ExpiresAt: now.Add(-73 * time.Hour),
+	}
+	if past.NeedsSupplierPoll() {
+		t.Fatal("past three days the quote leaves the poll set")
+	}
+}

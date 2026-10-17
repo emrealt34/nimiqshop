@@ -144,6 +144,23 @@ func TestLateMoneyReconcilePollsSlowly(t *testing.T) {
 	if got := pollIntervalFor(reconcile, now); got != lateMoneyReconcileInterval {
 		t.Fatalf("late-money reconcile cadence = %s, want %s", got, lateMoneyReconcileInterval)
 	}
+	// Owner, 2026-10-17: "expired olsa bile 6 saatte bir bak expired
+	// olanlara 3 gün boyunca". Pin both halves of that contract AND the
+	// arithmetic that makes it useful — a 6h cadence inside a 72h window
+	// gives every stranded order a dozen chances to be picked up.
+	if lateMoneyReconcileInterval != 6*time.Hour {
+		t.Fatalf("reconcile cadence = %s, want 6h", lateMoneyReconcileInterval)
+	}
+	if db.LateMoneyReconcileWindow != 72*time.Hour {
+		t.Fatalf("reconcile window = %s, want 72h", db.LateMoneyReconcileWindow)
+	}
+	if chances := db.LateMoneyReconcileWindow / lateMoneyReconcileInterval; chances < 10 {
+		t.Fatalf("only %d reconcile chances inside the window; a late supplier confirmation would be missed", chances)
+	}
+	// The reconcile class must stay far cheaper than a live buyer's order.
+	if live := pollIntervalFor(trackedQuote("live", cryptorefills.QuoteAwaitingPay, now, false), now); lateMoneyReconcileInterval <= live {
+		t.Fatalf("reconcile cadence %s must be slower than the live awaiting_payment cadence %s", lateMoneyReconcileInterval, live)
+	}
 
 	observed := reconcile
 	observed.PaymentObserved = true

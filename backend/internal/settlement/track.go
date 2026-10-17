@@ -286,10 +286,14 @@ func (w *OrderTracker) markDue(q db.Quote, now time.Time) bool {
 
 // lateMoneyReconcileInterval is the cadence for a quote the shop expired on
 // its own clock and is still re-asking the supplier about (see
-// db.LateMoneyReconcileWindow). It is the least urgent class in the tracker:
-// slow enough that a day's worth of abandoned carts cannot consume the poll
-// budget a buyer on the pay screen needs.
-const lateMoneyReconcileInterval = 5 * time.Minute
+// db.LateMoneyReconcileWindow). Owner, 2026-10-17: "expired olsa bile 6
+// saatte bir bak expired olanlara 3 gün boyunca".
+//
+// It is the least urgent class in the tracker: slow enough that days of
+// abandoned carts cannot consume the poll budget a buyer on the pay screen
+// needs, and short enough that a payment the supplier confirms late is still
+// picked up inside the window (72h / 6h ≈ 12 chances per quote).
+const lateMoneyReconcileInterval = 6 * time.Hour
 
 // pollIntervalFor is the adaptive schedule. Fresh awaiting_payment orders
 // poll fast (the customer is actively on the payment page and the webhook

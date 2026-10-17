@@ -148,12 +148,18 @@ func BlocksNewPurchase(q Quote) bool { return BlocksNewPurchaseAt(q, time.Now().
 //	              → a paid order is forgotten forever.
 //
 // Railway's idle-sleep and the tracker's own circuit breaker (up to 15 min)
-// both make that reachable in production. The window is bounded so an
-// abandoned cart does not become a permanent resident of the poll set, and
-// these rows poll at the slowest cadence and the lowest priority (see
-// pollIntervalFor / pollRank) so they can never take budget from a buyer who
-// is on the pay screen right now.
-const LateMoneyReconcileWindow = 24 * time.Hour
+// both make that reachable in production.
+//
+// THREE DAYS, not one (owner, 2026-10-17: "expired olsa bile 6 saatte bir
+// bak expired olanlara 3 gün boyunca; durum ödenire çevrilirse"). A supplier
+// can take a long time to move an order out of its own waiting state — a
+// manual-action queue, a weekend, a refund review — and the shop has no way
+// to predict that. Cost is not the reason to be stingy here: at the 6-hour
+// reconcile cadence a quote is asked about ~12 times over the whole window,
+// so even a thousand abandoned carts a day stay far below the per-tick poll
+// cap and never compete with a buyer who is on the pay screen (see
+// pollIntervalFor / pollRank / capPollPass).
+const LateMoneyReconcileWindow = 72 * time.Hour
 
 // NeedsSupplierPoll answers a DIFFERENT question from BlocksNewPurchase and
 // must not be derived from it: "is there any supplier state left to
