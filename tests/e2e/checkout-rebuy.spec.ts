@@ -73,13 +73,18 @@ function seedCart(page: Page, count: number) {
   }, count);
 }
 
-/** Cart → delivery details → "Continue to payment". */
-async function startCheckout(page: Page) {
-  await open(page, path('/cart'));
+/** Delivery details → "Continue to payment" (the cart page is already open). */
+async function continueToPayment(page: Page) {
   await page.locator('.btn-gold.btn-block.btn-lg').click();
   await page.getByPlaceholder('you@gmail.com').first().fill('buyer@example.com');
   await page.locator('#cdp-my-email-again').fill('buyer@example.com');
   await page.getByRole('button', { name: /Continue to payment/i }).click();
+}
+
+/** Cart → delivery details → "Continue to payment". */
+async function startCheckout(page: Page) {
+  await open(page, path('/cart'));
+  await continueToPayment(page);
 }
 
 const prompt = (page: Page) => page.getByTestId('live-duplicate');
@@ -168,25 +173,30 @@ test('the back-to-cart button on the question closes the checkout and creates no
 test('the cart-derived checkout key is spent once its order is settled, and kept while it is open', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await seedCart(page, 1);
+  // Every GET /api/quotes/{id} answers "open" until a step below says
+  // otherwise — the pay screen polls the order it shows, and an order that
+  // reports itself paid would (rightly) end the flow with the success beat
+  // and release the key for THAT reason, which is not what this test pins.
+  const lookups: Record<string, Record<string, unknown>> = {};
   // First purchase: a fresh order. The storefront stores key K1 → q-first.
-  const calls = await mockCheckout(page, [quoteBody('q-first'), quoteBody('q-second'), quoteBody('q-third')], {
-    'q-first': { quote: quoteBody('q-first', { status: 'fulfilled', can_pay: false }), can_pay: false, checkout_settled: true },
-    'q-second': { quote: quoteBody('q-second'), can_pay: true, checkout_settled: false },
-  });
+  const calls = await mockCheckout(page, [quoteBody('q-first'), quoteBody('q-second'), quoteBody('q-third')], lookups);
   await startCheckout(page);
   await expect(payScreen(page)).toBeVisible();
   expect(calls).toHaveLength(1);
   const k1 = calls[0].key;
   expect(k1.length).toBeGreaterThanOrEqual(16);
 
-  // The buyer comes back for the same cart after q-first was delivered
-  // (GET says checkout_settled). The same cart must NOT go out under K1:
-  // that is the key of a finished order, and replaying it is how a buyer
-  // landed on a completed order page instead of a pay screen.
-  await startCheckout(page);
+  // Later, q-first is paid and delivered. The buyer comes back for the same
+  // cart (the cart page no longer polls q-first), and the shop now reports
+  // that order as settled. The same cart must NOT go out under K1: that is
+  // the key of a finished order, and replaying it is how a buyer landed on
+  // a completed order page instead of a pay screen.
+  await open(page, path('/cart'));
+  lookups['q-first'] = { quote: quoteBody('q-first', { status: 'fulfilled', can_pay: false }), can_pay: false, checkout_settled: true };
+  await continueToPayment(page);
   await expect(payScreen(page)).toBeVisible();
   expect(calls).toHaveLength(2);
-  expect(calls[1].key).not.toBe(k1);
+  expect(calls[1].key, 'a settled order\'s key is spent — the same cart gets a fresh one').not.toBe(k1);
   const k2 = calls[1].key;
 
   // Same cart again while q-second is still OPEN: a retry, same key K2.
