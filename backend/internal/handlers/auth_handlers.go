@@ -22,6 +22,14 @@ type challengeResponse struct {
 	Token   string `json:"challenge_token"`
 }
 
+// loginChallengeMessage is the exact text Nimiq Hub signs during sign-in. It is
+// shared by the issuer and the verifier on purpose: the two must never drift,
+// and it must never collide with any other message the Hub is asked to sign
+// (see stakeLinkMessage).
+func loginChallengeMessage(siteName, nonce string) string {
+	return siteName + " login: " + nonce
+}
+
 func (h *Handlers) AuthChallenge(ctx *fasthttp.RequestCtx) {
 	nonce, err := auth.NewNonce()
 	if err != nil {
@@ -37,7 +45,7 @@ func (h *Handlers) AuthChallenge(ctx *fasthttp.RequestCtx) {
 
 	writeJSON(ctx, fasthttp.StatusOK, challengeResponse{
 		Nonce:   nonce,
-		Message: h.Cfg.SiteName() + " login: " + nonce,
+		Message: loginChallengeMessage(h.Cfg.SiteName(), nonce),
 		Token:   token,
 	})
 }
@@ -67,7 +75,9 @@ func (h *Handlers) HubLogin(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	claims, err := auth.ParseChallenge(h.Cfg.JWTSecret, req.ChallengeToken)
+	// Purpose-scoped: a challenge minted for another flow (stake-address
+	// linking) must not be able to sign someone in.
+	claims, err := auth.ParseChallengeFor(h.Cfg.JWTSecret, req.ChallengeToken, auth.PurposeLogin)
 	if err != nil {
 		writeError(ctx, fasthttp.StatusUnauthorized, "challenge expired or invalid, request a new one")
 		return
@@ -89,7 +99,7 @@ func (h *Handlers) HubLogin(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	message := h.Cfg.SiteName() + " login: " + claims.Nonce
+	message := loginChallengeMessage(h.Cfg.SiteName(), claims.Nonce)
 	if err := nimiq.VerifySignedMessage(pubKey, sig, message, req.Address); err != nil {
 		writeError(ctx, fasthttp.StatusUnauthorized, "signature verification failed")
 		return

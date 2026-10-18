@@ -296,7 +296,9 @@ func (h *Handlers) AdminListUsers(ctx *fasthttp.RequestCtx) {
 				rowBase = st.EffectiveBaseBps(baseBps)
 			}
 		}
-		rate := h.adminLiveCashbackRate(row.NimiqAddress, rowBase)
+		// Every wallet that earns for this customer, not just the primary: the
+		// console has to show the rate the shop will actually pay.
+		rate := h.adminLiveCashbackRateAll(row.EarningStakeAddresses(), rowBase)
 		for k, v := range rate {
 			view[k] = v
 		}
@@ -397,11 +399,25 @@ func (h *Handlers) AdminUserDetail(ctx *fasthttp.RequestCtx) {
 	}
 	paidLuna, pendingLuna, paidCount, pendingCount, _ := h.Store.UserCashbackTotals(user.ID)
 	baseBps, stake := h.buyerBaseBps(ctx, user.ID)
-	liveRate := h.adminLiveCashbackRate(user.NimiqAddress, baseBps)
+	// The console has to show the wallet that actually earns, and say when
+	// that is not the account's sign-in wallet: otherwise "why is this
+	// customer's rate X?" has no answer in the UI.
+	earningAddr := user.EffectiveStakeAddress()
+	earningAddrs := user.EarningStakeAddresses()
+	liveRate := h.adminLiveCashbackRateAll(earningAddrs, baseBps)
 	liveRate["staked"] = stake.Staked
+	// stake_nim is the TOTAL across every earning wallet — the same number the
+	// rate was computed from (db.AggregateStakerStake).
 	liveRate["stake_nim"] = float64(stake.StakeLuna) / lunaPerNIM
-	h.syncProfitOnDemand(ctx, user.NimiqAddress)
-	ledger := h.ledgerView(user.NimiqAddress)
+	liveRate["stake_address"] = earningAddr
+	liveRate["stake_addresses"] = earningAddrs
+	liveRate["linked_stake_addresses"] = linkedStakeRows(user)
+	liveRate["linked_wallet_limit"] = db.MaxLinkedStakeAddresses
+	liveRate["stake_address_linked"] = user.HasLinkedStakeAddress()
+	for _, address := range earningAddrs {
+		h.syncProfitOnDemand(ctx, address)
+	}
+	ledger := h.ledgerView(earningAddr)
 
 	cbs, _ := h.Store.ListCashbacksByUser(user.ID, 80)
 	cbViews := make([]map[string]any, 0, len(cbs))
@@ -1261,6 +1277,57 @@ func adminQuoteView(quote db.Quote) map[string]any {
 	view["lightning_funding_hint"] = quote.LightningFundingHint
 	view["lightning_chain_proof"] = quote.LightningChainProof
 	return view
+}
+
+// adminLiveCashbackRateAll is adminLiveCashbackRate over a SET of earning
+// wallets: the base is the operator's (already resolved once per customer) and
+// the boost is the sum of every wallet's own book.
+func (h *Handlers) adminLiveCashbackRateAll(addrs []string, baseBps int) map[string]any {
+	if len(addrs) == 1 {
+		return h.adminLiveCashbackRate(addrs[0], baseBps)
+	}
+	boost := 0
+	for _, addr := range addrs {
+		if lv := h.ledgerView(addr); lv != nil {
+			switch v := lv["boost_bps"].(type) {
+			case int:
+				boost += v
+			case int64:
+				boost += int(v)
+			case float64:
+				boost += int(v)
+			}
+		}
+	}
+	total := baseBps + boost
+	src := "base"
+	if boost > 0 {
+		src = "staker"
+	}
+	return map[string]any{
+		"base_bps":            baseBps,
+		"base_percent":        float64(baseBps) / 100.0,
+		"boost_bps":           boost,
+		"boost_percent":       float64(boost) / 100.0,
+		"live_bps":            total,
+		"live_percent":        float64(total) / 100.0,
+		"live_source":         src,
+		"staker_program_live": h.stakeProgramEnabled(),
+	}
+}
+
+// linkedStakeRows is the small "which extra wallets earn here" list the buyer
+// and the admin console both render: address plus when ownership was proven.
+func linkedStakeRows(user db.User) []map[string]any {
+	links := user.LinkedStakeWallets()
+	out := make([]map[string]any, 0, len(links))
+	for _, link := range links {
+		out = append(out, map[string]any{
+			"address":   link.Address,
+			"linked_at": link.LinkedAt,
+		})
+	}
+	return out
 }
 
 func adminCashbackView(cb db.Cashback) map[string]any {

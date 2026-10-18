@@ -63,7 +63,9 @@ func (h *Handlers) readWalletStake(address string, fresh bool) (walletStakeEntry
 		if !errors.As(err, &rpcErr) {
 			return walletStakeEntry{}, false
 		}
-		message := strings.ToLower(rpcErr.Message)
+		// Detail: the live node puts "No staker with address: …" in the error's
+		// data field and leaves the message generic.
+		message := strings.ToLower(rpcErr.Detail())
 		if !strings.Contains(message, "no staker") && !strings.Contains(message, "not a staker") {
 			return walletStakeEntry{}, false
 		}

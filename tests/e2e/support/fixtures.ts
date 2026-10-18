@@ -20,6 +20,11 @@ import { backendRoutes, matchRoute } from '../../../scripts/api-routes.mjs';
 
 export const ADDRESS = 'NQ07 0000 0000 0000 0000 0000 0000 0000 0000';
 export const OTHER_ADDRESS = 'NQ12 3456 7890 ABCD EFGH JKLM NPQR STUV';
+/** The wallet that stakes while the buyer pays from ADDRESS — a real mainnet
+ *  staker of this shop's validator, so the link flow under test is the one a
+ *  customer actually hits ("I stake from my regular wallet"). */
+export const STAKE_ADDRESS = 'NQ73 SE1X YRRF Q8NC DQCP HLJM NR85 8P7V 2HPD';
+export const VALIDATOR = 'NQ49 N8MB XYCR XBUP 404C KXKK L49M A7BT F082';
 export const API_ORIGIN = 'https://shopapi.nimiqbase.com';
 
 export type ApiMode = 'ok' | 'down' | 'error500' | 'garbage' | 'empty' | 'slow';
@@ -28,10 +33,92 @@ export type ApiOptions = {
   authed: boolean;
   orders: number;
   preference: 'burn' | 'cashback';
+  /** The staking wallets this account has linked; their stakes are summed. */
+  linkedStakeWallets?: string[];
 };
-export const DEFAULT_API: ApiOptions = { mode: 'ok', authed: true, orders: 5, preference: 'cashback' };
+export const DEFAULT_API: ApiOptions = { mode: 'ok', authed: true, orders: 5, preference: 'cashback', linkedStakeWallets: [] };
 
 const ROUTES: { method: string; path: string }[] = backendRoutes();
+
+/** NIM each test wallet delegates to our validator — the stake the rate sums. */
+export const STAKE_WALLET_NIM: Record<string, number> = {
+  [STAKE_ADDRESS]: 100,
+  [OTHER_ADDRESS]: 150,
+};
+export const WALLET_LIMIT = 5;
+
+/**
+ * GET /api/poolstake/me + POST /api/poolstake/refresh for an account that has
+ * linked `links` (the sign-in wallet always earns and is never in that list).
+ *
+ * Exported so a spec can drive a STATEFUL mock — link a wallet, then remove it —
+ * without duplicating the shape the backend really serves. The rules encoded
+ * here are the product rules: stakes are summed, the staker base is applied once
+ * however many wallets earn, and each linked wallet's own book adds its boost.
+ */
+export function poolStakeMe(links: string[]) {
+  const rows = [
+    { address: ADDRESS, linked: false, staked: false, stake_nim: 0, boost_bps: 0, loyalty_days: 0, source: 'pool' },
+    ...links.map(address => ({
+      address,
+      linked: true,
+      linked_at: iso(1),
+      staked: true,
+      stake_nim: STAKE_WALLET_NIM[address] ?? 120,
+      boost_bps: 10,
+      loyalty_days: 40,
+      source: 'chain',
+    })),
+  ];
+  const stakeNim = rows.reduce((sum, row) => sum + row.stake_nim, 0);
+  const staked = stakeNim > 0;
+  // ONE base for the account, plus each wallet's own boost.
+  const baseBps = staked ? 200 : 0;
+  const boostBps = rows.reduce((sum, row) => sum + row.boost_bps, 0);
+  return {
+    address: links[0] || ADDRESS,
+    account_address: ADDRESS,
+    stake_address: links[0] || '',
+    stake_address_linked: links.length > 0,
+    stake_address_linked_at: links.length ? iso(1) : '',
+    stake_addresses: rows,
+    earning_addresses: rows.map(row => row.address),
+    linked_wallet_limit: WALLET_LIMIT,
+    staked,
+    stake_luna: Math.round(stakeNim * 100_000),
+    stake_nim: stakeNim,
+    base_bps: baseBps,
+    base_percent: baseBps / 100,
+    base_source: staked ? 'pool_staker' : 'operator',
+    staker_base_bps: 200,
+    boost_bps: boostBps,
+    boost_percent: boostBps / 100,
+    cashback_bps: baseBps + boostBps,
+    cashback_percent: (baseBps + boostBps) / 100,
+    boosted: staked,
+    pool_validator_address: VALIDATOR,
+    staker_program_enabled: true,
+    ...(staked ? { staked_since: iso(40), loyalty_days: 40, checked_at: iso(0), from_cache: false } : {}),
+  };
+}
+
+/** POST (link) / DELETE (unlink) /api/poolstake/stake-address: the new state
+ *  plus the refreshed standing, exactly as writeLinkResult answers. */
+export function stakeLinkResult(links: string[]) {
+  return {
+    linked: links.length > 0,
+    account_address: ADDRESS,
+    stake_address: links[0] || '',
+    stake_address_linked_at: links.length ? iso(0) : '',
+    stake_addresses: links.map(address => ({ address, linked_at: iso(0) })),
+    linked_count: links.length,
+    linked_wallet_limit: WALLET_LIMIT,
+    effective_stake_address: links[0] || ADDRESS,
+    earning_addresses: [ADDRESS, ...links],
+    stake_source: links.length ? 'chain' : undefined,
+    me: poolStakeMe(links),
+  };
+}
 
 type Fixtures = {
   lang: Lang;
@@ -113,7 +200,40 @@ function payload(p: string, method: string, o: ApiOptions): unknown {
     staker_program_enabled: false,
   };
   if (p === '/account/limits') return { daily_usd: 500, used_usd: 20 };
-  if (p === '/poolstake/position' || p === '/poolstake/position/refresh') return { address: ADDRESS, exists: false, delegation: '', active_nim: 0, inactive_nim: 0, retired_nim: 0, checked_at: iso(), from_cache: false };
+  if (p === '/poolstake/me' || p === '/poolstake/refresh') return poolStakeMe(o.linkedStakeWallets ?? []);
+  if (p === '/poolstake/stake-address/challenge') return {
+    nonce: 'test-link-nonce',
+    message: `nimshop.io link stake wallet ${STAKE_ADDRESS.replace(/ /g, '')} to account ${ADDRESS.replace(/ /g, '')}: test-link-nonce`,
+    challenge_token: 'test-link-challenge',
+  };
+  /* POST links, DELETE unlinks; both answer with the new state plus the full
+     refreshed standing so the page re-renders in one step (writeLinkResult).
+     The fixture is stateless: it reports one wallet linked, which is enough for
+     every spec that only reads. Specs that link and then remove drive their own
+     stateful mock with poolStakeMe/stakeLinkResult. */
+  if (p === '/poolstake/stake-address') {
+    const links = method === 'DELETE' ? [] : [...(o.linkedStakeWallets ?? []), STAKE_ADDRESS];
+    return stakeLinkResult([...new Set(links)]);
+  }
+  if (p === '/poolstake/position' || p === '/poolstake/position/refresh') {
+    const links = o.linkedStakeWallets ?? [];
+    const activeNim = links.reduce((sum, a) => sum + (STAKE_WALLET_NIM[a] ?? 120), 0);
+    const positions = [
+      { address: ADDRESS, linked: false, exists: false, delegation: '', active_nim: 0, inactive_nim: 0, retired_nim: 0, from_cache: false },
+      ...links.map(a => ({
+        address: a, linked: true, exists: true, delegation: VALIDATOR,
+        active_nim: STAKE_WALLET_NIM[a] ?? 120, inactive_nim: 0, retired_nim: 0, from_cache: false,
+      })),
+    ];
+    return {
+      address: links[0] || ADDRESS, exists: links.length > 0,
+      account_address: ADDRESS, stake_address_linked: links.length > 0,
+      stake_address_linked_at: links.length ? iso(1) : '',
+      positions, earning_addresses: positions.map(row => row.address), partial: false,
+      delegation: links.length ? VALIDATOR : '', active_nim: activeNim, inactive_nim: 0, retired_nim: 0,
+      checked_at: iso(), from_cache: false,
+    };
+  }
   if (p === '/orders') return o.authed ? [order('o1', 'delivered', 0), order('o2', 'supplier_processing', 1), order('o3', 'failed', 2)] : [];
   if (p.startsWith('/orders/')) return order(p.split('/')[2], 'delivered', 0);
   if (p === '/quotes') return [];

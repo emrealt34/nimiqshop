@@ -6,7 +6,7 @@
 import { CFG } from './config';
 import { bytesToHex } from './format';
 import { detectMobilePlatform, getNimiqProvider, inNimiqPay, initNimiqMiniApp, openInNimiqPay } from './miniapp';
-import { authChallenge, hubLogin as apiHubLogin } from './api';
+import { authChallenge, hubLogin as apiHubLogin, stakeAddressChallenge, linkStakeAddress } from './api';
 import { saveSession } from './session';
 import { ensureLib } from './vendorLoad';
 import { saneBolt11 } from './pay';
@@ -29,6 +29,10 @@ function getHub(): any {
 
 const LOGIN_KEY = 'nimshop.pendingLogin';
 const PAY_KEY = 'nimshop.pendingPay';
+// A stake-wallet link is a second, different SIGN_MESSAGE flow: it has its own
+// challenge (purpose-bound server-side) and its own pending entry, so a Hub
+// redirect can be resumed into the right one.
+const LINK_KEY = 'nimshop.pendingStakeLink';
 
 function savePending(key: string, data: Record<string, unknown>) {
   try {
@@ -117,7 +121,7 @@ function takePrefetch(): HubChallenge | null {
 
 export type HubLoginResult = { address: string } | { redirecting: true };
 
-function hubSignMessage(message: string): Promise<{ signed: any } | { redirecting: true }> {
+function hubSignMessage(message: string, accountAddress?: string): Promise<{ signed: any } | { redirecting: true }> {
   const h = getHub();
   // On a phone the default popup is the wrong tool: browsers block a popup
   // that opens after an await, and a Hub window that opens without its request
@@ -133,6 +137,11 @@ function hubSignMessage(message: string): Promise<{ signed: any } | { redirectin
   const response = h.signMessage({
     appName: hubAppName(),
     message: String(message),
+    // Preselect the wallet that has to sign. Without it Hub offers the account
+    // picker and defaults to the last wallet used — which for a Nimiq Pay
+    // shopper is the paying wallet, not the staking one, and the signature then
+    // fails verification for a reason the buyer cannot see.
+    ...(accountAddress ? { accountAddress: String(accountAddress) } : {}),
   }, behavior);
   // RedirectRequestBehavior returns void (or resolves before navigation), not
   // a signature. A void response can also come from Hub's own fallback
@@ -264,6 +273,64 @@ async function finishLogin(challengeToken: string, signed: any): Promise<{ addre
   return { address: res.user.nimiq_address || address };
 }
 
+/* ---------------- Linking a staking wallet ---------------- */
+
+/**
+ * Proves ownership of a staking wallet so the shop can read this account's
+ * cashback from it.
+ *
+ * This is the answer to the customer who stakes from his regular wallet but
+ * checks out through Nimiq Pay: the shop signs him in as whichever wallet he
+ * picks there, and since one account == one address, his stake was invisible to
+ * the account that actually buys. He signs ONE message with the staking wallet —
+ * the same Hub signMessage() login uses — and the backend verifies both the
+ * signature and that the wallet delegates to our validator before it records
+ * the link.
+ *
+ * Returns the server's link response (which carries the refreshed cashback
+ * view), or { redirecting: true } when Hub took over the page on a phone;
+ * initHubRedirectHandling finishes the link when Hub sends the buyer back.
+ */
+export async function linkStakingWallet(stakeAddress: string): Promise<Record<string, any> | { redirecting: true }> {
+  const address = String(stakeAddress || '').trim();
+  if (!address) throw new Error(tr('hub.incomplete'));
+  if (!(window as any).HubApi) await loadHubApi();
+
+  const challenge: any = await stakeAddressChallenge(address);
+  const message = String(challenge?.message || '');
+  const token = String(challenge?.challenge_token || '');
+  if (!message || !token) throw new Error(tr('hub.failed'));
+
+  // Saved BEFORE the signature is requested: on a phone Hub navigates away and
+  // this page is gone, so the resume has to find the challenge here.
+  savePending(LINK_KEY, { challenge_token: token, message, stake_address: address });
+  let response: ReturnType<typeof hubSignMessage>;
+  try {
+    response = hubSignMessage(message, address);
+  } catch (err) {
+    clearPending(LINK_KEY);
+    throw err;
+  }
+  const result = await response;
+  if ('redirecting' in result) return { redirecting: true };
+  clearPending(LINK_KEY);
+  return finishStakeLink(token, address, result.signed);
+}
+
+async function finishStakeLink(challengeToken: string, stakeAddress: string, signed: any): Promise<Record<string, any>> {
+  if (!signed || typeof signed !== 'object') throw new Error(tr('hub.incomplete'));
+  const publicKey =
+    signed.signerPublicKey || signed.publicKey || (signed.signer instanceof Uint8Array ? signed.signer : undefined);
+  const signature = signed.signature;
+  if (!publicKey || !signature) throw new Error(tr('hub.incomplete'));
+  return linkStakeAddress({
+    challenge_token: challengeToken,
+    stake_address: stakeAddress,
+    public_key: publicKey instanceof Uint8Array ? bytesToHex(publicKey) : String(publicKey),
+    signature: signature instanceof Uint8Array ? bytesToHex(signature) : String(signature),
+  });
+}
+
 /* ---------------- Nimiq Pay: direct Nimiq Pay ---------------- */
 export function lightningPaymentURI(invoice: string): string {
   const raw = String(invoice || '').trim();
@@ -283,7 +350,7 @@ export function rememberLightningPayment(invoice: string, context?: Record<strin
 
 /* ---------------- Redirect result recovery (mobile) ---------------- */
 export function initHubRedirectHandling({ onLogin }: { onLogin?: (address: string) => void }): void {
-  if (!loadPending(LOGIN_KEY) && !loadPending(PAY_KEY)) return;
+  if (!loadPending(LOGIN_KEY) && !loadPending(PAY_KEY) && !loadPending(LINK_KEY)) return;
   (async () => {
     try {
       await loadHubApi();
@@ -293,6 +360,25 @@ export function initHubRedirectHandling({ onLogin }: { onLogin?: (address: strin
       h.on(
         HubApi.RequestType.SIGN_MESSAGE,
         async (result: any) => {
+          // A link and a login both arrive as SIGN_MESSAGE; the pending entry
+          // says which flow was in flight when Hub redirected away.
+          const linking = loadPending(LINK_KEY);
+          if (linking) {
+            clearPending(LINK_KEY);
+            try {
+              const linked = await finishStakeLink(
+                String(linking.challenge_token || ''),
+                String(linking.stake_address || ''),
+                result,
+              );
+              window.dispatchEvent(new CustomEvent('nimshop:stake-linked', { detail: linked }));
+            } catch (e) {
+              window.dispatchEvent(
+                new CustomEvent('nimshop:hub-error', { detail: { message: friendlyHubError(e) } })
+              );
+            }
+            return;
+          }
           const pending = loadPending(LOGIN_KEY);
           if (!pending) return;
           clearPending(LOGIN_KEY);
@@ -307,6 +393,7 @@ export function initHubRedirectHandling({ onLogin }: { onLogin?: (address: strin
         },
         () => {
           clearPending(LOGIN_KEY);
+          clearPending(LINK_KEY);
         }
       );
 

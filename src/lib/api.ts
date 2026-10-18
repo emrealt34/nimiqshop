@@ -833,6 +833,31 @@ export const getCashbackLeaderboard = (bucket: 'week' | 'month' | 'all' | string
   api('/cashback/leaderboard?bucket=' + encodeURIComponent(bucket));
 export const refreshPoolStake = () => api('/poolstake/refresh', { method: 'POST', auth: true });
 
+/* ---------------- Linked staking wallet ----------------
+ * A shop account IS an address, so a buyer who stakes from one wallet and pays
+ * from another (Nimiq Pay signs him in as whichever wallet he picks) ends up
+ * with two accounts: the staking one he never logs into and the paying one that
+ * has never staked. These three calls let him prove ownership of the staking
+ * wallet with the same Hub signature login uses, and have the shop read the
+ * stake, the loyalty ledger and the rate from it. The payout recipient stays the
+ * wallet he signed in with — see MyStake.account_address. */
+/** Step 1: a purpose-bound challenge naming both wallets and a nonce. */
+export const stakeAddressChallenge = (stakeAddress: string) =>
+  api('/poolstake/stake-address/challenge', { auth: true, method: 'POST', body: { stake_address: stakeAddress } });
+/** Step 2: hand back the Hub signature; the server verifies it and the stake. */
+export const linkStakeAddress = (req: Record<string, unknown>) =>
+  api('/poolstake/stake-address', { auth: true, method: 'POST', body: req });
+/**
+ * Drop a linked staking wallet. With an address only THAT wallet stops earning
+ * and the rest keep going; without one every link is removed and the account
+ * earns from the wallet it signed in with again. Cashback already earned is
+ * never affected — unlinking changes future reads only.
+ */
+export const unlinkStakeAddress = (address?: string) =>
+  address
+    ? api(`/poolstake/stake-address?address=${encodeURIComponent(address)}`, { auth: true, method: 'DELETE' })
+    : api('/poolstake/stake-address', { auth: true, method: 'DELETE' });
+
 /* ---------------- FX / NIM rate (sessionStorage cached) ---------------- */
 const FX_CACHE_KEY = 'nim_fx';
 const FX_CACHE_TTL_MS = 5 * 60 * 1000;

@@ -85,7 +85,10 @@ func (c *Client) ProvePayoutExpired(ctx context.Context, raw string) (PayoutExpi
 		err = c.callURL(ctx, url, "getTransactionByHash", []interface{}{hash}, &receipt)
 		if err != nil {
 			var rpcErr *RPCError
-			if !errors.As(err, &rpcErr) || !strings.EqualFold(strings.TrimSpace(rpcErr.Message), "Transaction not found: "+hash) {
+			// A tx that was never mined is the EXPECTED input to an expiry
+			// proof, not a failure to prove one. A live node says so in the
+			// error's Data field with a generic "Internal error" message.
+			if !errors.As(err, &rpcErr) || !rpcErr.ReasonIs("Transaction not found: "+hash) {
 				return agreed, false, err
 			}
 		} else if string(receipt) != "null" {

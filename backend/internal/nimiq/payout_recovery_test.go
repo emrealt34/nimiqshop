@@ -72,7 +72,10 @@ func TestExpiryProofRequiresFinalizedCheckpointAndUnpaidReceipt(t *testing.T) {
 				response := map[string]interface{}{"jsonrpc": "2.0", "id": 1, "result": result}
 				if problem != "" {
 					delete(response, "result")
-					response["error"] = map[string]interface{}{"code": -32603, "message": problem}
+					// Live shape: generic message, the reason in "data" (see
+					// RPCError.Detail — matching Message alone never fires
+					// against a real node).
+					response["error"] = map[string]interface{}{"code": -32603, "message": "Internal error", "data": problem}
 				}
 				_ = json.NewEncoder(w).Encode(response)
 			}))

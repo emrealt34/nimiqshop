@@ -40,11 +40,32 @@ const (
 // StakeRecheck is one scheduled re-ask: the buyer of quote QuoteID was NOT
 // (verifiably) staked at delivery time — re-check them until Deadline.
 type StakeRecheck struct {
-	QuoteID   string    `json:"quote_id"`
-	UserID    string    `json:"user_id"`
-	Address   string    `json:"address"`
+	QuoteID string `json:"quote_id"`
+	UserID  string `json:"user_id"`
+	// Address is the PRIMARY earning wallet, kept for the legacy no-user
+	// fallback and for logs.
+	Address string `json:"address"`
+	// Addresses is every wallet that earns this buyer's cashback: the re-ask
+	// has to watch all of them, because the stake that was missing at delivery
+	// time can appear under any wallet the buyer owns — and one positive
+	// answer is enough to upgrade the row (the total is recomputed from the
+	// whole set, so a second wallet joining later is picked up too).
+	Addresses []string  `json:"addresses,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 	Deadline  time.Time `json:"deadline"`
+}
+
+// EarningAddresses is the set this re-ask watches, tolerating a record written
+// before the list existed (one hour of records, but a restart must not drop a
+// buyer's window).
+func (rc StakeRecheck) EarningAddresses() []string {
+	if len(rc.Addresses) > 0 {
+		return rc.Addresses
+	}
+	if rc.Address != "" {
+		return []string{rc.Address}
+	}
+	return nil
 }
 
 // recordStakeRecheckTx writes the re-ask inside the caller's open
@@ -134,18 +155,40 @@ func (s *Store) RunStakeRechecks(now time.Time) (resolved, expired int) {
 		return 0, 0
 	}
 	for _, rc := range recs {
+		addrs := rc.EarningAddresses()
+		if len(addrs) == 0 {
+			_ = s.ClearStakeRecheck(rc.QuoteID)
+			expired++
+			continue
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), stakeRecheckTimeout)
-		st, _, lerr := s.lookupStake(ctx, rc.Address)
+		// Ask about EVERY earning wallet and fold the answers into one total
+		// (stakes summed, base once, loyalty the longest streak). The
+		// aggregate also advances each wallet's loyalty and ledger clocks,
+		// which is what the single-address version of this loop used to do
+		// by hand.
+		st, report := s.AggregateStakerStake(ctx, addrs)
 		cancel()
-		if lerr != nil {
-			// The pool could not be asked: this tick does not count.
+		if !st.Staked && report.Failed > 0 && report.Answered == 0 {
+			// The pool could not be asked about any wallet: this tick does not
+			// count, and an outage must not eat the buyer's window.
 			_ = s.ExtendStakeRecheck(rc.QuoteID, StakeRecheckInterval)
 			continue
 		}
 		if st.Staked && st.StakeLuna > 0 {
-			_, _ = s.ObserveStake(rc.Address, st.StakeLuna, now)
-			_ = s.ObserveStakeLedger(rc.Address, st.StakeLuna, now)
-			if _, err := s.ReconcileStakerCashback(rc.Address, st, now); err == nil {
+			// User-scoped on purpose. The earning wallets are not account
+			// addresses at all — for a linked staking wallet, resolving the
+			// user from it returns ErrNotFound, the repair never runs, and the
+			// buyer keeps the base rate with no error anywhere. Only rows that
+			// carry no user id (none are written any more) fall back to the
+			// address form, which can only ever find the primary wallet.
+			var rerr error
+			if rc.UserID != "" {
+				_, rerr = s.ReconcileStakerCashbackForUser(rc.UserID, st, now)
+			} else {
+				_, rerr = s.ReconcileStakerCashback(addrs[0], st, now)
+			}
+			if rerr == nil {
 				_ = s.ClearStakeRecheck(rc.QuoteID)
 				resolved++
 			}
