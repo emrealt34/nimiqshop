@@ -55,6 +55,32 @@ export function saveIntentQuote(storage: Storage, key: string, intent: CheckoutI
   storage.setItem(key, JSON.stringify({ ...intent, quoteId }));
 }
 
+/**
+ * Is the order a stored intent points at OVER — paid and delivered, refunded,
+ * or dead without money — so that the intent's key has done its job?
+ *
+ * Why this matters (live bug, 2026-10-18): the intent key is derived from the
+ * cart, so buying the same product a second time reuses the key of the first
+ * purchase. A key is only a RETRY key while its order is unresolved; honouring
+ * it after the order finished replayed the completed order and the buyer was
+ * thrown onto a "completed" order page without ever seeing a pay screen.
+ *
+ * The backend's own verdict (`checkout_settled`, mirrored from
+ * db.CheckoutSettledAt) wins whenever it is present: it knows about payment
+ * evidence, holds and the supplier's grace buffer. The status fallback only
+ * covers a backend that predates the flag and is deliberately narrow — the
+ * two states that can never carry a pending payment. Anything uncertain keeps
+ * the key, and the server (which applies the same rule atomically) decides.
+ */
+export function checkoutSettled(response: unknown): boolean {
+  if (!response || typeof response !== 'object') return false;
+  const out = response as Record<string, unknown>;
+  if (typeof out.checkout_settled === 'boolean') return out.checkout_settled;
+  const quote = out.quote && typeof out.quote === 'object' ? (out.quote as Record<string, unknown>) : out;
+  const status = String(quote.status || '').toLowerCase();
+  return status === 'fulfilled' || status === 'refunded';
+}
+
 /** Only call following an explicit user action AND a verified terminal order. */
 export function releaseIntentForQuote(storage: Storage, quoteId: string) {
   for (let i = storage.length - 1; i >= 0; i--) {

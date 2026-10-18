@@ -909,15 +909,21 @@ func (h *Handlers) GetUserQuote(ctx *fasthttp.RequestCtx) {
 	if len(q.Fulfillment) > 0 && string(q.Fulfillment) != "null" {
 		fulfillment = q.Fulfillment
 	}
-	ownerQuote := q.PublicQuote(time.Now().UTC())
+	now := time.Now().UTC()
+	ownerQuote := q.PublicQuote(now)
 	ownerQuote.LightningSwapID = q.LightningSwapID
 	out := map[string]interface{}{
-		"test_mode":   h.Cfg.TestMode || q.TestMode,
-		"test_pay":    h.canTestPay(q),
-		"quote":       ownerQuote,
-		"can_pay":     q.CanPay(time.Now().UTC()),
-		"fulfillment": fulfillment,
-		"refund":      quoteRefundView(q),
+		"test_mode": h.Cfg.TestMode || q.TestMode,
+		"test_pay":  h.canTestPay(q),
+		"quote":     ownerQuote,
+		"can_pay":   q.CanPay(now),
+		// The checkout behind this order is over (delivered, refunded, or
+		// dead without money): the storefront drops its stored checkout
+		// key for it, so buying the same cart again is a NEW order instead
+		// of a replay of this one (live bug, 2026-10-18).
+		"checkout_settled": db.CheckoutSettledAt(q, now),
+		"fulfillment":      fulfillment,
+		"refund":           quoteRefundView(q),
 	}
 	if cb, err := h.Store.GetCashbackByQuote(q.ID); err == nil {
 		out["cashback"] = map[string]interface{}{

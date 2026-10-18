@@ -132,6 +132,37 @@ func LapsedUnpaidInvoice(q Quote, now time.Time) bool {
 // one request cannot decide on two different clocks.
 func BlocksNewPurchase(q Quote) bool { return BlocksNewPurchaseAt(q, time.Now().UTC()) }
 
+// CheckoutSettledAt reports that the checkout behind q is OVER: the invoice
+// can no longer be paid and no money is — or could still be — in play on it
+// (paid and delivered, refunded, lapsed unpaid past the supplier's grace,
+// or failed before any invoice existed).
+//
+// Why this exists (live bug, 2026-10-18, owner: "unipin 5 TL aldım, sonra
+// tekrar aynı ürünü almaya çalışınca beni tamamlanmış order sayfasına attı"):
+// the storefront derives its Idempotency-Key from the CART CONTENTS so that a
+// reload or a double tap can never open two supplier orders. The flip side is
+// that buying the very same product a second time arrives under the key of
+// the first, already-fulfilled order — and a key was honoured forever, so the
+// shop "created" the finished order again and the buyer landed on a completed
+// order page without ever seeing a pay screen.
+//
+// An idempotency key protects ONE unresolved purchase. Once that purchase is
+// settled there is nothing left for the key to protect, so a request arriving
+// under it is a NEW purchase of the same cart, not a retry of the old one.
+// This predicate is the single place that decides it, and every reader of the
+// key index (the handler pre-check, the atomic creation gate and the retry
+// alias binding) must consult it so they can never disagree.
+//
+// The money-safety half is untouched by construction: anything that still
+// blocks a new purchase (payment seen, hold, in-flight settlement, inside the
+// grace buffer) is NOT settled and keeps being replayed exactly as before.
+func CheckoutSettledAt(q Quote, now time.Time) bool {
+	return !q.CanPay(now) && !BlocksNewPurchaseAt(q, now)
+}
+
+// CheckoutSettled is the time.Now() wrapper of CheckoutSettledAt.
+func CheckoutSettled(q Quote) bool { return CheckoutSettledAt(q, time.Now().UTC()) }
+
 // LateMoneyReconcileWindow is how long a quote the shop expired ON ITS OWN
 // CLOCK keeps being offered to the supplier poller.
 //
@@ -259,9 +290,37 @@ func (s *Store) GetQuoteByIdempotencyRequest(user, key string) (Quote, string, e
 	return q, fp, err
 }
 
-// An alias is durable even after the quote finishes. Without this, a second
-// tab's new idempotency key could create a new order after fulfillment.
+// idempotencyKeySettled answers, inside the caller's transaction, whether an
+// Idempotency-Key is free to start a NEW quote: it is unbound, its binding
+// dangles (the quote record is gone), or the quote it is bound to is settled
+// (CheckoutSettledAt). A key bound to an unresolved quote is NOT free — that
+// request is a retry and must replay the existing quote.
+func idempotencyKeySettled(tx *badger.Txn, user, key string, now time.Time) (bool, error) {
+	boundID, err := getString(tx, quoteIdempotencyIndexKey(user, key))
+	if errors.Is(err, ErrNotFound) {
+		return true, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	var bound Quote
+	switch err := getJSON(tx, quoteKey(boundID), &bound); {
+	case errors.Is(err, ErrNotFound):
+		return true, nil
+	case err != nil:
+		return false, err
+	}
+	return CheckoutSettledAt(bound, now), nil
+}
+
+// An alias is durable for as long as the quote is unresolved. Without this, a
+// second tab's new idempotency key could create a new order while the first
+// one is still being paid. Once the bound quote is SETTLED the alias is spent
+// (CheckoutSettledAt) and the key may move on to a new quote — the same rule
+// the atomic creation gate applies, so a stale key can never strand a buyer
+// on a finished order.
 func (s *Store) BindQuoteIdempotency(user, key, fingerprint, quoteID string) error {
+	now := time.Now().UTC()
 	return s.Update(func(tx *badger.Txn) error {
 		var q Quote
 		if err := getJSON(tx, quoteKey(quoteID), &q); err != nil {
@@ -270,15 +329,32 @@ func (s *Store) BindQuoteIdempotency(user, key, fingerprint, quoteID string) err
 		if q.UserID != user {
 			return ErrConflict
 		}
-		if err := bindUniqueIndex(tx, quoteIdempotencyIndexKey(user, key), quoteID); err != nil {
-			return err
-		}
-		previous, err := getString(tx, quoteRequestFingerprintKey(user, key))
-		if err == nil && previous != fingerprint {
-			return ErrConflict
-		}
+		indexKey := quoteIdempotencyIndexKey(user, key)
+		existing, err := getString(tx, indexKey)
 		if err != nil && !errors.Is(err, ErrNotFound) {
 			return err
+		}
+		rebinding := err == nil && existing != quoteID
+		if rebinding {
+			settled, serr := idempotencyKeySettled(tx, user, key, now)
+			if serr != nil {
+				return serr
+			}
+			if !settled {
+				return ErrConflict
+			}
+		}
+		if err := tx.Set(indexKey, []byte(quoteID)); err != nil {
+			return err
+		}
+		if !rebinding {
+			previous, err := getString(tx, quoteRequestFingerprintKey(user, key))
+			if err == nil && previous != fingerprint {
+				return ErrConflict
+			}
+			if err != nil && !errors.Is(err, ErrNotFound) {
+				return err
+			}
 		}
 		return tx.Set(quoteRequestFingerprintKey(user, key), []byte(fingerprint))
 	})

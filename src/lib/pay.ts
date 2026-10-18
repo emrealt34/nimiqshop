@@ -104,6 +104,27 @@ export const PAID_STATUSES = new Set([
   'supplier_processing',
 ]);
 
+/**
+ * A checkout POST that answers with an order whose payment ALREADY landed did
+ * not create anything: the shop handed back an earlier order of the same cart
+ * that is still being delivered (its money-safety rule allows one unresolved
+ * checkout per buyer). Returns that status, or '' for a genuinely new /
+ * payable / unresolved-unpaid order.
+ *
+ * The pay screen must not open for such a handback: its poll would see the
+ * paid status at once and play the success beat for a purchase that never
+ * happened, which is the same "went straight to completed" surprise as the
+ * 2026-10-18 rebuy bug, one step earlier. The caller shows the honest
+ * "already paid, being prepared" screen instead.
+ */
+export function paidOrderHandedBack(created: unknown): string {
+  if (!created || typeof created !== 'object') return '';
+  const rec = created as Record<string, unknown>;
+  const inner = rec.quote && typeof rec.quote === 'object' ? (rec.quote as Record<string, unknown>) : null;
+  const st = String(rec.status || (inner && inner.status) || '').toLowerCase();
+  return PAID_STATUSES.has(st) ? st : '';
+}
+
 export const FAIL_STATUSES = new Set([
   'failed',
   'manual_review',

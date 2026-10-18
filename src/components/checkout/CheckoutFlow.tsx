@@ -36,7 +36,8 @@ import { saveLightningFunding } from '../../lib/api';
 import { inNimiqPay, detectMobilePlatform } from '../../lib/miniapp';
 import { PaymentCountdown } from './PaymentCountdown';
 import { lightningPaymentURI, rememberLightningPayment } from '../../lib/hub';
-import { PAID_STATUSES, quoteBolt11, quoteIdOf, isQuotePayable, launchLightningUri } from '../../lib/pay';
+import { PAID_STATUSES, quoteBolt11, quoteIdOf, isQuotePayable, launchLightningUri, paidOrderHandedBack } from '../../lib/pay';
+import { releaseIntentForQuote } from '../../lib/checkoutIntent';
 import { cashbackExclusiveNote, cashbackNimFromQuote, fmtCashbackNIM, loadCashbackBps } from '../../lib/cashback';
 import { quoteFaceValue } from '../../lib/format';
 import { StakerCashbackLine } from '../staker/StakerCashback';
@@ -521,6 +522,15 @@ export function CheckoutFlow({
             return;
           }
 
+          // The shop may hand back an EARLIER order of this cart that is
+          // already paid and being delivered (one unresolved checkout per
+          // buyer). That is not a new purchase: say so instead of opening
+          // a pay screen whose poll would instantly "succeed".
+          const handedBack = paidOrderHandedBack(batch);
+          if (handedBack) {
+            setPhase({ kind: 'already-paid', quoteId: quoteIdOf(batch), status: handedBack });
+            return;
+          }
           // ONE payment for the whole cart
           const paid = await new Promise<boolean>((resolve) => {
             setPhase({ kind: 'batch-pay', quote: batch, items });
@@ -537,7 +547,10 @@ export function CheckoutFlow({
             continue;
           }
           if (paid) {
-            // Success
+            // Success. The stored checkout key has done its job: the next
+            // purchase of this same cart is a NEW order, not a retry of
+            // this one (the backend enforces the same once it settles).
+            releaseCheckoutKey(batch);
             cart.clearCart();
             bumpAwaiting(items.reduce((s, it) => s + (it.qty || 0), 0));
             setPhase({ kind: 'success', paidCount: 1, delivered: items });
@@ -639,6 +652,13 @@ export function CheckoutFlow({
             stop = true;
             continue;
           }
+          // Same handback rule as the cart path: an earlier, already-paid
+          // order of this item is not a new purchase.
+          const handedBack = paidOrderHandedBack(quote);
+          if (handedBack) {
+            setPhase({ kind: 'already-paid', quoteId: quoteIdOf(quote), status: handedBack });
+            return;
+          }
           const paid = await new Promise<boolean>((resolve) => {
             setPhase({ kind: 'peritem-pay', index: i, quote, name: it.name, qty: it.qty || 1, total: items.length, paidCount: paidIdx.length });
             (window as any).__payResolver = (ok: boolean) => resolve(ok);
@@ -652,6 +672,7 @@ export function CheckoutFlow({
             continue;
           }
           if (paid) {
+            releaseCheckoutKey(quote);
             paidIdx.push(i);
             break;
           }
@@ -804,6 +825,14 @@ function resolvePay(ok: boolean) {
 function resolvePrompt(c: any) {
   const r = (window as any).__promptResolver;
   if (r) r(c);
+}
+
+/** Forget the durable checkout key of a PAID order (see checkoutIntent.ts). */
+function releaseCheckoutKey(created: unknown) {
+  try {
+    const id = quoteIdOf(created);
+    if (id) releaseIntentForQuote(localStorage, id);
+  } catch {}
 }
 
 function bumpAwaiting(n: number) {

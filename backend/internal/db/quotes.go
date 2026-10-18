@@ -195,12 +195,18 @@ func (s *Store) createQuoteWithPurchaseLimits(q Quote, maxOrders int, maxSpend, 
 			return err
 		}
 		// Idempotency: the same client key can never create a second
-		// supplier order (retries return the first quote).
+		// supplier order while the first one is unresolved (retries return
+		// the first quote). A key whose order is SETTLED has done its job:
+		// the request is a new purchase of the same cart (the storefront's
+		// key is content-derived, see CheckoutSettledAt), so creation goes
+		// ahead and the index below moves the key onto the new quote.
 		if q.IdempotencyKey != "" {
-			if _, err := tx.Get(quoteIdempotencyIndexKey(q.UserID, q.IdempotencyKey)); err == nil {
-				return ErrConflict
-			} else if !errors.Is(err, badger.ErrKeyNotFound) {
+			settled, err := idempotencyKeySettled(tx, q.UserID, q.IdempotencyKey, now)
+			if err != nil {
 				return err
+			}
+			if !settled {
+				return ErrConflict
 			}
 		}
 		// Checkout-safety question, answered through the per-user blocking

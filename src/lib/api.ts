@@ -10,7 +10,7 @@ import { CFG, siteName } from './config';
 import { asset } from './asset';
 import { getLang, t as tr } from '../i18n';
 import { uuid as uuid2 } from './format';
-import { canonicalIntent, purchaseIntentPayload, loadOrCreateIntent, saveIntentQuote, releaseIntentForQuote } from './checkoutIntent';
+import { canonicalIntent, purchaseIntentPayload, loadOrCreateIntent, saveIntentQuote, releaseIntentForQuote, checkoutSettled } from './checkoutIntent';
 import { dailyLimitMessage, isDailyLimitError } from './dailyLimit';
 import { countryHint, COUNTRY_HINT_HEADER } from './edgeGeo';
 import { recordAvailability } from './catalogStock';
@@ -574,7 +574,19 @@ async function createCheckout(path: string, req: unknown, proposedKey?: string):
   if (pending) return pending;
   const promise = (async () => {
     // Store FIRST, then send. Ambiguous failures never delete or rotate this key.
-    const saved = await loadOrCreateIntent(localStorage, scope, proposedKey || uuid2());
+    let saved = await loadOrCreateIntent(localStorage, scope, proposedKey || uuid2());
+    // A stored key that already produced an order is a RETRY key only while
+    // that order is unresolved. Once the order is settled (delivered,
+    // refunded, or dead without money) the key is spent: this request is the
+    // buyer purchasing the same cart AGAIN, so it must go out under a fresh
+    // key and come back as a new, payable order — never as a replay of the
+    // finished one (live bug, 2026-10-18: "tamamlanmış order sayfasına
+    // attı"). The backend applies the same rule atomically; dropping the key
+    // here keeps one key per purchase even for an older backend.
+    if (saved.intent.quoteId && await intentOrderSettled(saved.intent.quoteId)) {
+      releaseIntentForQuote(localStorage, saved.intent.quoteId);
+      saved = await loadOrCreateIntent(localStorage, scope, uuid2());
+    }
     const quote = await api(path, { method: 'POST', body: req, auth: true,
       headers: { 'Idempotency-Key': saved.intent.key }, timeoutMs: 90000 });
     const id = String(quote.quote_id || quote.id || '');
@@ -584,6 +596,18 @@ async function createCheckout(path: string, req: unknown, proposedKey?: string):
   })().finally(() => _quoteInflight.delete(scope));
   _quoteInflight.set(scope, promise);
   return promise;
+}
+
+// intentOrderSettled asks the shop whether the order a stored checkout key
+// points at is over (see checkoutSettled). Unknown orders (404) are over too.
+// A failed lookup (offline, 5xx) keeps the key: that is the conservative
+// answer, and the backend's atomic gate makes the same call on its own.
+async function intentOrderSettled(quoteId: string): Promise<boolean> {
+  try {
+    return checkoutSettled(await api(`/quotes/${encodeURIComponent(quoteId)}`, { auth: true }));
+  } catch (err) {
+    return err instanceof ApiError && err.status === 404;
+  }
 }
 
 // Legacy callers may clear display state, never the durable purchase key.
@@ -626,9 +650,11 @@ export const authorizePaymentLaunch = async (id: string) => {
 };
 
 // Rebuy is a deliberate action on the completed order, never a timeout retry.
+// The shop's own verdict (checkout_settled) decides; the status rule below is
+// the fallback for a backend that does not send it yet.
 export const allowNewPurchase = async (id: string) => {
   const out = await getQuote(id); const q = out.quote || out;
-  const safe = ['fulfilled', 'refunded'].includes(q.status) ||
+  const safe = checkoutSettled(out) ||
     (q.status === 'failed' && (!q.supplier_order_id || (q.supplier_status === 'PaymentSetupFailed' && !q.payment_observed)));
   if (!safe) throw new ApiError(409, tr('api.resolveFirst'));
   releaseIntentForQuote(localStorage, id);

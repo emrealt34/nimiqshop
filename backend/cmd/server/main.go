@@ -682,6 +682,16 @@ func runtimeEnvelope(cfg config.Config) map[string]any {
 		// it.
 		out["badger_dir"] = dir
 	}
+	// Which build is answering. Railway stamps the deployed commit into the
+	// container's environment; the source is public, so the short sha is
+	// not a secret — it is how "is the fix live yet?" gets answered without
+	// guessing from behaviour (owner, 2026-10-18: "canlıda test et").
+	if sha := strings.TrimSpace(os.Getenv("RAILWAY_GIT_COMMIT_SHA")); sha != "" {
+		if len(sha) > 12 {
+			sha = sha[:12]
+		}
+		out["commit"] = sha
+	}
 	return out
 }
 

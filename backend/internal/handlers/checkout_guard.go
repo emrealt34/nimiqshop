@@ -66,16 +66,26 @@ func checkoutKey(ctx *fasthttp.RequestCtx) (string, bool) {
 // Runs BEFORE catalog, price, promo or supplier validation. Retries must work
 // even when the catalog changes, a promo code was consumed, or the API is down.
 func (h *Handlers) existingCheckout(ctx *fasthttp.RequestCtx, user, key, requestFP, purchaseFP string, ack bool) bool {
+	now := time.Now().UTC()
 	q, fp, err := h.Store.GetQuoteByIdempotencyRequest(user, key)
-	if err == nil {
+	switch {
+	case err == nil && db.CheckoutSettledAt(q, now):
+		// The key's order is finished (paid and delivered, refunded, or
+		// dead without money). The storefront's key is derived from the
+		// cart, so this is the buyer purchasing the SAME thing again — a
+		// new checkout, not a retry. Replaying the finished order here is
+		// exactly how a buyer ended up on a "completed" order page without
+		// ever seeing a pay screen (live bug, 2026-10-18). Fall through:
+		// the blocking check and the atomic gate treat the key as free and
+		// move it onto the new quote.
+	case err == nil:
 		if fp == "" || fp != requestFP {
 			writeJSON(ctx, 409, map[string]any{"error": "idempotency key belongs to a different request", "code": "IDEMPOTENCY_MISMATCH", "quote_id": q.ID, "detail": "Open the original order; do not pay a different cart using this key."})
 		} else {
 			h.writeQuoteCreated(ctx, q)
 		}
 		return true
-	}
-	if !errors.Is(err, db.ErrNotFound) {
+	case !errors.Is(err, db.ErrNotFound):
 		writeError(ctx, 503, "could not verify checkout idempotency; no order was dispatched")
 		return true
 	}
@@ -98,7 +108,7 @@ func (h *Handlers) existingCheckout(ctx *fasthttp.RequestCtx, user, key, request
 		// One predicate, one answer for both callers — and it is time-aware:
 		// a lapsed invoice keeps blocking only while money could still be in
 		// play (payment seen, hold, or inside the supplier's grace buffer).
-		if !db.BlocksNewPurchase(q) {
+		if !db.BlocksNewPurchaseAt(q, now) {
 			continue
 		}
 		if q.PurchaseFingerprint != "" && q.PurchaseFingerprint == purchaseFP && !ack {
@@ -106,7 +116,7 @@ func (h *Handlers) existingCheckout(ctx *fasthttp.RequestCtx, user, key, request
 			// buyer pressed "create a fresh invoice", and handing back the
 			// dead quote loops them onto a pay screen with no live invoice
 			// (live bug, 2026-10-04). Let creation proceed instead.
-			if !db.LapsedUnpaidInvoice(q, time.Now().UTC()) {
+			if !db.LapsedUnpaidInvoice(q, now) {
 				h.reuseCheckout(ctx, q, key, requestFP)
 				return true
 			}
@@ -173,8 +183,12 @@ func (h *Handlers) quoteReservationConflict(ctx *fasthttp.RequestCtx, err error,
 		return true
 	}
 	if errors.Is(err, db.ErrConflict) {
+		// The gate refused the key because it is bound to an UNRESOLVED
+		// quote (a settled one would have let creation through and moved
+		// the key — see db.CheckoutSettledAt). Replay that quote; it is
+		// the retry contract. Anything else is a genuine conflict.
 		q, fp, e := h.Store.GetQuoteByIdempotencyRequest(user, key)
-		if e == nil && fp == requestFP {
+		if e == nil && fp == requestFP && !db.CheckoutSettled(q) {
 			h.writeQuoteCreated(ctx, q)
 		} else {
 			writeError(ctx, 409, "conflicting checkout key or single-use cashback code")
