@@ -645,7 +645,10 @@ func testQuoteView(store *db.Store, q db.Quote, applied []string) map[string]any
 	return out
 }
 
-// AdminTestActivity controls display only; simulated payments stay simulated.
+// AdminTestActivity is the operator's switch for test orders on the public
+// site: activity feed, cashback totals and leaderboard, star summary, recent
+// comments and delivery statistics all follow it (see db.SetTestActivityVisible).
+// It controls display only; simulated payments stay simulated.
 func (h *Handlers) AdminTestActivity(ctx *fasthttp.RequestCtx) {
 	if ctx.IsPost() {
 		var req struct {

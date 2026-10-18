@@ -185,7 +185,7 @@ func (h *Handlers) submitRating(ctx *fasthttp.RequestCtx, kind string) {
 	// Only acknowledge the same owner's already verified, identical rating.
 	comment, commentError := ratings.NormalizeComment(req.Comment)
 	if saved, err := h.Store.GetRatingState(kind, id, userID); err == nil && commentError == nil && saved.Rated && saved.RatingTx != "" && saved.Stars == req.Stars && saved.Comment == comment && (req.TxHash == "" || req.TxHash == saved.RatingTx) {
-		agg, err := h.Store.GetRatingAggregate()
+		agg, err := h.Store.PublicRatingAggregate()
 		if err != nil {
 			writeError(ctx, 500, "could not load rating summary")
 			return
@@ -283,6 +283,12 @@ func (h *Handlers) submitRating(ctx *fasthttp.RequestCtx, kind string) {
 		writeError(ctx, fasthttp.StatusInternalServerError, "could not save rating")
 		return
 	}
+	// The buyer sees the same summary the storefront shows: ApplyRating
+	// returns the global counter, which still includes hidden test orders.
+	publicAgg, perr := h.Store.PublicRatingAggregate()
+	if perr != nil {
+		publicAgg = agg
+	}
 
 	writeJSON(ctx, fasthttp.StatusOK, map[string]interface{}{
 		"order_id":   id,
@@ -291,7 +297,7 @@ func (h *Handlers) submitRating(ctx *fasthttp.RequestCtx, kind string) {
 		"rated_at":   time.Now().UTC(),
 		"rating_tx":  proof.Hash,
 		"edits_left": ratings.MaxRatingsPerOrder - (st.Edits + 1),
-		"summary":    ratingSummaryShape(agg),
+		"summary":    ratingSummaryShape(publicAgg),
 	})
 }
 
@@ -372,6 +378,9 @@ func (h *Handlers) AdminListRatings(ctx *fasthttp.RequestCtx) {
 			"comment": c.Comment,
 			"at":      c.At,
 			"hidden":  c.Hidden,
+			// A comment on an admin test-center purchase: public only while
+			// the Test Center switch shows test orders.
+			"test_mode": c.TestMode,
 		})
 	}
 	agg, _ := h.Store.GetRatingAggregate()

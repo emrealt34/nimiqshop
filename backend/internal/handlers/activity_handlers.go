@@ -389,13 +389,17 @@ func (h *Handlers) ListActivity(ctx *fasthttp.RequestCtx) {
 		out = append(out, t.e)
 	}
 
-	agg, _ := h.Store.GetRatingAggregate()
+	// Public numbers follow the operator's test-order switch exactly like
+	// the rows do: hidden simulations are left out of the star summary and
+	// the delivery statistics as well.
+	agg, _ := h.Store.PublicRatingAggregate()
 	summary := ratingSummaryShape(agg)
+	showTests, _ := h.Store.TestActivityVisible()
 
 	// Measure payment CONFIRMATION -> delivery, including same-observation
 	// and sub-second records. Creation/handoff and mutable updated_at are not
 	// delivery timestamps; zero is a valid measurement, not a missing record.
-	for key, value := range recordedDeliverySummary(orders, quotes) {
+	for key, value := range recordedDeliverySummary(orders, quotes, showTests) {
 		summary[key] = value
 	}
 	if h.Presence != nil {
@@ -410,7 +414,7 @@ func (h *Handlers) ListActivity(ctx *fasthttp.RequestCtx) {
 
 // RatingSummary returns just the global star-rating aggregate (public).
 func (h *Handlers) RatingSummary(ctx *fasthttp.RequestCtx) {
-	agg, _ := h.Store.GetRatingAggregate()
+	agg, _ := h.Store.PublicRatingAggregate()
 	summary := ratingSummaryShape(agg)
 	if h.Presence != nil {
 		summary["active_users"] = h.Presence.ActiveCount()

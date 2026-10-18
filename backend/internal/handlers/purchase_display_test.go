@@ -26,9 +26,15 @@ func TestRecordedAverageIncludesInstantAnonymousPurchasesAndExcludesFakeAndUnkno
 	unknown.PaidAt = nil
 	unknown.PaymentHandoffAt = paid
 	legacy := db.Order{ID: "legacy", Status: "delivered", CreatedAt: base.CreatedAt, PaidAt: &paid, DeliveredAt: &end}
-	got := recordedDeliverySummary([]db.Order{legacy}, []db.Quote{base, instant, fake, sim, unknown})
+	got := recordedDeliverySummary([]db.Order{legacy}, []db.Quote{base, instant, fake, sim, unknown}, false)
 	if got["delivered_count"] != 3 || got["avg_delivery_seconds"] != 1.0/3.0 {
 		t.Fatalf("wrong summary: %+v", got)
+	}
+	// With test orders shown publicly the simulation counts too; the legacy
+	// exclusion list and unknown times never do.
+	shown := recordedDeliverySummary([]db.Order{legacy}, []db.Quote{base, instant, fake, sim, unknown}, true)
+	if shown["delivered_count"] != 4 || shown["avg_delivery_seconds"] != 1.5/4.0 {
+		t.Fatalf("wrong summary with test orders shown: %+v", shown)
 	}
 }
 
@@ -53,7 +59,7 @@ func TestPublicActivityAndTrackUseRecordedTimesAndLegacyPurchasedUnits(t *testin
 	if stages[1]["timestamp"] != paid.Format(time.RFC3339Nano) || stages[3]["timestamp"] != paid.Format(time.RFC3339Nano) {
 		t.Fatal(stages)
 	}
-	if got := recordedDeliverySummary(nil, []db.Quote{q}); got["avg_delivery_seconds"] != float64(0) || got["delivered_count"] != 1 {
+	if got := recordedDeliverySummary(nil, []db.Quote{q}, false); got["avg_delivery_seconds"] != float64(0) || got["delivered_count"] != 1 {
 		t.Fatal(got)
 	}
 	o := db.Order{ID: "legacy-unit", UserID: "buyer", Payload: json.RawMessage(`{"product_name":"Carrefour","value":10,"currency":"EUR","country":"FR"}`)}

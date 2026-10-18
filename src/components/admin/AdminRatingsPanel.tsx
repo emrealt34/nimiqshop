@@ -20,6 +20,8 @@ interface AdminRating {
   comment: string;
   at: string;
   hidden: boolean;
+  /** Left on an admin test-center purchase; public only while test orders are shown. */
+  test_mode?: boolean;
 }
 
 export function AdminRatingsPanel() {
@@ -110,6 +112,7 @@ export function AdminRatingsPanel() {
                   <span className="xs faint">{fmtDate(r.at)}</span>
                   <span className="xs mono faint">{t('rating.adminPurchase')} {r.id.slice(0, 8)}</span>
                   {r.hidden ? <span className="xs strong">{t('rating.adminHidden')}</span> : null}
+                  {r.test_mode ? <span className="chip xs" title="Test order — public only while the Test Center switch shows test orders">TEST</span> : null}
                 </div>
                 {r.comment ? (
                   <div className="small mt-1" style={{ wordBreak: 'break-word' }}>{r.comment}</div>

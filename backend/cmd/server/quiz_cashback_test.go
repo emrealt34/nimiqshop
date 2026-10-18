@@ -67,7 +67,7 @@ func TestQuizCashbackCodeIsServerGatedAndSingleUse(t *testing.T) {
 
 func TestAdminTestActivityToggleRequiresAdminAndLabelsPublicRows(t *testing.T) {
 	s := bootStack(t, stackOptions{testMode: true})
-	shopper, _ := s.signIn()
+	shopper, shopperAddress := s.signIn()
 	for _, headers := range []map[string]string{nil, shopper} {
 		if r := s.do("POST", "/api/admin/test-activity", map[string]any{"enabled": true}, headers); r.status != 401 {
 			t.Fatalf("unauthorized toggle %d", r.status)
@@ -78,6 +78,29 @@ func TestAdminTestActivityToggleRequiresAdminAndLabelsPublicRows(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := s.h.Store.CompleteQuoteWithFulfillment(q.ID, nil); err != nil {
+		t.Fatal(err)
+	}
+	// The same switch governs the cashback page and the star ratings. A
+	// delivered test purchase of the shopper earns (simulated) cashback at
+	// the operator's 1% base rate, and the quote owner leaves a comment.
+	if r := s.do("POST", "/api/admin/settings/cashback", map[string]any{"cashback_bps": 100}, s.adminHeaders()); r.status != 200 {
+		t.Fatalf("cashback settings %d %s", r.status, r.body)
+	}
+	owner, err := s.h.Store.GetUserByAddress(shopperAddress)
+	if err != nil {
+		t.Fatal(err)
+	}
+	paid := db.Quote{ID: "toggle-api-cashback", UserID: owner.ID, ProductID: "Test product", TestMode: true, Status: "awaiting_payment", EstimatedNIM: 100, NimUsdRate: 0.01, ProductUSD: 1_000_000}
+	if err := s.h.Store.CreateQuoteWithDailyLimits(paid, 0, 0, time.Now().Add(-time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.h.Store.CompleteQuoteWithFulfillment(paid.ID, nil); err != nil {
+		t.Fatal(err)
+	}
+	if cb, err := s.h.Store.GetCashbackByQuote(paid.ID); err != nil || !cb.TestMode || cb.AmountLuna <= 0 || cb.Status != db.CashbackQueued {
+		t.Fatalf("precondition: simulated cashback row expected: %+v %v", cb, err)
+	}
+	if _, err := s.h.Store.ApplyRating(db.RatingWrite{Kind: db.RatingKindQuote, ID: q.ID, UserID: "buyer", Stars: 2, Comment: "only a simulation", TxHash: "toggle-rating-tx", MaxRatings: 5, Now: time.Now().UTC()}); err != nil {
 		t.Fatal(err)
 	}
 	for _, enabled := range []bool{true, false} {
@@ -91,6 +114,32 @@ func TestAdminTestActivityToggleRequiresAdminAndLabelsPublicRows(t *testing.T) {
 		if enabled && (!strings.Contains(string(r.body), `"test_mode":true`) || !strings.Contains(string(r.body), `"test_activity_visible":true`)) {
 			t.Fatal("test marker missing")
 		}
+		wantCount := float64(0)
+		if enabled {
+			wantCount = 1
+		}
+		if summary, _ := r.json(t)["summary"].(map[string]any); summary["count"] != wantCount {
+			t.Fatalf("enabled=%v: activity star summary should count %v test ratings: %v", enabled, wantCount, summary)
+		}
+		if r := s.do("GET", "/api/ratings/summary", nil, nil); r.status != 200 || r.json(t)["count"] != wantCount {
+			t.Fatalf("enabled=%v: ratings summary %d %s", enabled, r.status, r.body)
+		}
+		if r := s.do("GET", "/api/ratings/comments", nil, nil); r.status != 200 || strings.Contains(string(r.body), "only a simulation") != enabled {
+			t.Fatalf("enabled=%v: ratings comments %d %s", enabled, r.status, r.body)
+		}
+		lb := s.do("GET", "/api/cashback/leaderboard", nil, nil)
+		if lb.status != 200 {
+			t.Fatalf("leaderboard %d %s", lb.status, lb.body)
+		}
+		totals, _ := lb.json(t)["totals"].(map[string]any)
+		rows, _ := lb.json(t)["leaderboard"].([]any)
+		if totals["orders"] != wantCount || len(rows) != int(wantCount) || strings.Contains(strings.ReplaceAll(string(lb.body), " ", ""), strings.ReplaceAll(shopperAddress, " ", "")) != enabled {
+			t.Fatalf("enabled=%v: cashback page should count %v test orders: %s", enabled, wantCount, lb.body)
+		}
+	}
+	// The owner still sees their own test order and its cashback regardless.
+	if r := s.do("GET", "/api/cashback/me", nil, shopper); r.status != 200 || !strings.Contains(string(r.body), paid.ID) {
+		t.Fatalf("owner lost their own cashback row: %d %s", r.status, r.body)
 	}
 }
 func TestUniqueQuizViewReturnsOnlyTheCompletingAccountsCode(t *testing.T) {

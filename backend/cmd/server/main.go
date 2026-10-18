@@ -254,6 +254,15 @@ func main() {
 	} else if migrated {
 		log.Printf("cashback: spend caps migrated 50/500 -> 500/1000")
 	}
+	// The public star summary leaves admin test-center ratings out while
+	// test orders are hidden. Recount both aggregates from the records at
+	// boot so a database written before the test-only counter existed does
+	// not keep old simulations in the public average.
+	if all, test, err := store.RebuildRatingAggregates(); err != nil {
+		log.Printf("ratings: aggregate rebuild: %v", err)
+	} else {
+		log.Printf("ratings: aggregate rebuilt: %d ratings, %d on test orders", all.Count, test.Count)
+	}
 	if st, serr := store.GetAdminSettings(0); serr == nil {
 		pc := st.EffectiveStakeCashback()
 		log.Printf("cashback: programme caps day=$%.0f month=$%.0f (stored_row=%v)", pc.DailyCapUSD, pc.MonthlyCapUSD, st.StakeCashback != nil)

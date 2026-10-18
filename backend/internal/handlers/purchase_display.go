@@ -47,7 +47,10 @@ func quoteFaceSummary(q db.Quote) string {
 	return strings.Join(parts, " + ")
 }
 
-func recordedDeliverySummary(orders []db.Order, quotes []db.Quote) map[string]interface{} {
+// recordedDeliverySummary averages payment-to-delivery time over the public
+// rows. Test purchases count only while the operator shows them publicly;
+// hidden simulations never shape the public numbers.
+func recordedDeliverySummary(orders []db.Order, quotes []db.Quote, showTests bool) map[string]interface{} {
 	var total float64
 	count := 0
 	add := func(created time.Time, paid *time.Time, delivered time.Time) {
@@ -62,7 +65,7 @@ func recordedDeliverySummary(orders []db.Order, quotes []db.Quote) map[string]in
 		}
 	}
 	for _, q := range quotes {
-		if activityvisibility.Visible(q.ID, q.TestMode) && (q.Status == "delivered" || q.Status == "fulfilled" || q.Status == "complete") {
+		if activityvisibility.Visible(q.ID, q.TestMode && !showTests) && (q.Status == "delivered" || q.Status == "fulfilled" || q.Status == "complete") {
 			add(q.CreatedAt, q.PaidAt, q.DeliveryTime())
 		}
 	}

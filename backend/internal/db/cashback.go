@@ -627,6 +627,13 @@ func (s *Store) CashbackLeaderboardAndTotals(bucket string, limit int) (Cashback
 	byUser := map[string]*agg{}
 
 	err := s.View(func(tx *badger.Txn) error {
+		// Simulated (admin test-center) cashback is public only while the
+		// operator shows test orders publicly; otherwise it must not move
+		// the totals or rank anyone on the leaderboard.
+		showTests, err := testActivityVisible(tx)
+		if err != nil {
+			return err
+		}
 		for _, st := range []string{CashbackPaid, CashbackQueued, CashbackSending, CashbackBroadcast} {
 			if err := scanIndex(tx, cashbackStatusIndexPrefix(st), 0, func(id string) error {
 				var cb Cashback
@@ -637,6 +644,20 @@ func (s *Store) CashbackLeaderboardAndTotals(bucket string, limit int) (Cashback
 					return e
 				}
 				if cb.AmountLuna <= 0 {
+					return nil
+				}
+				// Respect quote anonymity on the public leaderboard, and
+				// recognise a test purchase even on a row that predates the
+				// cashback-side TestMode flag.
+				anon, test := false, cb.TestMode
+				if cb.QuoteID != "" {
+					var q Quote
+					if err := getJSON(tx, quoteKey(cb.QuoteID), &q); err == nil {
+						anon = q.Anonymous
+						test = test || q.TestMode
+					}
+				}
+				if test && !showTests {
 					return nil
 				}
 				nim := float64(cb.AmountLuna) / cashback.LunaPerNIM
@@ -681,14 +702,6 @@ func (s *Store) CashbackLeaderboardAndTotals(bucket string, limit int) (Cashback
 
 				if uidKey == "" {
 					return nil
-				}
-				// Respect quote anonymity on the public leaderboard
-				anon := false
-				if cb.QuoteID != "" {
-					var q Quote
-					if err := getJSON(tx, quoteKey(cb.QuoteID), &q); err == nil && q.Anonymous {
-						anon = true
-					}
 				}
 				displayUser := ""
 				if !anon {

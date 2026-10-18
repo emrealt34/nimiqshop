@@ -49,6 +49,9 @@ type RatingComment struct {
 	Comment string    `json:"comment"`
 	At      time.Time `json:"at"`
 	Hidden  bool      `json:"hidden,omitempty"`
+	// TestMode marks a comment left on an admin test-center purchase. Public
+	// callers only see it while the operator shows test orders publicly.
+	TestMode bool `json:"test_mode,omitempty"`
 }
 
 // RatingState is the rating view of one purchase for its owner.
@@ -62,6 +65,8 @@ type RatingState struct {
 	RatingTx  string
 	// Owner is false when the record exists but belongs to someone else.
 	Owner bool
+	// TestMode is true for an admin test-center purchase (Quote.TestMode).
+	TestMode bool
 }
 
 // RatingWrite is one accepted on-chain rating.
@@ -107,7 +112,7 @@ func loadRatingRecord(txn *badger.Txn, kind, id string) (RatingState, string, er
 		}
 		st = RatingState{Rated: q.Rating > 0, Stars: q.Rating, Comment: q.RatingComment,
 			Edits: q.RatingEdits, Delivered: rateable(kind, q.Status), RatedAt: q.RatedAt,
-			RatingTx: q.RatingTx, Owner: true}
+			RatingTx: q.RatingTx, Owner: true, TestMode: q.TestMode}
 		return st, q.UserID, nil
 	}
 	return st, "", ErrNotFound
@@ -189,15 +194,16 @@ func (s *Store) ApplyRating(w RatingWrite) (RatingAggregate, error) {
 		}
 
 		agg = loadAggregate(txn)
-		old := st.Stars
-		if old == 0 {
-			agg.Count++
-			agg.Sum += w.Stars
-			agg.Dist[w.Stars]++
-		} else {
-			agg.Sum += w.Stars - old
-			agg.Dist[old]--
-			agg.Dist[w.Stars]++
+		agg.apply(st.Stars, w.Stars)
+		// A rating on a test purchase is counted twice: in the global
+		// aggregate and in the test-only one, so the public summary can
+		// leave simulations out while they are hidden.
+		if st.TestMode {
+			testAgg := loadTestAggregate(txn)
+			testAgg.apply(st.Stars, w.Stars)
+			if err := saveTestAggregate(txn, testAgg); err != nil {
+				return err
+			}
 		}
 
 		if st.Rated && st.RatingTx != "" {
@@ -238,7 +244,7 @@ func (s *Store) ApplyRating(w RatingWrite) (RatingAggregate, error) {
 			}
 		}
 		return upsertRecentComment(txn, RatingComment{Kind: w.Kind, ID: w.ID,
-			Stars: w.Stars, Comment: w.Comment, At: now})
+			Stars: w.Stars, Comment: w.Comment, At: now, TestMode: st.TestMode})
 	})
 	return agg, err
 }
@@ -349,9 +355,23 @@ func (s *Store) ListRatingComments(limit int, admin bool) ([]RatingComment, erro
 		if !admin && !commentsOn(txn) {
 			return nil
 		}
+		showTests := admin
+		if !admin {
+			var err error
+			if showTests, err = testActivityVisible(txn); err != nil {
+				return err
+			}
+		}
 		list := loadRecentComments(txn)
 		for _, c := range list {
 			if !admin && (c.Hidden || c.Comment == "") {
+				continue
+			}
+			if !c.TestMode && c.Kind == RatingKindQuote {
+				// Entries written before the flag existed: ask the record.
+				c.TestMode = isTestPurchase(txn, c.Kind, c.ID)
+			}
+			if c.TestMode && !showTests {
 				continue
 			}
 			if !admin {
@@ -365,6 +385,123 @@ func (s *Store) ListRatingComments(limit int, admin bool) ([]RatingComment, erro
 		return nil
 	})
 	return out, err
+}
+
+// isTestPurchase reports whether a rated record is an admin test-center
+// purchase. Legacy orders never are; an unreadable record is not either.
+func isTestPurchase(txn *badger.Txn, kind, id string) bool {
+	if kind != RatingKindQuote {
+		return false
+	}
+	var q Quote
+	if err := getJSON(txn, quoteKey(id), &q); err != nil {
+		return false
+	}
+	return q.TestMode
+}
+
+// apply moves one purchase's rating from old stars (0 = unrated) to new stars.
+func (a *RatingAggregate) apply(old, stars int) {
+	if old == 0 {
+		a.Count++
+		a.Sum += stars
+		a.Dist[stars]++
+		return
+	}
+	a.Sum += stars - old
+	a.Dist[old]--
+	a.Dist[stars]++
+}
+
+// minus returns the aggregate without the ratings counted in b, clamped at
+// zero so a stale counter can never produce a negative public summary.
+func (a RatingAggregate) minus(b RatingAggregate) RatingAggregate {
+	out := RatingAggregate{Count: a.Count - b.Count, Sum: a.Sum - b.Sum}
+	for i := range out.Dist {
+		out.Dist[i] = a.Dist[i] - b.Dist[i]
+		if out.Dist[i] < 0 {
+			out.Dist[i] = 0
+		}
+	}
+	if out.Count < 0 || out.Sum < 0 {
+		out = RatingAggregate{}
+	}
+	return out
+}
+
+func loadTestAggregate(txn *badger.Txn) RatingAggregate {
+	var agg RatingAggregate
+	item, err := txn.Get([]byte(metaRatingAggregateTestKey))
+	if err != nil {
+		return agg
+	}
+	_ = item.Value(func(v []byte) error { return unmarshal(v, &agg) })
+	return agg
+}
+
+func saveTestAggregate(txn *badger.Txn, agg RatingAggregate) error {
+	blob, err := marshal(agg)
+	if err != nil {
+		return err
+	}
+	return txn.Set([]byte(metaRatingAggregateTestKey), blob)
+}
+
+// PublicRatingAggregate is the star summary the storefront may show: every
+// rating while the operator shows test orders publicly, otherwise every
+// rating except those left on test purchases.
+func (s *Store) PublicRatingAggregate() (RatingAggregate, error) {
+	var agg RatingAggregate
+	err := s.View(func(txn *badger.Txn) error {
+		showTests, err := testActivityVisible(txn)
+		if err != nil {
+			return err
+		}
+		agg = loadAggregate(txn)
+		if !showTests {
+			agg = agg.minus(loadTestAggregate(txn))
+		}
+		return nil
+	})
+	return agg, err
+}
+
+// RebuildRatingAggregates recounts both aggregates from the rated records.
+// It runs at boot so a database written before the test-only aggregate
+// existed stops counting old test ratings in the public summary. The
+// counters are derived data: the records are the truth.
+func (s *Store) RebuildRatingAggregates() (all, test RatingAggregate, err error) {
+	err = s.Update(func(txn *badger.Txn) error {
+		it := txn.NewIterator(badger.DefaultIteratorOptions)
+		defer it.Close()
+		for it.Seek([]byte(prefixQuote)); it.ValidForPrefix([]byte(prefixQuote)); it.Next() {
+			var q Quote
+			if err := getJSON(txn, it.Item().Key(), &q); err != nil {
+				return err
+			}
+			if q.Rating < 1 || q.Rating > 5 {
+				continue
+			}
+			all.apply(0, q.Rating)
+			if q.TestMode {
+				test.apply(0, q.Rating)
+			}
+		}
+		for it.Seek([]byte(prefixOrder)); it.ValidForPrefix([]byte(prefixOrder)); it.Next() {
+			var o Order
+			if err := getJSON(txn, it.Item().Key(), &o); err != nil {
+				return err
+			}
+			if o.Rating >= 1 && o.Rating <= 5 {
+				all.apply(0, o.Rating)
+			}
+		}
+		if err := saveAggregate(txn, all); err != nil {
+			return err
+		}
+		return saveTestAggregate(txn, test)
+	})
+	return all, test, err
 }
 
 func loadRecentComments(txn *badger.Txn) []RatingComment {

@@ -209,3 +209,10 @@ func cashbackUserIndexPrefix(userID string) []byte {
 
 // metaRatingAggregateKey is the single key holding the global RatingAggregate.
 const metaRatingAggregateKey = "meta:rating_aggregate"
+
+// metaRatingAggregateTestKey holds the same aggregate restricted to ratings
+// left on admin test-center purchases (Quote.TestMode). The public summary is
+// the global aggregate minus this one while test orders are hidden. It shares
+// the "meta:rating_aggregate" prefix on purpose so the operator reset wipes
+// both together.
+const metaRatingAggregateTestKey = "meta:rating_aggregate_test"

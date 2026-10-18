@@ -5,6 +5,14 @@ import (
 	"github.com/dgraph-io/badger/v4"
 )
 
+// testActivityKey is the operator's ONE switch for admin test-center
+// purchases on the public site. Off (the default): a test order appears
+// nowhere a visitor can see — not in the activity feed, not in the cashback
+// totals or leaderboard, not in the star summary or the recent comments, and
+// not in the delivery statistics. On: it is listed with a TEST label and
+// counted like any other purchase, so the operator can check every public
+// surface end to end before switching it off again. The switch is display
+// only; payments and cashback rows are never touched.
 var testActivityKey = []byte("admin:test-activity-visible")
 
 func testActivityVisible(tx *badger.Txn) (bool, error) {

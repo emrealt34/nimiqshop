@@ -107,7 +107,7 @@ export function AdminTestCenterPanel() {
   const [showTests,setShowTests]=useState<boolean|null>(null);
   const [visibilityBusy,setVisibilityBusy]=useState(false);
   useEffect(()=>{void adminTestActivity().then(r=>setShowTests(!!r.enabled)).catch(e=>toast(describeError(e),'error'));},[toast]);
-  const toggleVisibility=async()=>{if(showTests===null)return;setVisibilityBusy(true);try{const r=await adminSetTestActivity(!showTests);setShowTests(!!r.enabled);toast(r.enabled?'Test payments are visible in Activity':'Test payments are hidden from Activity','success');}catch(e){toast(describeError(e),'error');}finally{setVisibilityBusy(false)}};
+  const toggleVisibility=async()=>{if(showTests===null)return;setVisibilityBusy(true);try{const r=await adminSetTestActivity(!showTests);setShowTests(!!r.enabled);toast(r.enabled?'Test orders are now PUBLIC: Activity, cashback page and ratings show them with a TEST label':'Test orders are hidden from every public page','success');}catch(e){toast(describeError(e),'error');}finally{setVisibilityBusy(false)}};
 
   const [country, setCountry] = useState('US');
   const [query, setQuery] = useState('');
@@ -315,7 +315,28 @@ export function AdminTestCenterPanel() {
         Mailtrap transport (sandbox or live, see the Mailtrap status above).
       </div>
 
-      <div className="card mb-2"><div className="row between" style={{flexWrap:'wrap',gap:12}}><div><strong>Test payments in public Activity</strong><p className="small muted">Display only. Entries keep a TEST label and do not count as real purchase volume.</p></div><button className="btn btn-outline" type="button" role="switch" aria-checked={showTests===true} disabled={showTests===null||visibilityBusy} onClick={()=>void toggleVisibility()}>{showTests?'Visible — hide':'Hidden — show'}</button></div></div>
+      {/* ONE switch for every public surface. Off (default): a test order
+          appears nowhere a visitor can see. On: it is listed with a TEST
+          label and counted, so the whole public site can be checked end to
+          end. Display only — payments and cashback rows never change. */}
+      <div className="card mb-2" style={showTests ? { borderColor: 'var(--warning, #e0a800)' } : undefined}>
+        <div className="row between" style={{ flexWrap: 'wrap', gap: 12 }}>
+          <div style={{ flex: '1 1 320px' }}>
+            <strong>Test orders on the public site</strong>{' '}
+            <span className="chip xs" style={showTests ? { borderColor: 'var(--warning, #e0a800)', color: 'var(--warning, #e0a800)' } : undefined}>
+              {showTests === null ? '…' : showTests ? 'VISIBLE TO EVERYONE' : 'HIDDEN'}
+            </span>
+            <p className="small muted" style={{ marginTop: 6 }}>
+              Controls the <strong>Activity</strong> feed, the <strong>Cashback</strong> page (totals and leaderboard), the public <strong>star rating</strong> average and recent comments, and the delivery statistics — all at once.
+              Hidden (default): test orders appear nowhere on the public site. Visible: they are listed with a TEST label and counted, so you can check every page end to end — switch it back off when you are done.
+              The buyer always sees their own test orders in <em>Orders</em> and <em>My cashback</em>; the admin console always shows everything. Nothing about the payments changes.
+            </p>
+          </div>
+          <button className={showTests ? 'btn btn-outline' : 'btn'} type="button" role="switch" aria-checked={showTests === true} disabled={showTests === null || visibilityBusy} onClick={() => void toggleVisibility()}>
+            {showTests ? 'Hide test orders from the public' : 'Show test orders publicly'}
+          </button>
+        </div>
+      </div>
       <div className="field">
         <label>Country (2-letter code)</label>
         <input className="input" type="text" maxLength={2} value={country} onChange={(e) => setCountry(e.target.value)} style={{ maxWidth: 120 }} />
