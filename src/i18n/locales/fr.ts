@@ -86,6 +86,8 @@ const fr = {
     "count": "{{n}} portefeuille(s) de staking lié(s) sur {{max}}",
     "limitReached": "Vous avez lié les {{max}} portefeuilles. Retirez-en un pour en lier un autre.",
     "why": "Vous stakez depuis d’autres portefeuilles que celui avec lequel vous payez ? Liez-les et votre taux staker suivra l’ensemble de votre stake.",
+    "intent": "Ce lien a ouvert le formulaire pour le portefeuille {{address}}. Vérifiez-le, puis appuyez sur Lier : Hub ne demande la signature qu’après votre confirmation.",
+    "intentSignIn": "Pour lier le portefeuille {{address}}, connectez-vous d’abord. Le formulaire de liaison s’ouvrira ici une fois connecté.",
     "openLink": "Lier le portefeuille avec lequel vous stakez",
     "addAnother": "Lier un autre portefeuille",
     "addressLabel": "Adresse du portefeuille de staking",

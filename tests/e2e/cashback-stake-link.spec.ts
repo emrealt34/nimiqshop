@@ -124,3 +124,60 @@ test.describe('Linked staking wallets @smoke', () => {
     await expect(card.getByTestId('stake-link-count')).toContainText('5 of 5');
   });
 });
+
+/**
+ * A link that carries the wallet: ?link_stake=NQ…  It must open the form with
+ * that wallet filled in, and sign NOTHING until the buyer taps Link.
+ */
+test.describe('Link opened from a URL @smoke', () => {
+  test.use({ lang: 'en' });
+
+  test('a signed-in buyer lands on the form pre-filled, the URL is cleaned, and nothing is signed until Link', async ({ page }) => {
+    await fakeHub(page);
+    const challenges: string[] = [];
+    await page.route('**/api/poolstake/me', route => route.fulfill({ json: poolStakeMe([]) }));
+    await page.route('**/api/poolstake/refresh', route => route.fulfill({ json: poolStakeMe([]) }));
+    await page.route('**/api/poolstake/stake-address/challenge', route => {
+      challenges.push(String(route.request().postData()));
+      return route.fulfill({ json: { nonce: 'n', message: `nimshop.io link stake wallet ${STAKE_ADDRESS.replace(/ /g, '')} to account ${ADDRESS.replace(/ /g, '')}: n`, challenge_token: 'tok' } });
+    });
+    await page.route('**/api/poolstake/stake-address', route => route.fulfill({ json: stakeLinkResult([STAKE_ADDRESS]) }));
+
+    await open(page, path(`/cashback?link_stake=${STAKE_ADDRESS.replace(/ /g, '')}`));
+
+    const card = page.getByTestId('linked-stake-wallet');
+    await expect(card.getByTestId('stake-link-intent')).toBeVisible();
+    await expect(card.getByTestId('stake-link-address')).toHaveValue(STAKE_ADDRESS);
+    // Opening the link is not consent: no challenge, no Hub signature yet.
+    await page.waitForTimeout(300);
+    expect(challenges).toHaveLength(0);
+    // The address bar no longer carries the wallet, so a refresh cannot reopen it.
+    expect(page.url()).not.toContain('link_stake');
+
+    await card.getByTestId('stake-link-confirm').click();
+    await expect.poll(() => challenges.length).toBe(1);
+  });
+
+  test('a malformed link_stake value is ignored: no form, no notice', async ({ page }) => {
+    await page.route('**/api/poolstake/me', route => route.fulfill({ json: poolStakeMe([]) }));
+    await open(page, path('/cashback?link_stake=not-a-wallet'));
+    const card = page.getByTestId('linked-stake-wallet');
+    await expect(card).toBeVisible();
+    await expect(card.getByTestId('stake-link-intent')).toHaveCount(0);
+    await expect(card.getByTestId('stake-link-address')).toHaveCount(0);
+  });
+});
+
+test.describe('Link opened from a URL, signed out @smoke', () => {
+  test.use({ lang: 'en', api: { authed: false, mode: 'ok', orders: 0, preference: 'cashback' } });
+
+  test('a signed-out buyer is told to sign in first, and the intent survives the page', async ({ page }) => {
+    await open(page, path(`/cashback?link_stake=${STAKE_ADDRESS.replace(/ /g, '')}`));
+    await expect(page.getByTestId('stake-link-signin')).toBeVisible();
+    await expect(page.getByTestId('stake-link-signin')).toContainText('NQ73');
+    expect(page.url()).not.toContain('link_stake');
+    // Reloading without the parameter keeps the intent (sessionStorage).
+    await page.reload({ waitUntil: 'load' });
+    await expect(page.getByTestId('stake-link-signin')).toBeVisible();
+  });
+});

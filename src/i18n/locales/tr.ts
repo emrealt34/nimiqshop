@@ -86,6 +86,8 @@ const tr = {
     "count": "{{n}} / {{max}} stake cüzdanı bağlı",
     "limitReached": "{{max}} cüzdanın hepsini bağladın. Başka bir cüzdan bağlamak için birini kaldır.",
     "why": "Ödeme yaptığın cüzdandan farklı cüzdanlarla mı stake ediyorsun? Bağla, staker oranın tüm stake'ini takip etsin.",
+    "intent": "Bu bağlantı {{address}} cüzdanını bağlamak için formu açtı. Kontrol et, sonra Bağla'ya bas: Hub ancak sen onaylayınca o cüzdandan imza ister.",
+    "intentSignIn": "{{address}} cüzdanını bağlamak için önce giriş yap. Giriş yapınca bağlama formu burada hazır olacak.",
     "openLink": "Stake ettiğin cüzdanı bağla",
     "addAnother": "Başka bir cüzdan bağla",
     "addressLabel": "Stake cüzdanı adresi",

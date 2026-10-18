@@ -22,12 +22,13 @@
  * that as an eligibility rule. It never was — the rate comes from the stake
  * behind the earning wallets, whatever rail the order is paid on.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ApiError, friendlyApiMessage, unlinkStakeAddress } from '../../lib/api';
 import { linkStakingWallet } from '../../lib/hub';
 import { type MyStake, type StakeWalletRow, fmtStakeNIM } from '../../lib/stakerCashback';
 import { POOL_VALIDATOR_NAME } from '../../lib/stake';
 import { formatWalletAddress } from '../../lib/format';
+import { clearStakeLinkIntent, normalizeStakeAddress } from '../../lib/stakeLinkIntent';
 import { useT } from '../../i18n';
 import { Icon } from '../ui/Icon';
 import { useToast } from '../AppProviders';
@@ -36,7 +37,18 @@ import { useToast } from '../AppProviders';
  *  that predates the field, so the UI never offers a link it cannot perform. */
 const FALLBACK_WALLET_LIMIT = 5;
 
-export function LinkedStakeWallet({ mine, onChanged }: { mine: MyStake | null; onChanged: () => void }) {
+/**
+ * `intent` is a staking wallet that arrived in a link (?link_stake=…). It opens
+ * the form already filled in, and waits for the buyer to tap Link: nothing is
+ * signed on arrival. `onIntentDone` clears it once the buyer has linked or
+ * dismissed it, so a later visit does not reopen the form.
+ */
+export function LinkedStakeWallet({ mine, onChanged, intent, onIntentDone }: {
+  mine: MyStake | null;
+  onChanged: () => void;
+  intent?: string;
+  onIntentDone?: () => void;
+}) {
   const { t } = useT();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -79,6 +91,33 @@ export function LinkedStakeWallet({ mine, onChanged }: { mine: MyStake | null; o
     return friendlyApiMessage(e, t('stakeLink.errGeneric'));
   }
 
+  // Open the form with the linked wallet already entered, unless it is linked
+  // already (then there is nothing to do) or the account is full.
+  const [fromLink, setFromLink] = useState(false);
+  useEffect(() => {
+    if (!intent) return;
+    const canonical = normalizeStakeAddress(intent);
+    const already = linkedRows.some(row => normalizeStakeAddress(row.address) === canonical);
+    if (already || !canonical) {
+      clearStakeLinkIntent();
+      onIntentDone?.();
+      return;
+    }
+    if (!atLimit) {
+      setAddress(formatWalletAddress(canonical));
+      setOpen(true);
+      setFromLink(true);
+    }
+    // Run once per intent; the handlers below clear it when the buyer is done.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [intent]);
+
+  function finishIntent() {
+    if (fromLink) setFromLink(false);
+    clearStakeLinkIntent();
+    onIntentDone?.();
+  }
+
   async function link() {
     const target = address.trim();
     if (!target || busy) return;
@@ -96,6 +135,7 @@ export function LinkedStakeWallet({ mine, onChanged }: { mine: MyStake | null; o
       toast(t('stakeLink.linked', { address: pretty(linkedAddr) }), 'success');
       setOpen(false);
       setAddress('');
+      finishIntent();
       onChanged();
     } catch (e) {
       setErr(explain(e));
@@ -240,6 +280,12 @@ export function LinkedStakeWallet({ mine, onChanged }: { mine: MyStake | null; o
             onChange={event => setAddress(event.target.value)}
             data-testid="stake-link-address"
           />
+          {fromLink && (
+            <div className="cb-link-note mt-1" data-testid="stake-link-intent">
+              <Icon name="info" size={16} />
+              <div className="small">{t('stakeLink.intent', { address: pretty(address) })}</div>
+            </div>
+          )}
           <p className="xs faint">{t('stakeLink.signHint')}</p>
           <div className="row" style={{ gap: 8 }}>
             <button
@@ -258,6 +304,7 @@ export function LinkedStakeWallet({ mine, onChanged }: { mine: MyStake | null; o
               onClick={() => {
                 setOpen(false);
                 setErr('');
+                finishIntent();
               }}
               disabled={busy}
             >

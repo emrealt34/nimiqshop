@@ -86,6 +86,8 @@ const es = {
     "count": "{{n}} de {{max}} monederos de staking vinculados",
     "limitReached": "Ya vinculaste los {{max}} monederos. Quita uno para vincular otro.",
     "why": "¿Haces staking desde monederos distintos del que usas para pagar? Vincúlalos y tu tarifa de staker seguirá todo tu stake.",
+    "intent": "Este enlace abrió el formulario para el monedero {{address}}. Revísalo y pulsa Vincular: Hub pide la firma solo cuando confirmas.",
+    "intentSignIn": "Para vincular el monedero {{address}}, inicia sesión primero. El formulario se abrirá aquí una vez que hayas entrado.",
     "openLink": "Vincular el monedero con el que haces staking",
     "addAnother": "Vincular otro monedero",
     "addressLabel": "Dirección del monedero de staking",

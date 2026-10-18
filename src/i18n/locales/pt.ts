@@ -86,6 +86,8 @@ const pt = {
     "count": "{{n}} de {{max}} carteiras de staking ligadas",
     "limitReached": "Já ligou as {{max}} carteiras. Remova uma para ligar outra.",
     "why": "Faz staking a partir de carteiras diferentes daquela com que paga? Ligue-as e a sua tarifa de staker passa a seguir todo o seu stake.",
+    "intent": "Este link abriu o formulário para a carteira {{address}}. Confira e toque em Ligar: o Hub só pede a assinatura depois da sua confirmação.",
+    "intentSignIn": "Para ligar a carteira {{address}}, inicie sessão primeiro. O formulário abre aqui assim que tiver sessão iniciada.",
     "openLink": "Ligar a carteira com que faz staking",
     "addAnother": "Ligar outra carteira",
     "addressLabel": "Endereço da carteira de staking",

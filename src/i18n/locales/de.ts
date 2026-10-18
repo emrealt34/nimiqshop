@@ -86,6 +86,8 @@ const de = {
     "count": "{{n}} von {{max}} Staking-Wallets verknüpft",
     "limitReached": "Du hast alle {{max}} Wallets verknüpft. Entferne eine, um eine andere zu verknüpfen.",
     "why": "Du stakst über andere Wallets als die, mit der du bezahlst? Verknüpfe sie und dein Staker-Tarif folgt deinem gesamten Stake.",
+    "intent": "Dieser Link hat das Formular für die Wallet {{address}} geöffnet. Prüfe sie und tippe dann auf Verknüpfen: Hub fordert die Signatur erst nach deiner Bestätigung an.",
+    "intentSignIn": "Melde dich zuerst an, um die Wallet {{address}} zu verknüpfen. Danach öffnet sich hier das Verknüpfungsformular.",
     "openLink": "Staking-Wallet verknüpfen",
     "addAnother": "Weitere Wallet verknüpfen",
     "addressLabel": "Adresse der Staking-Wallet",

@@ -92,6 +92,8 @@ const en = {
     "count": "{{n}} of {{max}} staking wallets linked",
     "limitReached": "You have linked all {{max}} wallets. Remove one to link another.",
     "why": "Do you stake from wallets other than the one you pay with? Link them and your staker rate follows your whole stake.",
+    "intent": "This link opened the form for wallet {{address}}. Check it, then tap Link: Hub asks that wallet to sign only after you confirm.",
+    "intentSignIn": "To link wallet {{address}}, sign in first. The link form opens here once you are signed in.",
     "openLink": "Link the wallet you stake from",
     "addAnother": "Link another wallet",
     "addressLabel": "Staking wallet address",
