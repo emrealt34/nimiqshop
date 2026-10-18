@@ -81,6 +81,17 @@ export function checkoutSettled(response: unknown): boolean {
   return status === 'fulfilled' || status === 'refunded';
 }
 
+/**
+ * Drop the stored key of ONE scope so the next checkout of that cart goes out
+ * under a fresh key. Only for an explicit buyer decision: "open a NEW order
+ * next to the live one" (the live-duplicate prompt). A stale key here would
+ * make the shop replay the earlier order forever instead of creating — the
+ * exact loop the prompt exists to break.
+ */
+export async function forgetIntent(storage: Storage, scope: string) {
+  storage.removeItem(INTENT_PREFIX + await digestIntent(scope));
+}
+
 /** Only call following an explicit user action AND a verified terminal order. */
 export function releaseIntentForQuote(storage: Storage, quoteId: string) {
   for (let i = storage.length - 1; i >= 0; i--) {

@@ -36,7 +36,7 @@ import { saveLightningFunding } from '../../lib/api';
 import { inNimiqPay, detectMobilePlatform } from '../../lib/miniapp';
 import { PaymentCountdown } from './PaymentCountdown';
 import { lightningPaymentURI, rememberLightningPayment } from '../../lib/hub';
-import { PAID_STATUSES, quoteBolt11, quoteIdOf, isQuotePayable, launchLightningUri, paidOrderHandedBack } from '../../lib/pay';
+import { PAID_STATUSES, quoteBolt11, quoteIdOf, isQuotePayable, launchLightningUri, paidOrderHandedBack, liveOrderHandedBack } from '../../lib/pay';
 import { releaseIntentForQuote } from '../../lib/checkoutIntent';
 import { cashbackExclusiveNote, cashbackNimFromQuote, fmtCashbackNIM, loadCashbackBps } from '../../lib/cashback';
 import { quoteFaceValue } from '../../lib/format';
@@ -71,6 +71,7 @@ type Phase =
   | { kind: 'item-failed'; issues?: SupplierIssue[]; it: CartItem; reason: string; msg: string; detail?: string; index: number; total: number; paidCount: number }
   | { kind: 'limit-blocked'; limit: DailyLimit; subject: string; paidCount: number; restCount: number }
   | { kind: 'already-paid'; quoteId: string; status: string }
+  | { kind: 'live-duplicate'; quoteId: string; expiresAt: number }
   | { kind: 'success'; paidCount: number; delivered: CartItem[] }
   | { kind: 'summary'; paid: CartItem[]; kept: CartItem[]; stoppedEarly: boolean };
 
@@ -325,6 +326,17 @@ export function CheckoutFlow({
   // "Continue anyway" on the unresolved-checkout hold: once pressed, every
   // quote creation in this flow carries the buyer's ack to the backend gate.
   const ackRef = useRef(false);
+  // "Open a new order" on the live-duplicate prompt: the NEXT quote creation
+  // (and only that one) drops the cart's stored checkout key first, so the
+  // shop cannot replay the live order the key is bound to. The replacement
+  // key is stored before the request like any other, so a later plain retry
+  // of the same request still dedupes instead of opening a third order.
+  const freshRef = useRef(false);
+  const takeFresh = () => {
+    const fresh = freshRef.current;
+    freshRef.current = false;
+    return fresh;
+  };
   const [, setDelivery] = useState<DeliveryInfo | null>(null);
   const [activeItems, setActiveItems] = useState<CartItem[]>(items);
   const flowRef = useRef<{ done: boolean; started: boolean }>({ done: false, started: false });
@@ -375,6 +387,17 @@ export function CheckoutFlow({
           identicon,
         });
 
+      // The live-duplicate prompt, shared by the cart and per-item paths:
+      // resolves with the buyer's choice once they press a button.
+      const askLiveDuplicate = async (live: { quoteId: string; expiresAt: number }) => {
+        const choice = await new Promise<'existing' | 'new' | 'cart'>((resolve) => {
+          setPhase({ kind: 'live-duplicate', quoteId: live.quoteId, expiresAt: live.expiresAt });
+          (window as any).__promptResolver = (x: any) => resolve(x === 'new' || x === 'cart' ? x : 'existing');
+        });
+        (window as any).__promptResolver = undefined;
+        return choice;
+      };
+
       // BATCH-FIRST for multi-item carts
       if (items.length > 1) {
         setPhase({ kind: 'preparing', label: t('checkout.flowPreparing', { n: items.length }) });
@@ -398,7 +421,7 @@ export function CheckoutFlow({
             if (cards.length > 0 && !isValidEmail(info.email)) {
               throw new Error(t('checkout.flowNeedEmail'));
             }
-            batch = await createQuoteBatch(batchReqFor(items, info.phones, info.email, pm, cd, !!info.anonymous, identicon), info.email.trim(), uuid(), currentCashbackCode(), pm, cd, !!info.anonymous, ackRef.current);
+            batch = await createQuoteBatch(batchReqFor(items, info.phones, info.email, pm, cd, !!info.anonymous, identicon), info.email.trim(), uuid(), currentCashbackCode(), pm, cd, !!info.anonymous, ackRef.current, { fresh: takeFresh() });
           } catch (e) {
             batchIssues = supplierIssues(e);
             batchLimit = dailyLimitFromError(e);
@@ -531,6 +554,25 @@ export function CheckoutFlow({
             setPhase({ kind: 'already-paid', quoteId: quoteIdOf(batch), status: handedBack });
             return;
           }
+          // The shop may also hand back a LIVE, unpaid invoice of this same
+          // cart (abandoned pay screen, other device). Owner (2026-10-18):
+          // ask — continue with that order, or open a new one beside it —
+          // instead of silently reopening the old pay screen.
+          const live = liveOrderHandedBack(batch);
+          if (live) {
+            const c = await askLiveDuplicate(live);
+            if (c === 'new') {
+              ackRef.current = true;
+              freshRef.current = true;
+              await tryBatch();
+              continue;
+            }
+            if (c === 'cart') {
+              onClose();
+              return;
+            }
+            // 'existing': the handed-back order IS the one to pay.
+          }
           // ONE payment for the whole cart
           const paid = await new Promise<boolean>((resolve) => {
             setPhase({ kind: 'batch-pay', quote: batch, items });
@@ -601,7 +643,7 @@ export function CheckoutFlow({
           let qLimit: DailyLimit | null = null;
           let qIssues: SupplierIssue[] = [];
           try {
-            quote = await createQuote(ackRef.current ? { ...buildReq(it), ack_active_checkout: true } : buildReq(it));
+            quote = await createQuote(ackRef.current ? { ...buildReq(it), ack_active_checkout: true } : buildReq(it), undefined, { fresh: takeFresh() });
           } catch (e) {
             qIssues = supplierIssues(e);
             qLimit = dailyLimitFromError(e);
@@ -658,6 +700,27 @@ export function CheckoutFlow({
           if (handedBack) {
             setPhase({ kind: 'already-paid', quoteId: quoteIdOf(quote), status: handedBack });
             return;
+          }
+          // Same live-duplicate question as the cart path (see above).
+          const live = liveOrderHandedBack(quote);
+          if (live) {
+            const c = await askLiveDuplicate(live);
+            if (c === 'new') {
+              ackRef.current = true;
+              freshRef.current = true;
+              continue;
+            }
+            if (c === 'cart') {
+              // Nothing paid yet: just close. Otherwise stop here so the
+              // reconcile step below still clears the PAID items from the
+              // cart and shows the summary.
+              if (paidIdx.length === 0) {
+                onClose();
+                return;
+              }
+              stop = true;
+              continue;
+            }
           }
           const paid = await new Promise<boolean>((resolve) => {
             setPhase({ kind: 'peritem-pay', index: i, quote, name: it.name, qty: it.qty || 1, total: items.length, paidCount: paidIdx.length });
@@ -807,6 +870,9 @@ export function CheckoutFlow({
           onOpenOrders={goToOrders}
           onBackToCart={onClose}
         />
+      )}
+      {phase.kind === 'live-duplicate' && (
+        <LiveDuplicatePhase quoteId={phase.quoteId} expiresAt={phase.expiresAt} onChoice={(c) => resolvePrompt(c)} />
       )}
       {phase.kind === 'success' && (
         <SuccessBeat paidCount={phase.paidCount} delivered={phase.delivered} onDone={goToOrders} />
@@ -1521,6 +1587,51 @@ function AlreadyPaidPhase({ quoteId, status, onOpenOrders, onBackToCart }: { quo
         </button>
       </div>
       {status ? <div className="xs faint mt-2">{status}</div> : null}
+    </div>
+  );
+}
+
+/**
+ * LiveDuplicatePhase — the shop handed back an OPEN, unpaid order of this
+ * same cart instead of creating one.
+ *
+ * Owner (2026-10-18): "önceki faturası hâlâ geçerliyken aynı ürünü tekrar
+ * almaya çalışırsa dükkân sormalı". The buyer may well want a second copy —
+ * or may have simply forgotten the first pay screen. Only they know, so the
+ * shop states the fact (with how long the open order stays payable) and
+ * offers both: continue with that order, or open a new one beside it. The
+ * third button is the usual way back to the cart.
+ */
+function LiveDuplicatePhase({ quoteId, expiresAt, onChoice }: { quoteId: string; expiresAt: number; onChoice: (c: 'existing' | 'new' | 'cart') => void }) {
+  const { t } = useT();
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 15000);
+    return () => window.clearInterval(id);
+  }, []);
+  const minutes = Math.max(1, Math.ceil((expiresAt - now) / 60000));
+  return (
+    <div className="center" style={{ padding: '26px 10px', textAlign: 'center' }} data-testid="live-duplicate">
+      <div className="pay-check" style={{ margin: '0 auto 12px' }}>
+        <Icon name="clock" size={30} />
+      </div>
+      <div className="strong">{t('checkout.flowLiveDuplicate')}</div>
+      <div className="small muted mt-1" style={{ maxWidth: 380, margin: '6px auto 0' }}>
+        {t('checkout.flowLiveDuplicateBody', { minutes })}
+      </div>
+      <div style={{ maxWidth: 330, margin: '16px auto 0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <button type="button" className="btn btn-gold btn-block" onClick={() => onChoice('existing')}>
+          {t('checkout.flowLiveDuplicateExisting')}
+        </button>
+        <button type="button" className="btn btn-outline btn-block" onClick={() => onChoice('new')}>
+          {t('checkout.flowLiveDuplicateNew')}
+        </button>
+        <button type="button" className="btn btn-ghost btn-block" onClick={() => onChoice('cart')}>
+          {t('checkout.flowBackToCartItem')}
+        </button>
+      </div>
+      <div className="xs faint mt-2">{t('checkout.flowLiveDuplicateNote')}</div>
+      {quoteId ? <div className="xs faint mono mt-1">{quoteId}</div> : null}
     </div>
   );
 }

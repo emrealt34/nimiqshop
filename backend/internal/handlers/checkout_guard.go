@@ -82,7 +82,14 @@ func (h *Handlers) existingCheckout(ctx *fasthttp.RequestCtx, user, key, request
 		if fp == "" || fp != requestFP {
 			writeJSON(ctx, 409, map[string]any{"error": "idempotency key belongs to a different request", "code": "IDEMPOTENCY_MISMATCH", "quote_id": q.ID, "detail": "Open the original order; do not pay a different cart using this key."})
 		} else {
-			h.writeQuoteCreated(ctx, q)
+			// A replay is never a creation, and the storefront needs to know
+			// the difference: when the handed-back order is a LIVE, unpaid
+			// invoice of the same cart, it asks the buyer whether to return
+			// to that order or open a new one beside it (ack_active_checkout)
+			// instead of silently reopening the old pay screen. Every
+			// handback path says `reused` for that reason — see
+			// reuseCheckout and quoteReservationConflict.
+			h.writeQuoteCreatedExtra(ctx, q, map[string]any{"reused": true})
 		}
 		return true
 	case !errors.Is(err, db.ErrNotFound):
@@ -189,7 +196,7 @@ func (h *Handlers) quoteReservationConflict(ctx *fasthttp.RequestCtx, err error,
 		// the retry contract. Anything else is a genuine conflict.
 		q, fp, e := h.Store.GetQuoteByIdempotencyRequest(user, key)
 		if e == nil && fp == requestFP && !db.CheckoutSettled(q) {
-			h.writeQuoteCreated(ctx, q)
+			h.writeQuoteCreatedExtra(ctx, q, map[string]any{"reused": true})
 		} else {
 			writeError(ctx, 409, "conflicting checkout key or single-use cashback code")
 		}

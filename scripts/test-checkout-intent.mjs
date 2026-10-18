@@ -34,8 +34,8 @@ writeFileSync(entry, `
 (globalThis as any).localStorage ??= { getItem: () => null, setItem() {}, removeItem() {} };
 (globalThis as any).window ??= { addEventListener() {}, location: { href: '' }, navigator: { language: 'en' } };
 (globalThis as any).document ??= { addEventListener() {}, documentElement: { lang: 'en' }, createElement: () => ({ style: {} }), cookie: '' };
-export { checkoutSettled, releaseIntentForQuote, saveIntentQuote, INTENT_PREFIX } from ${JSON.stringify(path.join(root, 'src/lib/checkoutIntent'))};
-export { paidOrderHandedBack } from ${JSON.stringify(path.join(root, 'src/lib/pay'))};
+export { checkoutSettled, releaseIntentForQuote, saveIntentQuote, forgetIntent, digestIntent, INTENT_PREFIX } from ${JSON.stringify(path.join(root, 'src/lib/checkoutIntent'))};
+export { paidOrderHandedBack, liveOrderHandedBack } from ${JSON.stringify(path.join(root, 'src/lib/pay'))};
 `);
 
 const esbuild = path.join(root, 'node_modules', '.bin', process.platform === 'win32' ? 'esbuild.cmd' : 'esbuild');
@@ -48,7 +48,7 @@ assert.equal(built.status, 0, built.stderr || 'esbuild failed to bundle src/lib/
 process.on('exit', () => rmSync(dir, { recursive: true, force: true }));
 
 const require = createRequire(import.meta.url);
-const { checkoutSettled, releaseIntentForQuote, saveIntentQuote, INTENT_PREFIX, paidOrderHandedBack } = require(bundle);
+const { checkoutSettled, releaseIntentForQuote, saveIntentQuote, forgetIntent, digestIntent, INTENT_PREFIX, paidOrderHandedBack, liveOrderHandedBack } = require(bundle);
 
 /** A GET /api/quotes/{id} body as the backend shapes it. */
 const lookup = (status, extra = {}) => ({ quote: { id: 'q1', status }, can_pay: status === 'awaiting_payment', ...extra });
@@ -99,4 +99,60 @@ test('a checkout answer that is already paid is a handback, never a new purchase
   }
   assert.equal(paidOrderHandedBack({ quote: { id: 'q1', status: 'fulfilled' } }), 'fulfilled', 'nested quote bodies are read too');
   assert.equal(paidOrderHandedBack(null), '');
+});
+
+/* ---- live-duplicate prompt (owner, 2026-10-18): "önceki faturası hâlâ
+   geçerliyken aynı ürünü tekrar almaya çalışırsa dükkân sormalı" ---- */
+
+const NOW = Date.parse('2026-10-18T12:00:00Z');
+const inMin = (m) => new Date(NOW + m * 60000).toISOString();
+const liveReply = (extra = {}) => ({ quote_id: 'q-live', status: 'awaiting_payment', can_pay: true, payment_expires_at: inMin(14.2), reused: true, ...extra });
+
+test('a reused, still-payable invoice of the same cart becomes the "open order" question', () => {
+  const live = liveOrderHandedBack(liveReply(), NOW);
+  assert.deepEqual(live, { quoteId: 'q-live', expiresAt: NOW + 14.2 * 60000, minutesLeft: 15 }, 'minutes are rounded UP so the prompt never promises less time than there is');
+  assert.equal(liveOrderHandedBack(liveReply({ payment_expires_at: inMin(0.2) }), NOW)?.minutesLeft, 1, 'never "0 min" while it is still payable');
+  assert.equal(liveOrderHandedBack({ ...liveReply(), payment_expires_at: undefined, payment_expiry: inMin(5) }, NOW)?.minutesLeft, 5, 'the alternative deadline field is read too');
+});
+
+test('a genuinely new order never triggers the question', () => {
+  assert.equal(liveOrderHandedBack({ quote_id: 'q-new', status: 'awaiting_payment', can_pay: true, payment_expires_at: inMin(15) }, NOW), null, 'no reused marker: the shop created this one');
+  assert.equal(liveOrderHandedBack({ quote_id: 'q-new', status: 'awaiting_payment', can_pay: true, payment_expires_at: inMin(15), reused: false }, NOW), null);
+});
+
+test('a handback that cannot be paid belongs to the other screens, not to the question', () => {
+  for (const paid of ['payment_received', 'delivering', 'fulfilled']) {
+    assert.equal(liveOrderHandedBack(liveReply({ status: paid }), NOW), null, `${paid}: the already-paid screen owns it`);
+  }
+  assert.equal(liveOrderHandedBack(liveReply({ status: 'order_creating', can_pay: false }), NOW), null);
+  assert.equal(liveOrderHandedBack(liveReply({ can_pay: false }), NOW), null, 'the server did not authorise payment');
+  assert.equal(liveOrderHandedBack(liveReply({ payment_expires_at: inMin(-1) }), NOW), null, 'lapsed: the renew path owns it');
+  assert.equal(liveOrderHandedBack(liveReply({ payment_expires_at: 'garbage' }), NOW), null, 'unknown deadline: never claim "N minutes"');
+  assert.equal(liveOrderHandedBack(liveReply({ payment_observed: true }), NOW), null, 'money was seen: no second order may be offered');
+  assert.equal(liveOrderHandedBack(liveReply({ payment_blocked: true }), NOW), null);
+  assert.equal(liveOrderHandedBack(liveReply({ quote_id: '' }), NOW), null, 'no id, nothing to continue with');
+  assert.equal(liveOrderHandedBack(null, NOW), null);
+  assert.equal(liveOrderHandedBack('reused', NOW), null);
+});
+
+test('"open a new order" forgets exactly that cart\'s key, so the next request cannot replay the live order', async () => {
+  const store = new Map();
+  const storage = {
+    get length() { return store.size; },
+    key: (i) => [...store.keys()][i] ?? null,
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => void store.set(k, String(v)),
+    removeItem: (k) => void store.delete(k),
+  };
+  const scopeA = 'u1|/quotes|{"product_id":"a"}';
+  const scopeB = 'u1|/quotes|{"product_id":"b"}';
+  const keyA = INTENT_PREFIX + await digestIntent(scopeA);
+  const keyB = INTENT_PREFIX + await digestIntent(scopeB);
+  saveIntentQuote(storage, keyA, { key: 'k'.repeat(32), createdAt: 1 }, 'q-live');
+  saveIntentQuote(storage, keyB, { key: 'j'.repeat(32), createdAt: 1 }, 'q-other');
+  await forgetIntent(storage, scopeA);
+  assert.equal(storage.getItem(keyA), null, 'the live order\'s key is gone: the next POST mints a fresh one');
+  assert.ok(storage.getItem(keyB), 'another cart\'s checkout keeps its key');
+  await forgetIntent(storage, 'u1|/quotes|never-stored');
+  assert.equal(store.size, 1, 'forgetting an unknown scope touches nothing');
 });

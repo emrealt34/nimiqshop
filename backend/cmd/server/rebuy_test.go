@@ -204,3 +204,138 @@ func TestRebuyAfterRealSupplierDeliveryOrExpiryStartsAFreshOrder(t *testing.T) {
 		t.Errorf("the live order must report checkout_settled=false")
 	}
 }
+
+// Owner (2026-10-18): "aynı ürünü, önceki faturası hâlâ geçerliyken tekrar
+// almaya çalışırsa dükkân SORMALI — o siparişe mi gidelim, yeni mi açalım?"
+// The storefront can only ask that question if the shop tells it that a
+// checkout POST handed back an EARLIER order instead of creating one. So, on
+// the real pipeline (test-mode quotes never block, so they never get handed
+// back): every replay of a live, unpaid invoice — same key or a fresh key for
+// the same cart — carries `reused: true`, a genuinely new order never does,
+// and the buyer's "open a new one" (ack_active_checkout under a fresh key)
+// creates a second payable order while the first stays exactly as it was.
+func TestLiveSameCartIsHandedBackAsReusedAndAckOpensASecondOrder(t *testing.T) {
+	s := bootStack(t, stackOptions{testMode: false})
+	supplierOrder := func(t *testing.T, res resp) string {
+		t.Helper()
+		sid, _ := res.json(t)["supplier_order_id"].(string)
+		if sid == "" {
+			t.Fatalf("supplier order id missing: %s", truncate(res.body))
+		}
+		return sid
+	}
+	mock := func(t *testing.T, sid, action string, body string) {
+		t.Helper()
+		r, err := http.Post(s.supplier.URL+"/mock/orders/"+sid+"/"+action, "application/json", strings.NewReader(body)) //nolint:noctx // in-process fixture
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = r.Body.Close()
+		if r.StatusCode != http.StatusOK {
+			t.Fatalf("supplier fixture %s: %d", action, r.StatusCode)
+		}
+	}
+	item := map[string]any{"product_id": "test-airbnb", "country": "US", "quantity": 1, "denomination": "range", "product_value": 25}
+	single := map[string]any{"product_id": "test-airbnb", "country": "US", "quantity": 1, "denomination": "range", "product_value": 25, "email": "buyer@example.com"}
+	batch := map[string]any{"items": []map[string]any{item, {"product_id": "test-airbnb", "country": "US", "quantity": 1, "denomination": "range", "product_value": 50}}, "email": "buyer@example.com"}
+	acked := func(cart map[string]any) map[string]any {
+		out := map[string]any{"ack_active_checkout": true}
+		for k, v := range cart {
+			out[k] = v
+		}
+		return out
+	}
+	for _, tc := range []struct {
+		name, path string
+		cart       map[string]any
+	}{{"single", "/api/quotes", single}, {"batch", "/api/quotes/batch", batch}} {
+		t.Run(tc.name, func(t *testing.T) {
+			// One buyer per endpoint: the live order the previous subtest
+			// leaves behind would (correctly) hold this one's new cart.
+			auth, _ := s.signIn()
+			withKey := func(k string) map[string]string {
+				return map[string]string{"Authorization": auth["Authorization"], "Idempotency-Key": k}
+			}
+			waitStatus := func(id, want string) {
+				t.Helper()
+				status := ""
+				for deadline := time.Now().Add(15 * time.Second); time.Now().Before(deadline) && status != want; {
+					s.do(http.MethodPost, "/api/quotes/"+id+"/refresh", nil, auth)
+					status = quoteStatus(s.do(http.MethodGet, "/api/quotes/"+id, nil, auth).json(t))
+					if status != want {
+						time.Sleep(100 * time.Millisecond)
+					}
+				}
+				if status != want {
+					t.Fatalf("quote %s never reached %s (status %q)", id, want, status)
+				}
+			}
+			cartKey := newIdempotencyKey(t)
+			first := s.do(http.MethodPost, tc.path, tc.cart, withKey(cartKey))
+			firstID := quoteIDFrom(t, first)
+			if first.status != 201 || first.json(t)["can_pay"] != true {
+				t.Fatalf("first checkout must be a payable creation: %d %s", first.status, truncate(first.body))
+			}
+			if _, present := first.json(t)["reused"]; present {
+				t.Fatalf("a freshly created order must not say reused: %s", truncate(first.body))
+			}
+
+			// The buyer comes back to the same cart while the invoice is still
+			// live. The storefront sends the same cart-derived key: the shop
+			// hands the live order back AND says so.
+			again := s.do(http.MethodPost, tc.path, tc.cart, withKey(cartKey))
+			if id := quoteIDFrom(t, again); id != firstID {
+				t.Fatalf("same cart under the live key must hand back %s, got %s", firstID, id)
+			}
+			if body := again.json(t); again.status != 201 || body["reused"] != true || body["status"] != "awaiting_payment" || body["can_pay"] != true {
+				t.Fatalf("handback of a live invoice must be 201 + reused:true + payable: %d %s", again.status, truncate(again.body))
+			}
+			if exp, _ := again.json(t)["payment_expires_at"].(string); exp == "" {
+				t.Fatalf("the handback must carry payment_expires_at so the prompt can say how long the order stays open: %s", truncate(again.body))
+			}
+			// A fresh key for the same cart (another device, cleared storage)
+			// is the same handback, with the same marker.
+			if res := s.do(http.MethodPost, tc.path, tc.cart, withKey(newIdempotencyKey(t))); quoteIDFrom(t, res) != firstID || res.json(t)["reused"] != true {
+				t.Fatalf("same cart under a fresh key must hand back %s as reused: %d %s", firstID, res.status, truncate(res.body))
+			}
+
+			// "Open a new order": the acknowledgement under a fresh key opens
+			// a SECOND payable order beside the live one.
+			ackKey := newIdempotencyKey(t)
+			second := s.do(http.MethodPost, tc.path, acked(tc.cart), withKey(ackKey))
+			secondID := quoteIDFrom(t, second)
+			if second.status != 201 || second.json(t)["can_pay"] != true || secondID == firstID {
+				t.Fatalf("ack under a fresh key must open a new payable order: %d %s", second.status, truncate(second.body))
+			}
+			if _, present := second.json(t)["reused"]; present {
+				t.Fatalf("the new order must not say reused: %s", truncate(second.body))
+			}
+			// The first order is untouched: still live, still payable.
+			if got := s.do(http.MethodGet, "/api/quotes/"+firstID, nil, auth).json(t); quoteStatus(got) != "awaiting_payment" || got["can_pay"] != true {
+				t.Fatalf("opening a new order must leave the first one payable: %s", truncate(mustJSON(t, got)))
+			}
+			// The retry contract still holds for the new order: the same ack
+			// request under the same key replays IT (as a reuse), never the
+			// first order and never a third one.
+			if res := s.do(http.MethodPost, tc.path, acked(tc.cart), withKey(ackKey)); quoteIDFrom(t, res) != secondID || res.json(t)["reused"] != true {
+				t.Fatalf("retry of the ack request must replay %s as reused: %d %s", secondID, res.status, truncate(res.body))
+			}
+			// And the original cart key still points at the first order.
+			if res := s.do(http.MethodPost, tc.path, tc.cart, withKey(cartKey)); quoteIDFrom(t, res) != firstID || res.json(t)["reused"] != true {
+				t.Fatalf("the cart key must keep replaying %s as reused: %d %s", firstID, res.status, truncate(res.body))
+			}
+			// Both orders are paid and delivered independently.
+			for _, res := range []resp{first, second} {
+				mock(t, supplierOrder(t, res), "pay", "{}")
+				mock(t, supplierOrder(t, res), "advance", "{}")
+			}
+			waitStatus(firstID, "fulfilled")
+			waitStatus(secondID, "fulfilled")
+			// Once both are over, the cart key is spent: the same cart opens
+			// a third, new order (the 2026-10-18 rebuy rule).
+			if res := s.do(http.MethodPost, tc.path, tc.cart, withKey(cartKey)); res.status != 201 || quoteIDFrom(t, res) == firstID || quoteIDFrom(t, res) == secondID {
+				t.Fatalf("rebuy after both orders settled must be a new order: %d %s", res.status, truncate(res.body))
+			}
+		})
+	}
+}

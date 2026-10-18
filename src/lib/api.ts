@@ -10,7 +10,7 @@ import { CFG, siteName } from './config';
 import { asset } from './asset';
 import { getLang, t as tr } from '../i18n';
 import { uuid as uuid2 } from './format';
-import { canonicalIntent, purchaseIntentPayload, loadOrCreateIntent, saveIntentQuote, releaseIntentForQuote, checkoutSettled } from './checkoutIntent';
+import { canonicalIntent, purchaseIntentPayload, loadOrCreateIntent, saveIntentQuote, releaseIntentForQuote, forgetIntent, checkoutSettled } from './checkoutIntent';
 import { dailyLimitMessage, isDailyLimitError } from './dailyLimit';
 import { countryHint, COUNTRY_HINT_HEADER } from './edgeGeo';
 import { recordAvailability } from './catalogStock';
@@ -562,7 +562,16 @@ export const checkPhone = (phoneNumber: string, country?: string) =>
 /* ---------------- Quotes: durable, retry-safe intent ---------------- */
 const _quoteInflight = new Map<string, Promise<Record<string, any>>>();
 
-async function createCheckout(path: string, req: unknown, proposedKey?: string): Promise<Record<string, any>> {
+/**
+ * CheckoutOptions.fresh — the buyer explicitly asked for a NEW order next to
+ * a live one (the live-duplicate prompt's "open a new order"). The scope's
+ * stored key is dropped BEFORE this request, so it cannot replay the order
+ * the key was bound to. The new key is stored before the POST like any
+ * other, so a plain retry of this same request (no `fresh`) still dedupes.
+ */
+export type CheckoutOptions = { fresh?: boolean };
+
+async function createCheckout(path: string, req: unknown, proposedKey?: string, opts: CheckoutOptions = {}): Promise<Record<string, any>> {
   // sessionGetter returns the user id (the JWT `uid` claim, now delivered as
   // plain data instead of decoded out of a token), so the scope string is
   // byte-for-byte what it was before the cookie change and intents already
@@ -573,6 +582,7 @@ async function createCheckout(path: string, req: unknown, proposedKey?: string):
   const pending = _quoteInflight.get(scope);
   if (pending) return pending;
   const promise = (async () => {
+    if (opts.fresh) await forgetIntent(localStorage, scope);
     // Store FIRST, then send. Ambiguous failures never delete or rotate this key.
     let saved = await loadOrCreateIntent(localStorage, scope, proposedKey || uuid2());
     // A stored key that already produced an order is a RETRY key only while
@@ -612,8 +622,8 @@ async function intentOrderSettled(quoteId: string): Promise<boolean> {
 
 // Legacy callers may clear display state, never the durable purchase key.
 export const forgetQuote = (_req: unknown) => {};
-export const createQuote = (req: unknown, key?: string) => createCheckout('/quotes', req, key);
-export const createQuoteBatch = (items: unknown[], email?: string, key?: string, cashbackCode?: string, paymentMethod?: string, cashbackDest?: string, anonymous?: boolean, ackActiveCheckout?: boolean) =>
+export const createQuote = (req: unknown, key?: string, opts?: CheckoutOptions) => createCheckout('/quotes', req, key, opts);
+export const createQuoteBatch = (items: unknown[], email?: string, key?: string, cashbackCode?: string, paymentMethod?: string, cashbackDest?: string, anonymous?: boolean, ackActiveCheckout?: boolean, opts?: CheckoutOptions) =>
   createCheckout('/quotes/batch', {
     items,
     email,
@@ -622,7 +632,7 @@ export const createQuoteBatch = (items: unknown[], email?: string, key?: string,
     payment_method: paymentMethod || 'nimiq_pay',
     cashback_destination: cashbackDest || 'cashback',
     anonymous: !!anonymous,
-  }, key);
+  }, key, opts);
 
 /* ---------------- Site config (feature flags) ---------------- */
 export const getSiteConfig = () => api('/site-config');

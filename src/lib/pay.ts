@@ -125,6 +125,35 @@ export function paidOrderHandedBack(created: unknown): string {
   return PAID_STATUSES.has(st) ? st : '';
 }
 
+/** What the shop handed back instead of creating: a LIVE, unpaid invoice. */
+export type LiveOrderHandback = { quoteId: string; expiresAt: number; minutesLeft: number };
+
+/**
+ * A checkout POST that answers `reused: true` with an order that is still
+ * AWAITING PAYMENT did not create anything either: the buyer already has an
+ * open, unexpired, unpaid invoice for exactly this cart (they abandoned the
+ * pay screen, or opened it on another device) and the shop handed it back.
+ *
+ * Owner (2026-10-18): that must not silently reopen the old pay screen. The
+ * shop asks — "you already have an open order for this (expires in N min):
+ * continue with it, or open a new one?" — and the caller renders that
+ * prompt. Returns the handed-back order's id and how long it stays payable,
+ * or null for a genuinely new order, a handback that is not payable (the
+ * already-paid screen and the renew path own those), or an unknown deadline.
+ */
+export function liveOrderHandedBack(created: unknown, now = Date.now()): LiveOrderHandback | null {
+  if (!created || typeof created !== 'object') return null;
+  const rec = created as Record<string, unknown>;
+  if (rec.reused !== true) return null;
+  if (!isPayableStatus(rec.status) || rec.can_pay !== true) return null;
+  if (rec.payment_observed || rec.payment_blocked) return null;
+  const expiresAt = paymentDeadline(rec);
+  if (!Number.isFinite(expiresAt) || expiresAt <= now) return null;
+  const quoteId = quoteIdOf(rec);
+  if (!quoteId) return null;
+  return { quoteId, expiresAt, minutesLeft: Math.max(1, Math.ceil((expiresAt - now) / 60000)) };
+}
+
 export const FAIL_STATUSES = new Set([
   'failed',
   'manual_review',
