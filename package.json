@@ -29,6 +29,7 @@
     "install:cloudflared": "node devtools/ensure-cloudflared.mjs",
     "diagnose": "node scripts/diagnose-url.mjs",
     "test:e2e:build": "node tests/e2e/support/build.mjs",
+    "test:e2e:fullstack": "node tests/e2e/support/fullstack.mjs",
     "test:e2e": "node tests/e2e/support/build.mjs && playwright test",
     "test:e2e:quick": "playwright test",
     "test:e2e:smoke": "playwright test --grep @smoke",

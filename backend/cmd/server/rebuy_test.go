@@ -324,12 +324,30 @@ func TestLiveSameCartIsHandedBackAsReusedAndAckOpensASecondOrder(t *testing.T) {
 			if res := s.do(http.MethodPost, tc.path, tc.cart, withKey(cartKey)); quoteIDFrom(t, res) != firstID || res.json(t)["reused"] != true {
 				t.Fatalf("the cart key must keep replaying %s as reused: %d %s", firstID, res.status, truncate(res.body))
 			}
-			// Both orders are paid and delivered independently.
-			for _, res := range []resp{first, second} {
-				mock(t, supplierOrder(t, res), "pay", "{}")
-				mock(t, supplierOrder(t, res), "advance", "{}")
+			// The acknowledgement is an answer to the gate, not part of the
+			// purchase: the new order's own key retried WITHOUT the flag is
+			// still a retry of that order, never an IDEMPOTENCY_MISMATCH.
+			if res := s.do(http.MethodPost, tc.path, tc.cart, withKey(ackKey)); quoteIDFrom(t, res) != secondID || res.json(t)["reused"] != true {
+				t.Fatalf("retry of the new order's key without the ack flag must replay %s as reused: %d %s", secondID, res.status, truncate(res.body))
 			}
+			// The first order is paid and delivered; the second stays live.
+			mock(t, supplierOrder(t, first), "pay", "{}")
+			mock(t, supplierOrder(t, first), "advance", "{}")
 			waitStatus(firstID, "fulfilled")
+			// The same cart again — fresh key, no flag — is the question
+			// about the order that IS still open (the second one), not a
+			// replay of the delivered one and not the ACTIVE_CHECKOUT wall.
+			// This was the gap: the second order's fingerprint carried the
+			// ack flag, so the same cart never matched it again.
+			for _, key := range []string{newIdempotencyKey(t), cartKey} {
+				res := s.do(http.MethodPost, tc.path, tc.cart, withKey(key))
+				if res.status != 201 || quoteIDFrom(t, res) != secondID || res.json(t)["reused"] != true || res.json(t)["can_pay"] != true {
+					t.Fatalf("same cart with %s open and %s delivered must hand back the open one as reused: %d %s", secondID, firstID, res.status, truncate(res.body))
+				}
+			}
+			// The second order is paid and delivered too.
+			mock(t, supplierOrder(t, second), "pay", "{}")
+			mock(t, supplierOrder(t, second), "advance", "{}")
 			waitStatus(secondID, "fulfilled")
 			// Once both are over, the cart key is spent: the same cart opens
 			// a third, new order (the 2026-10-18 rebuy rule).

@@ -103,11 +103,20 @@ export function releaseIntentForQuote(storage: Storage, quoteId: string) {
 }
 
 /** Cosmetics/rewards must not turn an uncertain purchase into a fresh intent.
- * The server still binds the FULL body and rejects incompatible key reuse. */
+ * The server still binds the FULL body and rejects incompatible key reuse.
+ *
+ * `ack_active_checkout` is the buyer's answer to the checkout gate ("open a
+ * new order beside the live one"), not part of the purchase, so it does not
+ * make a separate scope either: the order opened through the prompt lives
+ * under the cart's own key. Otherwise the ack POST minted its key in a scope
+ * of its own, the cart's scope still pointed at the earlier order, and the
+ * next checkout of the same cart neither replayed the new order nor matched
+ * it on the server (found by the full-stack browser run, 2026-10-18). */
+export const INTENT_SCOPE_IGNORED_FIELDS = ['cashback_code', 'gift_channel', 'gift_message', 'gifter_identicon', 'coin', 'network', 'ack_active_checkout'] as const;
 export function purchaseIntentPayload(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(purchaseIntentPayload);
   if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value as Record<string,unknown>)
-    .filter(([key]) => !['cashback_code','gift_channel','gift_message','gifter_identicon','coin','network'].includes(key))
+    .filter(([key]) => !(INTENT_SCOPE_IGNORED_FIELDS as readonly string[]).includes(key))
     .map(([key,v]) => [key,purchaseIntentPayload(v)]));
   return value;
 }

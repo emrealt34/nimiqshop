@@ -34,7 +34,17 @@ func fingerprint(v any) string {
 	h := sha256.Sum256(b)
 	return hex.EncodeToString(h[:])
 }
+
+// The buyer's answer to the checkout gate ("continue anyway" / "open a new
+// order beside the live one") is NOT part of what is being bought, so it is
+// in neither fingerprint. It used to be in both: an order opened through the
+// acknowledgement carried the flag in its fingerprints, so the SAME cart
+// coming back later (no flag) never matched it — the buyer hit the hard
+// ACTIVE_CHECKOUT wall instead of the "go to the open order or open a new
+// one" question, and a retry of that order's own key without the flag was an
+// IDEMPOTENCY_MISMATCH (found by the full-stack browser run, 2026-10-18).
 func singleFingerprints(req createQuoteRequest) (string, string) {
+	req.AckActiveCheckout = false
 	request := fingerprint(req)
 	req.CashbackCode = ""
 	req.GiftChannel = ""
@@ -43,6 +53,7 @@ func singleFingerprints(req createQuoteRequest) (string, string) {
 	return request, fingerprint(req)
 }
 func batchFingerprints(req batchQuoteRequest) (string, string) {
+	req.AckActiveCheckout = false
 	req.Items = append([]batchQuoteItem(nil), req.Items...)
 	sort.Slice(req.Items, func(i, j int) bool { return fingerprint(req.Items[i]) < fingerprint(req.Items[j]) })
 	request := fingerprint(req)

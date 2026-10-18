@@ -34,7 +34,7 @@ writeFileSync(entry, `
 (globalThis as any).localStorage ??= { getItem: () => null, setItem() {}, removeItem() {} };
 (globalThis as any).window ??= { addEventListener() {}, location: { href: '' }, navigator: { language: 'en' } };
 (globalThis as any).document ??= { addEventListener() {}, documentElement: { lang: 'en' }, createElement: () => ({ style: {} }), cookie: '' };
-export { checkoutSettled, releaseIntentForQuote, saveIntentQuote, forgetIntent, digestIntent, INTENT_PREFIX } from ${JSON.stringify(path.join(root, 'src/lib/checkoutIntent'))};
+export { checkoutSettled, releaseIntentForQuote, saveIntentQuote, forgetIntent, digestIntent, canonicalIntent, purchaseIntentPayload, INTENT_PREFIX } from ${JSON.stringify(path.join(root, 'src/lib/checkoutIntent'))};
 export { paidOrderHandedBack, liveOrderHandedBack } from ${JSON.stringify(path.join(root, 'src/lib/pay'))};
 `);
 
@@ -48,7 +48,7 @@ assert.equal(built.status, 0, built.stderr || 'esbuild failed to bundle src/lib/
 process.on('exit', () => rmSync(dir, { recursive: true, force: true }));
 
 const require = createRequire(import.meta.url);
-const { checkoutSettled, releaseIntentForQuote, saveIntentQuote, forgetIntent, digestIntent, INTENT_PREFIX, paidOrderHandedBack, liveOrderHandedBack } = require(bundle);
+const { checkoutSettled, releaseIntentForQuote, saveIntentQuote, forgetIntent, digestIntent, canonicalIntent, purchaseIntentPayload, INTENT_PREFIX, paidOrderHandedBack, liveOrderHandedBack } = require(bundle);
 
 /** A GET /api/quotes/{id} body as the backend shapes it. */
 const lookup = (status, extra = {}) => ({ quote: { id: 'q1', status }, can_pay: status === 'awaiting_payment', ...extra });
@@ -155,4 +155,15 @@ test('"open a new order" forgets exactly that cart\'s key, so the next request c
   assert.ok(storage.getItem(keyB), 'another cart\'s checkout keeps its key');
   await forgetIntent(storage, 'u1|/quotes|never-stored');
   assert.equal(store.size, 1, 'forgetting an unknown scope touches nothing');
+});
+
+test('the gate acknowledgement does not open a scope of its own: the new order lives under the cart\'s key', () => {
+  const scopeOf = (req) => canonicalIntent(purchaseIntentPayload(req));
+  const single = { product_id: 'test-airbnb', country: 'US', denomination: 'range', product_value: 25, quantity: 1, email: 'buyer@example.com' };
+  assert.equal(scopeOf({ ...single, ack_active_checkout: true }), scopeOf(single), 'single: ack is not part of the scope');
+  assert.equal(scopeOf({ ...single, ack_active_checkout: false }), scopeOf(single), 'single: an explicit false is not either');
+  const batch = { items: [single], email: 'buyer@example.com', payment_method: 'nimiq_pay', cashback_destination: 'cashback', anonymous: false, cashback_code: 'PROMO' };
+  assert.equal(scopeOf({ ...batch, ack_active_checkout: true }), scopeOf({ ...batch, cashback_code: '' }), 'batch: neither ack nor the promo code changes the scope');
+  assert.notEqual(scopeOf({ ...single, product_value: 50 }), scopeOf(single), 'a different face value is a different purchase');
+  assert.notEqual(scopeOf({ ...batch, anonymous: true }), scopeOf(batch), 'the anonymity choice stays part of the purchase');
 });

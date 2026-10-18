@@ -99,6 +99,7 @@ npm start              # static frontend on :8085, API on :8084 (proxied under /
 | `npm run verify` | Every static gate CI runs (types, i18n, API contract, lint, config) |
 | `npm run test:e2e` | Build the test stack and run the full Playwright suite |
 | `npm run test:e2e:smoke` | Only `@smoke` tests |
+| `npm run test:e2e:fullstack` | Real browser against the REAL backend (no API mocks): boots the Go stack with the supplier mock, runs `tests/e2e/fullstack-*.spec.ts` — needs Go |
 | `go run ./cmd/mockstack` (in `backend/`) | Deterministic CryptoRefills stand-in on `:9020` |
 
 ## Configuration
