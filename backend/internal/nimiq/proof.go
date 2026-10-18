@@ -212,8 +212,10 @@ func (r *proofReader) signatureProof() (addr string, ok bool) {
 		if _, ok := r.u8(); !ok {
 			return "", false
 		}
-		if !r.lengthPrefixed() || !r.lengthPrefixed() {
-			return "", false
+		for i := 0; i < 2; i++ { // client data JSON, then extension data
+			if !r.lengthPrefixed() {
+				return "", false
+			}
 		}
 	}
 	if merkleNodes > 0 {
