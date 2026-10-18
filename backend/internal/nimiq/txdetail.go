@@ -6,22 +6,26 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 )
 
 // TxDetail is what a rating verifier needs from one on-chain transaction. The
-// RPC reports it as: {"hash","blockNumber","from","to","value","recipientData",
-// "executionResult",…} (shape verified live against rpc.nimiqwatch.com).
-// recipientData is the hex of the transaction's data field, i.e. the memo.
+// RPC reports it as: {"hash","blockNumber","from","fromType","to","value",
+// "recipientData","proof","executionResult",…} (shape verified live against
+// rpc.nimiqwatch.com). recipientData is the hex of the transaction's data
+// field, i.e. the memo.
 type TxDetail struct {
-	Hash    string
-	From    string // normalised NQ address, no spaces
-	To      string // normalised NQ address, no spaces
-	Value   int64  // Luna
-	Data    []byte // decoded recipientData (the memo bytes)
-	Mined   bool   // a block number is present
-	Success bool   // executionResult is true
+	Hash     string
+	From     string   // normalised NQ address, no spaces: the debited account
+	FromType int      // AccountTypeBasic, AccountTypeVesting, AccountTypeHTLC, …
+	Signers  []string // normalised addresses of the keys that signed the proof (see proof.go)
+	To       string   // normalised NQ address, no spaces
+	Value    int64    // Luna
+	Data     []byte   // decoded recipientData (the memo bytes)
+	Mined    bool     // a block number is present
+	Success  bool     // executionResult is true
 }
 
 var txHashRe = regexp.MustCompile(`^[0-9a-fA-F]{64}$`)
@@ -70,8 +74,8 @@ func (c *Client) GetTransactionDetail(ctx context.Context, hash string) (TxDetai
 			mined = r.d.Mined
 			continue
 		}
-		if r.d.From != agreed.From || r.d.To != agreed.To || r.d.Value != agreed.Value ||
-			string(r.d.Data) != string(agreed.Data) || r.d.Success != agreed.Success {
+		if r.d.From != agreed.From || r.d.FromType != agreed.FromType || r.d.To != agreed.To || r.d.Value != agreed.Value ||
+			string(r.d.Data) != string(agreed.Data) || r.d.Success != agreed.Success || !slices.Equal(r.d.Signers, agreed.Signers) {
 			return TxDetail{}, false, errors.New("nimiq rpc: transaction details disagree")
 		}
 		mined = mined && r.d.Mined
@@ -88,12 +92,21 @@ func (c *Client) txDetailOne(ctx context.Context, baseURL, hash string) (TxDetai
 		Hash            *string `json:"hash"`
 		BlockNumber     *int64  `json:"blockNumber"`
 		From            string  `json:"from"`
+		FromType        int     `json:"fromType"`
 		To              string  `json:"to"`
 		Value           int64   `json:"value"`
 		RecipientData   string  `json:"recipientData"`
+		Proof           string  `json:"proof"`
 		ExecutionResult *bool   `json:"executionResult"`
 	}
 	if err := c.callURL(ctx, baseURL, "getTransactionByHash", []interface{}{hash}, &out); err != nil {
+		// A hash the node has not seen yet (still propagating, or never
+		// broadcast) is answered with an RPC *error* by Albatross nodes
+		// ("Transaction not found: <hash>"), not with a null result. That is
+		// "not found", not an outage.
+		if isTxNotFound(err) {
+			return TxDetail{}, false, nil
+		}
 		return TxDetail{}, false, err
 	}
 	if out.Hash == nil {
@@ -103,13 +116,27 @@ func (c *Client) txDetailOne(ctx context.Context, baseURL, hash string) (TxDetai
 	if err != nil {
 		return TxDetail{}, false, errors.New("recipientData is not hex")
 	}
+	// The proof is informational for the verifier (who signed); a malformed
+	// one yields no signers rather than an error.
+	proof, _ := hex.DecodeString(out.Proof)
 	return TxDetail{
-		Hash:    strings.ToLower(*out.Hash),
-		From:    NormalizeAddress(out.From),
-		To:      NormalizeAddress(out.To),
-		Value:   out.Value,
-		Data:    data,
-		Mined:   out.BlockNumber != nil,
-		Success: out.ExecutionResult != nil && *out.ExecutionResult,
+		Hash:     strings.ToLower(*out.Hash),
+		From:     NormalizeAddress(out.From),
+		FromType: out.FromType,
+		Signers:  ProofSigners(out.FromType, proof),
+		To:       NormalizeAddress(out.To),
+		Value:    out.Value,
+		Data:     data,
+		Mined:    out.BlockNumber != nil,
+		Success:  out.ExecutionResult != nil && *out.ExecutionResult,
 	}, true, nil
+}
+
+func isTxNotFound(err error) bool {
+	var rpcErr *RPCError
+	if !errors.As(err, &rpcErr) {
+		return false
+	}
+	text := strings.ToLower(rpcErr.Message + " " + rpcErr.Data)
+	return strings.Contains(text, "transaction not found") || strings.Contains(text, "unknown transaction")
 }

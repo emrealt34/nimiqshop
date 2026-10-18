@@ -5,9 +5,15 @@ package handlers
 The buyer's own wallet signs and pays for every rating: 1 Luna plus the network
 fee, sent to the shop wallet with the memo "<stars>[ <comment>]". The shop never
 spends anything on a rating. The rating is saved only after the chain shows
-that exact transaction: sent by the buyer's address, paid to the shop, the
-right amount, the right memo, executed and included in a block. Each
-transaction proves one rating, once.
+that exact transaction: paid by the buyer, paid to the shop, the right amount,
+the right memo, executed and included in a block. Each transaction proves one
+rating, once.
+
+"Paid by the buyer" (ratings.PaidBy) means the transaction's sender is the
+buyer's signed-in address, or — for Nimiq Pay, which keeps the user's NIM in a
+per-user HTLC and pays from that contract — the buyer's key is one of the
+signatures in the transaction proof. The chain's `from` alone would reject
+every Nimiq Pay rating with "transaction does not match this rating".
 
 Flow:
   1. POST …/rating/intent  → memo, recipient, amount and fee to show the buyer
@@ -289,43 +295,52 @@ func (h *Handlers) submitRating(ctx *fasthttp.RequestCtx, kind string) {
 	})
 }
 
-// findRatingTx looks through the buyer's most recent transactions for the one
-// that pays the shop with this exact memo. Transactions already used for a
-// rating are skipped. The scan is bounded (100 history entries, 5 candidate
-// lookups per request) because every request costs RPC calls.
+// findRatingTx looks for the transaction that pays the shop with this exact
+// memo, first in the buyer's most recent transactions, then in the shop
+// wallet's. The second pass exists because a Nimiq Pay payment is sent from
+// the user's HTLC, so it is indexed under the contract's address and the
+// shop's, not under the buyer's own address. Transactions already used for a
+// rating are skipped. The scan is bounded (100 history entries per address, 5
+// candidate lookups per request) because every request costs RPC calls.
 func (h *Handlers) findRatingTx(ctx context.Context, buyer, memo string) (nimiq.TxDetail, bool, error) {
-	txs, err := h.RatingRPC.GetTransactionsByAddress(ctx, buyer, 100, "")
-	if err != nil {
-		return nimiq.TxDetail{}, false, err
-	}
 	shop := nimiq.NormalizeAddress(h.RatingRecipient)
 	expectedData := hex.EncodeToString([]byte(memo))
 	checked := 0
-	for _, t := range txs {
-		if nimiq.NormalizeAddress(t.To) != shop || t.Value != ratings.PriceLuna {
-			continue
-		}
-		// History includes memo bytes on current RPCs. Skip unrelated 1-Luna
-		// payments before spending the limited detail-lookup budget.
-		if t.RecipientData != nil && !strings.EqualFold(*t.RecipientData, expectedData) {
-			continue
-		}
-		if h.Store.RatingTxUsed(t.Hash) {
-			continue
-		}
-		if checked >= 5 {
-			break
-		}
-		checked++
-		det, found, err := h.RatingRPC.GetTransactionDetail(ctx, t.Hash)
+	seen := map[string]struct{}{}
+	for _, addr := range []string{buyer, h.RatingRecipient} {
+		txs, err := h.RatingRPC.GetTransactionsByAddress(ctx, addr, 100, "")
 		if err != nil {
 			return nimiq.TxDetail{}, false, err
 		}
-		if !found {
-			continue
-		}
-		if ratings.VerifyTx(det, buyer, h.RatingRecipient, memo) == nil {
-			return det, true, nil
+		for _, t := range txs {
+			if nimiq.NormalizeAddress(t.To) != shop || t.Value != ratings.PriceLuna {
+				continue
+			}
+			// History includes memo bytes on current RPCs. Skip unrelated 1-Luna
+			// payments before spending the limited detail-lookup budget.
+			if t.RecipientData != nil && !strings.EqualFold(*t.RecipientData, expectedData) {
+				continue
+			}
+			if _, dup := seen[strings.ToLower(t.Hash)]; dup || h.Store.RatingTxUsed(t.Hash) {
+				continue
+			}
+			seen[strings.ToLower(t.Hash)] = struct{}{}
+			if checked >= 5 {
+				return nimiq.TxDetail{}, false, nil
+			}
+			checked++
+			det, found, err := h.RatingRPC.GetTransactionDetail(ctx, t.Hash)
+			if err != nil {
+				return nimiq.TxDetail{}, false, err
+			}
+			if !found {
+				continue
+			}
+			// VerifyTx decides who paid (basic sender or the HTLC's signing
+			// buyer); history metadata never establishes a rating by itself.
+			if ratings.VerifyTx(det, buyer, h.RatingRecipient, memo) == nil {
+				return det, true, nil
+			}
 		}
 	}
 	return nimiq.TxDetail{}, false, nil

@@ -75,17 +75,37 @@ type rpcRequest struct {
 type rpcResponse struct {
 	Result json.RawMessage `json:"result"`
 	Error  *struct {
-		Code    int    `json:"code"`
-		Message string `json:"message"`
+		Code    int             `json:"code"`
+		Message string          `json:"message"`
+		Data    json.RawMessage `json:"data"` // Albatross puts the detail here, e.g. "Transaction not found: <hash>"
 	} `json:"error"`
 }
 
 type RPCError struct {
 	Code    int
 	Message string
+	Data    string // the error's "data" member as text, "" when absent
 }
 
-func (e *RPCError) Error() string { return fmt.Sprintf("nimiq rpc error %d: %s", e.Code, e.Message) }
+func (e *RPCError) Error() string {
+	if e.Data != "" {
+		return fmt.Sprintf("nimiq rpc error %d: %s (%s)", e.Code, e.Message, e.Data)
+	}
+	return fmt.Sprintf("nimiq rpc error %d: %s", e.Code, e.Message)
+}
+
+// rpcErrorData renders an error's optional "data" member as plain text: a
+// JSON string is unquoted, anything else is kept as compact JSON.
+func rpcErrorData(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var s string
+	if json.Unmarshal(raw, &s) == nil {
+		return s
+	}
+	return string(raw)
+}
 
 // callURL posts one JSON-RPC request. NimiqWatch-style endpoints (rpc.nimiqwatch.com,
 // rpc.testnet.nimiqwatch.com) wrap every result as {"data": <payload>,
@@ -120,7 +140,7 @@ func (c *Client) callURL(ctx context.Context, baseURL, method string, params []i
 		return fmt.Errorf("decode rpc response from %s: %w", baseURL, err)
 	}
 	if rr.Error != nil {
-		return &RPCError{Code: rr.Error.Code, Message: rr.Error.Message}
+		return &RPCError{Code: rr.Error.Code, Message: rr.Error.Message, Data: rpcErrorData(rr.Error.Data)}
 	}
 	if out != nil {
 		if len(rr.Result) == 0 {

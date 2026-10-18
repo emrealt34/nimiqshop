@@ -1528,6 +1528,7 @@ const pt = {
     updateNimiqPay: 'Atualize o Nimiq Pay para avaliar com pagamento pela carteira.',
     failed: 'Não foi possível guardar a avaliação. Tente novamente.',
     notSignedIn: 'Inicie sessão com a sua carteira para avaliar esta compra.',
+    wrongWallet: 'Pague com a carteira com que iniciou sessão. Nada foi cobrado.',
     unavailable: 'As avaliações por estrelas não estão disponíveis neste momento.',
     recentTitle: 'Comentários recentes de compradores',
     adminTitle: 'Avaliações e comentários',

@@ -1528,6 +1528,7 @@ const es = {
     updateNimiqPay: 'Actualiza Nimiq Pay para valorar con un pago desde la billetera.',
     failed: 'No se pudo guardar la valoración. Inténtalo de nuevo.',
     notSignedIn: 'Inicia sesión con tu billetera para valorar esta compra.',
+    wrongWallet: 'Paga con la billetera con la que iniciaste sesión. No se ha cobrado nada.',
     unavailable: 'Las valoraciones con estrellas no están disponibles ahora.',
     recentTitle: 'Comentarios recientes de compradores',
     adminTitle: 'Valoraciones y comentarios',

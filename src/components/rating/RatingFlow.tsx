@@ -162,8 +162,9 @@ export function RatingFlow({
       setPhase('saved');
       onSaved?.(res);
     } catch (err) {
-      if (err instanceof RatingError && err.code === 'cancelled') {
-        // Only an explicit wallet refusal releases the durable reservation.
+      if (err instanceof RatingError && (err.code === 'cancelled' || err.code === 'wrongWallet')) {
+        // Only an explicit wallet refusal (or Hub refusing to pay from the
+        // signed-in address) releases the durable reservation: nothing was sent.
         await cancelRatingIntent(kind, id, { stars, comment: c }).catch(() => undefined);
       }
       if (err instanceof RatingError && err.code === 'pending') {
@@ -259,6 +260,7 @@ function messageFor(err: unknown, t: Translator): string {
     if (err.code === 'cancelled') return t('rating.cancelled');
     if (err.code === 'pending') return t('rating.pendingTimeout');
     if (err.code === 'unavailable') return t('rating.updateNimiqPay');
+    if (err.code === 'wrongWallet') return t('rating.wrongWallet');
     return t('rating.failed');
   }
   if (err instanceof ApiError) {

@@ -305,3 +305,44 @@ func TestBackgroundRunRecordsReviewWithNoHTTPRequest(t *testing.T) {
 	}
 	t.Fatal("background monitor did not record payment without a client")
 }
+
+// Nimiq Pay pays from the user's HTLC: the history and proof report the
+// contract as `from`, the buyer is one of the proof's signers. The watcher
+// must still settle the buyer's reservation (it used to file these as
+// "unmatched", since no user owns the contract address).
+func TestWalletMonitorSettlesANimiqPayPaymentSentFromTheBuyersHTLC(t *testing.T) {
+	const htlc = "NQ23E6AHUL22YN31RNTVGS97JJA4TKT78YSK"
+	const cosigner = "NQ14LU5RUH5492SHGEN4U63CSV4V7N49YYU4"
+	s := openStore(t, t.TempDir())
+	defer func() { _ = s.Close() }()
+	prepare(t, s, "o1", "5 kinda cool")
+	tx := history(1, "5 kinda cool")
+	tx.From = htlc
+	p := proof(tx, "5 kinda cool")
+	p.From = htlc
+	p.FromType = nimiq.AccountTypeHTLC
+	p.Signers = []string{cosigner, buyer}
+	rpc := &fakeRPC{history: []nimiq.Transaction{tx}, proofs: map[string]nimiq.TxDetail{tx.Hash: p}}
+	w := Worker{Store: s, RPC: rpc, Recipient: shop}
+	if _, err := w.Tick(context.Background(), now); err != nil {
+		t.Fatal(err)
+	}
+	assertSaved(t, s, "o1", tx.Hash)
+
+	// A contract payment signed by nobody the shop knows stays unmatched.
+	prepare(t, s, "o2", "4 fine")
+	other := history(2, "4 fine")
+	other.From = htlc
+	op := proof(other, "4 fine")
+	op.From = htlc
+	op.FromType = nimiq.AccountTypeHTLC
+	op.Signers = []string{cosigner, "NQ99000000000000000000000000000000000000"}
+	rpc.history = []nimiq.Transaction{other, tx}
+	rpc.proofs[other.Hash] = op
+	if _, err := w.Tick(context.Background(), now); err != nil {
+		t.Fatal(err)
+	}
+	if st, _ := s.GetRatingState("order", "o2", "buyer"); st.Rated {
+		t.Fatal("a stranger's contract payment settled the buyer's reservation")
+	}
+}

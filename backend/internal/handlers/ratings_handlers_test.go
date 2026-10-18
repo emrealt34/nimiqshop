@@ -31,11 +31,12 @@ const (
 // fakeChain is a JSON-RPC stand-in for the Nimiq node. It answers the two
 // methods the rating verifier uses, in the wrapped shape the live RPC returns.
 type fakeChain struct {
-	mu           sync.Mutex
-	txs          map[string]map[string]interface{} // hash -> getTransactionByHash payload
-	history      []map[string]interface{}          // getTransactionsByAddress payload
-	detailCalls  int
-	historyLimit int
+	mu              sync.Mutex
+	txs             map[string]map[string]interface{} // hash -> getTransactionByHash payload
+	history         []map[string]interface{}          // getTransactionsByAddress payload
+	detailCalls     int
+	historyLimit    int
+	notFoundAsError bool // answer unknown hashes the way Albatross does: with an RPC error
 }
 
 func (f *fakeChain) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -52,6 +53,13 @@ func (f *fakeChain) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		f.detailCalls++
 		if d, ok := f.txs[req.Params[0].(string)]; ok {
 			data = d
+		} else if f.notFoundAsError {
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"jsonrpc": "2.0",
+				"error":   map[string]interface{}{"code": -32603, "message": "Internal error", "data": "Transaction not found: " + req.Params[0].(string)},
+				"id":      1,
+			})
+			return
 		}
 	case "getTransactionsByAddress":
 		f.historyLimit = int(req.Params[1].(float64))
@@ -422,5 +430,117 @@ func TestRatingIntentPersistsAssociationBeforeWalletPayment(t *testing.T) {
 	}
 	if _, err := e.store.GetRatingIntent(key); !errors.Is(err, db.ErrNotFound) {
 		t.Fatal("explicitly declined wallet intent remains active")
+	}
+}
+
+/* ---------------- Nimiq Pay: paid from the user's HTLC ---------------- */
+
+// Mainnet transaction 86cf31881e4e1e0901aeeec54d400dae78b3392501a5d3a1613259d9a28dba06,
+// a "5 kinda cool" rating paid through Nimiq Pay. The debited account is the
+// user's HTLC (fromType 2); the EarlyResolve proof is signed by the Nimiq Pay
+// co-signer and by the user, whose address is the one they sign in with.
+const (
+	nimiqPayHTLC   = "NQ23 E6AH UL22 YN31 RNTV GS97 JJA4 TKT7 8YSK"
+	nimiqPayBuyer  = "NQ73 SE1X YRRF Q8NC DQCP HLJM NR85 8P7V 2HPD"
+	nimiqPayShop   = "NQ12 CPDG 4KKU 70UB NC7U 0Q82 T8U7 US17 PYHU"
+	nimiqPayHash   = "86cf31881e4e1e0901aeeec54d400dae78b3392501a5d3a1613259d9a28dba06"
+	nimiqPayProof  = "010091b21f4b100273bd7034f6369c29d1f7ba72dba7de6720ad3cd8b8191621891300866a4c60f1be3f88fc1bc67b70b46ae36ca42c03606ca75e313bc07292ff344571f7dcb5acc89e23b1e7ebcf3bda3baf87c08a914cf6c149f0d14851c77c6c0900ad4272a1f4302adc01af44cd4b97d75df19717239af2886dcbe7a1cc7182f629009159304b51e62dc4f5207fbda47c6e0069f9e7dcfe5ac557c249891edb60c1b27b2da5789bcef743546bd59f3f0799341337059386d81dc6dab75c8ff4c86006"
+	nimiqPayMemo   = "5 kinda cool"
+	nimiqPayStars  = 5
+	nimiqPayReview = "kinda cool"
+)
+
+func nimiqPayTx() map[string]interface{} {
+	d := tx(nimiqPayHash, nimiqPayHTLC, nimiqPayShop, 1, nimiqPayMemo, true)
+	d["fromType"] = 2
+	d["toType"] = 0
+	d["proof"] = nimiqPayProof
+	d["relatedAddresses"] = []string{nimiqPayShop, nimiqPayHTLC, "NQ14 LU5R UH54 92SH GEN4 U63C SV4V 7N49 YYU4", nimiqPayBuyer}
+	return d
+}
+
+func newNimiqPayEnv(t *testing.T) *ratingEnv {
+	t.Helper()
+	e := newRatingEnv(t)
+	e.h.RatingRecipient = nimiqPayShop
+	if _, err := e.store.GetOrCreateUserByID("payuser", nimiqPayBuyer); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.store.CreateOrder(db.Order{ID: "p1", UserID: "payuser", Status: "delivered"}); err != nil {
+		t.Fatal(err)
+	}
+	return e
+}
+
+// The bug: "transaction does not match this rating" for every Nimiq Pay buyer,
+// because the chain's `from` is the HTLC, never the signed-in address.
+func TestNimiqPayRatingPaidFromTheUsersHTLCIsAccepted(t *testing.T) {
+	e := newNimiqPayEnv(t)
+	e.chain.txs[nimiqPayHash] = nimiqPayTx()
+	status, out := call(t, e.h.RateOrder, "payuser", "p1", map[string]interface{}{
+		"stars": nimiqPayStars, "comment": nimiqPayReview, "tx_hash": nimiqPayHash,
+	})
+	if status != 200 {
+		t.Fatalf("Nimiq Pay rating: %d %v", status, out)
+	}
+	if out["rating_tx"] != nimiqPayHash || out["rating"] != float64(5) || out["comment"] != nimiqPayReview {
+		t.Fatalf("response = %v", out)
+	}
+	st, _ := e.store.GetRatingState(db.RatingKindOrder, "p1", "payuser")
+	if !st.Rated || st.Stars != 5 || st.RatingTx != nimiqPayHash {
+		t.Fatalf("stored state = %+v", st)
+	}
+}
+
+// Nobody else can claim that payment: a different signed-in buyer is neither
+// the debited account nor among the proof's signers.
+func TestNimiqPayPaymentStillBelongsOnlyToItsSigner(t *testing.T) {
+	e := newNimiqPayEnv(t)
+	e.chain.txs[nimiqPayHash] = nimiqPayTx()
+	status, out := call(t, e.h.RateOrder, "buyer", "o1", map[string]interface{}{
+		"stars": nimiqPayStars, "comment": nimiqPayReview, "tx_hash": nimiqPayHash,
+	})
+	if status != 400 || out["error"] != ratings.ErrNotThisRating.Error() {
+		t.Fatalf("stranger claiming an HTLC payment: %d %v", status, out)
+	}
+	// A contract payment whose proof does not carry the buyer's key is not
+	// theirs either, even with the right memo and amount.
+	d := nimiqPayTx()
+	d["proof"] = "00" // not a parsable HTLC proof
+	e.chain.txs[nimiqPayHash] = d
+	status, _ = call(t, e.h.RateOrder, "payuser", "p1", map[string]interface{}{
+		"stars": nimiqPayStars, "comment": nimiqPayReview, "tx_hash": nimiqPayHash,
+	})
+	if status != 400 {
+		t.Fatalf("unsigned contract payment accepted: %d", status)
+	}
+}
+
+// Without a hash (Nimiq Pay returns a serialized transaction, not a hash, and
+// a redirect can lose it) the payment is not in the buyer's own history — it
+// is indexed under the HTLC and the shop. The shop wallet's history finds it.
+func TestWithoutHashANimiqPayRatingIsFoundInTheShopWalletHistory(t *testing.T) {
+	e := newNimiqPayEnv(t)
+	e.chain.txs[nimiqPayHash] = nimiqPayTx()
+	e.chain.history = []map[string]interface{}{nimiqPayTx()} // served for both address lookups
+	status, out := call(t, e.h.RateOrder, "payuser", "p1", map[string]interface{}{
+		"stars": nimiqPayStars, "comment": nimiqPayReview,
+	})
+	if status != 200 || out["rating_tx"] != nimiqPayHash {
+		t.Fatalf("Nimiq Pay discovery: %d %v", status, out)
+	}
+	if e.chain.detailCalls != 1 {
+		t.Fatalf("the same hash was looked up %d times across the two history scans", e.chain.detailCalls)
+	}
+}
+
+// Albatross nodes answer an unknown hash with an RPC error, not a null result.
+// That is "not on chain yet", which the buyer's client polls, not an outage.
+func TestUnknownHashReportedAsRPCErrorIsPendingNotAnOutage(t *testing.T) {
+	e := newRatingEnv(t)
+	e.chain.notFoundAsError = true
+	const hash = "cc33dd44ee55ff66aa11bb22cc33dd44ee55ff66aa11bb22cc33dd44ee55ff66"
+	if status, out := call(t, e.h.RateOrder, "buyer", "o1", map[string]interface{}{"stars": 3, "tx_hash": hash}); status != 202 {
+		t.Fatalf("unknown tx: %d %v, want 202", status, out)
 	}
 }

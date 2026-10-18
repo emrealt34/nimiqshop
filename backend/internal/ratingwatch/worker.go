@@ -162,12 +162,20 @@ func (w *Worker) reconcile(ctx context.Context, entry db.RatingChainInbox, now t
 			entry.Status = "ignored"
 			return w.Store.SaveRatingChainInbox(entry)
 		}
+		// Who paid: the debited account for a basic wallet; for a Nimiq Pay
+		// payment the debited account is the user's HTLC and the user is one
+		// of the proof's signers. The buyer is whichever candidate reserved
+		// this memo (or, for pre-intent releases, is a known user).
+		buyer, err := w.resolveBuyer(proof)
+		if err != nil {
+			return err
+		}
 		entry.Verified = true
-		entry.Buyer = proof.From
+		entry.Buyer = buyer
 		entry.Recipient = proof.To
 		entry.Stars = stars
 		entry.Comment = comment
-		entry.Fingerprint = db.RatingIntentKey(proof.From, proof.To, string(proof.Data))
+		entry.Fingerprint = db.RatingIntentKey(buyer, proof.To, string(proof.Data))
 	}
 	intent, err := w.Store.GetRatingIntent(entry.Fingerprint)
 	if errors.Is(err, db.ErrNotFound) {
@@ -212,6 +220,39 @@ func (w *Worker) reconcile(ctx context.Context, entry db.RatingChainInbox, now t
 		log.Printf("ratings watcher: verified chain review recorded (kind=%s)", intent.Kind)
 	}
 	return w.Store.SaveRatingChainInbox(entry)
+}
+
+// resolveBuyer picks the buyer address a verified payment belongs to. The
+// candidates are the debited account and, for contract senders, the keys that
+// signed the proof (ratings.PayerCandidates). The first candidate with a
+// pending reservation for this exact memo wins; without any reservation the
+// first candidate that is a registered user does, so legacyIntent can still
+// match a pre-intent payment; otherwise the debited account is kept.
+func (w *Worker) resolveBuyer(proof nimiq.TxDetail) (string, error) {
+	candidates := ratings.PayerCandidates(proof)
+	if len(candidates) == 0 {
+		return proof.From, nil
+	}
+	memo := string(proof.Data)
+	for _, c := range candidates {
+		_, err := w.Store.GetRatingIntent(db.RatingIntentKey(c, proof.To, memo))
+		if err == nil {
+			return c, nil
+		}
+		if !errors.Is(err, db.ErrNotFound) {
+			return "", err
+		}
+	}
+	for _, c := range candidates {
+		_, err := w.Store.GetUserByAddress(c)
+		if err == nil {
+			return c, nil
+		}
+		if !errors.Is(err, db.ErrNotFound) {
+			return "", err
+		}
+	}
+	return candidates[0], nil
 }
 
 // Older releases did not persist intents. Recover only when the chain sender

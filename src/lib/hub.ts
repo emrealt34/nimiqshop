@@ -179,12 +179,20 @@ export function loginWithHub(_onProgress?: (step: 'challenge' | 'sign') => void)
  *  Desktop opens Hub in a popup and resolves with the transaction hash. On a
  *  phone Hub's redirect behaviour is used: the page reloads when Hub returns,
  *  and the rating flow resumes from its saved pending entry (no hash needed,
- *  the shop finds the transaction on chain). */
+ *  the shop finds the transaction on chain).
+ *
+ *  `sender` is the address the buyer signed in with. The shop only accepts a
+ *  rating paid by that address, and a Hub holding several addresses would
+ *  otherwise let the buyer pay from any of them and only learn afterwards that
+ *  the transaction "does not match this rating". With `sender` Hub skips the
+ *  address choice; with `forceSender` it refuses instead of silently falling
+ *  back to another address when that one is not in this Hub. */
 export async function sendRatingWithHub(req: {
   recipient: string;
   value: number;
   fee: number;
   extraData: string;
+  sender?: string;
 }): Promise<{ hash?: string }> {
   await loadHubApi();
   const h = getHub();
@@ -193,12 +201,14 @@ export async function sendRatingWithHub(req: {
   const behavior = mobile && HubApi && HubApi.RedirectRequestBehavior
     ? new HubApi.RedirectRequestBehavior()
     : undefined;
+  const sender = String(req.sender || '').trim();
   const signed = await h.checkout({
     appName: hubAppName(),
     recipient: req.recipient,
     value: req.value,
     fee: req.fee,
     extraData: req.extraData,
+    ...(sender ? { sender, forceSender: true } : {}),
   }, behavior);
   return { hash: signed && typeof signed.hash === 'string' ? signed.hash : undefined };
 }

@@ -1529,6 +1529,7 @@ const tr = {
     updateNimiqPay: 'Cüzdan ödemesiyle puanlamak için Nimiq Pay\'i güncelleyin.',
     failed: 'Puan kaydedilemedi. Lütfen tekrar deneyin.',
     notSignedIn: 'Bu siparişi puanlamak için cüzdanınızla giriş yapın.',
+    wrongWallet: 'Giriş yaptığınız cüzdanla ödeyin. Hiçbir ücret alınmadı.',
     unavailable: 'Yıldız puanlama şu an kullanılamıyor.',
     recentTitle: 'Son alıcı yorumları',
     adminTitle: 'Puanlar ve yorumlar',

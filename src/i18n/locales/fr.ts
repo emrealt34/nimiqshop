@@ -1528,6 +1528,7 @@ const fr = {
     updateNimiqPay: 'Mettez à jour Nimiq Pay pour noter avec un paiement par portefeuille.',
     failed: 'La note n\'a pas pu être enregistrée. Réessayez.',
     notSignedIn: 'Connectez-vous avec votre portefeuille pour noter cet achat.',
+    wrongWallet: 'Payez avec le portefeuille utilisé pour vous connecter. Rien n’a été débité.',
     unavailable: 'Les notes en étoiles ne sont pas disponibles pour le moment.',
     recentTitle: 'Derniers commentaires d\'acheteurs',
     adminTitle: 'Notes et commentaires',

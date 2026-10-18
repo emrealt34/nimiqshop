@@ -1528,6 +1528,7 @@ const de = {
     updateNimiqPay: 'Aktualisiere Nimiq Pay, um mit einer Wallet-Zahlung zu bewerten.',
     failed: 'Die Bewertung konnte nicht gespeichert werden. Bitte versuche es erneut.',
     notSignedIn: 'Melde dich mit deiner Wallet an, um diese Bestellung zu bewerten.',
+    wrongWallet: 'Zahle mit der Wallet, mit der du angemeldet bist. Es wurde nichts abgebucht.',
     unavailable: 'Sternebewertungen sind gerade nicht verfügbar.',
     recentTitle: 'Neueste Käuferkommentare',
     adminTitle: 'Bewertungen & Kommentare',

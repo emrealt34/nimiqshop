@@ -1537,6 +1537,7 @@ const en = {
     updateNimiqPay: 'Update Nimiq Pay to rate with a wallet payment.',
     failed: 'The rating could not be saved. Please try again.',
     notSignedIn: 'Sign in with your wallet to rate this purchase.',
+    wrongWallet: 'Pay from the wallet you signed in with. Nothing was charged.',
     unavailable: 'Star ratings are not available right now.',
     recentTitle: 'Recent buyer comments',
     adminTitle: 'Ratings & comments',

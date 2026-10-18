@@ -11,12 +11,12 @@ import { ApiError, submitRating, type RatingBody, type RatingKind } from './api'
 import { inNimiqPay, initNimiqMiniApp } from './miniapp';
 import { sendRatingWithHub } from './hub';
 import { classifyWalletError } from './walletErrors';
-import { getUid } from './session';
+import { getAddress, getUid } from './session';
 import { cleanComment } from './ratingComment';
 import { ratingStars } from './ratingStars';
 
 export class RatingError extends Error {
-  /** 'cancelled' | 'unavailable' | 'failed' | 'pending' | 'refused' */
+  /** 'cancelled' | 'unavailable' | 'failed' | 'pending' | 'refused' | 'wrongWallet' */
   code: string;
   hash?: string;
   constructor(code: string, message: string, hash?: string) {
@@ -124,6 +124,8 @@ export async function payRatingIntent(intent: RatingIntent): Promise<{ hash?: st
       value: intent.value_luna,
       fee: intent.fee_luna,
       extraData: intent.memo,
+      // The shop verifies the payer against the signed-in address; pin Hub to it.
+      sender: getAddress(),
     });
   } catch (err) {
     if (err instanceof RatingError) throw err;
@@ -132,6 +134,11 @@ export async function payRatingIntent(intent: RatingIntent): Promise<{ hash?: st
       const hash = outcome.data?.hash;
       throw new RatingError('pending', 'uncertain-wallet-submission',
         typeof hash === 'string' && /^[0-9a-f]{64}$/i.test(hash) ? hash.toLowerCase() : undefined);
+    }
+    // Hub's answer to forceSender when the signed-in address is not in this
+    // Hub. Nothing was charged; the buyer must use the wallet they signed in with.
+    if (/address not found/i.test(String((err as Error)?.message || ''))) {
+      throw new RatingError('wrongWallet', 'wrong-wallet');
     }
     const cls = classifyWalletError(err);
     if (cls === 'denied') throw new RatingError('cancelled', 'cancelled');
