@@ -4105,10 +4105,12 @@ body { padding-bottom: 0; }
 .cb-payouts-head > span:first-child { flex: 1 1 160px; min-width: 0; }
 .cb-payouts-head .cb-ledger-refresh { flex: 0 0 auto; margin-left: auto; letter-spacing: normal; text-transform: none; }
 
-/* Primary headings share an alignment; home keeps its own editorial layout. */
-#page-content[data-page]:not([data-page="/"]) h1 { text-align: center; justify-content: center; text-wrap: balance; letter-spacing: -.025em; font-size: clamp(1.65rem, 3vw, 2.3rem); line-height: 1.25; }
-#page-content[data-page]:not([data-page="/"]) h1 + :is(.lede,.muted),
-#page-content[data-page]:not([data-page="/"]) .container > .lede { text-align: center; max-width: 65ch; margin-inline: auto; line-height: 1.6; }
+/* Primary headings share an alignment; home keeps its own editorial layout,
+   and so does the product page: its title sits beside the artwork, above a
+   left-aligned chip row, so it stays left like the rest of that hero. */
+#page-content[data-page]:not([data-page="/"]):not([data-page="/product"]) h1 { text-align: center; justify-content: center; text-wrap: balance; letter-spacing: -.025em; font-size: clamp(1.65rem, 3vw, 2.3rem); line-height: 1.25; }
+#page-content[data-page]:not([data-page="/"]):not([data-page="/product"]) h1 + :is(.lede,.muted),
+#page-content[data-page]:not([data-page="/"]):not([data-page="/product"]) .container > .lede { text-align: center; max-width: 65ch; margin-inline: auto; line-height: 1.6; }
 #page-content .quiz-heading { flex-direction: column; align-items: center; gap: 10px; text-align: center; margin-block: 18px 28px; }
 #page-content .quiz-heading p { max-width: 60ch; margin-inline: auto; line-height: 1.6; }
 .activity-page .act-hero { display: block; position: relative; text-align: center; padding-inline: 100px; margin-block: 20px 24px; }

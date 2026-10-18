@@ -3,7 +3,7 @@ import {path} from './support/data';
 
 for(const width of [320,1280])for(const lang of ['tr','de'] as const)test.describe(`page headings ${width}px ${lang}`,()=>{
  test.use({viewport:{width,height:900},lang});
- test('secondary page titles are centered and controls fit the viewport',async({page},testInfo)=>{
+ test('secondary page titles are centered (product hero stays left) and controls fit the viewport',async({page},testInfo)=>{
   await page.route('**/api/catalog/products/**',r=>r.fulfill({json:[{family:'p1',kind:'giftcard',country_code:'TR',products:[{product_id:'heading-sku',denomination:'10 USD',coin:'BTC',coin_amount:'0.0001',delivery_type:'by_email',face_value:{currency_code:'USD',amount:{type:'fixed',price:'10'}}}]}]}));
   await page.route('**/api/catalog/unavailable**',r=>r.fulfill({json:{country:'TR',families:[]}}));
   await page.route('**/api/catalog/price**',r=>r.fulfill({json:{coin:'BTC',coin_amount:'0.0001',price_expires_at:new Date(Date.now()+60000).toISOString()}}));
@@ -11,7 +11,8 @@ for(const width of [320,1280])for(const lang of ['tr','de'] as const)test.descri
    await open(page,path(route));
    const heading=page.locator('#page-content h1, .orders-page .section-head h2, .order-summary-heading h2').first();
    await expect(heading,route).toBeVisible();
-   expect(await heading.evaluate(el=>getComputedStyle(el).textAlign),route).toBe('center');
+   // The product hero keeps its title on the left, beside the artwork and above the chip row.
+   expect(await heading.evaluate(el=>getComputedStyle(el).textAlign),route).toBe(route.startsWith('/product')?'start':'center');
    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),route).toBe(true);
    if(route==='/cashback'){
     const refresh=page.locator('.cb-recent-card .cb-ledger-refresh');await expect(refresh).toBeVisible();
