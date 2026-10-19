@@ -4176,3 +4176,6 @@ body { padding-bottom: 0; }
 /* The comments block is a full-width row UNDER the summary grid, never a
    third cell of it (see RatingFlow / ActivityPage). */
 .rating-summary .rs-comments { width: 100%; }
+.rating-comments > li { min-width: 0; }
+/* The same card inside another card (the track page) drops its own frame. */
+.rating-comment-plain { border: 0; background: none; padding: 0; }

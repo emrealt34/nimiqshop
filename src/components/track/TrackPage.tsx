@@ -23,6 +23,7 @@ import { useT } from '../../i18n';
 import { pagePath } from '../../lib/asset';
 import { LightningReceipt } from '../order/LightningReceipt';
 import { lightningReceiptOf } from '../../lib/lightningReceipt';
+import { RatingCommentCard } from '../rating/RatingFlow';
 
 type TrackData = any;
 
@@ -209,6 +210,29 @@ export function TrackView() {
     </div>
   ) : null;
 
+  // The rating the buyer left for THIS purchase. Both halves are already
+  // public — the stars ride the feed, the words ride the comment list — so
+  // the track page can put them side by side. What is not public stays out:
+  // a comment an admin hid never arrives here, and this page has never
+  // named the buyer, so there is no face to show.
+  const trkRating = trk.rating && typeof trk.rating === 'object' ? trk.rating : null;
+  const ratingCard = trkRating && (Number(trkRating.stars) > 0 || String(trkRating.comment || '').trim()) ? (
+    <div className="card mt-2">
+      <div className="card-title">{t('trackPage.ratingTitle')}</div>
+      <RatingCommentCard
+        plain
+        showProduct={false}
+        c={{
+          stars: Number(trkRating.stars) || 0,
+          comment: String(trkRating.comment || ''),
+          at: trkRating.at,
+          tx: trkRating.tx,
+          test_mode: !!trkRating.test_mode,
+        }}
+      />
+    </div>
+  ) : null;
+
   const ownerBar = authed === null ? null : authed ? (
     <a className="btn btn-gold btn-block" href={pagePath(quoteTracking ? `/order?type=quote&id=${encodeURIComponent(trk.id)}` : `/order?id=${encodeURIComponent(trk.id)}`)}>
       <Icon name="eye" size={18} />
@@ -240,6 +264,7 @@ export function TrackView() {
           </div>
           <div className="col">
             <KvCard title={t('trackPage.summaryTitle')} rows={rows} />
+            {ratingCard}
             <PublicItemsCard lines={Array.isArray(trk.lines) ? trk.lines : []} />
             {txCard}
             <div className="mt-2">{ownerBar}</div>

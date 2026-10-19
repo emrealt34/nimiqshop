@@ -13,12 +13,12 @@ import (
  * The public comment list carries no purchase id (ListRatingComments blanks
  * kind and id for public callers), so nothing about the buyer can be
  * resolved when the list is READ. The identity is therefore captured when
- * the rating is WRITTEN — and the one rule that matters is that an
- * anonymous buyer's wallet is never copied anywhere, because the feed does
- * not publish that buyer's wallet beside their purchase either.
+ * the rating is WRITTEN — and the one rule that matters is the feed's own:
+ * a comment never says more about the buyer than the feed does, so a
+ * purchase the feed publishes without a buyer gets no wallet here either.
  */
 
-func TestACommentRemembersWhoLeftItUnlessTheBuyerWasPrivate(t *testing.T) {
+func TestACommentNeverSaysMoreThanTheFeedDoes(t *testing.T) {
 	store, err := New(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -88,16 +88,17 @@ func TestACommentRemembersWhoLeftItUnlessTheBuyerWasPrivate(t *testing.T) {
 	if open.Product != "amazon" {
 		t.Fatalf("product = %q, want amazon", open.Product)
 	}
-	// A private purchase keeps its secret: the wallet is not even copied.
+	// A purchase the feed publishes without a buyer stays that way: the
+	// wallet is not even copied onto the comment.
 	hidden := byID(list, hiddenQuote.ID)
 	if hidden.Address != "" {
-		t.Fatalf("an anonymous buyer's wallet must never be stored on the comment, got %q", hidden.Address)
+		t.Fatalf("a purchase the feed leaves unnamed must get no wallet on its comment, got %q", hidden.Address)
 	}
 	if !hidden.Anonymous {
-		t.Fatal("an anonymous purchase must be recorded as anonymous, not merely as addressless")
+		t.Fatal("an unnamed purchase must be recorded as unnamed, not merely as addressless")
 	}
 	if hidden.Product != "amazon" {
-		t.Fatalf("product = %q, the product of a private purchase is still its own", hidden.Product)
+		t.Fatalf("product = %q, the product of an unnamed purchase is still its own", hidden.Product)
 	}
 	// And the public list never carries the purchase id to begin with.
 	publicList, err := store.ListRatingComments(50, false)

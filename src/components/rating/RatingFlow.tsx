@@ -20,24 +20,25 @@ import {
   type RatingIntent,
 } from '../../lib/ratingPay';
 import { cleanComment, commentProblem, MAX_COMMENT, memoPreview } from '../../lib/ratingComment';
-import { ClockTime, StarPicker, StarsDisplay } from '../ui/uiKit';
+import { ClockTime, OnChainRating, StarPicker, StarsDisplay } from '../ui/uiKit';
 import { Identicon } from '../ui/Identicon';
-import { Icon } from '../ui/Icon';
 import { shortAddr } from '../../lib/format';
 
-/** One public buyer comment, as /api/ratings/comments returns it. */
-interface RatingCommentItem {
+/** One buyer rating, as the public comment list and the track page return
+ *  it. Every field but the stars is optional: a rating is just stars, and a
+ *  comment the shop cannot match to a buyer has no face. */
+export interface RatingCommentItem {
   stars: number;
-  comment: string;
-  at: string;
-  /** The buyer's wallet — present only when the purchase was not anonymous. */
+  comment?: string;
+  at?: string;
+  /** The buyer's wallet. Absent whenever the shop cannot match the purchase. */
   address?: string;
-  /** The purchase hid the buyer's identity: no wallet is ever shown. */
-  anonymous?: boolean;
-  /** Public product label of the purchase the comment belongs to. */
+  /** Public product label of the purchase the rating belongs to. */
   product?: string;
   /** An admin test-center purchase, visible only while test orders are shown. */
   test_mode?: boolean;
+  /** The rating's own on-chain transaction, when the anchor landed. */
+  tx?: string;
 }
 import { ratingStars } from '../../lib/ratingStars';
 
@@ -307,6 +308,36 @@ function messageFor(err: unknown, t: Translator): string {
  *
  * Renders nothing when there are no comments.
  */
+/**
+ * One buyer rating: the buyer's face, the stars, when it was written, the
+ * words and the on-chain rating itself. Shared by the Activity comment list
+ * and the track page, so the same rating looks the same in both places.
+ */
+export function RatingCommentCard({ c, plain = false, showProduct = true }: { c: RatingCommentItem; plain?: boolean; showProduct?: boolean }) {
+  const words = String(c.comment || '').trim();
+  return (
+    <div className={plain ? 'rating-comment rating-comment-plain' : 'rating-comment'}>
+      <div className="rating-comment-head">
+        {/* Not a copy button and not a tooltip carrying the whole wallet:
+            the feed row beside the purchase is where an address is meant
+            to be read and copied. */}
+        {c.address ? (
+          <span className="feed-wallet chip">
+            <Identicon address={c.address} className="feed-id" size={22} />
+            <span className="mono">{shortAddr(c.address)}</span>
+          </span>
+        ) : null}
+        <StarsDisplay rating={c.stars} size={13} />
+        <ClockTime ts={c.at} className="xs faint" />
+        {c.test_mode ? <span className="chip xs">TEST</span> : null}
+        <OnChainRating tx={c.tx} />
+      </div>
+      {words ? <p className="rating-comment-body">{words}</p> : null}
+      {showProduct && c.product ? <div className="xs faint">{c.product}</div> : null}
+    </div>
+  );
+}
+
 export function RecentRatingComments({ seed }: { seed?: RatingCommentItem[] } = {}) {
   const { t } = useT();
   // `seed` is the seam for the preview and the tests: the page itself always
@@ -331,28 +362,8 @@ export function RecentRatingComments({ seed }: { seed?: RatingCommentItem[] } = 
       <div className="small strong mb-1">{t('rating.recentTitle')}</div>
       <ul className="rating-comments">
         {items.slice(0, 8).map((c, i) => (
-          <li className="rating-comment" key={`${c.at}-${i}`}>
-            <div className="rating-comment-head">
-              {/* Not a copy button and not a tooltip carrying the whole
-                  wallet: the feed row beside the purchase is where an
-                  address is meant to be read and copied. */}
-              {c.address ? (
-                <span className="feed-wallet chip">
-                  <Identicon address={c.address} className="feed-id" size={22} />
-                  <span className="mono">{shortAddr(c.address)}</span>
-                </span>
-              ) : c.anonymous ? (
-                <span className="feed-wallet chip feed-wallet-private" title={t('activityPage.privateBuyerTitle')}>
-                  <Icon name="eye-off" size={14} />
-                  <span>{t('activityPage.privateBuyer')}</span>
-                </span>
-              ) : null}
-              <StarsDisplay rating={c.stars} size={13} />
-              <ClockTime ts={c.at} className="xs faint" />
-              {c.test_mode ? <span className="chip xs">TEST</span> : null}
-            </div>
-            <p className="rating-comment-body">{c.comment}</p>
-            {c.product ? <div className="xs faint">{c.product}</div> : null}
+          <li key={`${c.at}-${i}`}>
+            <RatingCommentCard c={c} />
           </li>
         ))}
       </ul>

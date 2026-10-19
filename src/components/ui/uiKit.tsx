@@ -604,12 +604,13 @@ export function StarPicker({ onSelect, size = 34, value: controlled, disabled = 
   );
 }
 
-/* ---------------- On-chain proof chip ---------------- */
+/* ---------------- On-chain rating chip ---------------- */
 
-/** The little "on-chain" chip that hangs off a star rating: it links to the
- *  Nimiq transaction whose memo carries the rating, so anyone can verify it
- *  without trusting the shop. Renders nothing without a valid hash. */
-export function OnChainProof({ tx, className = '' }: { tx?: string | null; className?: string }) {
+/** The little "on-chain rating" chip that hangs off a star rating: it links
+ *  to the buyer's own Nimiq rating transaction — the one whose memo carries
+ *  the stars and the comment — so anyone can verify it without trusting the
+ *  shop. Renders nothing without a valid hash. */
+export function OnChainRating({ tx, className = '' }: { tx?: string | null; className?: string }) {
   const { t } = useT();
   // Same network the app runs on (config.js): mainnet in production.
   const url = explorerUrl(tx, String(CFG.NETWORK || '').toLowerCase().startsWith('test') ? 'test' : 'main');
@@ -620,10 +621,10 @@ export function OnChainProof({ tx, className = '' }: { tx?: string | null; class
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      title={t('ui.onChainProofTitle', { tx: shortTx(String(tx)) })}
+      title={t('ui.onChainRatingTitle', { tx: shortTx(String(tx)) })}
     >
       <Icon name="link" size={13} />
-      <span>{t('ui.onChainProof')}</span>
+      <span>{t('ui.onChainRating')}</span>
     </a>
   );
 }

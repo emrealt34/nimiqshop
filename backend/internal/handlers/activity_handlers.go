@@ -610,6 +610,20 @@ func (h *Handlers) TrackStatus(ctx *fasthttp.RequestCtx) {
 			"delivered_at":  deliveryTimePointer(o.DeliveryTime()),
 			"current_stage": current,
 		}
+		// The buyer's own rating of THIS purchase. Both halves are already
+		// public — the stars ride the feed, the words ride the comment
+		// list — so showing them together here tells the world nothing it
+		// could not read elsewhere. What is private stays private: a
+		// comment an admin hid is hidden here too, and this page has never
+		// named the buyer, so the rating carries no wallet.
+		if o.Rating > 0 || o.RatingComment != "" {
+			resp["rating"] = map[string]interface{}{
+				"stars":   o.Rating,
+				"comment": visibleRatingComment(o.RatingComment, o.RatingCommentHidden),
+				"at":      o.RatedAt,
+				"tx":      o.RatingTx,
+			}
+		}
 		if o.NimUsdRate > 0 {
 			resp["nim"] = formatNIM((float64(o.PriceUSD) / 1_000_000) / o.NimUsdRate)
 		}
@@ -667,6 +681,17 @@ func (h *Handlers) TrackStatus(ctx *fasthttp.RequestCtx) {
 		}
 		if receipt := publicLightningReceipt(q); receipt != nil {
 			resp["lightning_receipt"] = receipt
+		}
+		// Same as the order branch above: the rating the buyer left for
+		// this purchase, and nothing that is not already public.
+		if q.Rating > 0 || q.RatingComment != "" {
+			resp["rating"] = map[string]interface{}{
+				"stars":     q.Rating,
+				"comment":   visibleRatingComment(q.RatingComment, q.RatingCommentHidden),
+				"at":        q.RatedAt,
+				"tx":        q.RatingTx,
+				"test_mode": q.TestMode,
+			}
 		}
 		writeJSON(ctx, fasthttp.StatusOK, resp)
 		return

@@ -74,20 +74,12 @@ func (h *Handlers) RatingComments(ctx *fasthttp.RequestCtx) {
 		}
 		// Who left it, as the feed is allowed to say it. The identity was
 		// captured when the rating was WRITTEN (db.commentIdentity): a
-		// public row carries no purchase id, so nothing about the buyer can
-		// be resolved from this list — an anonymous purchase therefore
-		// still shows no wallet here, exactly as it shows none beside the
-		// purchase itself in the feed. Comments written before the identity
-		// was captured simply arrive without one.
-		if !c.Anonymous && c.Address != "" {
+		// public row carries no purchase id, so nothing about the buyer
+		// can be resolved from this list. Comments written before that
+		// simply arrive without a face.
+		if c.Address != "" {
 			row["address"] = c.Address
 		}
-		if c.Anonymous {
-			row["anonymous"] = true
-		}
-		// The product is named either way: a private purchase hides the
-		// buyer, not what they bought — the feed publishes the title for
-		// private purchases too, and a comment must not say less.
 		if label := cleanPublicProductLabel(c.Product); label != "" {
 			row["product"] = label
 		}

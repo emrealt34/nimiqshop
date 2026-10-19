@@ -20,7 +20,7 @@ import { quoteStages, isTerminalStatus, isDeliveredStatus, isIssueStatus } from 
 import { deliverySummary, payRail } from '../../lib/deliveryCopy';
 import { useInterval } from '../../lib/useInterval';
 import { useToast, useSheet } from '../AppProviders';
-import { StatusBadge, MiniProgress, StarsDisplay, EmptyState, ErrorState, LockedSignInCard, SkeletonCards, NimAmount, OnChainProof, ClockTime } from '../ui/uiKit';
+import { StatusBadge, MiniProgress, StarsDisplay, EmptyState, ErrorState, LockedSignInCard, SkeletonCards, NimAmount, OnChainRating, ClockTime } from '../ui/uiKit';
 import { Pager } from '../ui/Pager';
 import { useT, t as i18nT } from '../../i18n';
 import { pagePath } from '../../lib/asset';
@@ -448,7 +448,7 @@ function OrderRow({ r }: { r: any }) {
           <span className="xs faint">{t('common.rated')}</span>
           {/* The rating is anchored on-chain as a 1-Luna memo; the chip links
               to the very transaction anyone can read on the explorer. */}
-          <OnChainProof tx={r.ratingTx} />
+          <OnChainRating tx={r.ratingTx} />
         </span>
       );
     } else if (!rated) {

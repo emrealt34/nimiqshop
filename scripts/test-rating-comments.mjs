@@ -1,5 +1,6 @@
 /**
- * test-rating-comments.mjs — the public buyer comments on the Activity page.
+ * test-rating-comments.mjs — the buyer comments on the Activity page and the
+ * rating on the track page.
  *
  * Owner (2026-10-19): a comment was entered and the block "looked wrong" in
  * Activity. Two real defects are pinned here:
@@ -12,9 +13,9 @@
  *     run-on line of text with `align-items: baseline`, which is what made
  *     long comments stretch the whole block sideways.
  *
- * And the privacy rule the whole thing rests on: an anonymous buyer's
- * comment shows NO wallet, ever — not even the identicon — because the feed
- * does not publish that buyer's wallet beside their purchase either.
+ * A comment the shop cannot match to a buyer simply has no face: it is never
+ * given an invented one. The card is shared, so the same rating looks the
+ * same on the Activity page and on the track page of the purchase itself.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -35,7 +36,7 @@ globalThis.window = { addEventListener() {}, location: { href: '' }, navigator: 
 globalThis.document = { addEventListener() {}, documentElement: { lang: 'en' }, createElement: () => ({ style: {} }), cookie: '' };
 export { renderToStaticMarkup } from 'react-dom/server';
 export { createElement } from 'react';
-export { RecentRatingComments } from ${JSON.stringify(new URL('../src/components/rating/RatingFlow.tsx', import.meta.url).pathname)};
+export { RecentRatingComments, RatingCommentCard } from ${JSON.stringify(new URL('../src/components/rating/RatingFlow.tsx', import.meta.url).pathname)};
 `,
     resolveDir: new URL('..', import.meta.url).pathname,
     sourcefile: 'rating-comments-entry.tsx',
@@ -53,9 +54,13 @@ export { RecentRatingComments } from ${JSON.stringify(new URL('../src/components
 
 const client = createRequire(import.meta.url)(bundle);
 const render = (items) => client.renderToStaticMarkup(client.createElement(client.RecentRatingComments, { seed: items }));
+const card = (c, props = {}) => client.renderToStaticMarkup(client.createElement(client.RatingCommentCard, { c, ...props }));
 process.on('exit', () => rmSync(dir, { recursive: true, force: true }));
 
 const WALLET = 'NQ242XCDPK1C7DR525U53PERU64VUSR2LPRK';
+// explorerUrl only accepts a real 64-hex hash, and the chip renders nothing
+// without one — which is exactly what makes the on-chain test meaningful.
+const TX = 'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90';
 
 test('a public comment shows its buyer, their stars and what they bought', () => {
   const out = render([
@@ -70,18 +75,10 @@ test('a public comment shows its buyer, their stars and what they bought', () =>
   assert.ok(!out.includes(WALLET), 'the activity page never prints a full wallet');
 });
 
-test('an anonymous buyer stays private — no face, no wallet, no guessing', () => {
-  const out = render([
-    { stars: 4, comment: 'Good.', at: '2026-10-19T16:54:44Z', anonymous: true, product: 'Amazon' },
-  ]);
-  assert.ok(!out.includes('<img'), 'an anonymous comment must not show an identicon');
-  assert.ok(!out.includes('NQ'), 'and it must not leak any part of a wallet');
-  assert.ok(out.includes('feed-wallet-private'), 'it shows the private-buyer chip instead');
-});
-
-test('a comment the shop cannot match to a buyer simply has no face', () => {
-  const out = render([{ stars: 3, comment: 'Written before faces were captured.', at: '2026-10-12T10:00:00Z' }]);
+test('a comment the shop cannot match to a buyer has no face at all', () => {
+  const out = card({ stars: 4, comment: 'Written before faces were captured.', at: '2026-10-19T16:54:44Z' });
   assert.ok(!out.includes('<img'), 'no invented avatar');
+  assert.ok(!out.includes('NQ'), 'and no invented wallet either');
   assert.ok(out.includes('Written before faces were captured.'));
 });
 
@@ -101,6 +98,40 @@ test('the list is one card per comment and never a cell of the summary grid', ()
   assert.equal((out.match(/class="rating-comment"/g) || []).length, 2, 'one card per comment');
   assert.ok(out.includes('rs-comments'), 'the block spans the card, under the two-column summary');
   assert.ok(!out.includes('rs-body'), 'and is not rendered inside that grid');
+});
+
+test('the same card carries the rating of the purchase on the track page', () => {
+  const out = card(
+    { stars: 5, comment: 'payment made under 10 seconds', at: '2026-10-19T19:49:51Z', tx: TX },
+    { plain: true, showProduct: false },
+  );
+  assert.ok(out.includes('payment made under 10 seconds'), "the buyer's words travel with the order");
+  assert.ok(out.includes('onchain-chip'), 'and so does the link to the rating on the chain');
+  assert.ok(out.includes('rating-comment-plain'), 'it drops its own frame inside the track card');
+  // The track page is about this one product already.
+  assert.ok(!out.includes('rating-comment-body">payment made under 10 seconds</p><div class="xs faint"'), 'no duplicate product line');
+});
+
+test('a rating with no words is still a rating', () => {
+  const out = card({ stars: 4, at: '2026-10-19T19:49:51Z' });
+  assert.ok(out.includes('stars'), 'the stars are the rating');
+  assert.ok(!out.includes('rating-comment-body'), 'no empty paragraph for a rating nobody wrote words for');
+});
+
+test('the on-chain chip says rating, in every language', () => {
+  const wanted = {
+    en: 'On-chain rating',
+    de: 'On-Chain-Bewertung',
+    fr: 'Évaluation on-chain',
+    es: 'Valoración on-chain',
+    pt: 'Avaliação on-chain',
+    tr: 'Zincir üstü puan',
+  };
+  for (const [lang, want] of Object.entries(wanted)) {
+    const src = readFileSync(new URL(`../src/i18n/locales/${lang}.ts`, import.meta.url), 'utf8');
+    assert.ok(src.includes(want), `${lang} must read "${want}"`);
+    assert.ok(!src.includes('onChainProof'), `${lang} still carries the old "proof" key`);
+  }
 });
 
 test('the layout rule that broke it is still in the stylesheet', () => {

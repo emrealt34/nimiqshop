@@ -274,10 +274,12 @@ func (s *Store) ApplyRating(w RatingWrite) (RatingAggregate, error) {
 // buyer, at the moment the rating is written.
 //
 // The list public callers read carries no purchase id (it is blanked on
-// purpose), so this is the only point at which the wallet, the anonymity of
-// the purchase and the product are all in hand. It is best effort throughout:
-// a missing record simply means the comment shows no face, and an anonymous
-// purchase never yields an address at all.
+// purpose), so this is the only point at which the wallet and the product are
+// both in hand. It is best effort throughout: a missing record simply means
+// the comment shows no face. The rule it follows is the feed's own rule — a
+// purchase the feed publishes without a buyer is published without one here
+// too, so no wallet is ever copied onto a comment the feed would not put a
+// name to.
 func commentIdentity(txn *badger.Txn, kind, id, userID string) (address string, anonymous bool, product string) {
 	switch kind {
 	case RatingKindQuote:
@@ -300,8 +302,8 @@ func commentIdentity(txn *badger.Txn, kind, id, userID string) (address string, 
 		}
 	}
 	if anonymous || userID == "" {
-		// An anonymous purchase keeps its secret here too: the wallet is
-		// not even copied onto the comment.
+		// No wallet on the feed row, no wallet on the comment: the wallet
+		// is not even copied onto it.
 		return "", anonymous, product
 	}
 	var u User
