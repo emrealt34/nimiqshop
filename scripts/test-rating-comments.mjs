@@ -71,8 +71,22 @@ test('a public comment shows its buyer, their stars and what they bought', () =>
   assert.ok(out.includes('<img'), 'the buyer gets their identicon face');
   assert.ok(out.includes('Fast delivery'), 'the comment itself is shown');
   assert.ok(out.includes('Amazon'), 'what they bought is shown with it');
-  // The wallet is copied short, never printed whole: this list is public.
-  assert.ok(!out.includes(WALLET), 'the activity page never prints a full wallet');
+});
+
+test("the buyer's wallet copies on a click, the way the feed row does", () => {
+  const out = render([{ stars: 5, comment: 'Fast.', at: '2026-10-19T16:54:44Z', address: WALLET }]);
+  const chip = out.match(/<button[^>]*class="feed-wallet chip"[^>]*>/);
+  assert.ok(chip, 'the wallet is a button — a click copies it');
+  assert.ok(chip[0].includes(WALLET), 'the whole address rides on the button, so the click has something to copy');
+  assert.ok(out.includes('<span class="mono">NQ24 2XCD…</span>'), 'what is shown is still the short form');
+  assert.ok(!out.includes(`>${WALLET}<`), 'the full address is never printed as text');
+  assert.ok(out.includes('copy'), 'and the chip shows that it is copyable');
+});
+
+test('a comment with no wallet has nothing to copy', () => {
+  const out = card({ stars: 4, comment: 'No face, nothing to copy.', at: '2026-10-19T16:54:44Z' });
+  assert.ok(!out.includes('<button'), 'no button to click at all');
+  assert.ok(!out.includes(WALLET));
 });
 
 test('a comment the shop cannot match to a buyer has no face at all', () => {

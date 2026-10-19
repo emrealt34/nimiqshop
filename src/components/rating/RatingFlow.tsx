@@ -22,6 +22,9 @@ import {
 import { cleanComment, commentProblem, MAX_COMMENT, memoPreview } from '../../lib/ratingComment';
 import { ClockTime, OnChainRating, StarPicker, StarsDisplay } from '../ui/uiKit';
 import { Identicon } from '../ui/Identicon';
+import { Icon } from '../ui/Icon';
+import { useToast } from '../AppProviders';
+import { Clipboard } from '../../lib/clipboard';
 import { shortAddr } from '../../lib/format';
 
 /** One buyer rating, as the public comment list and the track page return
@@ -314,18 +317,33 @@ function messageFor(err: unknown, t: Translator): string {
  * and the track page, so the same rating looks the same in both places.
  */
 export function RatingCommentCard({ c, plain = false, showProduct = true }: { c: RatingCommentItem; plain?: boolean; showProduct?: boolean }) {
+  const { t } = useT();
+  const { toast } = useToast();
   const words = String(c.comment || '').trim();
+  const addr = c.address || '';
   return (
     <div className={plain ? 'rating-comment rating-comment-plain' : 'rating-comment'}>
       <div className="rating-comment-head">
-        {/* Not a copy button and not a tooltip carrying the whole wallet:
-            the feed row beside the purchase is where an address is meant
-            to be read and copied. */}
-        {c.address ? (
-          <span className="feed-wallet chip">
-            <Identicon address={c.address} className="feed-id" size={22} />
-            <span className="mono">{shortAddr(c.address)}</span>
-          </span>
+        {/* The wallet copies on a click, the same way the feed row beside
+            the purchase does: the short form is what is shown, the whole
+            address is what the click puts on the clipboard. */}
+        {addr ? (
+          <button
+            className="feed-wallet chip"
+            type="button"
+            title={t('activityPage.copyTitle', { addr })}
+            onClick={(e) => {
+              e.preventDefault();
+              // Boolean copy: the toast must never claim success on a
+              // failure the way the old promise chain did.
+              const copied = Clipboard.copy(addr);
+              toast(copied ? t('activityPage.walletCopied') : t('activityPage.copyFailed'), copied ? 'success' : 'warn');
+            }}
+          >
+            <Identicon address={addr} className="feed-id" size={22} />
+            <span className="mono">{shortAddr(addr)}</span>
+            <Icon name="copy" size={12} />
+          </button>
         ) : null}
         <StarsDisplay rating={c.stars} size={13} />
         <ClockTime ts={c.at} className="xs faint" />

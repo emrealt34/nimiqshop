@@ -4160,7 +4160,8 @@ body { padding-bottom: 0; }
   min-width: 0;
 }
 .rating-comment-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
-.rating-comment-head .feed-wallet { cursor: default; }
+/* The chip is a button: a click copies the wallet, like the feed row. */
+.rating-comment-head .feed-wallet { cursor: pointer; }
 .rating-comment-body {
   margin: 6px 0 0;
   font-size: .86rem;
