@@ -85,6 +85,9 @@ func (h *Handlers) RatingComments(ctx *fasthttp.RequestCtx) {
 		if c.Anonymous {
 			row["anonymous"] = true
 		}
+		// The product is named either way: a private purchase hides the
+		// buyer, not what they bought — the feed publishes the title for
+		// private purchases too, and a comment must not say less.
 		if label := cleanPublicProductLabel(c.Product); label != "" {
 			row["product"] = label
 		}
