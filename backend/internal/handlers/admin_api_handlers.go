@@ -553,9 +553,15 @@ func (h *Handlers) AdminSyncOrder(ctx *fasthttp.RequestCtx) {
 // AdminCancelOrder is the operator's "release this abandoned order" button
 // (v6 PARTNER API, DELETE /v6/partner/orders/{id}).
 //
-// It is deliberately the slow, careful version of the automatic sweep: it
-// re-reads the supplier BEFORE asking, so an order that was paid in the last
-// few seconds is settled here rather than cancelled. The supplier refuses
+// This is the ONLY place the shop ever cancels an order. Nothing automatic
+// does it — not the tracker, not the checkout pre-check (owner, 2026-10-19:
+// "sipariş iptali öldürme yapılmaz"). Withdrawing an order is a one-way door
+// at the supplier, so it is a human decision on an order that human is
+// looking at, never a side effect of somebody browsing the shop.
+//
+// It is also deliberately slow and careful: it re-reads the supplier BEFORE
+// asking, so an order that was paid in the last few seconds is settled here
+// rather than cancelled. The supplier refuses
 // (409) once it has seen money anyway — but a refusal surfaced as an error is
 // a worse outcome than simply never asking.
 func (h *Handlers) AdminCancelOrder(ctx *fasthttp.RequestCtx) {

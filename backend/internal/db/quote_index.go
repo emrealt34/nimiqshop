@@ -422,3 +422,37 @@ func (s *Store) BlockingQuotesForUser(userID string) ([]Quote, error) {
 	})
 	return out, err
 }
+
+// LapsedUnpaidQuotesForUser returns the buyer's quotes whose single-use
+// invoice can no longer be paid and on which no money was ever seen.
+//
+// These are deliberately NOT in BlockingQuotesForUser: they do not block, so
+// the buyer is free to start again. They are listed separately because the
+// shop still wants to ASK the supplier about them first — a payment pushed
+// through at the very edge of the window is money the supplier can see and
+// the local record cannot, and only one order per cart may ever be paid for.
+// This listing feeds a GET (and, when the answer is "paid", the ordinary
+// settlement path). Nothing that comes out of it is ever cancelled.
+//
+// The scan is bounded: an unpaid invoice is at most one payment window old,
+// so the newest handful of the buyer's quotes always covers the whole set.
+func (s *Store) LapsedUnpaidQuotesForUser(userID string, now time.Time, limit int) ([]Quote, error) {
+	if userID == "" {
+		return nil, nil
+	}
+	if limit <= 0 || limit > 64 {
+		limit = 24
+	}
+	recent, err := s.ListQuotesForUser(userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Quote, 0, 2)
+	for _, q := range recent {
+		if q.UserID != userID || !LapsedUnpaidInvoice(q, now) {
+			continue
+		}
+		out = append(out, q)
+	}
+	return out, nil
+}

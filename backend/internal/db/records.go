@@ -266,8 +266,10 @@ type Quote struct {
 	// observed raw supplier state.
 	SupplierOrderID string `json:"supplier_order_id,omitempty"`
 	SupplierStatus  string `json:"supplier_status,omitempty"`
-	// SupplierCancelState is what the v6 PARTNER API answered when the shop
-	// asked it to cancel an order the buyer abandoned BEFORE paying:
+	// SupplierCancelState is what the v6 PARTNER API answered when the
+	// OPERATOR asked it to cancel an order the buyer abandoned BEFORE paying.
+	// Only the admin console ever asks (there is no automatic cancellation):
+	//
 	//   ""          – never asked (or the attempt is still due a retry)
 	//   "requested" – the supplier confirmed CANCELED (terminal, never asked again)
 	//   "refused"   – a definitive no (409 not cancellable / 404 unknown order);

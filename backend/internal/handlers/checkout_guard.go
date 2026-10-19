@@ -65,6 +65,14 @@ func batchFingerprints(req batchQuoteRequest) (string, string) {
 	return request, fingerprint(req)
 }
 
+// How many lapsed invoices a single checkout attempt may ask the supplier
+// about. Asking is a GET on the buyer's critical path, and it exists only to
+// catch a payment that landed at the very edge of its window — which is at
+// most the one or two orders the buyer was just looking at. Anything beyond
+// that is the settlement tracker's job (it keeps polling a dead order for the
+// whole late-money reconcile window).
+const maxLapsedInvoiceAsks = 3
+
 func checkoutKey(ctx *fasthttp.RequestCtx) (string, bool) {
 	key := strings.TrimSpace(string(ctx.Request.Header.Peek("Idempotency-Key")))
 	if len(key) < 16 || len(key) > 128 || strings.IndexFunc(key, func(r rune) bool { return r < 33 || r > 126 }) >= 0 {
@@ -107,8 +115,34 @@ func (h *Handlers) existingCheckout(ctx *fasthttp.RequestCtx, user, key, request
 		writeError(ctx, 503, "could not verify checkout idempotency; no order was dispatched")
 		return true
 	}
-	// Only the quotes that can actually block a new purchase are read. The
-	// previous ListQuotesForUser(user, 0) loaded and decoded the buyer's
+	// (1) The buyer's LAPSED, unpaid invoices are not blocking any more —
+	// but before the shop hands out a brand-new order it asks the supplier
+	// about them. A payment pushed through at the very edge of the window is
+	// money the supplier can see and the local record cannot: two orders for
+	// one cart may never be paid for twice. The question is a GET, and the
+	// ONLY thing the shop ever does with the answer is apply it (money seen
+	// → the ordinary settlement path) or ignore it (unpaid or unreachable →
+	// the buyer is simply free). Nothing here cancels an order: an abandoned
+	// order lapses at the supplier on its own, and withdrawing one is a
+	// decision an operator makes per order, from the admin console.
+	if lapsed, err := h.Store.LapsedUnpaidQuotesForUser(user, now, 0); err == nil {
+		for i, q := range lapsed {
+			if i >= maxLapsedInvoiceAsks {
+				break // bounded: this is a question on the checkout path, not a sweep
+			}
+			verified := h.askSupplierAboutALapsedInvoice(ctx, q, now)
+			if verified == nil {
+				continue
+			}
+			// Money was found, so the order is live again and it DOES block.
+			if db.BlocksNewPurchaseAt(*verified, now) {
+				h.activeCheckoutError(ctx, *verified)
+				return true
+			}
+		}
+	}
+	// (2) Only the quotes that can actually block a new purchase are read.
+	// The previous ListQuotesForUser(user, 0) loaded and decoded the buyer's
 	// ENTIRE history on every checkout attempt, which turned "abandon a lot
 	// of carts" into a way of making one's own (and the server's) checkout
 	// path arbitrarily expensive. See internal/db/quote_index.go.
@@ -125,16 +159,9 @@ func (h *Handlers) existingCheckout(ctx *fasthttp.RequestCtx, user, key, request
 		// buyer got ACTIVE_CHECKOUT with no way out (live bug, 2026-10-04).
 		// One predicate, one answer for both callers — and it is EVIDENCE,
 		// never a clock: money seen, a payment settling, or an operator hold.
-		// A lapsed, unpaid invoice is not decided by a timer any more: the
-		// v6 partner API can say whether anything was paid, and when nothing
-		// was the order is cancelled right here. This runs BEFORE the
-		// blocking question is asked, so the answer the shop acts on is the
-		// supplier's, not a buffer's.
-		if db.LapsedUnpaidInvoice(q, now) && q.SupplierOrderID != "" {
-			if verified := h.verifyLapsedWithSupplier(ctx, q, now); verified != nil {
-				q = *verified
-			}
-		}
+		// A lapsed, unpaid invoice is not decided by a timer any more (and it
+		// never reaches this loop: it is not blocking, so the index above it
+		// is where the supplier is asked about it — see step 1).
 		if !db.BlocksNewPurchaseAt(q, now) {
 			continue
 		}
@@ -160,25 +187,30 @@ func (h *Handlers) existingCheckout(ctx *fasthttp.RequestCtx, user, key, request
 	return false
 }
 
-// verifyLapsedWithSupplier replaces the old grace buffer with an ANSWER.
+// askSupplierAboutALapsedInvoice replaces the old grace buffer with an ANSWER
+// — and it CANCELS NOTHING.
 //
 // A lapsed invoice used to keep blocking the buyer for a few more minutes in
-// case a payment was still in flight. The v6 partner API settles that
-// question directly: ask for the order, and
+// case a payment was still in flight; the v6 partner API can settle that
+// question directly, so the shop asks it:
 //
-//   - if money has been observed, apply it — the purchase is settling and the
-//     buyer must not be given a second order to pay;
-//   - if nothing was paid, cancel the order. The invoice is then dead at the
-//     supplier too, so it can never be paid late, and the buyer is released
-//     on the spot instead of after a timer.
+//   - money observed (or any paid-or-beyond state) → the answer is applied
+//     here and the quote keeps blocking. The purchase is settling and the
+//     buyer must not be handed a second order to pay for it.
 //
-// If the supplier cannot be asked, nothing changes and the ordinary rule
-// applies (a lapsed unpaid invoice does not block). The shop never releases a
-// buyer on an assumption — it releases them on "the supplier says no money,
-// and the invoice is now cancelled".
+//   - no money, or the supplier cannot be asked → the shop does NOTHING to
+//     the order. No cancellation, no cleanup, no "releasing" it. The buyer is
+//     then free to buy something else, and the abandoned order simply lapses
+//     on its own at the supplier, which is the supplier's own business.
+//
+// Owner (2026-10-19): "sipariş iptali öldürme yapılmaz." Withdrawing an
+// order is a one-way door, and the one who decides to walk through it is a
+// human looking at that order in the admin console (AdminCancelOrder — which
+// re-reads the supplier first and refuses outright when money is involved).
+// A pre-check that runs because somebody opened the shop is not that.
 //
 // It returns the updated quote (nil when nothing changed).
-func (h *Handlers) verifyLapsedWithSupplier(ctx *fasthttp.RequestCtx, q db.Quote, now time.Time) *db.Quote {
+func (h *Handlers) askSupplierAboutALapsedInvoice(ctx *fasthttp.RequestCtx, q db.Quote, now time.Time) *db.Quote {
 	if h.CR == nil || !h.CR.PartnerMode() || q.SimulatedSupplier() || q.TestMode {
 		return nil
 	}
@@ -191,29 +223,20 @@ func (h *Handlers) verifyLapsedWithSupplier(ctx *fasthttp.RequestCtx, q db.Quote
 	if err != nil {
 		return nil // could not ask: the ordinary rule decides
 	}
-	if cryptorefills.MoneyObserved(fresh) || cryptorefills.IsPaidOrBeyond(fresh.Status) {
-		// Money is (or may be) on its way: settle it here, never beside it.
-		if _, aerr := settlement.ApplySupplierOrderNotify(h.Store, q.ID, fresh); aerr == nil {
-			if latest, gerr := h.Store.GetQuote(q.ID); gerr == nil {
-				return &latest
-			}
-		}
+	if !cryptorefills.MoneyObserved(fresh) && !cryptorefills.IsPaidOrBeyond(fresh.Status) {
+		// Nothing was paid AND the shop still does nothing about it: the
+		// order is the supplier's to keep or lapse, not ours to withdraw.
 		return nil
 	}
-	cancelled, err := h.CR.CancelOrder(sctx, q.SupplierOrderID)
-	if err != nil {
-		return nil // the supplier would not release it; leave the row alone
+	// Money is (or may be) on its way: settle it here, never beside it.
+	if _, aerr := settlement.ApplySupplierOrderNotify(h.Store, q.ID, fresh); aerr != nil {
+		return nil
 	}
-	_ = h.Store.MarkSupplierCancel(q.ID, "requested")
-	// Apply the supplier's own answer (Canceled) so both callers of
-	// BlocksNewPurchaseAt — this pre-check and the atomic gate inside the
-	// create — see the release at the same instant.
-	if _, aerr := settlement.ApplySupplierOrderNotify(h.Store, q.ID, cancelled); aerr == nil {
-		if latest, gerr := h.Store.GetQuote(q.ID); gerr == nil {
-			return &latest
-		}
+	latest, gerr := h.Store.GetQuote(q.ID)
+	if gerr != nil {
+		return nil
 	}
-	return nil
+	return &latest
 }
 
 func (h *Handlers) activeCheckoutError(ctx *fasthttp.RequestCtx, q db.Quote) {

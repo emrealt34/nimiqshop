@@ -16,10 +16,16 @@ import (
 // few more minutes, on the theory that a payment submitted at the very edge of
 // the window might not have reached the supplier yet — a timer standing in for
 // knowledge nobody had. On the v6 PARTNER API that guess is unnecessary: the
-// shop can ask whether anything was paid and, when nothing was, cancel the
-// order itself (DELETE /v6/partner/orders/{id}). So the release rule is now a
-// FACT from the supplier, checked in handlers.verifyLapsedWithSupplier, and
-// the moment the window closes the buyer is either released or told why not.
+// shop ASKS whether anything was paid (handlers.askSupplierAboutALapsedInvoice)
+// and applies the answer. So the moment the window closes the buyer is either
+// kept (money was seen, the purchase is settling) or free to carry on.
+//
+// What the shop still does not do is touch the abandoned order: no automatic
+// cancellation, no "cleanup" (owner, 2026-10-19: "sipariş iptali öldürme
+// yapılmaz"). It lapses at the supplier on its own; withdrawing it is an
+// operator's decision, made from the admin console on an order in front of
+// them.
+//
 // The frontend mirrors this in src/lib/pay.ts (PAYMENT_VERIFY_GRACE_MS = 0).
 
 func quoteRequestFingerprintKey(user, key string) []byte {
