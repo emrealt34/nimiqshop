@@ -49,12 +49,20 @@ type stackOptions struct {
 	testMode bool
 	env      map[string]string
 	listener net.Listener
+	// supplierWrap lets a test observe (or distort) exactly what the backend
+	// sends the supplier. Nothing is wrapped by default: the shop talks to
+	// the mock the same way it would talk to the real API.
+	supplierWrap func(http.Handler) http.Handler
 }
 
 func bootStack(t *testing.T, opts stackOptions) *testStack {
 	t.Helper()
 
-	supplier := httptest.NewServer(suppliermock.NewHandler())
+	var supplierHandler http.Handler = suppliermock.NewHandler()
+	if opts.supplierWrap != nil {
+		supplierHandler = opts.supplierWrap(supplierHandler)
+	}
+	supplier := httptest.NewServer(supplierHandler)
 	t.Cleanup(supplier.Close)
 
 	env := map[string]string{
@@ -96,12 +104,12 @@ func bootStack(t *testing.T, opts stackOptions) *testStack {
 	}
 	t.Cleanup(func() { _ = store.Close() })
 
-	cr := cryptorefills.NewClient(cfg.CRBaseURL, cfg.CRPartnerID, cfg.CRAppVersion, cfg.CRUserAgent, cryptorefills.QueueConfig{
+	cr := cryptorefills.NewClient(cryptorefills.ClientOptions{BaseURL: cfg.CRBaseURL, PartnerID: cfg.CRPartnerID, PartnerKey: cfg.CRPartnerKey, AppVersion: cfg.CRAppVersion, UserAgent: cfg.CRUserAgent, Queue: cryptorefills.QueueConfig{
 		MaxQueue:            cfg.CRQueueMax,
 		MaxQueuePerActor:    cfg.CRQueuePerActorMax,
 		ActorRequestsPerMin: cfg.CRActorPerMinute,
 		ActorBurst:          cfg.CRActorBurst,
-	})
+	}})
 	t.Cleanup(cr.Close)
 	h := handlers.New(store, cfg, cr)
 	// Fixed display price so no oracle/network is involved.

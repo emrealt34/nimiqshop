@@ -209,11 +209,11 @@ func validateStablecoinPayable(order *Order, now time.Time) (InvoiceInfo, error)
 }
 
 func orderIsAwaitingPayment(order *Order) bool {
-	switch strings.ToLower(strings.TrimSpace(order.Status)) {
-	case strings.ToLower(StatusCreated), strings.ToLower(StatusWaitingForPayment):
-		return true
-	}
-	return false
+	// Accepts both API spellings (v5 "WaitingForPayment" / v6 partner
+	// "WAITING_FOR_PAYMENT"). Getting this wrong does not degrade an order —
+	// it refuses to hand out EVERY invoice, because the guard would read a
+	// fresh partner order as "not awaiting payment".
+	return MapToQuoteStatus(order.Status) == QuoteAwaitingPay
 }
 
 // SamePositiveAmount checks identity of an already-issued payment request.

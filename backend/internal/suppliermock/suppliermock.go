@@ -385,6 +385,10 @@ const (
 	stFailed    = "PaymentFailed"
 	stSetupFail = "PaymentSetupFailed"
 	stRefunded  = "Refunded"
+	// stCanceled is spelled the way the v6 PARTNER API spells it — the mock
+	// serves the partner endpoints too, and a partner cancel answers with the
+	// partner's own vocabulary.
+	stCanceled = "CANCELED"
 )
 
 func (m *mockState) pushWebhook(o *order) {
@@ -492,6 +496,8 @@ func paymentStateFor(status string) string {
 		return "Refunded"
 	case stFailed:
 		return "PaymentFailed"
+	case stCanceled:
+		return "WalletCreated"
 	}
 	return "WalletCreated"
 }
@@ -547,7 +553,48 @@ func (m *mockState) handle(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		m.getOrder(w, rest)
+	// ---- v6 PARTNER API ------------------------------------------------
+	// The partner surface covers orders only (the catalogue stays on v5), and
+	// the create body is the same shape plus external_order_id, so the mock
+	// can serve both generations with the same handlers. Keeping it here
+	// matters: it lets the integration suite boot the shop in PARTNER mode
+	// without ever touching the real supplier.
+	case path == "v6/partner/orders" && r.Method == http.MethodPost:
+		m.createOrder(w, r)
+	case strings.HasPrefix(path, "v6/partner/orders/"):
+		rest := strings.TrimPrefix(path, "v6/partner/orders/")
+		if r.Method == http.MethodDelete {
+			m.cancelOrder(w, rest)
+			return
+		}
+		m.getOrder(w, rest)
 	}
+}
+
+// cancelOrder is DELETE /v6/partner/orders/{id}. It mirrors the two rules the
+// live partner API enforces: the call is idempotent (a second cancel answers
+// 200 again) and it REFUSES with 409 once any payment has been seen — the
+// shop relies on that refusal to never cancel an order that money may be
+// arriving for.
+func (m *mockState) cancelOrder(w http.ResponseWriter, id string) {
+	m.mu.Lock()
+	o, ok := m.orders[id]
+	if !ok {
+		m.mu.Unlock()
+		writeJSON(w, 404, map[string]interface{}{"error": "order_not_found", "detail": "no such order"})
+		return
+	}
+	switch o.Status {
+	case stCreated, stWaiting, stCanceled:
+		o.Status = stCanceled
+	default:
+		m.mu.Unlock()
+		writeJSON(w, 409, map[string]interface{}{"error": "order_not_cancellable", "detail": "a payment has been detected for this order"})
+		return
+	}
+	out := m.publicOrder(o)
+	m.mu.Unlock()
+	writeJSON(w, 200, out)
 }
 
 func (m *mockState) paymentVias() []map[string]interface{} {
@@ -1300,6 +1347,8 @@ func NewHandler() http.Handler {
 	mux.HandleFunc("/v2/", func(w http.ResponseWriter, r *http.Request) { m.handle(w, r) })
 	mux.HandleFunc("/v4/", func(w http.ResponseWriter, r *http.Request) { m.handle(w, r) })
 	mux.HandleFunc("/v5/", func(w http.ResponseWriter, r *http.Request) { m.handle(w, r) })
+	// The v6 PARTNER surface (orders only) is served by the same handlers.
+	mux.HandleFunc("/v6/", func(w http.ResponseWriter, r *http.Request) { m.handle(w, r) })
 	mux.HandleFunc("/mock/", func(w http.ResponseWriter, r *http.Request) { m.control(w, r) })
 	mux.HandleFunc("/v2/ping", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, map[string]bool{"ok": true}) })
 	return mux

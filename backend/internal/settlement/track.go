@@ -61,6 +61,17 @@ const (
 	// cooldownSkipLogEvery: while a pass is skipped due to endpoint
 	// cooldown, log that fact at most once per window.
 	cooldownSkipLogEvery = 60 * time.Second
+
+	// cancelBatch limits how many partner cancellations one tick issues: the
+	// call is rare, but it must never compete with real order traffic.
+	cancelBatch = 5
+	// cancelEvery throttles the cancellation pass itself — an abandoned order
+	// is not urgent, and the supplier's cancel is a favour, not a race.
+	cancelEvery = 60 * time.Second
+	// cancelRetryAfter is the cool-off before a TRANSIENT cancel failure is
+	// retried (rate limit, 503, transport). A definitive refusal (409/404) is
+	// never retried at any interval.
+	cancelRetryAfter = 30 * time.Minute
 )
 
 type OrderTracker struct {
@@ -92,6 +103,10 @@ type OrderTracker struct {
 
 	// skipLogAt dedups the pass-skip log lines.
 	skipLogAt time.Time
+
+	// nextCancelAt throttles the partner cancellation pass. Process-local on
+	// purpose: a restart simply re-evaluates the (small) eligible set.
+	nextCancelAt time.Time
 }
 
 type errLog struct {
@@ -189,6 +204,11 @@ func (w *OrderTracker) tick(ctx context.Context) {
 		w.logSkipOnce(fmt.Sprintf("tracker: supplier queue full (%d/%d), skipping this pass", stats.Queued, w.MaxOrders))
 		return
 	}
+
+	// 5b) Partner cancellation of abandoned orders (v6 partner API only).
+	// It sits behind every budget gate above: releasing an abandoned order
+	// is a courtesy, never worth competing with a live checkout for.
+	w.cancelAbandonedPartnerOrders(ctx)
 
 	// 6) Poll only DUE quotes, highest priority first, capped per pass.
 	tracked, err := w.Store.ListQuotesByStatuses([]string{
@@ -505,6 +525,15 @@ func (w *OrderTracker) redeliverCreation(ctx context.Context, q db.Quote) {
 			req.Deliveries = append(req.Deliveries, d)
 		}
 	}
+	// The v6 partner idempotency key: this is a REDISPATCH of a request that
+	// was frozen for this exact quote, so the partner API must be told it is
+	// the same order. Without it a create that actually succeeded upstream —
+	// but whose answer never reached us — would open a second order for the
+	// same cart. (The user.email the partner API requires is already in the
+	// stored payload: it was stamped before the payload was frozen.)
+	if w.CR != nil && w.CR.PartnerMode() {
+		req.ExternalOrderID = q.ID
+	}
 	// The CAS succeeds for exactly one live handler/recovery worker. A set
 	// marker NEVER gets refreshed or cleared, even after timeout/restart.
 	if err := w.Store.MarkSupplierRequestStarted(q.ID); err != nil {
@@ -520,6 +549,82 @@ func (w *OrderTracker) redeliverCreation(ctx context.Context, q db.Quote) {
 		return
 	}
 	w.attachRecoveredOrder(q, order)
+}
+
+// cancelAbandonedPartnerOrders asks the supplier to release orders the shop
+// has definitively given up on.
+//
+// Why this exists: on the partner API an abandoned order keeps holding a
+// payment slot until it times out on its own. Cancelling frees it, and the
+// supplier's cancellation is deliberately hard to misuse — it REFUSES (409)
+// once any payment has been seen, so an order that might still be paid can
+// never be cancelled out from under arriving money.
+//
+// Eligibility is therefore narrow by construction (see
+// db.ListQuotesPendingCancel): only locally dead, provably unpaid, real
+// orders. Any error is contained — a cancel that cannot be issued just means
+// the supplier keeps the order until it lapses on its own.
+func (w *OrderTracker) cancelAbandonedPartnerOrders(ctx context.Context) {
+	if w.CR == nil || !w.CR.PartnerMode() {
+		return // v5 cannot cancel; nothing to do
+	}
+	if !w.nextCancelAt.IsZero() && time.Now().UTC().Before(w.nextCancelAt) {
+		return
+	}
+	pending, err := w.Store.ListQuotesPendingCancel(cancelBatch, cancelRetryAfter)
+	if err != nil {
+		return
+	}
+	for _, q := range pending {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+		w.cancelOnePartnerOrder(ctx, q)
+	}
+	w.nextCancelAt = time.Now().UTC().Add(cancelEvery)
+}
+
+func (w *OrderTracker) cancelOnePartnerOrder(ctx context.Context, q db.Quote) {
+	// The buyer's IP travels with the cancel the same way it does with the
+	// create: it is the customer's request we are withdrawing.
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	ctx = cryptorefills.WithActor(ctx, "system:tracker")
+	ctx = cryptorefills.WithEndUserIP(ctx, q.EndUserIP)
+	ctx = cryptorefills.WithEndUserAgent(ctx, q.EndUserAgent)
+
+	order, err := w.CR.CancelOrder(ctx, q.SupplierOrderID)
+	if err == nil {
+		if serr := w.Store.MarkSupplierCancel(q.ID, "requested"); serr != nil {
+			log.Printf("tracker: partner order %s cancelled but the quote could not be updated: %v", q.SupplierOrderID, serr)
+		}
+		if rate, ok := order.CommissionRate(); ok {
+			log.Printf("tracker: cancelled abandoned partner order %s (quote %s, commission_rate_pct=%v released)", q.SupplierOrderID, q.ID, rate)
+			return
+		}
+		log.Printf("tracker: cancelled abandoned partner order %s (quote %s)", q.SupplierOrderID, q.ID)
+		return
+	}
+	var ce *cryptorefills.OrderCancelError
+	if !errors.As(err, &ce) {
+		log.Printf("tracker: partner cancel for order %s not attempted: %v", q.SupplierOrderID, err)
+		return
+	}
+	if ce.Retryable {
+		// Left eligible: a later pass retries after the cool-off.
+		if serr := w.Store.MarkSupplierCancel(q.ID, "failed"); serr == nil {
+			log.Printf("tracker: partner cancel for order %s failed (will retry): %v", q.SupplierOrderID, err)
+		}
+		return
+	}
+	// A definitive refusal. Recorded so it is never asked again — and, more
+	// importantly, so the order is left to settle normally: the usual reason
+	// is money the supplier can already see, which MUST still be fulfilled.
+	if serr := w.Store.MarkSupplierCancel(q.ID, "refused"); serr == nil {
+		log.Printf("tracker: supplier refuses to cancel order %s (quote %s): %v", q.SupplierOrderID, q.ID, err)
+	}
 }
 
 func (w *OrderTracker) attachRecoveredOrder(q db.Quote, order *cryptorefills.Order) {

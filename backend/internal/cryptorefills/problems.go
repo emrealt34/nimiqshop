@@ -61,6 +61,31 @@ func ProblemMessage(code string) string {
 // responseProblems handles the same envelope on success and HTTP-error paths.
 // Invalid problem arrays are protocol failures, never permission to order.
 func responseProblems(raw []byte, status int) error {
+	// The v6 PARTNER API answers a rejected order with a BARE JSON array
+	// ([{"problem":"NOT_AVAILABLE_PRODUCT","moreDetails":{...}}]) where v5
+	// wrapped the same list in an object ({"problems":[…]}). Both must be
+	// understood: an unparsed rejection becomes a generic failure and the
+	// buyer loses the actual reason (out of stock, KYC, limits…). Verified
+	// against the live partner endpoint (422 on POST /v6/partner/orders).
+	//
+	// Detection is strict on purpose: the supplier returns ARRAYS for plenty
+	// of healthy responses too (a product/brand catalogue is a bare array of
+	// objects that carry no "problem" key). A bare array is only a problem
+	// list when EVERY element carries a well-formed problem code — anything
+	// else is ordinary data and falls through to the v5 shape below.
+	var top []Problem
+	if err := json.Unmarshal(bytes.TrimSpace(raw), &top); err == nil && len(top) > 0 {
+		problems := top
+		for _, problem := range top {
+			if !isProblemCode(problem.Code) {
+				problems = nil
+				break
+			}
+		}
+		if problems != nil {
+			return &ProblemError{Problems: problems, HTTPStatus: status}
+		}
+	}
 	var obj map[string]json.RawMessage
 	if json.Unmarshal(raw, &obj) != nil || obj == nil {
 		return nil

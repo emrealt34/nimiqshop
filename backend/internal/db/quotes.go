@@ -964,6 +964,78 @@ func (s *Store) MarkGiftNotified(id string) error {
 	})
 }
 
+// MarkSupplierCancel records the outcome of a partner cancellation attempt
+// (see Quote.SupplierCancelState). It is a metadata write: the quote's status
+// is already terminal and is left untouched. Concurrent attempts are harmless
+// — the last recorded state wins, and a terminal "requested"/"refused" is
+// never proposed twice because ListQuotesPendingCancel stops offering them.
+func (s *Store) MarkSupplierCancel(id, state string) error {
+	return s.Update(func(tx *badger.Txn) error {
+		var q Quote
+		if err := getJSON(tx, quoteKey(id), &q); err != nil {
+			return err
+		}
+		if q.SupplierCancelState == "requested" || q.SupplierCancelState == "refused" {
+			return nil // already final; a late retry must not overwrite it
+		}
+		q.SupplierCancelState = state
+		q.SupplierCancelAt = time.Now().UTC()
+		return putQuoteTx(tx, &q)
+	})
+}
+
+// ListQuotesPendingCancel returns abandoned partner orders worth one cancel
+// call. Eligibility is deliberately narrow — the supplier refuses to cancel
+// an order once ANY payment has been seen, and a refusal is the strongest
+// signal that cancelling would strand money, so the shop only ever asks for
+// orders that are already locally dead AND provably unpaid:
+//
+//   - status expired or failed (the buyer's window is gone / the payment
+//     failed; nothing can resurrect them);
+//   - a real supplier order id exists (never a simulated test order);
+//   - no payment was ever observed locally and the supplier never reported a
+//     paid-or-beyond state;
+//   - never cancelled, or cancelled with a transient failure whose cool-off
+//     has elapsed.
+func (s *Store) ListQuotesPendingCancel(limit int, retryAfter time.Duration) ([]Quote, error) {
+	if limit <= 0 {
+		limit = 5
+	}
+	now := time.Now().UTC()
+	var out []Quote
+	// Badger has no secondary indexes: both dead-end statuses are listed and
+	// filtered here. The list is capped before filtering, which is fine —
+	// work is bounded and the next tick picks up the remainder.
+	for _, st := range []string{"expired", "failed"} {
+		qs, err := s.ListQuotesByStatus(st, limit)
+		if err != nil {
+			return nil, err
+		}
+		for _, q := range qs {
+			if q.SupplierOrderID == "" || q.SimulatedSupplier() || q.TestMode {
+				continue
+			}
+			if q.PaymentObserved || cryptorefills.IsPaidOrBeyond(q.SupplierStatus) {
+				continue
+			}
+			switch q.SupplierCancelState {
+			case "":
+			case "failed":
+				if !q.SupplierCancelAt.IsZero() && now.Before(q.SupplierCancelAt.Add(retryAfter)) {
+					continue
+				}
+			default:
+				continue // requested / refused: final
+			}
+			out = append(out, q)
+			if len(out) >= limit {
+				return out, nil
+			}
+		}
+	}
+	return out, nil
+}
+
 // publishToFeed adds a fulfilled quote to the public feed index (idempotent:
 // the index key is deterministic, so replays are no-ops). Anonymous purchases
 // are indexed too; the public handler publishes the product/status summary but

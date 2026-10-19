@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"math"
 	"strconv"
 	"strings"
@@ -390,7 +391,13 @@ func (h *Handlers) createQuoteInner(ctx *fasthttp.RequestCtx, userID string, req
 	// Mail and supplier language follow the product's market (see mail_lang.go).
 	mailLang := h.buyerMailLang(ctx, req.Country)
 
+	// The quote id exists BEFORE the supplier request is frozen: the v6
+	// partner API takes it as external_order_id (see prepareSupplierOrder),
+	// and the write-ahead payload below must carry it so a crash-recovery
+	// redelivery re-sends the SAME id instead of opening a second order.
+	quoteID := quoteIDNow()
 	orderReq := &cryptorefills.CreateOrderRequest{Deliveries: validateReq.Deliveries, Payment: validateReq.Payment, User: validateReq.User, Lang: mailLang, Acquisition: &cryptorefills.Acquisition{UTMSource: "nimshop"}}
+	h.prepareSupplierOrder(orderReq, quoteID)
 	supplierRequest, err := cryptorefills.MarshalCreateRequest(orderReq)
 	if err != nil {
 		writeError(ctx, 400, "invalid supplier request")
@@ -400,7 +407,7 @@ func (h *Handlers) createQuoteInner(ctx *fasthttp.RequestCtx, userID string, req
 	now := time.Now().UTC()
 
 	q := db.Quote{
-		ID: quoteIDNow(), UserID: userID, Lang: mailLang,
+		ID: quoteID, UserID: userID, Lang: mailLang,
 		ProductID: req.ProductID, ProductCountry: req.Country,
 		Denomination: denomLabel, ProductValue: faceValue, ProductCurrency: faceCurrency, Quantity: req.Quantity,
 		// Single-item carts get the same delivery manifest the batch path
@@ -885,6 +892,34 @@ func (m familyMeta) resolveSelection(denomination string, value float64) (float6
 
 func quoteIDNow() string {
 	return uuid.NewString()
+}
+
+// prepareSupplierOrder stamps a supplier request for the v6 PARTNER API.
+//
+// Two partner-only requirements, both of which must be baked into the request
+// BEFORE it is frozen into the write-ahead payload (that payload is exactly
+// what a crash-recovery redelivery re-sends):
+//
+//   - external_order_id: the partner API's idempotency key. The shop's own
+//     quote id guarantees a retried create returns the ORIGINAL order rather
+//     than a second unpaid invoice for the same cart.
+//   - user.email: the partner API answers 400 "user.email is required", even
+//     for a phone top-up where the product goes to a number and the buyer may
+//     have given no email at all. The shop's notification address fills that
+//     gap; an email the buyer actually gave is never replaced.
+//
+// Without a partner key this is a no-op: v5 takes neither field.
+func (h *Handlers) prepareSupplierOrder(req *cryptorefills.CreateOrderRequest, quoteID string) {
+	if req == nil || h.CR == nil || !h.CR.PartnerMode() {
+		return
+	}
+	req.ExternalOrderID = quoteID
+	req.FallbackEmail = h.Cfg.CRFallbackEmail
+	if fb := h.Cfg.CRFallbackEmail; fb != "" {
+		if used := req.EnsureUserEmail(fb); used == fb {
+			log.Printf("supplier order %s: buyer gave no email (top-up); the partner API requires user.email, using the configured fallback", quoteID)
+		}
+	}
 }
 
 // ListUserQuotes returns the authenticated user's quotes newest-first.

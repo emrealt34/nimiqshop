@@ -38,6 +38,16 @@ type Config struct {
 	MonthlySpendLimitUSD float64
 	CRBaseURL            string
 	CRPartnerID          string
+	// CRPartnerKey is the v6 PARTNER API key (cr_pk_…). Setting it moves
+	// order create/read/cancel from /v5/orders to /v6/partner/orders, which
+	// is the only path that earns commission. Without it the shop keeps
+	// using the v5 user-session API and earns nothing.
+	CRPartnerKey string
+	// CRFallbackEmail is the address sent as user.email when a buyer orders a
+	// phone top-up without giving an email of their own: the partner API
+	// rejects an order with no user.email (400), while the product itself is
+	// delivered to the phone number. Never used when the buyer has an email.
+	CRFallbackEmail      string
 	CRAppVersion         string
 	CRUserAgent          string
 	CRWebhookKey         string
@@ -728,7 +738,7 @@ func Load() Config {
 		// ORDER ceiling stays a separate knob (DAILY_ORDER_LIMIT).
 		DailyOrderLimit: envOrderLimit("DAILY_ORDER_LIMIT", 100), DailySpendLimitUSD: envBudgetUSD("DAILY_SPEND_LIMIT_USD", 500),
 		MonthlySpendLimitUSD: envBudgetUSD("MONTHLY_SPEND_LIMIT_USD", 1000),
-		CRBaseURL:            env("CRYPTOREFILLS_BASE_URL", "https://api.cryptorefills.com"), CRPartnerID: os.Getenv("CRYPTOREFILLS_PARTNER_ID"), CRAppVersion: env("CRYPTOREFILLS_APP_VERSION", "nimshop/1.0"), CRUserAgent: env("CRYPTOREFILLS_USER_AGENT", "nimshop/1.0 +https://"+host), CRWebhookKey: os.Getenv("CRYPTOREFILLS_WEBHOOK_KEY"), PublicWebhookBaseURL: strings.TrimRight(os.Getenv("PUBLIC_WEBHOOK_BASE_URL"), "/"),
+		CRBaseURL:            env("CRYPTOREFILLS_BASE_URL", "https://api.cryptorefills.com"), CRPartnerID: os.Getenv("CRYPTOREFILLS_PARTNER_ID"), CRPartnerKey: strings.TrimSpace(os.Getenv("CRYPTOREFILLS_PARTNER_KEY")), CRFallbackEmail: strings.TrimSpace(env("CRYPTOREFILLS_FALLBACK_EMAIL", "orders@"+host)), CRAppVersion: env("CRYPTOREFILLS_APP_VERSION", "nimshop/1.0"), CRUserAgent: env("CRYPTOREFILLS_USER_AGENT", "nimshop/1.0 +https://"+host), CRWebhookKey: os.Getenv("CRYPTOREFILLS_WEBHOOK_KEY"), PublicWebhookBaseURL: strings.TrimRight(os.Getenv("PUBLIC_WEBHOOK_BASE_URL"), "/"),
 		CRPollSecs: envInt("WORKER_ORDER_POLL_SECS", 5), CRStaleSecs: envInt("WORKER_ORDER_STALE_SECS", 300), TestMode: envBool("TEST_MODE", false),
 		AdminUsername: os.Getenv("ADMIN_USERNAME"), AdminPassword: os.Getenv("ADMIN_PASSWORD"), AdminPasswordHash: os.Getenv("ADMIN_PASSWORD_HASH"), AdminTOTPSecret: os.Getenv("ADMIN_TOTP_SECRET"), AdminSessionSecret: os.Getenv("ADMIN_SESSION_SECRET"),
 		// ADMIN_USERNAME + ADMIN_PASSWORD is the simple production/local
@@ -934,6 +944,15 @@ func (c Config) Validate() error {
 	}
 	if c.CRPartnerID == "" {
 		return fmt.Errorf("CRYPTOREFILLS_PARTNER_ID is required")
+	}
+	// A malformed partner key is not a warning: every order create would
+	// answer 401 and the shop would silently stop selling. Fail at boot with
+	// the reason instead.
+	if c.CRPartnerKey != "" && !strings.HasPrefix(c.CRPartnerKey, "cr_pk_") {
+		return fmt.Errorf("CRYPTOREFILLS_PARTNER_KEY must be a partner API key (cr_pk_…); got %d characters with an unexpected prefix", len(c.CRPartnerKey))
+	}
+	if c.CRPartnerKey != "" && c.CRFallbackEmail != "" && !strings.Contains(c.CRFallbackEmail, "@") {
+		return fmt.Errorf("CRYPTOREFILLS_FALLBACK_EMAIL must be an email address")
 	}
 	if c.CRPollSecs < 2 || c.CRPollSecs > 60 {
 		return fmt.Errorf("WORKER_ORDER_POLL_SECS must be 2-60")

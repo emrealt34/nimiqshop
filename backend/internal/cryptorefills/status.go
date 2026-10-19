@@ -53,27 +53,48 @@ const (
 	QuoteRefunded      = "refunded"
 )
 
+// normalizeState folds the two spellings the supplier's API generations use
+// into one comparable token. v5 answers CamelCase ("WaitingForPayment",
+// "PaymentStarted"), the v6 PARTNER API answers SCREAMING_SNAKE
+// ("WAITING_FOR_PAYMENT", "PAYMENT_STARTED"), and a state that fails to map
+// is not a cosmetic problem: "is this order still awaiting payment?" is the
+// question that decides whether an invoice may be shown at all.
+func normalizeState(s string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(strings.TrimSpace(s)) {
+		switch r {
+		case '_', '-', ' ', '.':
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
 // MapToQuoteStatus translates a supplier state to the local quote status.
 // Unknown states map to manual_review (fail visible, never silent).
 func MapToQuoteStatus(supplierStatus string) string {
-	switch strings.ToLower(strings.TrimSpace(supplierStatus)) {
-	case strings.ToLower(StatusCreated), strings.ToLower(StatusWaitingForPayment):
+	switch normalizeState(supplierStatus) {
+	case normalizeState(StatusCreated), normalizeState(StatusWaitingForPayment), "waitingforpay":
 		return QuoteAwaitingPay
-	case strings.ToLower(StatusPaymentStarted), strings.ToLower(StatusPartialPaymentStarted):
+	case normalizeState(StatusPaymentStarted), normalizeState(StatusPartialPaymentStarted):
 		return QuotePaidStarted
-	case strings.ToLower(StatusPaymentReceived):
+	case normalizeState(StatusPaymentReceived), "paymentconfirmed", "paymentcompleted", "paid":
 		return QuotePaidReceived
-	case strings.ToLower(StatusWaitingForDelivery):
+	case normalizeState(StatusWaitingForDelivery), "inprogress", "processing":
 		return QuoteDelivering
-	case strings.ToLower(StatusDone):
+	case normalizeState(StatusDone), "completed", "complete", "delivered", "success", "successful":
 		return QuoteFulfilled
-	case strings.ToLower(StatusExpired):
+	case normalizeState(StatusExpired), "canceled", "cancelled":
+		// A cancel (ours or the supplier's) only ever happens before money
+		// is seen, so locally it is the same outcome as a lapsed window:
+		// dead, unpaid, never payable again.
 		return QuoteExpired
-	case strings.ToLower(StatusPaymentFailed), strings.ToLower(StatusPaymentSetupFailed):
+	case normalizeState(StatusPaymentFailed), normalizeState(StatusPaymentSetupFailed), "failed":
 		return QuoteFailed
-	case strings.ToLower(StatusRefunded):
+	case normalizeState(StatusRefunded):
 		return QuoteRefunded
-	case strings.ToLower(StatusWaitingForManual):
+	case normalizeState(StatusWaitingForManual), "waitingformanual":
 		return QuoteManualReview
 	default:
 		return QuoteManualReview
@@ -82,10 +103,11 @@ func MapToQuoteStatus(supplierStatus string) string {
 
 // IsTerminal reports whether a supplier state will never change again.
 func IsTerminal(supplierStatus string) bool {
-	switch strings.ToLower(strings.TrimSpace(supplierStatus)) {
-	case strings.ToLower(StatusDone), strings.ToLower(StatusExpired),
-		strings.ToLower(StatusPaymentFailed), strings.ToLower(StatusPaymentSetupFailed),
-		strings.ToLower(StatusRefunded):
+	switch normalizeState(supplierStatus) {
+	case normalizeState(StatusDone), "completed", "complete", "delivered",
+		normalizeState(StatusExpired), "canceled", "cancelled",
+		normalizeState(StatusPaymentFailed), normalizeState(StatusPaymentSetupFailed), "failed",
+		normalizeState(StatusRefunded):
 		return true
 	}
 	return false
@@ -94,10 +116,12 @@ func IsTerminal(supplierStatus string) bool {
 // IsPaidOrBeyond reports whether the supplier has seen money (any state
 // from PaymentStarted onward, excluding pure setup failures).
 func IsPaidOrBeyond(supplierStatus string) bool {
-	switch strings.ToLower(strings.TrimSpace(supplierStatus)) {
-	case strings.ToLower(StatusPaymentStarted), strings.ToLower(StatusPartialPaymentStarted),
-		strings.ToLower(StatusPaymentReceived), strings.ToLower(StatusWaitingForDelivery),
-		strings.ToLower(StatusDone), strings.ToLower(StatusRefunded):
+	switch normalizeState(supplierStatus) {
+	case normalizeState(StatusPaymentStarted), normalizeState(StatusPartialPaymentStarted),
+		normalizeState(StatusPaymentReceived), "paymentconfirmed", "paymentcompleted", "paid",
+		normalizeState(StatusWaitingForDelivery), "inprogress", "processing",
+		normalizeState(StatusDone), "completed", "complete", "delivered",
+		normalizeState(StatusRefunded):
 		return true
 	}
 	return false
@@ -177,8 +201,10 @@ func MoneyObserved(order *Order) bool {
 	if IsPaidOrBeyond(order.Status) {
 		return true
 	}
-	switch strings.ToLower(order.PaymentState) {
-	case "paymentstarted", "partialpaymentstarted", "paymentreceived", "paymentcompleted", "paymentconfirmed":
+	// v6 may report the payment progress as its own state in either spelling
+	// ("payment_state": "PAYMENT_STARTED" is one observed shape).
+	switch normalizeState(order.PaymentState) {
+	case "paymentstarted", "partialpaymentstarted", "paymentreceived", "paymentcompleted", "paymentconfirmed", "paid":
 		return true
 	}
 	for _, v := range []string{order.ReceivedAmount, order.SentCoinAmount} {

@@ -381,6 +381,14 @@ func (s *Store) RecordSupplierOrder(id string, order *cryptorefills.Order) error
 		if q.SupplierStatus == "" {
 			q.SupplierStatus = order.Status
 		}
+		// The partner API reports what this order earns the shop. Stored once
+		// with the order id (both live creates and crash recoveries land
+		// here) so the earning is auditable per order; it is never read back
+		// into a price. A later observation without a rate never erases one
+		// that was already reported.
+		if rate, ok := order.CommissionRate(); ok && q.SupplierCommissionRate == 0 {
+			q.SupplierCommissionRate = rate
+		}
 		q.UpdatedAt = time.Now().UTC()
 		return putQuoteTx(tx, &q)
 	})

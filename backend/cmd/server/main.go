@@ -291,13 +291,27 @@ func main() {
 		}
 	}
 
-	cr := cryptorefills.NewClient(cfg.CRBaseURL, cfg.CRPartnerID, cfg.CRAppVersion, cfg.CRUserAgent, cryptorefills.QueueConfig{
-		MaxQueue:            cfg.CRQueueMax,
-		MaxQueuePerActor:    cfg.CRQueuePerActorMax,
-		ActorRequestsPerMin: cfg.CRActorPerMinute,
-		ActorBurst:          cfg.CRActorBurst,
+	cr := cryptorefills.NewClient(cryptorefills.ClientOptions{
+		BaseURL:    cfg.CRBaseURL,
+		PartnerID:  cfg.CRPartnerID,
+		PartnerKey: cfg.CRPartnerKey,
+		AppVersion: cfg.CRAppVersion,
+		UserAgent:  cfg.CRUserAgent,
+		Queue: cryptorefills.QueueConfig{
+			MaxQueue:            cfg.CRQueueMax,
+			MaxQueuePerActor:    cfg.CRQueuePerActorMax,
+			ActorRequestsPerMin: cfg.CRActorPerMinute,
+			ActorBurst:          cfg.CRActorBurst,
+		},
 	})
 	defer cr.Close()
+	// Which API generation is live decides whether the shop earns anything,
+	// so it is stated once at boot rather than discovered from a 401 later.
+	if cr.PartnerMode() {
+		log.Printf("cryptorefills: v6 PARTNER API — orders on /v6/partner/orders (commission eligible)")
+	} else {
+		log.Printf("cryptorefills: v5 user-session API — set CRYPTOREFILLS_PARTNER_KEY to earn commission on /v6/partner/orders")
+	}
 
 	h := handlers.New(store, cfg, cr)
 

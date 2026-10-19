@@ -8,6 +8,14 @@
 // Order fulfillment is observed by polling GET /v5/orders/{id} (plus an
 // optional webhook when configured) — there is no customer balance, no
 // refund signer and no treasury on this server.
+//
+// PARTNER API (v6): when a partner key is configured the client speaks
+// /v6/partner/orders instead of /v5/orders. The request body is the same
+// shop-shaped one plus two partner-only additions — `external_order_id`
+// (the quote id, so a retry can never create a second order) and the
+// X-CR-Partner-Key / X-CR-Forwarded-For headers — and only partner orders
+// earn commission. Catalog calls (prices, brands, products) are unchanged:
+// they stay on v5 because the partner surface covers orders only.
 package cryptorefills
 
 import (
@@ -38,11 +46,33 @@ import (
 type Client struct {
 	baseURL   string
 	partnerID string
-	appVer    string
-	userAgent string
-	http      *http.Client
-	queue     *Scheduler
-	gets      getCache
+	// partnerKey is the v6 PARTNER API key (cr_pk_…). When it is set the
+	// client creates, reads and cancels orders on /v6/partner/orders and
+	// every one of those orders earns commission; empty keeps the v5
+	// user-session API. Never logged, never sent anywhere else.
+	partnerKey string
+	appVer     string
+	userAgent  string
+	http       *http.Client
+	queue      *Scheduler
+	gets       getCache
+}
+
+// PartnerMode reports whether this client is on the v6 partner API (the one
+// that pays commission) rather than the v5 user-session API.
+func (c *Client) PartnerMode() bool { return c != nil && c.partnerKey != "" }
+
+// ordersPath is the orders collection for this client's API generation.
+func (c *Client) ordersPath() string {
+	if c.partnerKey != "" {
+		return "/v6/partner/orders"
+	}
+	return "/v5/orders"
+}
+
+// orderPath is the single-order path (GET read / DELETE cancel).
+func (c *Client) orderPath(id string) string {
+	return c.ordersPath() + "/" + url.PathEscape(id)
 }
 
 // getCache is a tiny TTL cache + singleflight for successful GET responses
@@ -143,9 +173,23 @@ func (g *getCache) doNeg(ttl, negTTL time.Duration, isEmpty func(interface{}) bo
 	return val, err
 }
 
+// ClientOptions builds a Client. Named fields, not positional strings: a
+// transposed key/id pair on a money path must be impossible by construction.
+type ClientOptions struct {
+	BaseURL    string
+	PartnerID  string // X-Cr-Application: the v5 attribution header
+	PartnerKey string // X-CR-Partner-Key: v6 partner API (empty = v5 orders)
+	AppVersion string
+	UserAgent  string
+	Queue      QueueConfig
+}
+
 // NewClient builds a queued client. partnerID is the X-Cr-Application
 // value from the account page; appVer/userAgent are required headers.
-func NewClient(baseURL, partnerID, appVer, userAgent string, cfg QueueConfig) *Client {
+// partnerKey switches order traffic to the v6 partner API (see PartnerMode).
+func NewClient(o ClientOptions) *Client {
+	baseURL, partnerID, partnerKey := o.BaseURL, o.PartnerID, strings.TrimSpace(o.PartnerKey)
+	appVer, userAgent, cfg := o.AppVersion, o.UserAgent, o.Queue
 	if appVer == "" {
 		appVer = "1.0"
 	}
@@ -168,10 +212,11 @@ func NewClient(baseURL, partnerID, appVer, userAgent string, cfg QueueConfig) *C
 		ForceAttemptHTTP2:     true,
 	}
 	return &Client{
-		baseURL:   strings.TrimRight(baseURL, "/"),
-		partnerID: partnerID,
-		appVer:    appVer,
-		userAgent: userAgent,
+		baseURL:    strings.TrimRight(baseURL, "/"),
+		partnerID:  partnerID,
+		partnerKey: partnerKey,
+		appVer:     appVer,
+		userAgent:  userAgent,
 		http: &http.Client{Timeout: 35 * time.Second, Transport: transport,
 			// Never replay POST /orders through 307/308 or leak partner headers.
 			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
@@ -197,7 +242,7 @@ func (c *Client) OrderPollWait() time.Duration {
 	if c.queue == nil {
 		return 0
 	}
-	return c.queue.endpointWait(policyFor(http.MethodGet, "/v5/orders/example"))
+	return c.queue.endpointWait(policyFor(http.MethodGet, c.orderPath("example")))
 }
 
 func (c *Client) Close() {
@@ -304,8 +349,16 @@ func (c *Client) do(ctx context.Context, method, path string, body, out interfac
 		} // system/catalog work has no browser
 		req.Header.Set("User-Agent", agent)
 		req.Header.Set("Content-Type", "application/json")
+		// The v6 PARTNER API authenticates with its own key and REJECTS an
+		// order create without the end customer's IP (400
+		// missing_required_header). Both are sent whenever they exist: the
+		// extra headers are ignored by v5 and by catalog endpoints.
+		if c.partnerKey != "" {
+			req.Header.Set("X-CR-Partner-Key", c.partnerKey)
+		}
 		if ip := endUserIPFromContext(ctx); ip != "" {
 			req.Header.Set("X-Forwarded-For", ip)
+			req.Header.Set("X-CR-Forwarded-For", ip)
 		}
 
 		resp, err := c.http.Do(req)
@@ -734,8 +787,18 @@ type OrderPayment struct {
 // CreateOrderRequest is the POST /v5/orders (and /v5/orders/validations)
 // body.
 type CreateOrderRequest struct {
-	Deliveries []Delivery   `json:"deliveries"`
-	Payment    OrderPayment `json:"payment"`
+	// ExternalOrderID is the v6 PARTNER idempotency key: submitting the same
+	// value twice returns the ORIGINAL order instead of creating a second
+	// one, which is what makes a retried create (crash recovery, timeout, an
+	// ambiguous upstream answer) safe. The shop sends its own quote id, and
+	// it is only emitted on the partner API (see createPayload).
+	ExternalOrderID string `json:"-"`
+	// FallbackEmail is used only when the buyer gave no email at all (a
+	// phone top-up ordered without one) and the partner API still requires
+	// user.email. It is never sent when the buyer has an email of their own.
+	FallbackEmail string       `json:"-"`
+	Deliveries    []Delivery   `json:"deliveries"`
+	Payment       OrderPayment `json:"payment"`
 	// Email mirrors the docs' top-level "email" field (the end user the
 	// supplier delivers to / notifies). The per-delivery
 	// beneficiary_account is the delivery target itself.
@@ -743,6 +806,36 @@ type CreateOrderRequest struct {
 	User        *OrderUser   `json:"user,omitempty"`
 	Lang        string       `json:"lang"`
 	Acquisition *Acquisition `json:"acquisition,omitempty"`
+}
+
+// EnsureUserEmail supplies the address the v6 partner API insists on (it
+// answers 400 "user.email is required" without one, even for a top-up that
+// is delivered to a phone number). It never replaces an email the buyer
+// actually gave and reports the address the order will carry, so a caller
+// can log the substitution instead of hiding it.
+func (r *CreateOrderRequest) EnsureUserEmail(fallback string) string {
+	if r == nil {
+		return ""
+	}
+	if have := strings.TrimSpace(r.Email); have != "" {
+		return have
+	}
+	if r.User != nil {
+		if have := strings.TrimSpace(r.User.Email); have != "" {
+			return have
+		}
+	}
+	fb := strings.TrimSpace(fallback)
+	if fb == "" {
+		return ""
+	}
+	r.Email = fb
+	if r.User == nil {
+		r.User = &OrderUser{Email: fb}
+	} else {
+		r.User.Email = fb
+	}
+	return fb
 }
 
 // OrderUser is the end customer record. Email is mandatory: Cryptorefills
@@ -760,6 +853,13 @@ type Acquisition struct {
 // UnmarshalJSON accepts the real API names (order_id/order_state) and
 // normalizes the supplier's decimal fields, which arrive as numbers or
 // strings depending on endpoint.
+//
+// It also tolerates the shapes the two API generations disagree on: the v6
+// partner API may echo the identity as `id`/`status`, and may nest the
+// payment details (address, coin, amount, network) under `payment` instead
+// of the flat v5 fields. A missing wallet address would make a perfectly
+// payable order look unpayable, so every flat field is filled from the
+// nested object when — and only when — the flat shape left it empty.
 func (o *Order) UnmarshalJSON(b []byte) error {
 	type orderAlias Order
 	var raw orderAlias
@@ -771,7 +871,76 @@ func (o *Order) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	*o = Order(raw)
+	var aux struct {
+		ID      string `json:"id"`
+		Status  string `json:"status"`
+		State   string `json:"order_state"`
+		Payment *struct {
+			Coin          string `json:"coin"`
+			CoinAmount    any    `json:"coin_amount"`
+			Network       string `json:"network"`
+			WalletAddress string `json:"wallet_address"`
+			QRText        string `json:"qr_text"`
+			QRURL         string `json:"qr_url"`
+			PaymentState  string `json:"payment_state"`
+		} `json:"payment"`
+	}
+	if err := json.Unmarshal(normalized, &aux); err != nil {
+		return nil // not the nested shape: the flat decode already succeeded
+	}
+	if o.ID == "" {
+		o.ID = aux.ID
+	}
+	if o.Status == "" {
+		o.Status = aux.Status
+	}
+	if o.Status == "" {
+		o.Status = aux.State
+	}
+	if aux.Payment == nil {
+		return nil
+	}
+	if o.Coin == "" {
+		o.Coin = aux.Payment.Coin
+	}
+	if o.CoinAmount == "" {
+		if v, ok := decimalString(aux.Payment.CoinAmount); ok {
+			o.CoinAmount = v
+		}
+	}
+	if o.Network == "" {
+		o.Network = aux.Payment.Network
+	}
+	if o.WalletAddress == "" {
+		o.WalletAddress = aux.Payment.WalletAddress
+	}
+	if o.QRText == "" {
+		o.QRText = aux.Payment.QRText
+	}
+	if o.QRURL == "" {
+		o.QRURL = aux.Payment.QRURL
+	}
+	if o.PaymentState == "" {
+		o.PaymentState = aux.Payment.PaymentState
+	}
 	return nil
+}
+
+// decimalString renders a JSON number or string as a plain decimal string
+// (the only shape the amount guards accept), reporting false for anything
+// else (null, object, array).
+func decimalString(v any) (string, bool) {
+	switch t := v.(type) {
+	case nil:
+		return "", false
+	case string:
+		return strings.TrimSpace(t), strings.TrimSpace(t) != ""
+	case float64:
+		return strconv.FormatFloat(t, 'f', -1, 64), true
+	case json.Number:
+		return t.String(), true
+	}
+	return "", false
 }
 
 // epochOrString decodes a supplier timestamp that the real API normally
@@ -847,8 +1016,16 @@ func (f *flexFloat) UnmarshalJSON(b []byte) error {
 // unix-epoch created_at, no payment_expires_at, plus qr_text/qr_url.
 // For BTC + Lightning the wallet_address IS a BOLT11 invoice (lnbc…).
 type Order struct {
-	ID                 string    `json:"order_id"`
-	ReferenceID        string    `json:"reference_id,omitempty"`
+	ID          string `json:"order_id"`
+	ReferenceID string `json:"reference_id,omitempty"`
+	// ExternalOrderID is the partner API's idempotency key — the shop sends
+	// its own quote id, so a retried create returns the SAME order instead
+	// of charging the buyer twice.
+	ExternalOrderID string `json:"external_order_id,omitempty"`
+	// CommissionRatePct is what this order earns the shop on the v6 partner
+	// API (e.g. 0.05 = 5%). Informational: it is never used to price a
+	// buyer-facing amount, only recorded for reporting.
+	CommissionRatePct  flexFloat `json:"commission_rate_pct,omitempty"`
 	Status             string    `json:"order_state"`
 	PaymentState       string    `json:"payment_state,omitempty"`
 	Coin               string    `json:"coin,omitempty"`
@@ -997,7 +1174,7 @@ func CreateOutcomeAmbiguous(err error) bool {
 // the customer must pay. The payment window is 30 minutes.
 func (c *Client) CreateOrder(ctx context.Context, req *CreateOrderRequest) (*Order, error) {
 	var out Order
-	if err := c.do(ctx, http.MethodPost, "/v5/orders", req.createPayload(), &out); err != nil {
+	if err := c.do(ctx, http.MethodPost, c.ordersPath(), req.createPayloadFor(c.PartnerMode()), &out); err != nil {
 		return nil, err
 	}
 	if out.ID == "" || out.Status == "" {
@@ -1013,9 +1190,9 @@ func (c *Client) CreateOrder(ctx context.Context, req *CreateOrderRequest) (*Ord
 // state transition meaningfully (the payment window is 30 minutes) but it
 // removes the duplicate-fetch burst that used to burn the polling budget.
 func (c *Client) GetOrder(ctx context.Context, orderID string) (*Order, error) {
-	v, err := c.gets.do(3*time.Second, "GET /v5/orders/"+orderID, func() (interface{}, error) {
+	v, err := c.gets.do(3*time.Second, "GET "+c.orderPath(orderID), func() (interface{}, error) {
 		var out Order
-		if ferr := c.do(ctx, http.MethodGet, "/v5/orders/"+urlQueryEscape(orderID), nil, &out); ferr != nil {
+		if ferr := c.do(ctx, http.MethodGet, c.orderPath(orderID), nil, &out); ferr != nil {
 			return nil, ferr
 		}
 		if out.ID != orderID || out.Status == "" {
@@ -1086,11 +1263,86 @@ var (
 // authorize a new wallet handoff. It is a GET, never a new supplier order.
 func (c *Client) GetOrderFresh(ctx context.Context, id string) (*Order, error) {
 	var order Order
-	if err := c.do(ctx, http.MethodGet, "/v5/orders/"+url.PathEscape(id), nil, &order); err != nil {
+	if err := c.do(ctx, http.MethodGet, c.orderPath(id), nil, &order); err != nil {
 		return nil, err
 	}
 	if order.ID != id || order.Status == "" {
 		return nil, fmt.Errorf("supplier order response id/state mismatch")
 	}
 	return &order, nil
+}
+
+// OrderCancelError is a failed cancellation attempt on the partner API.
+// Retryable separates "try again later" (rate limit, supplier unavailable,
+// transport) from a FINAL answer (409 order_not_cancellable, 404 no such
+// order): a final refusal must be recorded once and never asked again,
+// while a transient one must keep the order eligible.
+type OrderCancelError struct {
+	OrderID   string
+	Err       error
+	Retryable bool
+}
+
+func (e *OrderCancelError) Error() string {
+	verb := "refused"
+	if e.Retryable {
+		verb = "failed"
+	}
+	return fmt.Sprintf("cancel of supplier order %s %s: %v", e.OrderID, verb, e.Err)
+}
+
+func (e *OrderCancelError) Unwrap() error { return e.Err }
+
+// CancelOrder tells the supplier to stop watching an abandoned checkout
+// instead of letting it burn a payment window to its natural timeout.
+//
+// Only the v6 partner API can cancel (the v5 user-session path has no such
+// operation), so this is an error without a partner key. The call is
+// IDEMPOTENT (cancelling an already-cancelled order answers 200 again) and
+// the supplier refuses with 409 once ANY payment — even a partial one — has
+// been seen, which is exactly the guarantee we want: funds that may be
+// arriving are never stranded by a cancel.
+func (c *Client) CancelOrder(ctx context.Context, id string) (*Order, error) {
+	if strings.TrimSpace(id) == "" {
+		return nil, fmt.Errorf("missing supplier order id")
+	}
+	if !c.PartnerMode() {
+		return nil, fmt.Errorf("order cancellation requires the v6 partner API key")
+	}
+	var order Order
+	if err := c.do(ctx, http.MethodDelete, c.orderPath(id), nil, &order); err != nil {
+		// 409 = not cancellable (money may be on its way: never cancelled
+		// from under it) and 404 = the supplier has no such order. Both are
+		// definitive and must not be retried. Everything else — 429 velocity
+		// limit, 503 cancel_temporarily_unavailable, 5xx, transport — leaves
+		// the order eligible for a later attempt.
+		status := 0
+		var se *SupplierError
+		if errors.As(err, &se) {
+			status = se.Status
+		}
+		final := status == http.StatusConflict || status == http.StatusNotFound
+		return nil, &OrderCancelError{OrderID: id, Err: err, Retryable: !final}
+	}
+	if order.ID == "" {
+		order.ID = id
+	}
+	return &order, nil
+}
+
+// CommissionRate reports the commission_rate_pct the partner API returned
+// for this order, and whether it returned one at all. The value is passed
+// through EXACTLY as stated: the shop does not guess whether the supplier
+// means a fraction or a percentage, so nothing here is ever rendered as a
+// price or an earning. Commission is the whole point of the partner API, so
+// its presence is recorded — never used to compute a buyer-facing amount.
+func (o *Order) CommissionRate() (float64, bool) {
+	if o == nil {
+		return 0, false
+	}
+	v := float64(o.CommissionRatePct)
+	if v <= 0 {
+		return 0, false
+	}
+	return v, true
 }

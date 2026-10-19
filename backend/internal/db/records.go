@@ -266,6 +266,24 @@ type Quote struct {
 	// observed raw supplier state.
 	SupplierOrderID string `json:"supplier_order_id,omitempty"`
 	SupplierStatus  string `json:"supplier_status,omitempty"`
+	// SupplierCancelState is what the v6 PARTNER API answered when the shop
+	// asked it to cancel an order the buyer abandoned BEFORE paying:
+	//   ""          – never asked (or the attempt is still due a retry)
+	//   "requested" – the supplier confirmed CANCELED (terminal, never asked again)
+	//   "refused"   – a definitive no (409 not cancellable / 404 unknown order);
+	//                 the supplier may already see money, so it is left to settle
+	//   "failed"    – transport/rate-limit failure, retried after a cool-off
+	// Only partner orders can be cancelled; the field stays empty on v5.
+	SupplierCancelState string `json:"supplier_cancel_state,omitempty"`
+	// SupplierCancelAt is when that attempt was recorded, so a transient
+	// failure is retried on a cool-off instead of on every tracker tick.
+	SupplierCancelAt time.Time `json:"supplier_cancel_at,omitempty"`
+	// SupplierCommissionRate is the commission_rate_pct the partner API
+	// reported for this order — exactly as the supplier stated it, with no
+	// unit assumed by the shop (the partner dashboard is the authority).
+	// Commission is what the shop EARNS here; it is never used to price the
+	// buyer, which is decided locally before the order exists.
+	SupplierCommissionRate float64 `json:"supplier_commission_rate,omitempty"`
 	// SupplierRequestAt is the durable "supplier request started / supplier
 	// order id awaited" marker of the order-creation phase. It is committed
 	// immediately BEFORE the CreateOrder call begins, which gives the crash

@@ -32,17 +32,43 @@ func (r *CreateOrderRequest) requestDeliveries() []requestDelivery {
 }
 
 func (r *CreateOrderRequest) createPayload() any {
+	// The frozen payload records the idempotency key even when the running
+	// config is on v5 (the key is metadata about the quote, and a later boot
+	// with a partner key must be able to reuse it). Only the wire payload is
+	// generation-aware — see createPayloadFor, which strips it for v5.
+	return r.createPayloadFor(true)
+}
+
+// createPayloadFor builds the create body for one API generation. v5 has no
+// external_order_id and must not be sent an unknown field, so the key is
+// emitted only for the partner API — even though it is stored either way.
+func (r *CreateOrderRequest) createPayloadFor(partnerMode bool) any {
 	user := r.User
 	if user == nil && r.Email != "" {
 		user = &OrderUser{Email: r.Email}
 	}
+	// The v6 partner API REJECTS an order whose user block carries no email
+	// (400 "user.email is required") — including a phone top-up, where the
+	// product goes to a number and there may be no buyer email at all. The
+	// shop's own notification address fills that gap (set by EnsureUserEmail)
+	// so a top-up can still be ordered on the partner API.
+	if user == nil || strings.TrimSpace(user.Email) == "" {
+		if fb := strings.TrimSpace(r.FallbackEmail); fb != "" {
+			user = &OrderUser{Email: fb}
+		}
+	}
+	externalID := ""
+	if partnerMode {
+		externalID = strings.TrimSpace(r.ExternalOrderID)
+	}
 	return struct {
-		Deliveries  []requestDelivery `json:"deliveries"`
-		Payment     OrderPayment      `json:"payment"`
-		User        *OrderUser        `json:"user,omitempty"`
-		Lang        string            `json:"lang"`
-		Acquisition *Acquisition      `json:"acquisition,omitempty"`
-	}{r.requestDeliveries(), r.Payment, user, r.Lang, r.Acquisition}
+		ExternalOrderID string            `json:"external_order_id,omitempty"`
+		Deliveries      []requestDelivery `json:"deliveries"`
+		Payment         OrderPayment      `json:"payment"`
+		User            *OrderUser        `json:"user,omitempty"`
+		Lang            string            `json:"lang"`
+		Acquisition     *Acquisition      `json:"acquisition,omitempty"`
+	}{externalID, r.requestDeliveries(), r.Payment, user, r.Lang, r.Acquisition}
 }
 
 func (r *CreateOrderRequest) validationPayload() any {

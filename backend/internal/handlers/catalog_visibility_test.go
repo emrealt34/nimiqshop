@@ -20,7 +20,7 @@ func TestQuoteMetadataCannotLoseEMoneyFromAnotherVariant(t *testing.T) {
 		_, _ = w.Write([]byte(`[{"family":"Mixed Card","brand":"Retail Card","kind":"giftcard","category":"retail","products":[{"product_id":"retail","denomination":"10 USD"}]},{"family":"Mixed Card","brand":"Financial Card","kind":"giftcard","category":"e-money","products":[{"product_id":"financial","denomination":"10 USD"}]}]`))
 	}))
 	defer server.Close()
-	client := cryptorefills.NewClient(server.URL, "test", "test", "test", cryptorefills.QueueConfig{})
+	client := cryptorefills.NewClient(cryptorefills.ClientOptions{BaseURL: server.URL, PartnerID: "test", AppVersion: "test", UserAgent: "test"})
 	defer client.Close()
 	h := New(nil, config.Config{}, client)
 	ctx := &fasthttp.RequestCtx{}

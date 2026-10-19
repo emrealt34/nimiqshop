@@ -153,6 +153,12 @@ func policyFor(method, rawPath string) endpointPolicy {
 		case (len(parts) == 3 || (len(parts) == 4 && parts[3] == "subscribe")) && parts[0] == "v5" && parts[1] == "orders" && parts[2] != "":
 			// /v5/orders/{id} (polling) and /v5/orders/{id}/subscribe
 			return p("GET /v5/orders/{id}", 2400, time.Minute)
+		case len(parts) == 4 && parts[0] == "v6" && parts[1] == "partner" && parts[2] == "orders" && parts[3] != "":
+			// /v6/partner/orders/{id} — the partner API's fulfillment poll.
+			// It MUST land on a real policy: an unrecognised path falls
+			// through to "unknown" (10/min), which would throttle the tracker
+			// into uselessness and stall every delivery.
+			return p("GET /v6/partner/orders/{id}", 2400, time.Minute)
 		}
 	}
 	if method == http.MethodPost {
@@ -164,6 +170,19 @@ func policyFor(method, rawPath string) endpointPolicy {
 			// against the partner key. Intent/idempotency/unpaid-order guards
 			// remain mandatory; a larger budget is not permission for probes.
 			return p("POST /v5/orders", 600, 10*time.Minute)
+		case "v6/partner/orders":
+			// Same preciousness, different endpoint: this is the call that
+			// earns commission, and it is the one that must never be
+			// hammered (a partner order is a real order).
+			return p("POST /v6/partner/orders", 600, 10*time.Minute)
+		}
+	}
+	if method == http.MethodDelete {
+		// Cancelling an abandoned order is cheap for the supplier and rare,
+		// so it gets a small budget of its own rather than sharing the
+		// create budget (a cancel storm must never starve real orders).
+		if len(parts) == 4 && parts[0] == "v6" && parts[1] == "partner" && parts[2] == "orders" && parts[3] != "" {
+			return p("DELETE /v6/partner/orders/{id}", 600, 10*time.Minute)
 		}
 	}
 	return p(method+" /unknown", 10, time.Minute)
