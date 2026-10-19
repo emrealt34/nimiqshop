@@ -221,6 +221,11 @@ func (h *Handlers) askSupplierAboutALapsedInvoice(ctx *fasthttp.RequestCtx, q db
 	sctx = cryptorefills.WithEndUserAgent(sctx, q.EndUserAgent)
 	fresh, err := h.CR.GetOrderFresh(sctx, q.SupplierOrderID)
 	if err != nil {
+		// "No such order" is an answer, and it is final: record it so the
+		// question is asked once per order instead of on every checkout.
+		if cryptorefills.IsOrderNotFound(err) {
+			_ = h.Store.MarkSupplierOrderUnknown(q.ID)
+		}
 		return nil // could not ask: the ordinary rule decides
 	}
 	if !cryptorefills.MoneyObserved(fresh) && !cryptorefills.IsPaidOrBeyond(fresh.Status) {

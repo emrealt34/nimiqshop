@@ -1118,7 +1118,7 @@ function OrdersPanel() {
               {/* Recovery row: re-ask the supplier first (the only upstream
                   path an operator has for a stuck purchase), then inspect what
                   was stored locally. */}
-              <SupplierSyncButton id={q.id} onSynced={reload} />
+              <SupplierSyncButton id={q.id} supplierUnknown={!!q.supplier_unknown} onSynced={reload} />
               <SupplierCancelButton id={q.id} canCancel={!!q.can_cancel} cancelState={q.supplier_cancel_state} onDone={reload} />
               <PaymentInspectionButton id={q.id} />
               {/* Contact the buyer entered for this order (the same values the supplier request is built from). Admin-only view; never logged. */}
@@ -1626,11 +1626,20 @@ function OrderMoneyRow({ q }: { q: any }) {
  * reported. Test-center quotes and quotes with no supplier id are refused
  * upstream, and that refusal is shown verbatim.
  */
-function SupplierSyncButton({ id, onSynced }: { id: string; onSynced?: () => void }) {
+function SupplierSyncButton({ id, supplierUnknown, onSynced }: { id: string; supplierUnknown?: boolean; onSynced?: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<{ status: string; supplier_status: string } | null>(null);
   return <div className="mt-1" style={{ display: 'inline-block', marginRight: 8 }}>
+    {/* Why the button will fail before it is pressed: the supplier answered
+        404 for this order (it predates the v6 PARTNER API, or it belongs to
+        another partner key). Pressing it again is only worth something after
+        the key situation changes, so the reason is stated, not hidden. */}
+    {supplierUnknown
+      ? <div className="xs" data-testid="supplier-unknown-note" style={{ marginBottom: 4 }}>
+          Not visible to the supplier (404) — this is not a partner order, so there is nothing to sync.
+        </div>
+      : null}
     <button type="button" className="btn btn-outline btn-sm" disabled={busy}
       data-testid="supplier-sync"
       onClick={async () => {

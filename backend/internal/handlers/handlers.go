@@ -76,7 +76,7 @@ type Handlers struct {
 	// deterministic (zero or one configured origin). Only then may a
 	// URL-keyed shared cache store a public response: otherwise the cached
 	// Access-Control-Allow-Origin of one origin would be served to another.
-	CDNCacheSafe   bool
+	CDNCacheSafe bool
 	// HostEnv is the process environment exactly as the HOST set it, snapshotted
 	// at boot before any console-managed override was exported on top of it
 	// (see admin_env.go). It is the fallback a removed override returns to, and
@@ -236,6 +236,53 @@ func (h *Handlers) supplierContext(ctx *fasthttp.RequestCtx) context.Context {
 		actor = "user:" + userID
 	}
 	return cryptorefills.WithActor(out, actor)
+}
+
+// supplierContextForQuote builds the supplier context for a call ABOUT A
+// BUYER'S order. The buyer's own IP is the one the partner API must be shown:
+// X-CR-Forwarded-For is REQUIRED on the v6 PARTNER API and is what the
+// supplier attributes the order to.
+//
+// When the quote carries no recorded buyer IP (an older row, or one written
+// before that field was stored) the CALLER's IP is sent instead of nothing,
+// because an empty header is rejected outright (400 missing_required_header)
+// and an operator reading that would reasonably conclude the supplier was
+// broken. The buyer's own IP always wins when it is known.
+func (h *Handlers) supplierContextForQuote(ctx *fasthttp.RequestCtx, q db.Quote) context.Context {
+	sctx := h.supplierContext(ctx)
+	ip := q.EndUserIP
+	if ip == "" {
+		ip = clientip.Resolve(ctx, h.Cfg.TrustProxy, h.Cfg.ClientIPPolicy()).IP
+	}
+	sctx = cryptorefills.WithEndUserIP(sctx, ip)
+	// The buyer's user agent is only overwritten when it exists: the admin
+	// console's own agent is a better default than an empty string.
+	if ua := q.EndUserAgent; ua != "" {
+		sctx = cryptorefills.WithEndUserAgent(sctx, ua)
+	}
+	return sctx
+}
+
+// supplierOrderUnknownDetail is the operator's answer when the supplier has
+// never heard of an order — a bare 404 on the v6 PARTNER API.
+//
+// It used to surface as a 502 "could not verify supplier status", which is
+// the message for an outage: operators retried, and the same 404 came back
+// (live bug, 2026-10-19, on every order created before the shop moved onto
+// the partner API). A 404 is not an outage and asking again cannot change
+// it, so it is reported as what it is — and the local record is untouched.
+const supplierOrderUnknownDetail = "the supplier does not recognise this order (HTTP 404). It was created before the shop moved to the v6 PARTNER API, or under another partner key, so there is nothing to read, cancel or sync — the local record is left exactly as it is."
+
+// writeSupplierOrderUnknown answers a supplier 404 on an admin order action.
+// 409, not 502: the supplier did answer, and its answer is final.
+func writeSupplierOrderUnknown(ctx *fasthttp.RequestCtx) {
+	writeJSON(ctx, fasthttp.StatusConflict, map[string]interface{}{
+		"error":           supplierOrderUnknownDetail,
+		"code":            "SUPPLIER_ORDER_UNKNOWN",
+		"supplier_error":  true,
+		"upstream_status": fasthttp.StatusNotFound,
+		"retryable":       false,
+	})
 }
 
 // supplierError maps a supplier failure to a stable client response while

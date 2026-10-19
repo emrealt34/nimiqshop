@@ -280,6 +280,16 @@ type Quote struct {
 	// SupplierCancelAt is when that attempt was recorded, so a transient
 	// failure is retried on a cool-off instead of on every tracker tick.
 	SupplierCancelAt time.Time `json:"supplier_cancel_at,omitempty"`
+	// SupplierUnknownAt is when the supplier last answered "no such order"
+	// (a bare HTTP 404) for this quote.
+	//
+	// It is an ANSWER, not an error, and it is final for as long as the shop
+	// keeps the same partner key: the order predates the v6 PARTNER API (it
+	// was created on the v5 session API), or it belongs to a different
+	// partner account. There is nothing to poll, cancel or sync, so the
+	// record is marked and the shop stops asking. It is cleared the moment
+	// a read succeeds, so a key fix heals the order by itself.
+	SupplierUnknownAt time.Time `json:"supplier_unknown_at,omitempty"`
 	// SupplierCommissionRate is the commission_rate_pct the partner API
 	// reported for this order — exactly as the supplier stated it, with no
 	// unit assumed by the shop (the partner dashboard is the authority).

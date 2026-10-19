@@ -220,6 +220,14 @@ func (q Quote) NeedsSupplierPoll() bool {
 	if q.SupplierOrderID == "" || q.Status == "fulfilled" || q.Status == "refunded" {
 		return false
 	}
+	if !q.SupplierUnknownAt.IsZero() {
+		// The supplier has already told us it has no such order (404) —
+		// most likely one created before the shop moved to the v6 PARTNER
+		// API. Polling cannot change that answer, and each attempt costs
+		// budget and used to push the order into manual review forever.
+		// A later successful read clears the marker and polling resumes.
+		return false
+	}
 	switch q.Status {
 	case "order_creating", "awaiting_payment", "payment_started", "payment_received", "delivering", "manual_review":
 		return true

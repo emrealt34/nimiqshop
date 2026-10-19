@@ -886,9 +886,9 @@ type CreateOrderRequest struct {
 	// one, which is what makes a retried create (crash recovery, timeout, an
 	// ambiguous upstream answer) safe. The shop sends its own quote id, and
 	// it is only emitted on the partner API (see createPayload).
-	ExternalOrderID string `json:"-"`
-	Deliveries    []Delivery   `json:"deliveries"`
-	Payment       OrderPayment `json:"payment"`
+	ExternalOrderID string       `json:"-"`
+	Deliveries      []Delivery   `json:"deliveries"`
+	Payment         OrderPayment `json:"payment"`
 	// Email mirrors the docs' top-level "email" field (the end user the
 	// supplier delivers to / notifies). The per-delivery
 	// beneficiary_account is the delivery target itself.
@@ -897,7 +897,6 @@ type CreateOrderRequest struct {
 	Lang        string       `json:"lang"`
 	Acquisition *Acquisition `json:"acquisition,omitempty"`
 }
-
 
 // OrderUser is the end customer record. Email is mandatory: Cryptorefills
 // delivers the product to it.
@@ -1254,7 +1253,7 @@ func (c *Client) GetOrder(ctx context.Context, orderID string) (*Order, error) {
 	v, err := c.gets.do(3*time.Second, "GET "+c.orderPath(orderID), func() (interface{}, error) {
 		var out Order
 		if ferr := c.do(ctx, http.MethodGet, c.orderPath(orderID), nil, &out); ferr != nil {
-			return nil, ferr
+			return nil, notFound(orderID, ferr)
 		}
 		if out.ID != orderID || out.Status == "" {
 			return nil, fmt.Errorf("supplier order response id/state mismatch")
@@ -1320,12 +1319,61 @@ var (
 	ErrNoWallet = errors.New("order response missing wallet address")
 )
 
+// OrderNotFoundError is the supplier's DEFINITIVE answer to an order read:
+// it has no such order, or the order is not visible to the partner key the
+// shop just authenticated with. The body is empty — a bare 404 — so the raw
+// SupplierError carries no code at all, which is exactly why every caller
+// used to read it as "the supplier is unavailable" (live bug, 2026-10-19:
+// the admin console's "sync with supplier" showed a 502 for every order the
+// v6 PARTNER API could not see, i.e. every order created before the shop
+// moved onto it).
+//
+// It is NOT transient and it is NOT a failure of the supplier: asking again
+// will produce the same 404. What the shop must do instead is stop asking,
+// say so plainly, and leave the local record alone.
+type OrderNotFoundError struct {
+	OrderID string
+	Err     error // the underlying *SupplierError (404)
+}
+
+func (e *OrderNotFoundError) Error() string {
+	return fmt.Sprintf("cryptorefills: the supplier has no order %s (HTTP 404)", e.OrderID)
+}
+
+func (e *OrderNotFoundError) Unwrap() error { return e.Err }
+
+// IsOrderNotFound reports whether the supplier said "no such order". Callers
+// that would otherwise retry, back off or flag an order must check this
+// FIRST: a 404 is an answer, not an outage.
+func IsOrderNotFound(err error) bool {
+	var nf *OrderNotFoundError
+	if errors.As(err, &nf) {
+		return true
+	}
+	// Also catch the raw shape: some call paths hand back the underlying
+	// *SupplierError (the DELETE cancellation path, for one), and a 404
+	// means the same thing wherever it comes from.
+	var se *SupplierError
+	return errors.As(err, &se) && se.Status == http.StatusNotFound
+}
+
+// notFound upgrades a bare 404 SupplierError from an order read. It wraps
+// rather than replaces, so callers reading the upstream status through
+// errors.As(*SupplierError) keep working.
+func notFound(orderID string, err error) error {
+	var se *SupplierError
+	if err != nil && errors.As(err, &se) && se.Status == http.StatusNotFound {
+		return &OrderNotFoundError{OrderID: orderID, Err: err}
+	}
+	return err
+}
+
 // GetOrderFresh is an explicit pre-payment check. No previous cached state may
 // authorize a new wallet handoff. It is a GET, never a new supplier order.
 func (c *Client) GetOrderFresh(ctx context.Context, id string) (*Order, error) {
 	var order Order
 	if err := c.do(ctx, http.MethodGet, c.orderPath(id), nil, &order); err != nil {
-		return nil, err
+		return nil, notFound(id, err)
 	}
 	if order.ID != id || order.Status == "" {
 		return nil, fmt.Errorf("supplier order response id/state mismatch")

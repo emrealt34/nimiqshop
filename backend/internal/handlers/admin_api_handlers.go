@@ -514,10 +514,20 @@ func (h *Handlers) AdminSyncOrder(ctx *fasthttp.RequestCtx) {
 			writeError(ctx, 409, "supplier acceptance is unresolved; no supplier id is known, so automatic retry is unsafe")
 			return
 		}
-		sctx := cryptorefills.WithEndUserIP(h.supplierContext(ctx), q.EndUserIP)
-		sctx = cryptorefills.WithEndUserAgent(sctx, q.EndUserAgent)
-		order, err := h.CR.GetOrderFresh(sctx, q.SupplierOrderID)
+		if h.CR == nil || !h.CR.PartnerMode() {
+			writeError(ctx, 409, "supplier sync runs on the v6 PARTNER API: set CRYPTOREFILLS_PARTNER_KEY and the shop can read this order back")
+			return
+		}
+		order, err := h.CR.GetOrderFresh(h.supplierContextForQuote(ctx, q), q.SupplierOrderID)
 		if err != nil {
+			if cryptorefills.IsOrderNotFound(err) {
+				// The supplier answered, and its answer is final: stop
+				// asking, and say so instead of crying 502.
+				_ = h.Store.MarkSupplierOrderUnknown(q.ID)
+				h.audit(adminIdentity(ctx).User.ID, "admin.quote.sync", ctx, "supplier has no order for quote "+id)
+				writeSupplierOrderUnknown(ctx)
+				return
+			}
 			h.supplierError(ctx, err, "could not verify supplier status")
 			return
 		}
@@ -583,13 +593,19 @@ func (h *Handlers) AdminCancelOrder(ctx *fasthttp.RequestCtx) {
 		writeError(ctx, fasthttp.StatusConflict, "supplier acceptance is unresolved; no supplier id is known")
 		return
 	}
-	sctx := cryptorefills.WithEndUserIP(h.supplierContext(ctx), q.EndUserIP)
-	sctx = cryptorefills.WithEndUserAgent(sctx, q.EndUserAgent)
+	sctx := h.supplierContextForQuote(ctx, q)
 
 	// 1) Ask the supplier FIRST. If the buyer paid while this row sat still,
 	//    the poll settles the purchase — and the cancel below is never sent.
 	fresh, ferr := h.CR.GetOrderFresh(sctx, q.SupplierOrderID)
 	if ferr != nil {
+		if cryptorefills.IsOrderNotFound(ferr) {
+			// There is nothing to cancel at a supplier that has never
+			// heard of the order. Say that; do not report an outage.
+			_ = h.Store.MarkSupplierOrderUnknown(q.ID)
+			writeSupplierOrderUnknown(ctx)
+			return
+		}
 		h.supplierError(ctx, ferr, "could not verify supplier status before cancelling")
 		return
 	}
@@ -606,6 +622,11 @@ func (h *Handlers) AdminCancelOrder(ctx *fasthttp.RequestCtx) {
 	// 2) Ask the supplier to release it.
 	order, cerr := h.CR.CancelOrder(sctx, q.SupplierOrderID)
 	if cerr != nil {
+		if cryptorefills.IsOrderNotFound(cerr) {
+			_ = h.Store.MarkSupplierOrderUnknown(q.ID)
+			writeSupplierOrderUnknown(ctx)
+			return
+		}
 		var ce *cryptorefills.OrderCancelError
 		if errors.As(cerr, &ce) && !ce.Retryable {
 			_ = h.Store.MarkSupplierCancel(q.ID, "refused")
@@ -1380,22 +1401,30 @@ func (h *Handlers) adminQuoteView(quote db.Quote) map[string]any {
 	if !quote.SupplierCancelAt.IsZero() {
 		view["supplier_cancel_at"] = quote.SupplierCancelAt
 	}
+	// The supplier has told us it has no such order (404): it predates the
+	// partner API or belongs to another key, so there is nothing to sync,
+	// cancel or poll. Shown so the console can explain a button that can
+	// never succeed instead of failing mysteriously.
+	view["supplier_unknown"] = !quote.SupplierUnknownAt.IsZero()
 	// Whether the operator's cancel button is offered at all.
 	view["can_cancel"] = h.canCancelPartnerOrder(quote)
 	return view
 }
 
 // canCancelPartnerOrder decides whether the operator's cancel button is
-// offered at all. It is the SAME rule the automatic sweep uses, because the
-// reason is not bookkeeping: the supplier refuses to cancel an order once it
-// has seen any payment, so asking about an order that money may be arriving
-// for is at best a wasted call and at worst a confusing 409.
+// offered at all. The reason is not bookkeeping: the supplier refuses to
+// cancel an order once it has seen any payment, so asking about an order
+// that money may be arriving for is at best a wasted call and at worst a
+// confusing 409.
 func (h *Handlers) canCancelPartnerOrder(q db.Quote) bool {
 	if h.CR == nil || !h.CR.PartnerMode() {
 		return false // cancellation only exists on the v6 partner API
 	}
 	if q.SupplierOrderID == "" || q.SimulatedSupplier() || q.TestMode {
 		return false
+	}
+	if !q.SupplierUnknownAt.IsZero() {
+		return false // the supplier has no such order; there is nothing to cancel
 	}
 	if q.PaymentObserved || cryptorefills.IsPaidOrBeyond(q.SupplierStatus) {
 		return false

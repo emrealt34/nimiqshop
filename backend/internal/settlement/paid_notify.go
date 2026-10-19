@@ -1,6 +1,7 @@
 package settlement
 
 import (
+	"log"
 	"sync/atomic"
 
 	"nimiqshop/internal/cryptorefills"
@@ -42,6 +43,15 @@ func shouldNotifyPaid(changed bool, supplierStatus string) bool {
 // paid status (changed == true), so a repeated poll or webhook cannot re-send
 // it; the notifier's own per-order reference makes it at-most-once as well.
 func ApplySupplierOrderNotify(s *db.Store, id string, order *cryptorefills.Order) (bool, error) {
+	// A read that got through at all proves the supplier DOES have this
+	// order, so any earlier "no such order" (404) marker is stale: forget
+	// it, even when the reported state changes nothing locally. This is what
+	// makes a partner-key fix heal an order on its own.
+	if order != nil {
+		if cerr := s.ClearSupplierOrderUnknown(id); cerr != nil {
+			log.Printf("settlement: quote %s: could not clear the supplier-unknown marker: %v", id, cerr)
+		}
+	}
 	changed, err := s.ApplySupplierOrder(id, order)
 	if err != nil || !changed {
 		return changed, err

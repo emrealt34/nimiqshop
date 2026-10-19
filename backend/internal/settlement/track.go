@@ -733,6 +733,34 @@ func (w *OrderTracker) trackOne(ctx context.Context, q db.Quote) {
 	defer cancel()
 	order, err := w.CR.GetOrder(callCtx, q.SupplierOrderID)
 	if err != nil {
+		// The supplier's "no such order" (a bare 404) is an ANSWER, not an
+		// outage: the order is not visible to the shop's partner key, and
+		// in practice it predates the v6 PARTNER API entirely. Asking again
+		// cannot change it, so the order is marked and dropped out of the
+		// poll set; an operator is told what is missing and why.
+		if cryptorefills.IsOrderNotFound(err) {
+			if merr := w.Store.MarkSupplierOrderUnknown(q.ID); merr != nil {
+				log.Printf("tracker: quote %s: could not record the supplier's 404: %v", q.ID, merr)
+			}
+			// Only an order that money could still be sitting on needs a
+			// human. A long-dead, unpaid invoice the supplier cannot see
+			// is simply finished: flagging it would just fill the review
+			// queue with rows nobody can act on.
+			moneyPossible := q.PaymentObserved ||
+				q.Status == cryptorefills.QuoteAwaitingPay ||
+				q.Status == cryptorefills.QuotePaidStarted ||
+				q.Status == cryptorefills.QuotePaidReceived ||
+				q.Status == cryptorefills.QuoteDelivering
+			if q.Status != cryptorefills.QuoteManualReview && moneyPossible {
+				reason := "the supplier does not recognise this order (HTTP 404): it is not a partner order (it predates the v6 PARTNER API, or it belongs to another partner key), so it can never be polled, synced or cancelled. Check whether the buyer paid and settle it by hand."
+				if merr := w.Store.MarkQuoteManualReview(q.ID, reason); merr == nil {
+					log.Printf("tracker: quote %s flagged manual review (supplier 404: not a partner order); polling stopped", q.ID)
+				}
+			} else if q.Status != cryptorefills.QuoteManualReview {
+				log.Printf("tracker: order %s is not visible to the supplier (404) and carries no payment; polling stopped", q.SupplierOrderID)
+			}
+			return
+		}
 		permanent, class := classifyPollError(err)
 		if permanent {
 			// A definitive supplier refusal will not heal by polling.

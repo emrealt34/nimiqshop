@@ -968,6 +968,47 @@ func (s *Store) MarkGiftNotified(id string) error {
 	})
 }
 
+// MarkSupplierOrderUnknown records the supplier's "no such order" (404).
+//
+// The point is to stop asking. A 404 on an order read is not a supplier
+// outage and not a rate limit: it is the supplier saying it has never heard
+// of this id (most often because the order predates the shop's v6 partner
+// key). Polling it every tick burns budget and, worse, used to flag every
+// one of them for manual review with a message nobody could act on.
+//
+// Idempotent: the FIRST time is the fact; the rest are the same fact.
+func (s *Store) MarkSupplierOrderUnknown(id string) error {
+	return s.Update(func(tx *badger.Txn) error {
+		var q Quote
+		if err := getJSON(tx, quoteKey(id), &q); err != nil {
+			return err
+		}
+		if !q.SupplierUnknownAt.IsZero() {
+			return nil
+		}
+		q.SupplierUnknownAt = time.Now().UTC()
+		return putQuoteTx(tx, &q)
+	})
+}
+
+// ClearSupplierOrderUnknown forgets that marker: a read succeeded, so the
+// supplier DOES have the order after all (a key was fixed, or the order
+// appeared). It is a metadata write and is cheap when there is nothing to
+// clear, which is the common case.
+func (s *Store) ClearSupplierOrderUnknown(id string) error {
+	return s.Update(func(tx *badger.Txn) error {
+		var q Quote
+		if err := getJSON(tx, quoteKey(id), &q); err != nil {
+			return err
+		}
+		if q.SupplierUnknownAt.IsZero() {
+			return nil
+		}
+		q.SupplierUnknownAt = time.Time{}
+		return putQuoteTx(tx, &q)
+	})
+}
+
 // MarkSupplierCancel records the outcome of a partner cancellation attempt
 // (see Quote.SupplierCancelState). It is a metadata write: the quote's status
 // is already terminal and is left untouched.
