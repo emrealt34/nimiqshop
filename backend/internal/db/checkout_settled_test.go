@@ -59,7 +59,11 @@ func TestCheckoutSettledIsExactlyNoPaymentAndNoMoneyInPlay(t *testing.T) {
 		{"payment started", live(func(q *Quote) { q.Status = "payment_started" }), false},
 		{"payment received", live(func(q *Quote) { q.Status = "payment_received" }), false},
 		{"delivering", live(func(q *Quote) { q.Status = "delivering" }), false},
-		{"manual review", live(func(q *Quote) { q.Status = "manual_review"; q.PaymentBlocked = true }), false},
+		// A manual review is spent as far as the cart's key is concerned: the
+		// buyer may buy the same cart again, because the point of the key is
+		// to protect ONE unresolved purchase — and a review is the operator's
+		// queue, not the buyer's waiting room. The review itself stays open.
+		{"manual review", live(func(q *Quote) { q.Status = "manual_review"; q.PaymentBlocked = true }), true},
 		{"delivered", live(func(q *Quote) { q.Status = "fulfilled" }), true},
 		{"refunded", live(func(q *Quote) { q.Status = "refunded" }), true},
 		{"expired unpaid", live(func(q *Quote) { q.Status = "expired"; q.PaymentExpiry = safetyNow.Add(-time.Hour) }), true},

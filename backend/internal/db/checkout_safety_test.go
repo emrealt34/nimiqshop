@@ -122,8 +122,47 @@ func TestALapsedInvoiceIsReleasedByTheSuppliersAnswerNotByABuffer(t *testing.T) 
 	}
 }
 
+func TestAManualReviewDoesNotBlockANewPurchase(t *testing.T) {
+	// The review is the operator's queue, not the buyer's punishment: the
+	// quote keeps its status (the buyer sees "under review", the console
+	// keeps it in the review list) and the buyer may still buy something
+	// else. Nothing about a stuck order is improved by refusing the next one.
+	//
+	// Owner (2026-10-19): "elle incelemeler yeni ürünleri bloklamamalı …
+	// elle incelemede kalmalılar ama yeni şeyleri bloklamamalılar."
+	cases := []struct {
+		name string
+		q    Quote
+	}{
+		{"a live supplier order is stuck", Quote{Status: "manual_review", SupplierOrderID: "sup-1"}},
+		{"money was seen on it", Quote{Status: "manual_review", SupplierOrderID: "sup-1", PaymentObserved: true}},
+		{"an operator hold is on it", Quote{Status: "manual_review", SupplierOrderID: "sup-1", PaymentBlocked: true}},
+		{"the supplier reported a payment", Quote{Status: "manual_review", SupplierOrderID: "sup-1", SupplierStatus: cryptorefills.StatusPaymentReceived}},
+		{"no order was ever created", Quote{Status: "manual_review"}},
+		{"the window lapsed ages ago", Quote{Status: "manual_review", SupplierOrderID: "sup-1", PaymentExpiry: safetyNow.Add(-72 * time.Hour), ExpiresAt: safetyNow.Add(-80 * time.Hour)}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			q := tc.q
+			q.ID, q.UserID = "q1", "u1"
+			if BlocksNewPurchaseAt(q, safetyNow) {
+				t.Fatal("a manual review must never block a new purchase")
+			}
+			// …and it is NOT quietly re-labelled or swept away: it stays
+			// manual_review and out of the lapsed bucket, so the operator's
+			// queue is exactly what the console lists.
+			if q.Status != "manual_review" {
+				t.Fatalf("status = %q, the review must keep its own status", q.Status)
+			}
+			if LapsedUnpaidInvoice(q, safetyNow) {
+				t.Fatal("a review must never be treated as a lapsed unpaid invoice")
+			}
+		})
+	}
+}
+
 func TestMoneyInFlightBlocksAtEveryStatusAndTime(t *testing.T) {
-	statuses := []string{"order_creating", "payment_started", "payment_received", "delivering", "manual_review"}
+	statuses := []string{"order_creating", "payment_started", "payment_received", "delivering"}
 	for _, st := range statuses {
 		q := Quote{
 			ID: "q1", UserID: "u1", Status: st,

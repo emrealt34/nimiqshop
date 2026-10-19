@@ -84,13 +84,21 @@ func BlocksNewPurchaseAt(q Quote, now time.Time) bool {
 	case "order_creating", "payment_started", "payment_received", "delivering":
 		return true
 	case "manual_review":
-		// A review only blocks when the SUPPLIER may be holding something:
-		// an order exists whose outcome is unknown, or money was seen. A
-		// quote flagged before any order was created (a crashed creation,
-		// an intent the tracker gave up on) has neither — blocking on it
-		// would lock the buyer out of the shop for an incident that is not
-		// theirs. An unresolved order is still the operator's to resolve.
-		return q.SupplierOrderID != "" || q.hasPaymentEvidence()
+		// A review NEVER blocks a new purchase. It is the operator's queue,
+		// not the buyer's penalty: the quote keeps its status (the buyer sees
+		// "under review" on the order, the console keeps it in the
+		// manual-review list) while the buyer is free to buy something else.
+		//
+		// Owner (2026-10-19): "elle incelemeler yeni ürünleri bloklamamalı …
+		// elle incelemede kalmalılar ama yeni şeyleri bloklamamalılar."
+		//
+		// Holding the whole shop shut for a stuck order bought the buyer
+		// nothing and the shop nothing: the stuck order is not fixed by
+		// refusing the next one. What still keeps a possibly-paid purchase
+		// from being paid twice is the purchase fingerprint and the
+		// money-evidence rules for the other statuses — never a hold on
+		// everything the buyer might want next.
+		return false
 	case "awaiting_payment":
 		return !q.PaymentVerifiedUnpaid(now)
 	case "expired":
