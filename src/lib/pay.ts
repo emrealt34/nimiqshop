@@ -227,6 +227,49 @@ export function paymentInFlight(q: any): boolean {
 }
 
 /**
+ * True when the buyer's wallet has already been handed this invoice.
+ *
+ * Two independent stamps, both recorded by the shop itself:
+ *   - `payment_handoff_at` — a pay button opened the invoice in a wallet;
+ *   - `lightning_funding_hint` / `lightning_swap_id` — the wallet reported a
+ *     SUBMITTED funding transaction for this very invoice (these fields are
+ *     only ever written by that report, so their presence is real evidence
+ *     the buyer pressed pay).
+ *
+ * This is deliberately NOT part of `paymentInFlight` and must never be: the
+ * hint persists forever, so folding it in would make `canRenewQuote` refuse a
+ * replacement invoice for the rest of that order's life and strand a buyer
+ * whose swap failed. It means "something is moving", not "money landed" —
+ * which is exactly what a waiting buyer has to be told instead of being left
+ * in front of a QR code that looks frozen.
+ */
+export function paymentHandedOff(q: any): boolean {
+  if (!q) return false;
+  if (q.payment_handoff_at) return true;
+  return Boolean(String(q.lightning_funding_hint || '').trim() || String(q.lightning_swap_id || '').trim());
+}
+
+/**
+ * Is the checkout's payment watch OVER — should the client stop asking?
+ *
+ * This is the rule the pay poll uses to decide when to give up, and it is
+ * deliberately about the INVOICE, never about a counter in the browser. A
+ * fixed "N seconds and we call it a failure" clock used to fire 7.5 minutes
+ * into a ~25-minute payment window and put "the supplier has not confirmed"
+ * in front of a buyer who had paid minutes earlier and was still settling.
+ *
+ * Answering false is always the safe side: while money may exist (observed,
+ * in flight, or on an operator hold) the watch NEVER ends, however old the
+ * deadline is, because an order that is still settling is not a failure.
+ */
+export function paymentWatchOver(q: any, now = Date.now()): boolean {
+  if (paymentInFlight(q) || q?.payment_observed || q?.payment_blocked) return false;
+  const deadline = paymentDeadline(q);
+  if (!Number.isFinite(deadline)) return false; // unreadable record: keep watching
+  return now >= deadline + PAYMENT_VERIFY_GRACE_MS;
+}
+
+/**
  * May the buyer safely get a NEW invoice for the same order?
  *
  * Only when the old one can no longer be paid AND nothing was charged:

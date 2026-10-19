@@ -475,6 +475,7 @@ const es = {
     flowYouGet: 'Recibes',
     flowDirect: 'Paga directamente a CryptoRefills',
     flowWaiting: 'Esperando a tu cartera Lightning…',
+    flowWaitingConfirm: 'Pago enviado a tu cartera — esperando la confirmación de la red. Puede tardar unos minutos; la página sigue comprobando y se actualiza sola.',
     flowMethodNim: 'Cartera Lightning',
     flowBurnNim: '🔥 Quemar',
     flowDeliverySaved: 'Entrega guardada · pago después',

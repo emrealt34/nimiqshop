@@ -484,6 +484,7 @@ const en = {
     flowYouGet: 'You get',
     flowDirect: 'Pay directly to CryptoRefills',
     flowWaiting: 'Waiting for Nimiq Pay…',
+    flowWaitingConfirm: 'Payment handed to your wallet — waiting for the network to confirm. This can take a few minutes; the page keeps watching and updates itself.',
     flowMethodNim: 'Nimiq Pay',
     flowBurnNim: '🔥 Burn',
     flowDeliverySaved: 'Delivery saved · payment next',

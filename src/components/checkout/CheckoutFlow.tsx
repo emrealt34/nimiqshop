@@ -18,7 +18,7 @@ import { ErrorDetail } from '../ui/uiKit';
 import { useCart, itemKey, type CartItem } from '../../lib/cartStore';
 import { useToast } from '../AppProviders';
 import { createQuote, createQuoteBatch, forgetQuote, getQuote, friendlyApiMessage, authorizePaymentLaunch, cachedNimRate, errorDetailLine } from '../../lib/api';
-import { canRenewQuote, paymentInFlight } from '../../lib/pay';
+import { canRenewQuote, paymentHandedOff, paymentInFlight } from '../../lib/pay';
 import { buildOrderRequest, getGiftExtras, setBuyerIdenticon, type DeliveryInfo } from '../../lib/delivery';
 import { identiconPngDataUrl, prepareBuyerIdenticon } from '../../lib/identicon';
 import { getAddress } from '../../lib/session';
@@ -36,7 +36,7 @@ import { saveLightningFunding } from '../../lib/api';
 import { inNimiqPay, detectMobilePlatform } from '../../lib/miniapp';
 import { PaymentCountdown } from './PaymentCountdown';
 import { lightningPaymentURI, rememberLightningPayment } from '../../lib/hub';
-import { PAID_STATUSES, quoteBolt11, quoteIdOf, isQuotePayable, launchLightningUri, paidOrderHandedBack, liveOrderHandedBack } from '../../lib/pay';
+import { PAID_STATUSES, paymentWatchOver, quoteBolt11, quoteIdOf, isQuotePayable, launchLightningUri, paidOrderHandedBack, liveOrderHandedBack } from '../../lib/pay';
 import { releaseIntentForQuote } from '../../lib/checkoutIntent';
 import { cashbackExclusiveNote, cashbackNimFromQuote, fmtCashbackNIM, loadCashbackBps } from '../../lib/cashback';
 import { quoteFaceValue } from '../../lib/format';
@@ -920,6 +920,23 @@ function Preparing({ label }: { label: string }) {
   );
 }
 
+const POLL_INTERVAL_MS = 5000;
+
+/**
+ * How long the poll keeps asking before it gives up entirely (~35 min).
+ *
+ * This is only a backstop for a quote whose payment window the client cannot
+ * read. The invoice's own deadline (payment window ~25 min + the 5-minute
+ * verification grace) decides when a payment can no longer arrive, NOT a
+ * counter on the client: an on-chain payment routed through Nimiq Pay (BTC
+ * swapped to Lightning) routinely needs several minutes to be seen, so any
+ * fixed clock short of the real window tells a buyer "the supplier has not
+ * confirmed" while their invoice is still perfectly payable — and then hands
+ * them a fresh order, which is exactly the double-payment trap the copy on
+ * that very screen warns about.
+ */
+const POLL_MAX_ATTEMPTS = 420;
+
 /* Poll a quote until it fulfills/fails. */
 function usePaymentPoll(quote: any, onResult: (ok: boolean, reason?: string) => void, onUpdate?: (q: any) => void) {
   useEffect(() => {
@@ -944,13 +961,25 @@ function usePaymentPoll(quote: any, onResult: (ok: boolean, reason?: string) => 
         }
         // Failures/manual review stay visible and non-payable. Keep polling:
         // local expiry or a transient/manual state can still become delivered.
+        //
+        // Once the invoice can no longer be paid AND the grace has passed,
+        // stop ASKING but do not declare a failure: the pay screen's own
+        // countdown owns that moment and already shows the right way out
+        // (a fresh invoice, or "we see your money" when something landed).
+        // Resolving 'timeout' here used to replace that screen with
+        // "checkout paused / supplier has not confirmed" — a false alarm on
+        // an order that was still settling. The rule lives in pay.ts so the
+        // unit tests pin it in both directions.
+        if (paymentWatchOver(q, Date.now())) {
+          return;
+        }
       } catch {}
-      if (attempts >= 90) {
+      if (attempts >= POLL_MAX_ATTEMPTS) {
         (window as any).__lastPayReason = 'timeout';
         onResult(false, 'timeout');
         return;
       }
-      timer = setTimeout(check, 5000);
+      timer = setTimeout(check, POLL_INTERVAL_MS);
     };
     check();
     return () => {
@@ -1028,6 +1057,9 @@ export function PayScreen({
   // "creating your new invoice…" line froze forever (live bug, 2026-10-04).
   // Keying it by quote + attempt remounts it for every new attempt.
   const [renewTick, setRenewTick] = useState(0);
+  // Set the instant the wallet reports a submitted payment, so the page
+  // stops looking frozen without waiting for the next status poll.
+  const [walletSubmitted, setWalletSubmitted] = useState(false);
   // Owner (2026-10-04): the pay hero shows the cashback this order will earn,
   // right under "what you get" — one short line, hidden when there is none.
   const [cbNimLabel, setCbNimLabel] = useState('');
@@ -1113,6 +1145,11 @@ export function PayScreen({
   // recap always says "+ fee" instead of pretending the figure is final.
   const nimText = nimBase ? t('checkout.flowFeeSuffix', { amount: nimBase }) : null;
   const localFiat = (() => { try { const { label } = quoteFaceValue(current); return label || ''; } catch { return ''; } })();
+  // The buyer's wallet already has this invoice (a pay button opened it, or
+  // the wallet reported a submitted funding transaction) and no confirmation
+  // has come back yet. Nothing is broken in that window — a Lightning payment
+  // routed through a swap needs minutes, not seconds — so the page says so.
+  const handedOff = (walletSubmitted || paymentHandedOff(current)) && !paymentInFlight(current);
 
   return (
     <div>
@@ -1124,9 +1161,15 @@ export function PayScreen({
           onExpire={() => setExpired(true)}
         />
       </div>
+      {/* The invoice has already been handed to the buyer's wallet and the
+          network has not confirmed it yet. This is the moment that used to
+          look like nothing was happening at all: the pay card kept showing a
+          QR and a countdown, so a buyer who HAD just paid saw no sign that
+          anything was moving and assumed the checkout was broken. Say it out
+          loud — the payment is on its way and it can take a few minutes. */}
       <div className="pay-wait small muted mt-1 center" style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center' }}>
         <div className="spinner" style={{ width: 14, height: 14 }} />
-        <span>{t('checkout.flowWaiting')}</span>
+        <span>{handedOff ? t('checkout.flowWaitingConfirm') : t('checkout.flowWaiting')}</span>
       </div>
 
       <LightningRailPills />
@@ -1170,6 +1213,7 @@ export function PayScreen({
             <NimiqPayPayButton
               invoice={invoice}
               onSubmitted={outcome => {
+                setWalletSubmitted(true);
                 rememberLightningPayment(invoice, { kind: 'quote', ref: quoteIdOf(current) });
                 if ('hash' in outcome || 'swapId' in outcome) void saveLightningFunding(quoteIdOf(current), outcome.hash || '', outcome.swapId).catch(() => {});
               }}
@@ -1183,6 +1227,7 @@ export function PayScreen({
             className="btn btn-gold btn-block btn-lg"
             style={{ marginTop: 12 }}
             onClick={async () => {
+              setWalletSubmitted(true);
               rememberLightningPayment(invoice, { kind: 'quote', ref: quoteIdOf(current) });
               void authorizePaymentLaunch(quoteIdOf(current)).catch(() => {});
               // Outside Nimiq Pay the button must DO something: desktop gets

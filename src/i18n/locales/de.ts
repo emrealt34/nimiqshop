@@ -475,6 +475,7 @@ const de = {
     flowYouGet: 'Du erhältst',
     flowDirect: 'Direkt an CryptoRefills zahlen',
     flowWaiting: 'Warten auf deine Lightning-Wallet…',
+    flowWaitingConfirm: 'Zahlung an deine Wallet übergeben — wir warten auf die Bestätigung des Netzwerks. Das kann einige Minuten dauern; die Seite aktualisiert sich von selbst.',
     flowMethodNim: 'Lightning-Wallet',
     flowBurnNim: '🔥 Verbrennen',
     flowDeliverySaved: 'Lieferung gespeichert · Zahlung folgt',

@@ -23,7 +23,7 @@ import { quoteStages, isTerminalStatus } from '../../lib/orderTrack';
 import { brandMetaForTitle } from '../../lib/catalogMeta';
 import { mapKind } from '../../lib/catalog';
 import { lightningPaymentURI, rememberLightningPayment } from '../../lib/hub';
-import { isQuotePayable, quoteBolt11, canRenewQuote, paymentInFlight, paymentWindowVerifying, renewItemFromQuote, renewInfoFromQuote, canRebuildRequest } from '../../lib/pay';
+import { isQuotePayable, quoteBolt11, canRenewQuote, paymentHandedOff, paymentInFlight, paymentWindowVerifying, renewItemFromQuote, renewInfoFromQuote, canRebuildRequest } from '../../lib/pay';
 import { supplierStatusLabel } from '../../lib/supplierStatus';
 import { buildOrderRequest } from '../../lib/delivery';
 import { uuid } from '../../lib/format';
@@ -680,9 +680,14 @@ function PayNowCard({ q }: { q: any }) {
           onExpire={() => setExpired(true)}
         />
       </div>
+      {/* Same moment as on the checkout pay screen: the wallet already has
+          this invoice (or reported a submitted funding transaction) and the
+          network has not confirmed it yet. Say the payment is on its way
+          instead of leaving a buyer who HAS just paid staring at a QR code
+          that looks frozen. */}
       <div className="pay-wait small muted mt-1 center" style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center' }}>
         <div className="spinner" style={{ width: 14, height: 14 }} />
-        <span>{t('checkout.flowWaiting')}</span>
+        <span>{paymentHandedOff(q) && !paymentInFlight(q) ? t('checkout.flowWaitingConfirm') : t('checkout.flowWaiting')}</span>
       </div>
 
       <LightningRailPills />

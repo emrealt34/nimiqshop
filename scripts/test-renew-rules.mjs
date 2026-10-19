@@ -34,7 +34,7 @@ writeFileSync(entry, `
 (globalThis as any).localStorage ??= { getItem: () => null, setItem() {}, removeItem() {} };
 (globalThis as any).window ??= { addEventListener() {}, location: { href: '' }, navigator: { language: 'en' } };
 (globalThis as any).document ??= { addEventListener() {}, documentElement: { lang: 'en' }, createElement: () => ({ style: {} }), cookie: '' };
-export { canRenewQuote, paymentInFlight, paymentWindowOver, paymentWindowVerifying, PAYMENT_VERIFY_GRACE_MS, renewItemFromQuote, renewInfoFromQuote, canRebuildRequest } from ${JSON.stringify(path.join(root, 'src/lib/pay'))};
+export { canRenewQuote, paymentInFlight, paymentHandedOff, paymentWindowOver, paymentWindowVerifying, paymentWatchOver, paymentDeadline, PAYMENT_VERIFY_GRACE_MS, renewItemFromQuote, renewInfoFromQuote, canRebuildRequest } from ${JSON.stringify(path.join(root, 'src/lib/pay'))};
 `);
 
 const esbuild = path.join(root, 'node_modules', '.bin', process.platform === 'win32' ? 'esbuild.cmd' : 'esbuild');
@@ -47,7 +47,7 @@ assert.equal(built.status, 0, built.stderr || 'esbuild failed to bundle src/lib/
 process.on('exit', () => rmSync(dir, { recursive: true, force: true }));
 
 const require = createRequire(import.meta.url);
-const { canRenewQuote, paymentInFlight, paymentWindowOver, paymentWindowVerifying, PAYMENT_VERIFY_GRACE_MS, renewItemFromQuote, renewInfoFromQuote, canRebuildRequest } = require(bundle);
+const { canRenewQuote, paymentInFlight, paymentHandedOff, paymentWindowOver, paymentWindowVerifying, paymentWatchOver, paymentDeadline, PAYMENT_VERIFY_GRACE_MS, renewItemFromQuote, renewInfoFromQuote, canRebuildRequest } = require(bundle);
 
 const NOW = Date.parse('2026-10-04T12:00:00Z');
 const GRACE = PAYMENT_VERIFY_GRACE_MS;
@@ -130,6 +130,79 @@ test('the grace boundary is inclusive and the shop field names all work', () => 
   assert.equal(canRenewQuote({ status: 'awaiting_payment', can_pay: false, payment_expires_at: at(-GRACE) }, NOW), true);
   assert.equal(canRenewQuote({ status: 'awaiting_payment', can_pay: false, expires_at: at(-GRACE) }, NOW), true);
   assert.equal(canRenewQuote({ status: 'awaiting_payment', can_pay: false, expires_at: at(-GRACE + 1000) }, NOW), false);
+});
+
+/* ------------------------------------------------------------------ *
+ * The buyer who already pressed pay (2026-10-19).
+ *
+ * A buyer paid and saw nothing change: the pay card kept showing the same QR
+ * and the same countdown until, 7.5 minutes later, the checkout declared
+ * "the supplier has not confirmed" — on an invoice that was still perfectly
+ * payable. Two rules are pinned here and they pull in opposite directions:
+ *
+ *   1. a wallet that reported a SUBMITTED funding transaction is real
+ *      evidence the buyer pressed pay, and the page must say so instead of
+ *      looking frozen (paymentHandedOff);
+ *   2. a submission is NOT a confirmation — it must never be allowed into
+ *      `paymentInFlight`, or the hint (which never clears) would block a
+ *      fresh invoice for the rest of the order's life and strand every
+ *      buyer whose swap failed.
+ * ------------------------------------------------------------------ */
+test('a wallet that reported a submitted payment counts as handed off', () => {
+  assert.equal(paymentHandedOff(quote()), false, 'a plain open invoice is not a handoff');
+  assert.equal(paymentHandedOff(quote({ payment_handoff_at: at(-60_000) })), true);
+  assert.equal(paymentHandedOff(quote({ lightning_funding_hint: '0xfeed' })), true);
+  assert.equal(paymentHandedOff(quote({ lightning_swap_id: 'swap-1' })), true);
+  assert.equal(paymentHandedOff(quote({ lightning_funding_hint: '   ', lightning_swap_id: '' })), false);
+  assert.equal(paymentHandedOff(null), false);
+  assert.equal(paymentHandedOff(undefined), false);
+});
+
+test('a handed-off payment is not yet money: it never blocks a fresh invoice', () => {
+  const q = quote({ payment_expiry: at(-GRACE), can_pay: false, lightning_funding_hint: '0xfeed', lightning_swap_id: 'swap-1' });
+  assert.equal(paymentHandedOff(q), true);
+  assert.equal(paymentInFlight(q), false, 'a submission is not a confirmation');
+  assert.equal(canRenewQuote(q, NOW), true, 'a buyer whose swap failed must still be able to pay');
+});
+
+test('the invoice deadline, not a client counter, decides when a payment can no longer land', () => {
+  const q = quote({ payment_expiry: at(20 * 60_000) });
+  assert.equal(paymentDeadline(q), NOW + 20 * 60_000);
+  // 7.5 minutes of waiting (the old hard give-up) is nowhere near the end.
+  assert.ok(paymentDeadline(q) + GRACE > NOW + 7.5 * 60_000, 'the window plus grace outlives any short counter');
+  assert.equal(Number.isFinite(paymentDeadline({ status: 'awaiting_payment' })), false);
+});
+
+test('the payment watch outlives the window — it never ends on a client counter', () => {
+  // 7.5 minutes of waiting: the OLD hard give-up, and the reason a buyer who
+  // had just paid was told "the supplier has not confirmed".
+  const q = quote({ payment_expiry: at(20 * 60_000) });
+  assert.equal(paymentWatchOver(q, NOW + 7.5 * 60_000), false);
+  assert.equal(paymentWatchOver(q, NOW + 24 * 60_000), false, 'still inside the verification buffer');
+  // Inside the verification buffer the shop is still proving whether money
+  // arrived, so the watch stays on.
+  assert.equal(paymentWatchOver(quote({ payment_expiry: at(-60_000), can_pay: false }), NOW), false);
+  // Only the deadline PLUS the grace ends it.
+  assert.equal(paymentWatchOver(quote({ payment_expiry: at(-GRACE), can_pay: false }), NOW), true);
+});
+
+test('the payment watch never ends while money may exist', () => {
+  const ancient = { payment_expiry: at(-48 * 3600_000), can_pay: false };
+  for (const over of [
+    { payment_observed: true },
+    { payment_blocked: true },
+    { status: 'payment_started', supplier_status: 'PaymentStarted' },
+    { status: 'payment_received' },
+    { lightning_funding_hint: '0xfeed', status: 'payment_started' },
+  ]) {
+    assert.equal(paymentWatchOver(quote({ ...ancient, ...over }), NOW), false, JSON.stringify(over));
+  }
+});
+
+test('the payment watch keeps going when the record cannot be read', () => {
+  assert.equal(paymentWatchOver({}, NOW), false);
+  assert.equal(paymentWatchOver(null, NOW), false);
+  assert.equal(paymentWatchOver({ status: 'awaiting_payment' }, NOW), false, 'an unreadable deadline is not an expiry');
 });
 
 /* ------------------------------------------------------------------ *

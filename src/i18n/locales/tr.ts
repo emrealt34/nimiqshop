@@ -476,6 +476,7 @@ const tr = {
     flowYouGet: 'Aldığın',
     flowDirect: 'Doğrudan CryptoRefills\'e öde',
     flowWaiting: 'Nimiq Pay bekleniyor…',
+    flowWaitingConfirm: 'Ödeme cüzdanına gönderildi — ağın onaylaması bekleniyor. Bu birkaç dakika sürebilir; sayfa izlemeye devam eder ve kendiliğinden güncellenir.',
     flowMethodNim: 'Nimiq Pay',
     flowBurnNim: '🔥 Yak',
     flowDeliverySaved: 'Teslimat kaydedildi · sırada ödeme',
