@@ -106,6 +106,40 @@ export async function applyCashbackCode(raw: string, orderUSD = 0): Promise<Appl
   });
 }
 
+export type PromoVerdict =
+  | { state: 'none' } // nothing applied — nothing to prove
+  | { state: 'fresh'; code: AppliedCashbackCode } // the shop just said yes
+  | { state: 'rejected'; code: string; status: number } // the shop just said no
+  | { state: 'unknown' }; // we could not ask — not a verdict either way
+
+/**
+ * Ask the shop about the promo code the buyer is carrying, RIGHT NOW.
+ *
+ * A code is proven once when it is typed in and then kept in sessionStorage
+ * for five minutes, and in that window it can stop being true: it expires,
+ * its uses run out, an admin retires it, or the cart grew past its cap. What
+ * used to happen then is the worst possible outcome — the cart kept showing
+ * the promo cashback, the order was created, and the code was quietly dropped
+ * at the till, so the buyer found out only when the cashback never arrived.
+ *
+ * Callers must act on `rejected` (say so, drop the code) and must NOT block
+ * on `unknown`: only the shop's own refusal is proof.
+ */
+export async function verifyAppliedCashbackCode(orderUSD = 0): Promise<PromoVerdict> {
+  const current = readAppliedCashbackCode();
+  if (!current) return { state: 'none' };
+  try {
+    return { state: 'fresh', code: await applyCashbackCode(current.code, orderUSD) };
+  } catch (err) {
+    const status = Number((err as { status?: number } | null)?.status) || 0;
+    // A dropped connection or a 5xx is not proof the code is dead — blocking a
+    // buyer on it would punish them for our own outage. Only a 4xx is the shop
+    // saying "no", and only that may stop a checkout.
+    if (status >= 400 && status < 500) return { state: 'rejected', code: current.code, status };
+    return { state: 'unknown' };
+  }
+}
+
 export async function refreshAppliedCashbackCode(): Promise<AppliedCashbackCode | null> {
   const current = readAppliedCashbackCode();
   if (!current) return null;

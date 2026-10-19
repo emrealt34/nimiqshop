@@ -15,7 +15,7 @@ import { selectionPayload } from '../../lib/productMoney';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../ui/Icon';
 import { ErrorDetail } from '../ui/uiKit';
-import { useCart, itemKey, type CartItem } from '../../lib/cartStore';
+import { useCart, itemKey, rowUSD, type CartItem } from '../../lib/cartStore';
 import { useToast } from '../AppProviders';
 import { createQuote, createQuoteBatch, forgetQuote, getQuote, friendlyApiMessage, authorizePaymentLaunch, cachedNimRate, errorDetailLine } from '../../lib/api';
 import { canRenewQuote, paymentHandedOff, paymentInFlight } from '../../lib/pay';
@@ -41,7 +41,7 @@ import { releaseIntentForQuote } from '../../lib/checkoutIntent';
 import { cashbackExclusiveNote, cashbackNimFromQuote, fmtCashbackNIM, loadCashbackBps } from '../../lib/cashback';
 import { quoteFaceValue } from '../../lib/format';
 import { StakerCashbackLine } from '../staker/StakerCashback';
-import { currentCashbackCode } from '../../lib/cashbackCode';
+import { clearAppliedCashbackCode, currentCashbackCode, verifyAppliedCashbackCode } from '../../lib/cashbackCode';
 import { nimAmountText, nimAmountFor } from '../../lib/nim';
 import { refreshWalletBalance } from '../../lib/walletBalance';
 import { fmtUSD } from '../../lib/format';
@@ -435,6 +435,26 @@ export function CheckoutFlow({
             batchBlocked = blockedFrom(e);
           }
         };
+
+        // ONE MORE PROOF BEFORE MONEY MOVES. The cart asks at "Ödemeye geç",
+        // but the delivery card can sit open for minutes and a promo code can
+        // die in that window (expired, used up, retired). A dead code must
+        // never ride onto an order as a phantom promo, and the buyer is told
+        // here — not left to notice a missing cashback days later. Failing to
+        // ASK is not a refusal, so an offline check never blocks the checkout.
+        if (currentCashbackCode()) {
+          const cartUSD = items.reduce((sum, it) => sum + Math.max(0, Number(rowUSD(it)) || 0), 0);
+          const verdict = await verifyAppliedCashbackCode(cartUSD);
+          if (verdict.state === 'rejected') {
+            clearAppliedCashbackCode();
+            toast(
+              verdict.status === 403
+                ? t('cashback.codeLockedNow', { code: verdict.code })
+                : t('cashback.codeInvalidNow', { code: verdict.code }),
+              'error',
+            );
+          }
+        }
 
         await tryBatch();
         let perItem = false;

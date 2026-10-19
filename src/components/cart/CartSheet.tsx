@@ -14,7 +14,7 @@ import { useSheet, useToast } from '../AppProviders';
 import { COUNTRY_CCY, MAX_QTY, fmtMoney, fmtNIM } from '../../lib/format';
 import { getFXRates, getNimRate, getProduct, onRatesChange } from '../../lib/api';
 import { loadCashbackBps, cashbackEarnLine } from '../../lib/cashback';
-import { readAppliedCashbackCode, CASHBACK_CODE_EVENT } from '../../lib/cashbackCode';
+import { clearAppliedCashbackCode, readAppliedCashbackCode, verifyAppliedCashbackCode, CASHBACK_CODE_EVENT } from '../../lib/cashbackCode';
 import { isAuthed } from '../../lib/session';
 import { openLoginSheet } from '../shell/SiteShell';
 import { CheckoutFlow } from '../checkout/CheckoutFlow';
@@ -53,6 +53,12 @@ export function CartSheetContent({ close }: { close: () => void }) {
   const [checkoutItems, setCheckoutItems] = useState<any[] | null>(null);
   const [totals, setTotals] = useState<{ nim: number; local: { amount: number; ccy: string } | null; usd: number; bps: number } | null>(null);
   const [cashbackCode, setCashbackCode] = useState(() => readAppliedCashbackCode());
+  // A promo code is proven once, when it is typed in, and then trusted for
+  // five minutes. Pressing "Ödemeye geç" asks the shop again: a code that
+  // died in the meantime must be named HERE, in the cart, not discovered
+  // after the order was paid without it.
+  const [promoError, setPromoError] = useState('');
+  const [promoChecking, setPromoChecking] = useState(false);
 
   const { items } = cart;
   // The cart's own money (TR cart → ₺): every row and the total use it.
@@ -138,7 +144,13 @@ export function CartSheetContent({ close }: { close: () => void }) {
   );
 
   useEffect(() => {
-    const sync = () => setCashbackCode(readAppliedCashbackCode());
+    const sync = () => {
+      setCashbackCode(readAppliedCashbackCode());
+      // Whatever the field just did (new code applied, old one removed), the
+      // refusal from the previous attempt is history — do not let it sit there
+      // arguing with a code that is no longer on the cart.
+      setPromoError('');
+    };
     window.addEventListener(CASHBACK_CODE_EVENT, sync);
     return () => window.removeEventListener(CASHBACK_CODE_EVENT, sync);
   }, []);
@@ -216,6 +228,38 @@ export function CartSheetContent({ close }: { close: () => void }) {
       return;
     }
     if (!items.length) return;
+    if (promoChecking) return;
+
+    // PROVE THE PROMO CODE BEFORE LEAVING THE CART (owner, 2026-10-19: "promo
+    // kodu geçersizse o ilk şeyde söylemeli, ödemeye geç butonuna basarken").
+    // The cart shows the code's cashback as if it were earned; a code that has
+    // since expired, run out or been retired used to ride all the way to the
+    // order and get dropped there, and the buyer only noticed when the cashback
+    // never arrived. Ask now, at the button, and if the shop refuses: say so
+    // here, drop the code, and stay put — one more tap continues without it.
+    setPromoError('');
+    if (readAppliedCashbackCode()) {
+      setPromoChecking(true);
+      try {
+        const verdict = await verifyAppliedCashbackCode(Number(totals?.usd) || 0);
+        if (verdict.state === 'fresh') {
+          setCashbackCode(verdict.code);
+        } else if (verdict.state === 'rejected') {
+          const message = verdict.status === 403
+            ? t('cashback.codeLockedNow', { code: verdict.code })
+            : t('cashback.codeInvalidNow', { code: verdict.code });
+          clearAppliedCashbackCode(); // the promo card folds back to "no code"
+          setCashbackCode(null);
+          setPromoError(message);
+          toast(message, 'error');
+          return;
+        }
+        // 'unknown' (offline / 5xx) is not a refusal: never block on our outage.
+      } finally {
+        setPromoChecking(false);
+      }
+    }
+
     // Keep the cart sheet clear of a second shortfall warning. The explicit
     // balance prompt belongs to the actual Nimiq Pay button in CheckoutFlow.
     setCheckoutItems([...items]);
@@ -355,10 +399,25 @@ export function CartSheetContent({ close }: { close: () => void }) {
         className="mt-2"
       />
       <details className="checkout-details-min"><summary>{t('cartSheet.detailsSummary')}</summary><div style={{ marginTop: 8 }}><CashbackFeeNotice example="nim" /></div></details>
-      <button className="btn btn-gold btn-block btn-lg mt-2" onClick={startCheckout} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', justifyContent: 'center', minWidth: 0, paddingInline: '16px' }}>
+      {/* An invalid promo code is reported HERE, where the button was pressed
+          — not after the order exists. The code is already removed from the
+          cart by the time this shows, so a second press just carries on. */}
+      {promoError ? (
+        <div className="alert error mt-2" role="alert" style={{ marginBottom: 0, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+          <Icon name="alert" size={16} />
+          <div className="small">{promoError}</div>
+        </div>
+      ) : null}
+      <button
+        className="btn btn-gold btn-block btn-lg mt-2"
+        onClick={startCheckout}
+        disabled={promoChecking}
+        aria-busy={promoChecking ? 'true' : 'false'}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', justifyContent: 'center', minWidth: 0, paddingInline: '16px' }}
+      >
         <Icon name="nimiq" size={20} />
         <span className="btn-label" style={{ flex: '1 1 auto', minWidth: 0, whiteSpace: 'normal', overflowWrap: 'anywhere', textAlign: 'center', lineHeight: 1.25 }}>
-          {t('cartSheet.checkoutCta')}
+          {promoChecking ? t('cashback.codeChecking') : t('cartSheet.checkoutCta')}
         </span>
       </button>
       <div className="row between mt-1">
