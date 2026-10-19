@@ -4122,8 +4122,13 @@ body { padding-bottom: 0; }
 .orders-page .section-head > .row { grid-column: 3; justify-self: end; max-width: 165px; justify-content: flex-end; flex-wrap: wrap; }
 .admin-page-header { position: relative; display: block; padding-inline: 150px; text-align: center; }
 .admin-page-header > a { position: absolute; inset-inline-end: 0; top: 0; }
-.order-summary-heading { flex-direction: column; align-items: center; text-align: center; }
-.order-summary-heading > div > .row { justify-content: center; flex-wrap: wrap; }
+/* NOT a page heading: this is the order card's own bar — thumb, name and date
+   on the left, the status badge on the right, like every other card on the
+   order page. It was swept into the centred-heading block above and became a
+   stacked, centred column (owner, 2026-10-19: "ortada gözükmemesi lazımdı,
+   solda iyilerdi"), so it is left-aligned again here. */
+.order-summary-heading { flex-direction: row; align-items: center; text-align: left; }
+.order-summary-heading > div > .row { justify-content: flex-start; flex-wrap: wrap; }
 @media (max-width: 760px) {
   .activity-page .act-hero, .orders-page .section-head, .admin-page-header { padding-inline: 0; }
   .activity-page .activity-actions, .orders-page .section-head > .row, .admin-page-header > a { position: static; margin-top: 12px; }
