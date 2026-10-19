@@ -138,6 +138,11 @@ func main() {
 		log.Fatalf("load .env: %v", err)
 	}
 	cfg := config.Load()
+	// The host's own environment, captured BEFORE any console-managed
+	// override is exported on top of it. Removing an override in the admin
+	// console falls back to exactly these values (see handlers.HostEnv), so
+	// an operator can experiment with a key and undo it without a redeploy.
+	hostEnv := config.SnapshotEnv()
 
 	// Wallet-seed normalization: the operator may paste a 24-word BIP39
 	// recovery phrase (Nimiq Hub / Nimiq Safe style) directly into
@@ -291,6 +296,31 @@ func main() {
 		}
 	}
 
+	// Console-managed environment values (owner, 2026-10-19: "env
+	// anahtarlarını admin sayfasından ekleyip çıkarabilmeliyim … mesela
+	// partner key gibi"). They live in the shop's database, so they survive a
+	// redeploy onto a fresh filesystem, and they are applied HERE — after the
+	// host's own environment has been read and before the supplier client is
+	// built from it — so a saved partner key is in force on this very boot.
+	//
+	// A bad row can never stop the server: it is skipped with a warning and
+	// the host value keeps standing, because the console is the only way back
+	// in.
+	if rows, err := store.ListEnvOverrides(); err != nil {
+		log.Printf("env overrides: could not be read, starting on the host values: %v", err)
+	} else if len(rows) > 0 {
+		values := make(map[string]string, len(rows))
+		for _, row := range rows {
+			values[row.Key] = row.Value
+		}
+		var warnings []string
+		cfg, warnings = config.ApplyEnvOverrides(cfg, values)
+		for _, warning := range warnings {
+			log.Printf("env overrides: %s", warning)
+		}
+		log.Printf("env overrides: %d value(s) restored from the admin console", len(rows))
+	}
+
 	cr := cryptorefills.NewClient(cryptorefills.ClientOptions{
 		BaseURL:          cfg.CRBaseURL,
 		PartnerID:        cfg.CRPartnerID,
@@ -315,6 +345,7 @@ func main() {
 	}
 
 	h := handlers.New(store, cfg, cr)
+	h.HostEnv = hostEnv
 
 	h.Presence = presence.New()
 	// A shared (CDN) cache is keyed on the URL alone, so it may only store a
@@ -1027,6 +1058,13 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 	r.POST("/api/admin/test-pay", adminOnly(h.AdminTestPay))
 	r.GET("/api/admin/test-activity", adminOnly(h.AdminTestActivity))
 	r.POST("/api/admin/test-activity", adminOnly(h.AdminTestActivity))
+	// Environment variables, managed from the console: add, change and remove
+	// them here instead of editing the host dashboard and redeploying. The
+	// partner key is the one that matters — it is applied to the running
+	// supplier client the moment it is saved.
+	r.GET("/api/admin/env", adminOnly(h.AdminListEnv))
+	r.POST("/api/admin/env", adminOnly(h.AdminSetEnv))
+	r.DELETE("/api/admin/env/{key}", adminOnly(h.AdminDeleteEnv))
 	r.GET("/api/admin/test-accounts", adminOnly(h.AdminListTestAccounts))
 	r.POST("/api/admin/test-accounts", adminOnly(h.AdminAddTestAccount))
 	r.DELETE("/api/admin/test-accounts/{address}", adminOnly(h.AdminRemoveTestAccount))

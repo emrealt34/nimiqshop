@@ -77,6 +77,14 @@ type Handlers struct {
 	// URL-keyed shared cache store a public response: otherwise the cached
 	// Access-Control-Allow-Origin of one origin would be served to another.
 	CDNCacheSafe   bool
+	// HostEnv is the process environment exactly as the HOST set it, snapshotted
+	// at boot before any console-managed override was exported on top of it
+	// (see admin_env.go). It is the fallback a removed override returns to, and
+	// the only way to answer "is this value the host's or ours?" — once an
+	// override is exported with os.Setenv the host value is no longer readable
+	// from the environment itself. Written once at boot, only read afterwards,
+	// so it needs no lock.
+	HostEnv        map[string]string
 	cache          *ttlCache
 	flights        *flightGroup
 	cashbackWallet adminCashbackWalletCache

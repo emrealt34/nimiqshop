@@ -123,20 +123,19 @@ func (h *Handlers) existingCheckout(ctx *fasthttp.RequestCtx, user, key, request
 		// gate inside CreateQuote re-asks the same question through the same
 		// index and answered "blocked" for a lapsed invoice forever, so the
 		// buyer got ACTIVE_CHECKOUT with no way out (live bug, 2026-10-04).
-		// One predicate, one answer for both callers — and it is time-aware:
-		// a lapsed invoice keeps blocking only while money could still be in
-		// play (payment seen, hold, or inside the supplier's grace buffer).
-		if !db.BlocksNewPurchaseAt(q, now) {
-			continue
+		// One predicate, one answer for both callers — and it is EVIDENCE,
+		// never a clock: money seen, a payment settling, or an operator hold.
+		// A lapsed, unpaid invoice is not decided by a timer any more: the
+		// v6 partner API can say whether anything was paid, and when nothing
+		// was the order is cancelled right here. This runs BEFORE the
+		// blocking question is asked, so the answer the shop acts on is the
+		// supplier's, not a buffer's.
+		if db.LapsedUnpaidInvoice(q, now) && q.SupplierOrderID != "" {
+			if verified := h.verifyLapsedWithSupplier(ctx, q, now); verified != nil {
+				q = *verified
+			}
 		}
-		// A lapsed, unpaid invoice blocks only while the shop is still giving
-		// a slow payment time to show up (PaymentGrace). On the v6 partner
-		// API we no longer have to guess with a timer: ask the supplier, and
-		// when it has seen no money, release the order right there and let
-		// the buyer continue immediately. Anything uncertain (cannot ask,
-		// money on the way, supplier refuses) falls back to waiting — the
-		// hold is never lifted on an assumption.
-		if db.LapsedUnpaidInvoice(q, now) && h.releaseLapsedInvoice(ctx, q, now) {
+		if !db.BlocksNewPurchaseAt(q, now) {
 			continue
 		}
 		if q.PurchaseFingerprint != "" && q.PurchaseFingerprint == purchaseFP && !ack {
@@ -161,42 +160,60 @@ func (h *Handlers) existingCheckout(ctx *fasthttp.RequestCtx, user, key, request
 	return false
 }
 
-// releaseLapsedInvoice asks the supplier whether anything was paid on a
-// lapsed invoice and, when nothing was, cancels the order so the buyer is
-// released at once instead of waiting out the grace buffer.
+// verifyLapsedWithSupplier replaces the old grace buffer with an ANSWER.
 //
-// It only exists on the v6 partner API (the partner surface is the one with a
-// cancel), and it can only ever end in one of two safe states: the supplier
-// confirmed no money and the order is cancelled (so the invoice can no longer
-// be paid by anyone), or nothing changed and the hold stands.
-func (h *Handlers) releaseLapsedInvoice(ctx *fasthttp.RequestCtx, q db.Quote, now time.Time) bool {
-	if h.CR == nil || !h.CR.PartnerMode() || q.SupplierOrderID == "" || q.SimulatedSupplier() {
-		return false
+// A lapsed invoice used to keep blocking the buyer for a few more minutes in
+// case a payment was still in flight. The v6 partner API settles that
+// question directly: ask for the order, and
+//
+//   - if money has been observed, apply it — the purchase is settling and the
+//     buyer must not be given a second order to pay;
+//   - if nothing was paid, cancel the order. The invoice is then dead at the
+//     supplier too, so it can never be paid late, and the buyer is released
+//     on the spot instead of after a timer.
+//
+// If the supplier cannot be asked, nothing changes and the ordinary rule
+// applies (a lapsed unpaid invoice does not block). The shop never releases a
+// buyer on an assumption — it releases them on "the supplier says no money,
+// and the invoice is now cancelled".
+//
+// It returns the updated quote (nil when nothing changed).
+func (h *Handlers) verifyLapsedWithSupplier(ctx *fasthttp.RequestCtx, q db.Quote, now time.Time) *db.Quote {
+	if h.CR == nil || !h.CR.PartnerMode() || q.SimulatedSupplier() || q.TestMode {
+		return nil
+	}
+	if cryptorefills.IsTerminal(q.SupplierStatus) && !q.PaymentObserved {
+		return nil // already dead upstream and unpaid; nothing left to settle
 	}
 	sctx := cryptorefills.WithEndUserIP(h.supplierContext(ctx), q.EndUserIP)
 	sctx = cryptorefills.WithEndUserAgent(sctx, q.EndUserAgent)
 	fresh, err := h.CR.GetOrderFresh(sctx, q.SupplierOrderID)
 	if err != nil {
-		return false // could not ask: keep the hold, the buffer will expire it
+		return nil // could not ask: the ordinary rule decides
 	}
 	if cryptorefills.MoneyObserved(fresh) || cryptorefills.IsPaidOrBeyond(fresh.Status) {
-		_, _ = settlement.ApplySupplierOrderNotify(h.Store, q.ID, fresh)
-		return false // money is on its way: the hold is doing its job
+		// Money is (or may be) on its way: settle it here, never beside it.
+		if _, aerr := settlement.ApplySupplierOrderNotify(h.Store, q.ID, fresh); aerr == nil {
+			if latest, gerr := h.Store.GetQuote(q.ID); gerr == nil {
+				return &latest
+			}
+		}
+		return nil
 	}
 	cancelled, err := h.CR.CancelOrder(sctx, q.SupplierOrderID)
 	if err != nil {
-		return false // the supplier would not release it; wait for the buffer
+		return nil // the supplier would not release it; leave the row alone
 	}
 	_ = h.Store.MarkSupplierCancel(q.ID, "requested")
-	// Apply the supplier's own answer (Canceled) so BOTH callers of
+	// Apply the supplier's own answer (Canceled) so both callers of
 	// BlocksNewPurchaseAt — this pre-check and the atomic gate inside the
 	// create — see the release at the same instant.
-	_, _ = settlement.ApplySupplierOrderNotify(h.Store, q.ID, cancelled)
-	latest, err := h.Store.GetQuote(q.ID)
-	if err != nil {
-		return false
+	if _, aerr := settlement.ApplySupplierOrderNotify(h.Store, q.ID, cancelled); aerr == nil {
+		if latest, gerr := h.Store.GetQuote(q.ID); gerr == nil {
+			return &latest
+		}
 	}
-	return !db.BlocksNewPurchaseAt(latest, now)
+	return nil
 }
 
 func (h *Handlers) activeCheckoutError(ctx *fasthttp.RequestCtx, q db.Quote) {

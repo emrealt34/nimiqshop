@@ -368,7 +368,7 @@ export function CheckoutFlow({
 
   // ---------------- The orchestrator ----------------
   const runFlow = useCallback(
-    async (initialItems: CartItem[], info: DeliveryInfo, cards: CartItem[], _tops: CartItem[]) => {
+    async (initialItems: CartItem[], info: DeliveryInfo, _cards: CartItem[], _tops: CartItem[]) => {
       let items: CartItem[] = initialItems;
       const pm = info.paymentMethod || 'nimiq_pay';
       const cd = info.cashbackDestination || 'cashback';
@@ -418,7 +418,12 @@ export function CheckoutFlow({
           batchActiveCheckout = false;
           batchIssues = [];
           try {
-            if (cards.length > 0 && !isValidEmail(info.email)) {
+            // EVERY order needs the buyer's own address, a top-up included:
+            // the credit lands on the number, but the receipt and the order
+            // confirmation are emailed and the supplier refuses an order with
+            // no contact address. There is no fallback address to fall back
+            // on, so this is the buyer's own or no order.
+            if (!isValidEmail(info.email)) {
               throw new Error(t('checkout.flowNeedEmail'));
             }
             batch = await createQuoteBatch(batchReqFor(items, info.phones, info.email, pm, cd, !!info.anonymous, identicon), info.email.trim(), uuid(), currentCashbackCode(), pm, cd, !!info.anonymous, ackRef.current, { fresh: takeFresh() });
@@ -982,8 +987,8 @@ function usePaymentPoll(quote: any, onResult: (ok: boolean, reason?: string) => 
         // Failures/manual review stay visible and non-payable. Keep polling:
         // local expiry or a transient/manual state can still become delivered.
         //
-        // Once the invoice can no longer be paid AND the grace has passed,
-        // stop ASKING but do not declare a failure: the pay screen's own
+        // Once the invoice can no longer be paid, stop ASKING but do not
+        // declare a failure: the pay screen's own
         // countdown owns that moment and already shows the right way out
         // (a fresh invoice, or "we see your money" when something landed).
         // Resolving 'timeout' here used to replace that screen with
@@ -1717,8 +1722,10 @@ function SuccessBeat({ paidCount, delivered = [], onDone }: { paidCount: number;
     const t = setTimeout(finish, 900);
     return () => clearTimeout(t);
   }, [finish]);
-  // Channel-accurate confirmation: a phone-only cart has no code and no email,
-  // so the old "your code is delivered to the address" line was wrong for it.
+  // Channel-accurate confirmation: a phone-only cart has no CODE, so the old
+  // "your code is delivered to the address" line was wrong for it. It still
+  // has the buyer's email — that is where the receipt and the confirmation
+  // go — but the thing that was BOUGHT lands on the number.
   const del = deliverySummary(delivered);
   const what =
     del.channel === 'phone'

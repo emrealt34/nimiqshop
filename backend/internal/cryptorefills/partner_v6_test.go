@@ -198,35 +198,35 @@ func TestPartnerCreateForwardsTheEndCustomerIP(t *testing.T) {
 	}
 }
 
-func TestPartnerTopUpWithoutABuyerEmailUsesTheShopFallback(t *testing.T) {
-	// Phone top-ups are delivered to a number; a buyer may legitimately have
-	// no email, and the partner API rejects any order without user.email.
-	req := &CreateOrderRequest{
-		Deliveries:    []Delivery{{BrandName: "Turk Telekom", CountryCode: "TR", Denomination: "100 TRY", BeneficiaryAccount: "+905551234567"}},
-		Payment:       OrderPayment{Type: "via", PaymentVia: "USER_WALLET", Coin: "BTC"},
-		Lang:          "tr",
-		FallbackEmail: "orders@shop.example",
+// TestAnOrderWithoutTheBuyersEmailIsNeverDispatchedWithAnInventedOne is the
+// standing rule: the shop has NO fallback address and must never invent one.
+// The v6 partner API rejects any order whose user block carries no email
+// (400 "user.email is required", verified live), so a buyer who gives no
+// address simply cannot order until they do — the checkout refuses before a
+// single request reaches the supplier.
+func TestAnOrderWithoutTheBuyersEmailIsNeverDispatchedWithAnInventedOne(t *testing.T) {
+	// A mobile top-up: the credit lands on the number, and the buyer may not
+	// have entered an email at all.
+	topUp := &CreateOrderRequest{
+		Deliveries: []Delivery{{BrandName: "Turk Telekom", CountryCode: "TR", Denomination: "100 TRY", BeneficiaryAccount: "+905551234567"}},
+		Payment:    OrderPayment{Type: "via", PaymentVia: "USER_WALLET", Coin: "BTC"},
+		Lang:       "tr",
 	}
-	if used := req.EnsureUserEmail("orders@shop.example"); used != "orders@shop.example" {
-		t.Fatalf("fallback email was not applied: %q", used)
-	}
-	raw, err := MarshalCreateRequest(req)
+	raw, err := MarshalCreateRequest(topUp)
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	if !strings.Contains(string(raw), `"email":"orders@shop.example"`) {
-		t.Fatalf("the partner payload must carry user.email: %s", raw)
+	// No email anywhere in the payload — not the shop's, not a placeholder.
+	if strings.Contains(string(raw), "@") {
+		t.Fatalf("an order with no buyer email must carry no address at all: %s", raw)
 	}
-}
-
-func TestABuyerEmailIsNeverReplacedByTheFallback(t *testing.T) {
-	req := &CreateOrderRequest{User: &OrderUser{Email: "buyer@example.com"}, FallbackEmail: "orders@shop.example"}
-	if used := req.EnsureUserEmail("orders@shop.example"); used != "buyer@example.com" {
-		t.Fatalf("the buyer's own email must win, got %q", used)
-	}
-	raw, _ := MarshalCreateRequest(req)
-	if strings.Contains(string(raw), "orders@shop.example") {
-		t.Fatalf("the fallback must not appear when the buyer has an email: %s", raw)
+	// Which is exactly the payload the partner API answers 400 to. The shop
+	// refuses it earlier, with a sentence the buyer can act on.
+	withEmail := *topUp
+	withEmail.User = &OrderUser{Email: "buyer@example.com"}
+	raw2, _ := MarshalCreateRequest(&withEmail)
+	if !strings.Contains(string(raw2), `"email":"buyer@example.com"`) {
+		t.Fatalf("the buyer's own email must be sent exactly as given: %s", raw2)
 	}
 }
 

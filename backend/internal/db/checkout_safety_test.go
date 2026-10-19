@@ -41,38 +41,30 @@ func awaiting(setup func(*Quote)) Quote {
 	return q
 }
 
-func TestLapsedInvoiceReleasesOnlyAfterTheSupplierCouldNotHaveSeenPayment(t *testing.T) {
-	grace := PaymentGrace
-	if grace <= 0 {
-		t.Fatalf("PaymentGrace must be positive, got %s", grace)
-	}
+func TestALapsedInvoiceIsReleasedByTheSuppliersAnswerNotByABuffer(t *testing.T) {
+	// There is no grace buffer any more. A lapsed invoice stops blocking the
+	// moment its window closes, because whether money arrived is answered by
+	// the v6 partner API (handlers.verifyLapsedWithSupplier) — which cancels
+	// the order when nothing was paid — instead of by waiting. What still
+	// blocks is EVIDENCE: money observed, a payment being settled, an
+	// operator hold, or a record whose deadline is unreadable (fail closed).
 	cases := []struct {
 		name   string
 		quote  Quote
 		blocks bool
 	}{
 		{
-			name:   "window still open",
+			name:   "window still open — the invoice can still be paid",
 			quote:  awaiting(func(q *Quote) { q.PaymentExpiry = safetyNow.Add(20 * time.Minute) }),
 			blocks: true,
 		},
 		{
-			name:   "just lapsed, supplier may not have seen a last-second payment",
-			quote:  awaiting(func(q *Quote) { q.PaymentExpiry = safetyNow.Add(-time.Minute) }),
-			blocks: true,
-		},
-		{
-			name:   "grace elapsed, nothing seen anywhere",
-			quote:  awaiting(func(q *Quote) { q.PaymentExpiry = safetyNow.Add(-grace - time.Second) }),
+			name:   "window just closed: released at once, the supplier decides, not a timer",
+			quote:  awaiting(func(q *Quote) { q.PaymentExpiry = safetyNow.Add(-time.Second) }),
 			blocks: false,
 		},
 		{
-			name:   "exactly at the grace boundary the proof is complete",
-			quote:  awaiting(func(q *Quote) { q.PaymentExpiry = safetyNow.Add(-grace) }),
-			blocks: false,
-		},
-		{
-			name: "grace elapsed but money was observed",
+			name: "lapsed but money was observed",
 			quote: awaiting(func(q *Quote) {
 				q.PaymentExpiry = safetyNow.Add(-2 * time.Hour)
 				q.PaymentObserved = true
@@ -80,7 +72,7 @@ func TestLapsedInvoiceReleasesOnlyAfterTheSupplierCouldNotHaveSeenPayment(t *tes
 			blocks: true,
 		},
 		{
-			name: "grace elapsed but an operator hold is in place",
+			name: "lapsed but an operator hold is in place",
 			quote: awaiting(func(q *Quote) {
 				q.PaymentExpiry = safetyNow.Add(-2 * time.Hour)
 				q.PaymentBlocked = true
@@ -88,7 +80,7 @@ func TestLapsedInvoiceReleasesOnlyAfterTheSupplierCouldNotHaveSeenPayment(t *tes
 			blocks: true,
 		},
 		{
-			name: "grace elapsed but the supplier reports a payment beyond waiting",
+			name: "lapsed but the supplier reports a payment beyond waiting",
 			quote: awaiting(func(q *Quote) {
 				q.PaymentExpiry = safetyNow.Add(-2 * time.Hour)
 				q.SupplierStatus = cryptorefills.StatusPaymentStarted
@@ -120,6 +112,7 @@ func TestLapsedInvoiceReleasesOnlyAfterTheSupplierCouldNotHaveSeenPayment(t *tes
 			blocks: false,
 		},
 	}
+
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := BlocksNewPurchaseAt(tc.quote, safetyNow); got != tc.blocks {

@@ -15,6 +15,7 @@ import { AdminRatingsPanel } from './AdminRatingsPanel';
 import { AdminQuizPanel } from './AdminQuizPanel';
 import { AdminTestCenterPanel } from './AdminTestCenterPanel';
 import { AdminTestAccountsCard } from './AdminTestAccountsCard';
+import { AdminEnvPanel } from './AdminEnvPanel';
 import { AppRoot } from '../AppRoot';
 import { useSheet, useToast } from '../AppProviders';
 import {
@@ -55,7 +56,7 @@ function badge(label: string, on: boolean, detail?: string) {
   );
 }
 
-type AdminSection = 'overview' | 'catalog' | 'orders' | 'cashback' | 'people' | 'ratings' | 'quiz' | 'email' | 'test' | 'maintenance';
+type AdminSection = 'overview' | 'catalog' | 'orders' | 'cashback' | 'people' | 'ratings' | 'quiz' | 'email' | 'test' | 'env' | 'maintenance';
 
 type RuleOption = { value: string; label: string };
 
@@ -110,6 +111,11 @@ const ADMIN_SECTIONS: Array<{ id: AdminSection; label: string; hint: string; ico
   // Real catalogue products, completed through the real pipeline: the genuine
   // order email goes out, nothing is charged and nothing is fulfilled.
   { id: 'test', label: 'Test', hint: 'order emails, no charge', icon: 'package' },
+  // Environment variables: add, change and remove them here (the partner key
+  // is the one that matters) instead of editing the host dashboard and
+  // redeploying. Owner (2026-10-19): "env anahtarlarını admin sayfasından
+  // ekleyip çıkarabilmeliyim … mesela partner key gibi".
+  { id: 'env', label: 'Environment', hint: 'keys & variables', icon: 'lock' },
   // The only destructive surface in the console gets its own tab, so it can
   // never be clicked by accident while working on the page that is open daily.
   { id: 'maintenance', label: 'Maintenance', hint: 'memory & start over', icon: 'shield' },
@@ -1454,6 +1460,8 @@ export function AdminContent() {
         return <><StatusCard status={status} /><Composer status={status} /><TestEmailCard /></>;
       case 'test':
         return <><AdminTestAccountsCard /><AdminTestCenterPanel /></>;
+      case 'env':
+        return <AdminEnvPanel />;
       case 'maintenance':
         return <MaintenancePanel />;
       case 'overview':

@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"math"
 	"strconv"
 	"strings"
@@ -246,20 +245,23 @@ func (h *Handlers) createQuoteInner(ctx *fasthttp.RequestCtx, userID string, req
 		writeError(ctx, 503, "product metadata cannot be verified; no order was created")
 		return
 	}
-	// Cryptorefills delivers gift cards / eSIMs to this address — a bad email
-	// means a broken delivery, so reject early and strictly. MOBILE TOP-UPS
-	// deliver to the PHONE number instead; their email is optional (it is only
-	// used as the receipt / gift-note address when the buyer provides one).
+	// Utility-account products are the one delivery route the shop does not
+	// support at all, so they are refused before anything else is asked.
 	if meta.deliveryChannelFor(req.ProductID, req.Denomination) == "by_account" {
 		writeError(ctx, 409, "this product is delivered to a utility account number, which the shop does not support; no order was created")
 		return
 	}
 	topUpSel := isTopUpSelection(meta, req.ProductID, req.Denomination)
-	if !topUpSel {
-		if req.Email == "" || !validEmail(req.Email) {
-			writeError(ctx, fasthttp.StatusBadRequest, "a valid delivery email is required (the product is delivered to it)")
-			return
-		}
+	// An email is required for EVERY product, top-ups included. On the v6
+	// partner API an order without user.email is rejected outright (400
+	// "user.email is required" — verified live), and the shop will not invent
+	// an address to get around that: no shop-owned fallback, no placeholder,
+	// nothing the buyer did not type. For a top-up the credit still lands on
+	// the phone number; the email is where the receipt and the delivery
+	// confirmation go.
+	if req.Email == "" || !validEmail(req.Email) {
+		writeError(ctx, fasthttp.StatusBadRequest, "a valid email is required (your receipt and the order confirmation are sent to it)")
+		return
 	}
 	if topUpSel {
 		if req.PhoneNumber == "" {
@@ -896,30 +898,23 @@ func quoteIDNow() string {
 
 // prepareSupplierOrder stamps a supplier request for the v6 PARTNER API.
 //
-// Two partner-only requirements, both of which must be baked into the request
-// BEFORE it is frozen into the write-ahead payload (that payload is exactly
-// what a crash-recovery redelivery re-sends):
+// The partner API's idempotency key has to be baked in BEFORE the request is
+// frozen into the write-ahead payload (that payload is exactly what a
+// crash-recovery redelivery re-sends): the shop's own quote id guarantees a
+// retried create returns the ORIGINAL order rather than a second unpaid
+// invoice for the same cart.
 //
-//   - external_order_id: the partner API's idempotency key. The shop's own
-//     quote id guarantees a retried create returns the ORIGINAL order rather
-//     than a second unpaid invoice for the same cart.
-//   - user.email: the partner API answers 400 "user.email is required", even
-//     for a phone top-up where the product goes to a number and the buyer may
-//     have given no email at all. The shop's notification address fills that
-//     gap; an email the buyer actually gave is never replaced.
+// Without a partner key this is a no-op: v5 takes no such field.
 //
-// Without a partner key this is a no-op: v5 takes neither field.
+// There is deliberately NO email handling here. The partner API rejects any
+// order without user.email (400), so the buyer's own address is required and
+// is checked before an order is ever dispatched. The shop never invents an
+// address — not a "no-reply", not its own, nothing.
 func (h *Handlers) prepareSupplierOrder(req *cryptorefills.CreateOrderRequest, quoteID string) {
 	if req == nil || h.CR == nil || !h.CR.PartnerMode() {
 		return
 	}
 	req.ExternalOrderID = quoteID
-	req.FallbackEmail = h.Cfg.CRFallbackEmail
-	if fb := h.Cfg.CRFallbackEmail; fb != "" {
-		if used := req.EnsureUserEmail(fb); used == fb {
-			log.Printf("supplier order %s: buyer gave no email (top-up); the partner API requires user.email, using the configured fallback", quoteID)
-		}
-	}
 }
 
 // ListUserQuotes returns the authenticated user's quotes newest-first.

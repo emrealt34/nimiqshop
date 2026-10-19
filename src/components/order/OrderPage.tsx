@@ -23,7 +23,7 @@ import { quoteStages, isTerminalStatus } from '../../lib/orderTrack';
 import { brandMetaForTitle } from '../../lib/catalogMeta';
 import { mapKind } from '../../lib/catalog';
 import { lightningPaymentURI, rememberLightningPayment } from '../../lib/hub';
-import { isQuotePayable, quoteBolt11, canRenewQuote, paymentHandedOff, paymentInFlight, paymentWindowVerifying, renewItemFromQuote, renewInfoFromQuote, canRebuildRequest } from '../../lib/pay';
+import { isQuotePayable, quoteBolt11, canRenewQuote, paymentHandedOff, paymentInFlight, renewItemFromQuote, renewInfoFromQuote, canRebuildRequest } from '../../lib/pay';
 import { supplierStatusLabel } from '../../lib/supplierStatus';
 import { buildOrderRequest } from '../../lib/delivery';
 import { uuid } from '../../lib/format';
@@ -572,7 +572,6 @@ function PayNowCard({ q }: { q: any }) {
   // state with no button: the exact dead end reported on 2026-10-04. Three
   // states matter, and each gets its own card:
   //   • money was seen (or is in flight) → say so calmly; nothing to do;
-  //   • window just lapsed, verification buffer running → "checking", no CTA;
   //   • window over with nothing charged → one-tap FRESH INVOICE.
   if (expired || !isQuotePayable(q)) {
     if (paymentInFlight(q)) {
@@ -587,21 +586,11 @@ function PayNowCard({ q }: { q: any }) {
         </div>
       );
     }
-    if (!canRenewQuote(q, Date.now())) {
-      // Either the shop is still proving whether money arrived (the grace
-      // buffer after the deadline) or a human has this order. Both are
-      // "wait, do not pay again" — a timer is never proof of failure.
-      if (!paymentWindowVerifying(q, Date.now())) return null;
-      return (
-        <div className="card" style={{ borderColor: 'var(--line-strong)', borderWidth: '2px' }}>
-          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Icon name="clock" size={15} />
-            <span>{t('orderPage.verifyTitle')}</span>
-          </div>
-          <div className="small muted">{t('orderPage.verifyBody')}</div>
-        </div>
-      );
-    }
+    // Nothing renewable to offer: money may exist, a human owns the order, or
+    // the record is unreadable. Every one of those is "wait, do not pay
+    // again" — and none of them is a timer. Whether a lapsed invoice was
+    // ever paid is answered by the supplier, not by a buffer.
+    if (!canRenewQuote(q, Date.now())) return null;
     const renew = async () => {
       setRenewBusy(true);
       setRenewErr('');

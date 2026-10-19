@@ -10,21 +10,17 @@ import (
 	"nimiqshop/internal/cryptorefills"
 )
 
-// quoteExpiryBuffer is how long a supplier-linked quote must sit past its
-// payment window (unpaid, no money observed) before the tracker may expire it
-// locally. A lapsed single-use Lightning invoice can no longer be paid, so this
-// buffer only guards against a payment that landed right at the window edge —
-// it never ends fulfillment polling for a quote where money was actually seen.
-const quoteExpiryBuffer = 5 * time.Minute
-
-// PaymentGrace is how long after the supplier's payment window the shop keeps
-// treating a lapsed invoice as possibly paid. A payment submitted right at the
-// edge of the window may not be visible to the supplier yet, so a timer running
-// out is NOT proof that nothing was charged. Until this buffer has passed the
-// quote keeps blocking a new purchase and the buyer is told the shop is still
-// verifying — never that the payment failed. The frontend mirrors the same
-// constant in src/lib/pay.ts; the two must not drift.
-const PaymentGrace = quoteExpiryBuffer
+// There is deliberately NO grace buffer any more.
+//
+// The shop used to make a lapsed invoice keep blocking a new purchase for a
+// few more minutes, on the theory that a payment submitted at the very edge of
+// the window might not have reached the supplier yet — a timer standing in for
+// knowledge nobody had. On the v6 PARTNER API that guess is unnecessary: the
+// shop can ask whether anything was paid and, when nothing was, cancel the
+// order itself (DELETE /v6/partner/orders/{id}). So the release rule is now a
+// FACT from the supplier, checked in handlers.verifyLapsedWithSupplier, and
+// the moment the window closes the buyer is either released or told why not.
+// The frontend mirrors this in src/lib/pay.ts (PAYMENT_VERIFY_GRACE_MS = 0).
 
 func quoteRequestFingerprintKey(user, key string) []byte {
 	return []byte("ix:q:request:" + user + ":" + key)
@@ -69,7 +65,7 @@ func (q Quote) PaymentVerifiedUnpaid(now time.Time) bool {
 	if deadline.IsZero() {
 		return false
 	}
-	return !now.Before(deadline.Add(PaymentGrace))
+	return !now.Before(deadline)
 }
 
 // Deliberately conservative: one unresolved checkout per buyer, including an

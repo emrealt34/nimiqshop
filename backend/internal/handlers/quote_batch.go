@@ -274,6 +274,15 @@ func (h *Handlers) createQuoteBatchInner(ctx *fasthttp.RequestCtx, userID string
 	faceTotalsComplete := true
 	allPricesKnown := true
 	seenAnyCard := false // does ANY item deliver to an email?
+	// An email is required for EVERY cart, top-ups included: the v6 partner
+	// API rejects an order without user.email (400 "user.email is required"),
+	// and the shop will not invent an address to get around that. For a
+	// top-up the credit still lands on the phone number — the email is where
+	// the receipt and the confirmation go.
+	if req.Email == "" || !validEmail(req.Email) {
+		writeError(ctx, fasthttp.StatusBadRequest, "a valid email is required (your receipt and the order confirmation are sent to it)")
+		return
+	}
 	// allFaceKnown: every item has an ISO currency, so totalFaceUSD is a
 	// trustworthy expectation to check the supplier invoice against.
 	for i, it := range req.Items {
@@ -304,10 +313,6 @@ func (h *Handlers) createQuoteBatchInner(ctx *fasthttp.RequestCtx, userID string
 			topUp = true
 		}
 		if !topUp {
-			if req.Email == "" || !validEmail(req.Email) {
-				writeError(ctx, fasthttp.StatusBadRequest, "a valid delivery email is required (the products are delivered to it)")
-				return
-			}
 			seenAnyCard = true
 		}
 		beneficiary := req.Email

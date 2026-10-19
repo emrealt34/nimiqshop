@@ -902,7 +902,11 @@ func (s *Store) SweepExpiredQuotes(now time.Time, limit int) (int, error) {
 			// move on from an abandoned order. Quotes where money was seen stay
 			// awaiting so fulfillment polling NEVER stops.
 			if q.SupplierOrderID != "" {
-				if q.PaymentObserved || cryptorefills.IsPaidOrBeyond(q.SupplierStatus) || now.Before(q.ExpiresAt.Add(quoteExpiryBuffer)) {
+				// No grace buffer: a lapsed, unpaid invoice is expired as
+				// soon as its window closes. The payment question is answered
+				// by the supplier (see handlers.verifyLapsedWithSupplier),
+				// not by waiting.
+				if q.PaymentObserved || cryptorefills.IsPaidOrBeyond(q.SupplierStatus) || now.Before(q.ExpiresAt) {
 					continue
 				}
 			}

@@ -173,17 +173,23 @@ export const FAIL_STATUSES = new Set([
  * pay and no way to start a fresh invoice.
  */
 /**
- * Grace period after the invoice's payment window, mirrored EXACTLY by the
- * backend (`db.PaymentGrace`). It is the time the supplier gets to notice a
- * payment that landed right at the edge of the window.
+ * There is no grace buffer any more — on either side. This constant is 0 and
+ * it mirrors the backend exactly (which no longer defines one at all); the
+ * two must not drift.
  *
- * Until it has passed, "the timer ran out" is NOT proof that nothing was
- * charged — so no buyer is told "ödeme alınmadı" and no fresh invoice is
- * offered to sit next to a possibly-paid one. Both sides read the same field
- * (`payment_expiry`) and the same constant, so the button never appears
- * before the backend is willing to honour it.
+ * The shop used to hold a lapsed invoice against the buyer for five more
+ * minutes in case a payment submitted at the very edge of the window had not
+ * reached the supplier yet: a timer standing in for knowledge nobody had. On
+ * the v6 PARTNER API that guess is unnecessary. The moment the window closes
+ * the backend ASKS whether anything was paid and, when nothing was, cancels
+ * the order — so the invoice can never be paid late. The release is a fact
+ * from the supplier, not a wait, and the buyer is not parked in front of a
+ * screen that says "we are checking" when nobody is.
+ *
+ * What still blocks is EVIDENCE, never a clock: money observed, a payment
+ * settling, or an operator hold.
  */
-export const PAYMENT_VERIFY_GRACE_MS = 5 * 60 * 1000;
+export const PAYMENT_VERIFY_GRACE_MS = 0;
 
 /** The quote's payment deadline in ms, or NaN when the shop cannot know it. */
 export function paymentDeadline(q: any): number {
@@ -194,19 +200,6 @@ export function paymentDeadline(q: any): number {
 export function paymentWindowOver(q: any, now = Date.now()): boolean {
   const expiry = paymentDeadline(q);
   return Number.isFinite(expiry) && expiry <= now;
-}
-
-/**
- * The window is over but the shop is still proving whether money arrived
- * (inside the grace buffer, or the deadline is unknown). The truthful state
- * here is "checking, you will be able to get a fresh invoice in a moment",
- * never "it failed" and never a second payment.
- */
-export function paymentWindowVerifying(q: any, now = Date.now()): boolean {
-  if (paymentInFlight(q) || q?.payment_observed || q?.payment_blocked) return false;
-  const deadline = paymentDeadline(q);
-  if (!Number.isFinite(deadline)) return false;
-  return deadline <= now && now < deadline + PAYMENT_VERIFY_GRACE_MS;
 }
 
 /** Supplier states that mean money was seen or is being verified. */

@@ -97,12 +97,27 @@ func bootStack(t *testing.T, opts stackOptions) *testStack {
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("config.Validate: %v", err)
 	}
+	// The host's own environment, captured before any console override is
+	// exported on top of it — exactly what main() hands to the handlers.
+	hostEnv := config.SnapshotEnv()
 
 	store, err := db.New(cfg.BadgerDir, db.Options{SyncWrites: cfg.BadgerSyncWrites, ValueThresholdKB: cfg.BadgerValueThresholdKB})
 	if err != nil {
 		t.Fatalf("db.New: %v", err)
 	}
 	t.Cleanup(func() { _ = store.Close() })
+
+	// Console-managed env, applied with the SAME call the server uses at boot
+	// (a value an operator saved must be in force on this very start).
+	if rows, rerr := store.ListEnvOverrides(); rerr != nil {
+		t.Fatalf("env overrides: %v", rerr)
+	} else if len(rows) > 0 {
+		values := make(map[string]string, len(rows))
+		for _, row := range rows {
+			values[row.Key] = row.Value
+		}
+		cfg, _ = config.ApplyEnvOverrides(cfg, values)
+	}
 
 	cr := cryptorefills.NewClient(cryptorefills.ClientOptions{BaseURL: cfg.CRBaseURL, PartnerID: cfg.CRPartnerID, PartnerKey: cfg.CRPartnerKey, AppVersion: cfg.CRAppVersion, UserAgent: cfg.CRUserAgent, Queue: cryptorefills.QueueConfig{
 		MaxQueue:            cfg.CRQueueMax,
@@ -112,6 +127,7 @@ func bootStack(t *testing.T, opts stackOptions) *testStack {
 	}})
 	t.Cleanup(cr.Close)
 	h := handlers.New(store, cfg, cr)
+	h.HostEnv = hostEnv
 	// Fixed display price so no oracle/network is involved.
 	h.NIMUSDPrice = func(context.Context) (float64, error) { return 0.002, nil }
 	// The SAME pool + chain wiring production boots with. Tests that fake a

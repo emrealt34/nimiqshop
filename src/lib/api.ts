@@ -1089,6 +1089,13 @@ export const userTestPay = (quoteId: string) =>
 export const adminTestQuote = (quoteId: string) => api(`/admin/test-quote/${encodeURIComponent(quoteId)}`);
 export const adminCatalogRules = (opts: { path?: string; method?: string; body?: unknown } = {}) =>
   api('/admin/catalog-rules' + (opts.path || ''), opts.method ? { method: opts.method, body: opts.body } : {});
+// Environment variables, managed from the console (owner, 2026-10-19): add,
+// change and remove them here instead of editing the host dashboard and
+// redeploying. Secrets are write-only — the list only ever carries a masked
+// value, just enough to tell which key is loaded.
+export const adminEnv = () => api('/admin/env');
+export const adminSetEnv = (key: string, value: string) => api('/admin/env', { method: 'POST', body: { key, value } });
+export const adminRemoveEnv = (key: string) => api(`/admin/env/${encodeURIComponent(key)}`, { method: 'DELETE' });
 export const adminGetCashback = () => api('/admin/settings/cashback');
 /** Headline counters: Players + the cashback payment queue. */
 export const adminDashboard = () => api('/admin/dashboard');

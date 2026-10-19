@@ -47,16 +47,6 @@ func (r *CreateOrderRequest) createPayloadFor(partnerMode bool) any {
 	if user == nil && r.Email != "" {
 		user = &OrderUser{Email: r.Email}
 	}
-	// The v6 partner API REJECTS an order whose user block carries no email
-	// (400 "user.email is required") — including a phone top-up, where the
-	// product goes to a number and there may be no buyer email at all. The
-	// shop's own notification address fills that gap (set by EnsureUserEmail)
-	// so a top-up can still be ordered on the partner API.
-	if user == nil || strings.TrimSpace(user.Email) == "" {
-		if fb := strings.TrimSpace(r.FallbackEmail); fb != "" {
-			user = &OrderUser{Email: fb}
-		}
-	}
 	externalID := ""
 	if partnerMode {
 		externalID = strings.TrimSpace(r.ExternalOrderID)

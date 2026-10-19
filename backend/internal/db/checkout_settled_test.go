@@ -45,12 +45,9 @@ func TestCheckoutSettledIsExactlyNoPaymentAndNoMoneyInPlay(t *testing.T) {
 		settled bool
 	}{
 		{"payable invoice stays the buyer's checkout", live(nil), false},
-		{"just-lapsed invoice inside the grace buffer may still carry money", live(func(q *Quote) {
+		{"window still open: the buyer may still pay, so nothing is over", live(nil), false},
+		{"window closed with nothing seen: the supplier answers, no buffer is waited out", live(func(q *Quote) {
 			q.PaymentExpiry = safetyNow.Add(-time.Minute)
-			q.ExpiresAt = q.PaymentExpiry
-		}), false},
-		{"lapsed invoice past the grace buffer with nothing seen is over", live(func(q *Quote) {
-			q.PaymentExpiry = safetyNow.Add(-PaymentGrace - time.Minute)
 			q.ExpiresAt = q.PaymentExpiry
 		}), true},
 		{"lapsed invoice with money observed is NOT over", live(func(q *Quote) {

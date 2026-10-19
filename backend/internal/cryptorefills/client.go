@@ -69,16 +69,45 @@ type Client struct {
 
 // activePartnerKey is the key the next call authenticates with (see
 // partnerKeyBackup). Empty means this client is not on the partner API.
+//
+// It always takes the key lock: SetPartnerKeys can replace both keys in the
+// live process (console-managed env), so the fast path that used to skip the
+// lock while no backup was configured was a race waiting for that feature.
 func (c *Client) activePartnerKey() string {
-	if c.partnerKeyBackup == "" {
-		return c.partnerKey
-	}
 	c.keyMu.Lock()
 	defer c.keyMu.Unlock()
-	if c.usingBackup {
+	if c.usingBackup && c.partnerKeyBackup != "" {
 		return c.partnerKeyBackup
 	}
 	return c.partnerKey
+}
+
+// primaryPartnerKey is the configured v6 key, read under the lock. It decides
+// which API generation the client speaks (see ordersPath), so it must never
+// be read while SetPartnerKeys is halfway through swapping it.
+func (c *Client) primaryPartnerKey() string {
+	c.keyMu.Lock()
+	defer c.keyMu.Unlock()
+	return c.partnerKey
+}
+
+// SetPartnerKeys replaces the v6 partner keys in the LIVE client, without a
+// restart and without a redeploy.
+//
+// The partner guide rotates keys by minting a new one, switching to it and
+// revoking the old one; the operator can now do exactly that from the admin
+// console (see config.ManagedEnvKeys — CRYPTOREFILLS_PARTNER_KEY is a live
+// key). Switching resets the failover state so the new primary is tried
+// first again; the values themselves are never logged.
+func (c *Client) SetPartnerKeys(primary, backup string) {
+	if c == nil {
+		return
+	}
+	c.keyMu.Lock()
+	defer c.keyMu.Unlock()
+	c.partnerKey = strings.TrimSpace(primary)
+	c.partnerKeyBackup = strings.TrimSpace(backup)
+	c.usingBackup = false
 }
 
 // switchToBackupKey promotes the backup key after the primary was rejected.
@@ -100,11 +129,11 @@ func (c *Client) switchToBackupKey(rejected string) bool {
 
 // PartnerMode reports whether this client is on the v6 partner API (the one
 // that pays commission) rather than the v5 user-session API.
-func (c *Client) PartnerMode() bool { return c != nil && c.partnerKey != "" }
+func (c *Client) PartnerMode() bool { return c != nil && c.primaryPartnerKey() != "" }
 
 // ordersPath is the orders collection for this client's API generation.
 func (c *Client) ordersPath() string {
-	if c.partnerKey != "" {
+	if c.primaryPartnerKey() != "" {
 		return "/v6/partner/orders"
 	}
 	return "/v5/orders"
@@ -858,10 +887,6 @@ type CreateOrderRequest struct {
 	// ambiguous upstream answer) safe. The shop sends its own quote id, and
 	// it is only emitted on the partner API (see createPayload).
 	ExternalOrderID string `json:"-"`
-	// FallbackEmail is used only when the buyer gave no email at all (a
-	// phone top-up ordered without one) and the partner API still requires
-	// user.email. It is never sent when the buyer has an email of their own.
-	FallbackEmail string       `json:"-"`
 	Deliveries    []Delivery   `json:"deliveries"`
 	Payment       OrderPayment `json:"payment"`
 	// Email mirrors the docs' top-level "email" field (the end user the
@@ -873,35 +898,6 @@ type CreateOrderRequest struct {
 	Acquisition *Acquisition `json:"acquisition,omitempty"`
 }
 
-// EnsureUserEmail supplies the address the v6 partner API insists on (it
-// answers 400 "user.email is required" without one, even for a top-up that
-// is delivered to a phone number). It never replaces an email the buyer
-// actually gave and reports the address the order will carry, so a caller
-// can log the substitution instead of hiding it.
-func (r *CreateOrderRequest) EnsureUserEmail(fallback string) string {
-	if r == nil {
-		return ""
-	}
-	if have := strings.TrimSpace(r.Email); have != "" {
-		return have
-	}
-	if r.User != nil {
-		if have := strings.TrimSpace(r.User.Email); have != "" {
-			return have
-		}
-	}
-	fb := strings.TrimSpace(fallback)
-	if fb == "" {
-		return ""
-	}
-	r.Email = fb
-	if r.User == nil {
-		r.User = &OrderUser{Email: fb}
-	} else {
-		r.User.Email = fb
-	}
-	return fb
-}
 
 // OrderUser is the end customer record. Email is mandatory: Cryptorefills
 // delivers the product to it.

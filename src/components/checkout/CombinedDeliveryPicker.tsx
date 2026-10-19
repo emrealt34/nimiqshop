@@ -135,8 +135,24 @@ export function CombinedDeliveryPicker({
       clearGiftExtras();
       email = myEmail.trim();
     } else {
-      // phone-only, not a gift: no email at all — the credit lands on the number.
+      // EVERY order carries an address, top-ups included.
+      //
+      // The credit lands on the number, but the receipt and the order
+      // confirmation are emailed, and the supplier refuses an order with no
+      // contact address at all — it answers "user.email is required" even for
+      // a top-up. So there is no "phone-only, no email" path any more, and
+      // there is no fallback address behind it either: the buyer's own
+      // address, typed twice, or no order.
+      if (!isValidEmail(myEmail)) {
+        setSelfError(t('delivery.cdpEnterValidEmail'));
+        return;
+      }
+      if (!confirmMatches(myEmail, myEmail2, 'email')) {
+        setEmail2Err(t('delivery.confirmEmailMismatch'));
+        return;
+      }
       clearGiftExtras();
+      email = myEmail.trim();
     }
     const info: DeliveryInfo = {
       email,
@@ -310,9 +326,14 @@ export function CombinedDeliveryPicker({
             {api.error && <div className="small" style={{ color: 'var(--stamp)', marginTop: 4 }}>{api.error}</div>}
           </div>
         </div>
-      ) : hasEmail ? (
+      ) : (
         <div className="field" style={{ marginBottom: 14 }}>
-          <label style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink-dim)' }}>{t('delivery.yourEmailReceipt')}</label>
+          {/* Shown for EVERY cart: a top-up is credited to the number, but the
+              receipt and the order confirmation are emailed — and the supplier
+              will not take an order without the buyer's own address. */}
+          <label style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink-dim)' }}>
+            {hasEmail ? t('delivery.yourEmailReceipt') : t('delivery.cdpTopUpEmail')}
+          </label>
           <input
             className="input"
             type="email"
@@ -337,11 +358,11 @@ export function CombinedDeliveryPicker({
           />
           )}
           <div className="small muted" style={{ marginTop: 6, display: 'flex', gap: 6, alignItems: 'flex-start', background: 'var(--paper-tint)', border: '1px dashed rgba(78,61,40,.25)', borderRadius: 8, padding: '8px 10px' }}>
-            <span>⚠️</span><span>{t('delivery.cdpCodeToEmail')}</span>
+            <span>⚠️</span><span>{hasEmail ? t('delivery.cdpCodeToEmail') : t('delivery.cdpReceiptToEmail')}</span>
           </div>
           {selfError && <div className="small" style={{ color: 'var(--stamp)', marginTop: 6 }}>{selfError}</div>}
         </div>
-      ) : null}
+      )}
 
 
       <CashbackCodeField compact />
