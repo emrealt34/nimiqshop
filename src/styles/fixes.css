@@ -4136,3 +4136,11 @@ body { padding-bottom: 0; }
   .orders-page .section-head { display: block; }
   .orders-page .section-head > .row { max-width: none; justify-content: center; margin-inline: 0; }
 }
+
+/* ---- address chip: identicon + address in groups of four ----
+ * Used wherever an operator has to tell one wallet from another at a glance
+ * (quiz participants, staker ledgers, admin orders, ratings). The face is a
+ * Nimiq identicon, so it is rounded like the wallet apps show it; the text
+ * must be allowed to wrap between groups, never inside one. */
+.addr-chip-face { border-radius: 5px; flex: 0 0 auto; }
+.addr-chip > code { font-variant-numeric: tabular-nums; letter-spacing: .02em; }

@@ -39,6 +39,7 @@ import { fmtDate, fmtNIM, fmtNum, fmtUSD, formatWalletAddress } from '../../lib/
 import { siteName } from '../../lib/config';
 import { orderedCountries } from '../../lib/countries';
 import { CopyButton, AlertBox } from '../ui/uiKit';
+import { AddressChip } from '../ui/AddressChip';
 import { pagePath } from '../../lib/asset';
 
 function badge(label: string, on: boolean, detail?: string) {
@@ -876,8 +877,8 @@ function StakeLedgerTable() {
             <tbody>
               {rows.map((r: any) => (
                 <tr key={r.address} style={{ borderTop: '1px solid var(--line)' }}>
-                  <td className="mono" style={{ padding: '6px 8px', wordBreak: 'break-all', fontSize: 12 }}>
-                    {formatWalletAddress(r.address)}
+                  <td style={{ padding: '6px 8px' }}>
+                    <AddressChip address={r.address} size={20} copy />
                   </td>
                   <td style={{ padding: '6px 8px' }}>{Number(r.stake_nim || 0).toLocaleString('en-US')} NIM</td>
                   <td style={{ padding: '6px 8px' }}>
@@ -1130,6 +1131,13 @@ function OrdersPanel() {
                 <span>
                   <span className="faint">Email: </span>
                   <span className="mono">{q.customer_email ? String(q.customer_email) : '—'}</span>
+                </span>
+                {/* The buyer's own wallet, with its identicon — the face an
+                    operator recognises the account by. Not the payment
+                    address: that is the supplier's one-time invoice. */}
+                <span>
+                  <span className="faint">Wallet: </span>
+                  <AddressChip address={q.buyer_address} size={18} />
                 </span>
               </div>
             </div>

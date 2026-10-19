@@ -1391,6 +1391,15 @@ func (h *Handlers) adminQuoteView(quote db.Quote) map[string]any {
 	if cb, err := h.Store.GetCashbackByQuote(quote.ID); err == nil {
 		view["cashback"] = adminCashbackView(cb)
 	}
+	// The buyer's OWN wallet, so the console can show their identicon next
+	// to the order (owner, 2026-10-19: every row should carry the face of
+	// the account it belongs to). It is deliberately not the payment
+	// address: `wallet_address` is the supplier's one-time invoice, and
+	// mixing the two is how an operator ends up chasing the wrong wallet.
+	// Best effort: a deleted or never-created user simply shows no face.
+	if u, uerr := h.Store.GetUser(quote.UserID); uerr == nil && u.NimiqAddress != "" {
+		view["buyer_address"] = u.NimiqAddress
+	}
 	// v6 PARTNER API: what this order earns the shop, and what the supplier
 	// answered the last time we asked it to release an abandoned one.
 	// The commission is reported exactly as the supplier stated it

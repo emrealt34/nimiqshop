@@ -12,6 +12,7 @@ import { useT } from '../../i18n';
 import { adminHideRatingComment, adminListRatings, adminSetRatingComments } from '../../lib/api';
 import { fmtDate } from '../../lib/format';
 import { AlertBox, StarsDisplay } from '../ui/uiKit';
+import { AddressChip } from '../ui/AddressChip';
 
 interface AdminRating {
   kind: 'order' | 'quote';
@@ -22,6 +23,8 @@ interface AdminRating {
   hidden: boolean;
   /** Left on an admin test-center purchase; public only while test orders are shown. */
   test_mode?: boolean;
+  /** The buyer's own wallet, resolved from the purchase (best-effort). */
+  buyer_address?: string;
 }
 
 export function AdminRatingsPanel() {
@@ -110,6 +113,9 @@ export function AdminRatingsPanel() {
                 <div className="row" style={{ gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                   <StarsDisplay rating={r.stars} size={14} />
                   <span className="xs faint">{fmtDate(r.at)}</span>
+                  {/* Who left it: the buyer's wallet with its identicon, so
+                      one person's comments are recognisable at a glance. */}
+                  <AddressChip address={r.buyer_address} size={18} />
                   <span className="xs mono faint">{t('rating.adminPurchase')} {r.id.slice(0, 8)}</span>
                   {r.hidden ? <span className="xs strong">{t('rating.adminHidden')}</span> : null}
                   {r.test_mode ? <span className="chip xs" title="Test order — public only while the Test Center switch shows test orders">TEST</span> : null}

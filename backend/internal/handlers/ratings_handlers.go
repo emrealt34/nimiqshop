@@ -381,6 +381,11 @@ func (h *Handlers) AdminListRatings(ctx *fasthttp.RequestCtx) {
 			// A comment on an admin test-center purchase: public only while
 			// the Test Center switch shows test orders.
 			"test_mode": c.TestMode,
+			// Who left it. The comment records the purchase, not the
+			// person; the operator console is the one place that may put a
+			// face to it (owner, 2026-10-19). Best effort — an old or
+			// deleted purchase simply carries no address.
+			"buyer_address": h.addressOfPurchase(c.Kind, c.ID),
 		})
 	}
 	agg, _ := h.Store.GetRatingAggregate()
@@ -389,6 +394,35 @@ func (h *Handlers) AdminListRatings(ctx *fasthttp.RequestCtx) {
 		"items":            out,
 		"summary":          ratingSummaryShape(agg),
 	})
+}
+
+// addressOfPurchase resolves the buyer's NIM wallet for one rated purchase.
+//
+// A rating is keyed by the purchase it belongs to (a quote, or an order from
+// the older table), and the comment itself stores no identity at all — which
+// is right for a PUBLIC list and unhelpful for a moderator who has to tell
+// one buyer's comments from another's. This is the admin-only bridge back to
+// the account, and it is best effort throughout: any missing link (a purged
+// quote, an orphaned order, a user who never logged in again) simply means
+// "no address", never an error and never a guess.
+func (h *Handlers) addressOfPurchase(kind, id string) string {
+	userID := ""
+	if q, err := h.Store.GetQuote(id); err == nil {
+		userID = q.UserID
+	}
+	if userID == "" {
+		if o, err := h.Store.GetOrder(id); err == nil {
+			userID = o.UserID
+		}
+	}
+	if userID == "" {
+		return ""
+	}
+	u, err := h.Store.GetUser(userID)
+	if err != nil {
+		return ""
+	}
+	return u.NimiqAddress
 }
 
 // AdminSetRatingComments switches buyer comments on or off for everybody.
