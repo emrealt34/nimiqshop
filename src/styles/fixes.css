@@ -4144,3 +4144,35 @@ body { padding-bottom: 0; }
  * must be allowed to wrap between groups, never inside one. */
 .addr-chip-face { border-radius: 5px; flex: 0 0 auto; }
 .addr-chip > code { font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+
+/* ---- public buyer comments (activity page) ----
+ * A comment is a person's words, so it gets the same furniture a purchase
+ * row gets: the buyer's face and wallet, their stars, when they said it and
+ * what they were writing about. The cards are separate rows, not one star
+ * glued to a run-on line of text — long comments used to stretch the whole
+ * list sideways. */
+.rating-comments { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.rating-comment {
+  border: 2px solid var(--line, #e5ded2);
+  border-radius: var(--r-m, 10px);
+  background: var(--surface-1, #fff);
+  padding: 9px 11px;
+  min-width: 0;
+}
+.rating-comment-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.rating-comment-head .feed-wallet { cursor: default; }
+.rating-comment-body {
+  margin: 6px 0 0;
+  font-size: .86rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+@media (max-width: 520px) {
+  .rating-comment-head { gap: 6px; }
+  .rating-comment-body { font-size: .82rem; }
+}
+
+/* The comments block is a full-width row UNDER the summary grid, never a
+   third cell of it (see RatingFlow / ActivityPage). */
+.rating-summary .rs-comments { width: 100%; }

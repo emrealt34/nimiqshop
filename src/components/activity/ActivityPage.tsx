@@ -323,6 +323,10 @@ export function ActivityView() {
                 })}
               </div>
             </div>
+            {/* The comments sit under the summary, NOT inside rs-body: that
+                is a two-column grid (average + distribution), so a third
+                child was dropped into the left column and squeezed into a
+                third of the card — which is why the list looked broken. */}
             <RecentRatingComments />
           </div>
         )}

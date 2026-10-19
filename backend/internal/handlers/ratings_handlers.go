@@ -67,11 +67,31 @@ func (h *Handlers) RatingComments(ctx *fasthttp.RequestCtx) {
 	}
 	out := make([]map[string]interface{}, 0, len(items))
 	for _, c := range items {
-		out = append(out, map[string]interface{}{
+		row := map[string]interface{}{
 			"stars":   c.Stars,
 			"comment": c.Comment,
 			"at":      c.At,
-		})
+		}
+		// Who left it, as the feed is allowed to say it. The identity was
+		// captured when the rating was WRITTEN (db.commentIdentity): a
+		// public row carries no purchase id, so nothing about the buyer can
+		// be resolved from this list — an anonymous purchase therefore
+		// still shows no wallet here, exactly as it shows none beside the
+		// purchase itself in the feed. Comments written before the identity
+		// was captured simply arrive without one.
+		if !c.Anonymous && c.Address != "" {
+			row["address"] = c.Address
+		}
+		if c.Anonymous {
+			row["anonymous"] = true
+		}
+		if label := cleanPublicProductLabel(c.Product); label != "" {
+			row["product"] = label
+		}
+		if c.TestMode {
+			row["test_mode"] = true
+		}
+		out = append(out, row)
 	}
 	writeJSON(ctx, fasthttp.StatusOK, map[string]interface{}{
 		"comments_enabled": h.Store.RatingCommentsEnabled(),

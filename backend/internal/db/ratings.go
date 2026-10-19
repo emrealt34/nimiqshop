@@ -52,6 +52,25 @@ type RatingComment struct {
 	// TestMode marks a comment left on an admin test-center purchase. Public
 	// callers only see it while the operator shows test orders publicly.
 	TestMode bool `json:"test_mode,omitempty"`
+	// Address is the buyer's wallet AS THE PUBLIC FEED MAY SHOW IT, captured
+	// at write time — see commentIdentity.
+	//
+	// The public comment list deliberately carries no purchase id
+	// (ListRatingComments blanks kind and id for public callers), so nothing
+	// about the buyer can be resolved when the list is read. Whatever the
+	// public surface may say about who left a comment is therefore decided
+	// once, here, with the purchase in hand. It stores nothing the feed does
+	// not already publish: an anonymous purchase stays anonymous (empty
+	// address, Anonymous set), a public one shows the same wallet the feed
+	// shows beside the purchase itself.
+	Address string `json:"address,omitempty"`
+	// Anonymous is true when the rated purchase hid the buyer's identity.
+	// It is stored explicitly (rather than inferred from an empty address)
+	// so "private on purpose" is never confused with "not filled in yet".
+	Anonymous bool `json:"anonymous,omitempty"`
+	// Product is the rated purchase's product id — raw, because cleaning a
+	// public label is the handler's job, not the store's.
+	Product string `json:"product,omitempty"`
 }
 
 // RatingState is the rating view of one purchase for its owner.
@@ -243,10 +262,107 @@ func (s *Store) ApplyRating(w RatingWrite) (RatingAggregate, error) {
 				return err
 			}
 		}
+		address, anonymous, product := commentIdentity(txn, w.Kind, w.ID, w.UserID)
 		return upsertRecentComment(txn, RatingComment{Kind: w.Kind, ID: w.ID,
-			Stars: w.Stars, Comment: w.Comment, At: now, TestMode: st.TestMode})
+			Stars: w.Stars, Comment: w.Comment, At: now, TestMode: st.TestMode,
+			Address: address, Anonymous: anonymous, Product: product})
 	})
 	return agg, err
+}
+
+// commentIdentity captures what the PUBLIC comment list may say about the
+// buyer, at the moment the rating is written.
+//
+// The list public callers read carries no purchase id (it is blanked on
+// purpose), so this is the only point at which the wallet, the anonymity of
+// the purchase and the product are all in hand. It is best effort throughout:
+// a missing record simply means the comment shows no face, and an anonymous
+// purchase never yields an address at all.
+func commentIdentity(txn *badger.Txn, kind, id, userID string) (address string, anonymous bool, product string) {
+	switch kind {
+	case RatingKindQuote:
+		var q Quote
+		if err := getJSON(txn, quoteKey(id), &q); err == nil {
+			anonymous = q.Anonymous
+			product = q.ProductID
+			if userID == "" {
+				userID = q.UserID
+			}
+		}
+	case RatingKindOrder:
+		var o Order
+		if err := getJSON(txn, orderKey(id), &o); err == nil {
+			anonymous = o.Anonymous
+			product = o.ProductID
+			if userID == "" {
+				userID = o.UserID
+			}
+		}
+	}
+	if anonymous || userID == "" {
+		// An anonymous purchase keeps its secret here too: the wallet is
+		// not even copied onto the comment.
+		return "", anonymous, product
+	}
+	var u User
+	if err := getJSON(txn, userKey(userID), &u); err == nil {
+		address = u.NimiqAddress
+	}
+	return address, anonymous, product
+}
+
+// BackfillRatingCommentIdentity fills the identity of comments written before
+// it was captured (Address/Anonymous/Product), so an old comment gets the same
+// face as a new one instead of looking half-built.
+//
+// It only ever touches rows where BOTH the address is empty and the comment is
+// not marked anonymous — a private purchase is finished once it is known to be
+// private — so the work disappears on its own after the first pass.
+func (s *Store) BackfillRatingCommentIdentity(limit int) (int, error) {
+	if limit <= 0 {
+		limit = 300
+	}
+	fixed := 0
+	err := s.Update(func(txn *badger.Txn) error {
+		list := loadRecentComments(txn)
+		for _, c := range list {
+			if len(c.Kind) == 0 || len(c.ID) == 0 {
+				continue // nothing to resolve from (already a public row)
+			}
+			if c.Address != "" || c.Anonymous {
+				continue
+			}
+			userID := ""
+			switch c.Kind {
+			case RatingKindQuote:
+				var q Quote
+				if err := getJSON(txn, quoteKey(c.ID), &q); err == nil {
+					userID = q.UserID
+				}
+			case RatingKindOrder:
+				var o Order
+				if err := getJSON(txn, orderKey(c.ID), &o); err == nil {
+					userID = o.UserID
+				}
+			}
+			address, anonymous, product := commentIdentity(txn, c.Kind, c.ID, userID)
+			if address == "" && !anonymous && product == "" {
+				continue
+			}
+			c.Address = address
+			c.Anonymous = anonymous
+			c.Product = product
+			if err := upsertRecentComment(txn, c); err != nil {
+				return err
+			}
+			fixed++
+			if fixed >= limit {
+				break
+			}
+		}
+		return nil
+	})
+	return fixed, err
 }
 
 // storeRatingFields writes the rating onto the order or quote record.

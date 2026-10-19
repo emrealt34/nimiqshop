@@ -20,7 +20,25 @@ import {
   type RatingIntent,
 } from '../../lib/ratingPay';
 import { cleanComment, commentProblem, MAX_COMMENT, memoPreview } from '../../lib/ratingComment';
-import { StarPicker, StarsDisplay } from '../ui/uiKit';
+import { ClockTime, StarPicker, StarsDisplay } from '../ui/uiKit';
+import { Identicon } from '../ui/Identicon';
+import { Icon } from '../ui/Icon';
+import { shortAddr } from '../../lib/format';
+
+/** One public buyer comment, as /api/ratings/comments returns it. */
+interface RatingCommentItem {
+  stars: number;
+  comment: string;
+  at: string;
+  /** The buyer's wallet — present only when the purchase was not anonymous. */
+  address?: string;
+  /** The purchase hid the buyer's identity: no wallet is ever shown. */
+  anonymous?: boolean;
+  /** Public product label of the purchase the comment belongs to. */
+  product?: string;
+  /** An admin test-center purchase, visible only while test orders are shown. */
+  test_mode?: boolean;
+}
 import { ratingStars } from '../../lib/ratingStars';
 
 export interface RatingCurrent {
@@ -277,11 +295,25 @@ function messageFor(err: unknown, t: Translator): string {
   return t('rating.failed');
 }
 
-/** Public list of the newest buyer comments. Renders nothing when there are none. */
-export function RecentRatingComments() {
+/**
+ * Public list of the newest buyer comments, on the Activity page.
+ *
+ * A comment is a person's words, so it is shown the way the feed shows a
+ * purchase: the buyer's identicon and wallet beside their stars, when they
+ * said it, what they bought, and the comment under it. The wallet is only
+ * ever the one the feed already publishes for that purchase — an anonymous
+ * buyer stays a "Private buyer" chip, and a comment the shop could not match
+ * to a buyer (written before the face was captured) simply has no face.
+ *
+ * Renders nothing when there are no comments.
+ */
+export function RecentRatingComments({ seed }: { seed?: RatingCommentItem[] } = {}) {
   const { t } = useT();
-  const [items, setItems] = useState<{ stars: number; comment: string; at: string }[]>([]);
+  // `seed` is the seam for the preview and the tests: the page itself always
+  // lets the component load the list.
+  const [items, setItems] = useState<RatingCommentItem[]>(seed || []);
   useEffect(() => {
+    if (seed) return;
     let alive = true;
     getRatingComments()
       .then((r: any) => alive && setItems(Array.isArray(r?.items) ? r.items : []))
@@ -289,16 +321,38 @@ export function RecentRatingComments() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [seed]);
   if (!items.length) return null;
   return (
-    <div className="mt-2">
+    // rs-comments spans the whole card: the summary above it is a two-column
+    // grid, and a comment list squeezed into one of those columns is what
+    // made the block look broken on the Activity page.
+    <div className="rs-comments mt-2">
       <div className="small strong mb-1">{t('rating.recentTitle')}</div>
-      <ul className="rating-comments" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+      <ul className="rating-comments">
         {items.slice(0, 8).map((c, i) => (
-          <li key={i} className="row" style={{ gap: '8px', alignItems: 'baseline', padding: '4px 0', borderTop: i ? '1px solid var(--line, #eee)' : 'none' }}>
-            <StarsDisplay rating={c.stars} size={12} />
-            <span className="small" style={{ wordBreak: 'break-word' }}>{c.comment}</span>
+          <li className="rating-comment" key={`${c.at}-${i}`}>
+            <div className="rating-comment-head">
+              {/* Not a copy button and not a tooltip carrying the whole
+                  wallet: the feed row beside the purchase is where an
+                  address is meant to be read and copied. */}
+              {c.address ? (
+                <span className="feed-wallet chip">
+                  <Identicon address={c.address} className="feed-id" size={22} />
+                  <span className="mono">{shortAddr(c.address)}</span>
+                </span>
+              ) : c.anonymous ? (
+                <span className="feed-wallet chip feed-wallet-private" title={t('activityPage.privateBuyerTitle')}>
+                  <Icon name="eye-off" size={14} />
+                  <span>{t('activityPage.privateBuyer')}</span>
+                </span>
+              ) : null}
+              <StarsDisplay rating={c.stars} size={13} />
+              <ClockTime ts={c.at} className="xs faint" />
+              {c.test_mode ? <span className="chip xs">TEST</span> : null}
+            </div>
+            <p className="rating-comment-body">{c.comment}</p>
+            {c.product ? <div className="xs faint">{c.product}</div> : null}
           </li>
         ))}
       </ul>

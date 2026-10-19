@@ -472,6 +472,15 @@ func main() {
 	} else {
 		log.Printf("ratings: CASHBACK_WALLET_SEED or NIMIQ_RPC_URL missing, star ratings disabled")
 	}
+	// Comments written before the shop captured who left them get their face
+	// and product filled in from the purchase they belong to. It is the one
+	// place that may still read a comment's purchase id, and it stops doing
+	// work by itself once every row is filled.
+	if fixed, err := store.BackfillRatingCommentIdentity(0); err != nil {
+		log.Printf("ratings: could not backfill comment identities: %v", err)
+	} else if fixed > 0 {
+		log.Printf("ratings: %d comment(s) matched to their buyer and product", fixed)
+	}
 	if notifyOn {
 		log.Printf("notify: order-ready memo channel enabled (network=%s fee=%d Luna)", cfg.NotifyWalletNetwork, cfg.NotifyWalletFeeLuna)
 	} else {

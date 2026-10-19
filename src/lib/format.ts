@@ -113,7 +113,12 @@ export function shortAddr(addr?: string | null, lead = 9, _tail = 6): string {
   const a = String(addr).replace(/\s+/g, '');
   if (!a) return '';
   if (a.length <= lead + 1) return formatWalletAddress(a);
-  return formatWalletAddress(a.slice(0, lead)) + '…';
+  // Cut ON A GROUP BOUNDARY. The address is written in groups of four, and
+  // chopping it mid-group produced "NQ24 2XCD P…" in the public feed — a
+  // stump that is not a shorter address, just a broken one that no wallet
+  // app would ever print.
+  const head = Math.max(4, lead - (lead % 4));
+  return formatWalletAddress(a.slice(0, head)) + '…';
 }
 
 /** ISO 3166-1 alpha-2 → flag emoji (graceful on systems without flag glyphs). */
