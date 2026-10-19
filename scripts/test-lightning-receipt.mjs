@@ -17,7 +17,10 @@ test('public privacy, simulation exclusions, network and hash validation', () =>
   assert.equal(lightningReceiptOf({ coin: 'BTC', network: 'Lightning', tx: hash }), null);
   assert.equal(lightningReceiptOf({ ...quote, anonymous: true }, true), null);
   assert.equal(lightningReceiptOf({ ...quote, anonymous: true }, false).payment_hash, hash);
-  assert.equal(lightningReceiptOf({ ...quote, test_mode: true }), null);
+  // A test wallet's order really paid is a real receipt; a simulated
+  // test-pay has no payment hash at all, which is what excludes it.
+  assert.equal(lightningReceiptOf({ ...quote, test_mode: true }).payment_hash, hash);
+  assert.equal(lightningReceiptOf({ ...quote, test_mode: true, lightning_payment_hash: undefined }), null);
   assert.equal(lightningReceiptOf({ ...quote, coin: 'USDT', network: 'Polygon' }), null);
   assert.equal(paymentHash(` ${hash.toUpperCase()} `), hash);
   for (const bad of [null, 123, 'a'.repeat(63), 'a'.repeat(65), 'z'.repeat(64), 'lnbc123']) assert.equal(paymentHash(bad), '');

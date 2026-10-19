@@ -152,10 +152,13 @@ func (w *OrderTracker) tick(ctx context.Context) {
 	creating, err := w.Store.ListQuotesByStatus(cryptorefills.QuoteOrderCreating, 100)
 	if err == nil {
 		for _, q := range creating {
-			// Test-center quotes belong to the simulated supplier; polling
-			// the REAL supplier for their ids would only burn budget and
-			// flag manual review. The admin test-pay endpoint drives them.
-			if q.TestMode {
+			// Only a fabricated (TESTSIM-) id belongs to the simulated
+			// supplier; polling the REAL supplier for it would burn budget
+			// and flag manual review. The admin test-pay endpoint drives
+			// those. A listed test wallet's quote is NOT one of them: it
+			// has a real supplier order behind it and is resolved (and
+			// later polled) exactly like any other purchase.
+			if q.SimulatedSupplier() {
 				continue
 			}
 			w.resolveCreating(ctx, q)
@@ -207,9 +210,11 @@ func (w *OrderTracker) tick(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
-		// Test-center quotes are driven by the admin test-pay endpoint,
-		// never by the real supplier poller.
-		if q.TestMode {
+		// Only a fabricated (TESTSIM-) id is driven by the admin test-pay
+		// endpoint instead of the real supplier poller. A listed test
+		// wallet's order is a real supplier order: if the buyer really
+		// pays the invoice, this poller is what delivers the product.
+		if q.SimulatedSupplier() {
 			continue
 		}
 		if q.NeedsSupplierPoll() && w.markDue(q, now) {

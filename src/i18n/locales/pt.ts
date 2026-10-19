@@ -484,7 +484,7 @@ const pt = {
     flowPayWithNim: 'Pagar com Nimiq Pay',
     testPaySimulate: "Simular pagamento (teste)",
     testPaySimulating: "Simulando…",
-    testPayHint: "Carteira de teste: o pagamento é simulado e nenhum dinheiro real é movimentado.",
+    testPayHint: "Carteira de teste: a fatura é real e pode ser paga de verdade. Só este botão finge o pagamento: nenhum dinheiro se move e nenhum código é emitido.",
     testPayFailed: "O pagamento simulado falhou",
     flowCashbackLine: 'Você ganhará ≈ {{nim}} NIM de cashback',
     nimiqPayNotFound: "Nimiq Pay não encontrado — escaneie o QR code abaixo com seu telefone para pagar.",

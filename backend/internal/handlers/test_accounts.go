@@ -7,15 +7,28 @@ import (
 
 	"github.com/valyala/fasthttp"
 
+	"nimiqshop/internal/cryptorefills"
 	"nimiqshop/internal/db"
 	"nimiqshop/internal/nimiq"
 )
 
-// Test accounts are wallets the operator lists in the admin console. A listed
-// wallet's own checkouts run the simulated path: real validation and pricing,
-// no supplier order, no real payment, and a "simulate payment" button. Every
-// other wallet gets the normal flow. Listing is per wallet, so the global
-// TEST_MODE switch is never needed for this.
+// Test accounts are wallets the operator lists in the admin console.
+//
+// A listed test wallet runs the REAL checkout: the same validation, the same
+// pricing, the same catalog rules, a REAL supplier order and a REAL, payable
+// invoice. The ONLY simulated thing left is the "simulate payment" button:
+// pressing it settles the order through the real state machine without any
+// money moving, which is what makes the button a test tool rather than a
+// purchase. Before this, a listed wallet was handed a fabricated invoice
+// (checksum-valid but unpayable, always priced at 0.00001 BTC) and no supplier
+// order at all — so nothing about the payment rail could be tested for real.
+//
+// Everything else stays simulated in the bookkeeping sense (Quote.TestMode):
+// test orders are hidden from the public feed, badged in the admin console,
+// paid out with a TESTTX- cashback hash, and kept out of the daily budget.
+//
+// The global TEST_MODE switch (dev/staging) is a different thing: there the
+// supplier itself is simulated, so quotes get the fabricated attach.
 
 // isTestAccountUser reports whether the signed-in user's wallet is listed.
 func (h *Handlers) isTestAccountUser(userID string) bool {
@@ -29,17 +42,51 @@ func (h *Handlers) isTestAccountUser(userID string) bool {
 	return h.Store.IsTestAccount(nimiq.NormalizeAddress(u.NimiqAddress))
 }
 
-// canTestPay reports whether the simulated pay button (and its endpoint) apply
-// to this quote: a simulated order owned by a listed test wallet. The global
-// TEST_MODE switch does not extend this, so nobody else can simulate a payment.
-func (h *Handlers) canTestPay(q db.Quote) bool {
-	return q.TestMode && strings.HasPrefix(q.SupplierOrderID, "TESTSIM-") && h.isTestAccountUser(q.UserID)
+// testModeQuoteFor reports whether a quote created by this user is a TEST
+// order for bookkeeping: hidden from public surfaces, simulated cashback
+// payout, no daily-budget consumption. A listed test wallet's quote is one;
+// the global TEST_MODE switch makes every quote one.
+func (h *Handlers) testModeQuoteFor(userID string) bool {
+	return h.Cfg.TestMode || h.isTestAccountUser(userID)
 }
 
-// simulatedPaymentFor is the single gate for the simulated checkout: the
-// global TEST_MODE switch (dev/staging) or a listed test wallet (live).
+// simulatedPaymentFor is the single gate for the SIMULATED supplier: when it
+// is true the quote gets a fabricated invoice instead of a real supplier
+// order. That is now the global TEST_MODE switch only (dev/staging, where no
+// real supplier order should be created at all). A listed test wallet on the
+// live site is NOT simulated here — it pays a real invoice, or fakes the
+// payment with its test-pay button.
 func (h *Handlers) simulatedPaymentFor(userID string) bool {
-	return h.Cfg.TestMode || h.isTestAccountUser(userID)
+	return h.Cfg.TestMode
+}
+
+// canTestPay reports whether the simulated pay button (and its endpoint) apply
+// to this quote: an unsettled order owned by a listed test wallet. The wallet
+// — never the global switch — is what grants it, so nobody else can settle an
+// order without paying. A quote whose payment target was fabricated by the
+// admin sandbox (TESTSIM-) can still be driven when the global TEST_MODE
+// switch is on; on the live site that shape is the operator's test center and
+// belongs to the admin test-pay endpoint, not to a customer's button.
+func (h *Handlers) canTestPay(q db.Quote) bool {
+	if !h.isTestAccountUser(q.UserID) {
+		return false
+	}
+	if h.Cfg.TestMode {
+		return !settledForTestPay(q)
+	}
+	return !q.SimulatedSupplier() && !settledForTestPay(q)
+}
+
+// settledForTestPay reports whether this quote is already paid or otherwise
+// finished, so the simulated pay button has nothing left to do.
+func settledForTestPay(q db.Quote) bool {
+	switch q.Status {
+	case cryptorefills.QuoteFulfilled, cryptorefills.QuoteRefunded,
+		cryptorefills.QuoteExpired, cryptorefills.QuoteFailed:
+		return true
+	default:
+		return false
+	}
 }
 
 type testAccountView struct {

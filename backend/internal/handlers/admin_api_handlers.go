@@ -506,8 +506,8 @@ func (h *Handlers) AdminSyncOrder(ctx *fasthttp.RequestCtx) {
 	// consulted for older data. If the id is a quote, re-poll the supplier
 	// through the shared queue and apply the conditional transition.
 	if q, qerr := h.Store.GetQuote(id); qerr == nil {
-		if q.TestMode {
-			writeError(ctx, fasthttp.StatusConflict, "test-center quote: drive it from the admin test center (test-pay), not a real supplier sync")
+		if q.SimulatedSupplier() {
+			writeError(ctx, fasthttp.StatusConflict, "simulated order: drive it from the admin test center (test-pay), not a real supplier sync")
 			return
 		}
 		if q.SupplierOrderID == "" {

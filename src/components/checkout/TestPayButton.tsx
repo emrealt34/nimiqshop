@@ -6,11 +6,16 @@ import { useT } from '../../i18n';
  * TestPayButton — the simulated "pay" button for a listed test wallet.
  *
  * The server decides whether it applies: GET /api/quotes/{id} returns
- * `test_pay: true` only for a simulated order owned by a wallet on the admin's
+ * `test_pay: true` only for an order owned by a wallet on the admin's
  * test-account list. For everyone else the component renders nothing, so the
- * normal checkout is unchanged. Clicking it settles the simulated order (no
- * supplier order, no real payment); the surrounding payment poll picks up the
- * result.
+ * normal checkout is unchanged.
+ *
+ * WHAT IS REAL AND WHAT IS NOT: the order behind this button is a real order
+ * with a real, payable invoice — the buyer can pay it and receive a real code.
+ * Pressing the button is the ONE simulated step: it settles the order through
+ * the real state machine without any money moving, so the code it delivers is
+ * a placeholder. It never replaces the invoice, and it is never needed to
+ * complete a purchase.
  */
 export function TestPayButton({ quoteId, onPaid }: { quoteId: string; onPaid?: () => void }) {
   const { t } = useT();

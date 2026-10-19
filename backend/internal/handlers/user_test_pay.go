@@ -8,18 +8,21 @@ import (
 	"nimiqshop/internal/middleware"
 )
 
-/* user_test_pay.go — the TEST_MODE customer's "pay" button.
+/* user_test_pay.go — a listed test wallet's "pay" button.
  *
- * When the shop runs with TEST_MODE=true, the customer experiences the
- * COMPLETE normal flow — wallet login, catalog, delivery step, checkout,
- * invoice — and pays through this endpoint instead of a real wallet handoff:
- * POST /api/quotes/{id}/test-pay walks the order through the REAL state
- * machine (broadcast → confirm → deliver) exactly like an on-chain payment
- * landing, so the pay screen's live polling, the delivery code, the gift
- * email, the cashback engine and the orders page all behave like production.
+ * A wallet on the admin's test-account list experiences the COMPLETE normal
+ * flow — wallet login, catalog, delivery step, checkout, a REAL supplier
+ * order and a REAL invoice — and may then settle through this endpoint
+ * instead of paying it: POST /api/quotes/{id}/test-pay walks the order
+ * through the REAL state machine (broadcast → confirm → deliver) exactly
+ * like an on-chain payment landing, so the pay screen's live polling, the
+ * delivery code, the gift email, the cashback engine and the orders page all
+ * behave like production.
  *
- * Only the owner's own test quote (TestMode + TESTSIM- supplier id) can be
- * driven, and only while TEST_MODE is on.
+ * The simulated step is the PAYMENT, not the invoice: everything up to it is
+ * a real order that can really be paid, and pressing this button is the one
+ * thing that pretends money moved. Only the owner's own quote can be driven,
+ * and only a wallet the admin listed can drive it at all.
  */
 
 // UserTestPay is the customer-facing simulated payment.

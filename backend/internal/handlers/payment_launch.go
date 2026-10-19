@@ -72,10 +72,12 @@ func (h *Handlers) RefreshQuote(ctx *fasthttp.RequestCtx) {
 		writeJSON(ctx, 409, map[string]any{"code": "ORDER_OUTCOME_UNKNOWN", "quote_id": q.ID, "detail": "Supplier acceptance is unconfirmed and no order id is known. No new order will be sent; contact support."})
 		return
 	}
-	// Simulated (TEST_MODE) quotes never existed at the supplier: their
-	// TESTSIM- order advances through the settlement tracker, so a refresh
-	// is just a re-read of local state instead of a doomed supplier GET.
-	if q.TestMode || strings.HasPrefix(q.SupplierOrderID, "TESTSIM-") {
+	// A fabricated (TESTSIM-) order never existed at the supplier: it
+	// advances through the settlement tracker, so a refresh is just a
+	// re-read of local state instead of a doomed supplier GET. A listed
+	// test wallet's order DOES exist at the supplier — its refresh must
+	// ask the supplier, exactly like any other buyer's.
+	if q.SimulatedSupplier() {
 		h.GetUserQuote(ctx)
 		return
 	}

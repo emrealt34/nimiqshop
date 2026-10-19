@@ -541,9 +541,10 @@ func (h *Handlers) createQuoteBatchInner(ctx *fasthttp.RequestCtx, userID string
 		PaymentMethod:       req.PaymentMethod,
 		CashbackDestination: req.CashbackDestination,
 		Anonymous:           req.Anonymous,
-		// TEST MODE: real validation and pricing, simulated payment (see
-		// createQuoteInner's branch — the batch shares the semantics).
-		TestMode:           h.simulatedPaymentFor(userID),
+		// TEST ORDER: real validation, real pricing, real supplier order —
+		// TestMode only marks the cart as a test purchase for bookkeeping
+		// (see createQuoteInner; the batch shares the semantics).
+		TestMode:           h.testModeQuoteFor(userID),
 		CashbackCode:       cashbackView.Code,
 		CashbackCodeBps:    cashbackView.promotionBps(),
 		CashbackCodeMaxUSD: cashbackView.PromoCapUSD,
@@ -581,8 +582,10 @@ func (h *Handlers) createQuoteBatchInner(ctx *fasthttp.RequestCtx, userID string
 		return
 	}
 
-	// TEST MODE: no real supplier order — simulated attach, same batch
-	// payload back to the customer (see createQuoteInner's branch).
+	// TEST MODE (global switch only): no real supplier order — simulated
+	// attach, same batch payload back to the customer (see
+	// createQuoteInner's branch). A listed test wallet's cart goes to the
+	// real supplier like any other cart.
 	if h.simulatedPaymentFor(userID) {
 		if !faceTotalsComplete {
 			faceByCurrency = nil

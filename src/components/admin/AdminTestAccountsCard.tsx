@@ -13,9 +13,14 @@ function describeError(e: unknown): string {
 }
 
 /**
- * Test accounts: wallets allowed to run the simulated checkout. A listed wallet
- * sees a "simulate payment" button on its own orders; nothing else changes for
- * it, and no real money moves. Everyone else is unaffected.
+ * Test accounts: wallets the operator lets test the checkout end to end.
+ *
+ * A listed wallet buys like anyone else — real supplier order, real payable
+ * invoice — and additionally gets a "simulate payment" button on its own
+ * orders: pressing it settles the order through the real state machine with no
+ * money moving, which is the one simulated step. Its orders stay out of the
+ * public feed and out of the daily budget, and its cashback is paid with a
+ * simulated hash. Everyone else is unaffected.
  */
 export function AdminTestAccountsCard() {
   const { toast } = useToast();
@@ -78,8 +83,10 @@ export function AdminTestAccountsCard() {
         <span>Test accounts</span>
       </div>
       <div className="small muted mb-2">
-        Listed wallets get a simulate-payment button on their own orders, for phone testing. Simulated orders
-        create no supplier order and move no real money. Everyone else is unaffected.
+        Listed wallets buy for real — a real supplier order with a real, payable invoice — and get a
+        simulate-payment button on their own orders for phone testing. Pressing it is the only simulated step:
+        the order settles with no money moving, so the code it delivers is a placeholder. These orders stay out
+        of the public feed and the daily budget. Everyone else is unaffected.
       </div>
 
       {accounts === null && !err ? <LoadingRows /> : null}

@@ -417,10 +417,12 @@ func (h *Handlers) createQuoteInner(ctx *fasthttp.RequestCtx, userID string, req
 		PaymentMethod:       req.PaymentMethod,
 		CashbackDestination: req.CashbackDestination,
 		Anonymous:           req.Anonymous,
-		// TEST MODE: the quote rides the REAL pipeline, but its payment is
-		// simulated end to end (no supplier order, TESTSIM- attach, the
-		// customer pays through the simulated pay button).
-		TestMode: h.simulatedPaymentFor(userID),
+		// TEST ORDER: the quote rides the REAL pipeline (real supplier
+		// order, real payable invoice) — TestMode only marks it as a test
+		// purchase for bookkeeping: hidden from public surfaces, simulated
+		// cashback payout, no daily-budget consumption. The one simulated
+		// thing is the test-pay button (see canTestPay).
+		TestMode: h.testModeQuoteFor(userID),
 		// Gift notification metadata — already canonicalized and checked
 		// against this order's contacts above, and persisted BEFORE the
 		// supplier call so the tracker can send the email when fulfillment
@@ -469,10 +471,14 @@ func (h *Handlers) createQuoteInner(ctx *fasthttp.RequestCtx, userID string, req
 		return
 	}
 
-	// TEST MODE: everything above ran for real (validation, pricing, rules,
-	// the write-ahead quote) — from here NO real supplier order is created.
-	// Attach a simulated invoice instead; the customer "pays" it with the
-	// simulated pay button (POST /api/quotes/{id}/test-pay).
+	// TEST MODE (global switch only): everything above ran for real
+	// (validation, pricing, rules, the write-ahead quote) — from here NO
+	// real supplier order is created. Attach a simulated invoice instead;
+	// the customer "pays" it with the simulated pay button.
+	//
+	// A listed test wallet does NOT take this branch any more: it gets a
+	// real supplier order and a real invoice, and only the test-pay button
+	// is a simulation (see test_accounts.go).
 	if h.simulatedPaymentFor(userID) {
 		h.finishSimulatedCreation(ctx, q, faceUSD, func(latest db.Quote) {
 			h.writeQuoteCreatedExtra(ctx, latest, map[string]any{"simulated_payment": true})

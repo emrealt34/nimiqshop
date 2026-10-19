@@ -485,7 +485,7 @@ const tr = {
     flowPayWithNim: 'Nimiq Pay ile öde',
     testPaySimulate: "Ödemeyi simüle et (test)",
     testPaySimulating: "Simüle ediliyor…",
-    testPayHint: "Test cüzdanı: ödeme simüle edilir, gerçek para hareket etmez.",
+    testPayHint: "Test cüzdanı: fatura gerçektir ve gerçekten ödenebilir. Sadece bu düğme ödemeyi taklit eder — para hareket etmez ve kod verilmez.",
     testPayFailed: "Simüle ödeme başarısız",
     flowCashbackLine: '≈ {{nim}} NIM cashback kazanacaksın',
     nimiqPayNotFound: "Nimiq Pay bulunamadı — telefonunuzda alttaki QR'ı okutarak ödeyebilirsiniz.",

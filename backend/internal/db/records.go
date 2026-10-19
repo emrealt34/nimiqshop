@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"nimiqshop/internal/nimiq"
+	"strings"
 	"time"
 
 	"nimiqshop/internal/money"
@@ -302,6 +303,44 @@ type Quote struct {
 	// actually saw, not a later oracle tick. Zero means "unknown — skip".
 	NimUsdRate   float64 `json:"nim_usd_rate,omitempty"`
 	EstimatedNIM float64 `json:"estimated_nim,omitempty"`
+}
+
+// SimulatedSupplierPrefix marks the supplier order ids the test engine
+// fabricates. A quote carrying one has NO real supplier order behind it: no
+// Cryptorefills order exists, nobody can pay the invoice it shows, and the
+// only thing that can move it forward is the test-pay button.
+//
+// It is deliberately NOT the same thing as Quote.TestMode. TestMode is
+// bookkeeping for a test purchase (hidden from the public feed, badged in the
+// admin console, simulated cashback payout, exempt from the daily budget). A
+// listed test wallet's own checkout sets TestMode AND rides the REAL supplier:
+// it gets a real supplier order and a real, payable invoice, and only the
+// test-pay button is a simulation. Everything that must never touch the real
+// supplier keys off SimulatedSupplier() instead of TestMode.
+const SimulatedSupplierPrefix = "TESTSIM-"
+
+// SimulatedSupplier reports whether this quote's payment target was fabricated
+// by the test engine rather than issued by the supplier.
+func (q Quote) SimulatedSupplier() bool {
+	return strings.HasPrefix(q.SupplierOrderID, SimulatedSupplierPrefix)
+}
+
+// RealSupplierOrder reports whether a real supplier order exists behind this
+// quote, i.e. the supplier can be polled and the invoice can really be paid.
+// A quote still being created has no id yet — it is not "simulated", it is
+// simply not attached, and the crash tracker must still resolve it.
+func (q Quote) RealSupplierOrder() bool {
+	return q.SupplierOrderID != "" && !q.SimulatedSupplier()
+}
+
+// NeverPayable reports whether this quote has no real, payable invoice behind
+// it — so it can never have a payment proof or a receipt. That is true for a
+// fabricated (TESTSIM-) order, and for a test order with no supplier order
+// attached at all. A listed test wallet's order is neither: it is a real
+// order, and when the buyer really pays it, the proof and the receipt are
+// real too.
+func (q Quote) NeverPayable() bool {
+	return q.SimulatedSupplier() || (q.TestMode && !q.RealSupplierOrder())
 }
 
 // Only chain-verified data is stored here; invoice hashes are not transaction IDs.

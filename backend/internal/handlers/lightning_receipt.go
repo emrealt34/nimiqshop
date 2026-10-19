@@ -10,7 +10,10 @@ import (
 // Public metadata, not a claim of cryptographic proof. Never publish the raw
 // invoice (it can contain supplier references) or anonymous payment details.
 func publicLightningReceipt(q db.Quote) map[string]any {
-	if q.Anonymous || q.TestMode || !strings.EqualFold(q.Coin, "BTC") || !strings.EqualFold(q.Network, "Lightning") {
+	// An order that was never payable has no receipt to publish. A listed
+	// test wallet's order is a real one — when it is really paid it earns
+	// the same real receipt as any other purchase.
+	if q.Anonymous || q.NeverPayable() || !strings.EqualFold(q.Coin, "BTC") || !strings.EqualFold(q.Network, "Lightning") {
 		return nil
 	}
 	hash := strings.ToLower(strings.TrimSpace(q.LightningPaymentHash))

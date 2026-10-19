@@ -663,7 +663,7 @@ function PayNowCard({ q }: { q: any }) {
   try {
     if (invoice) payURI = lightningPaymentURI(invoice);
   } catch {}
-  // TEST MODE: NO separate simulated screen — this exact real pay-now card
+  // TEST WALLET: NO separate simulated screen — this exact real pay-now card
   // (recap · countdown · real QR/wallet block) gains ONE extra button, the
   // simulated pay button, right at the payment spot. The page's 12s poll
   // hides this card once the simulated payment settles.

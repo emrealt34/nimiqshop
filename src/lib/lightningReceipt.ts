@@ -13,7 +13,11 @@ export type LightningReceiptData = {
 export type LightningChainProof = { funding_tx: string; contract: string; settlement_tx?: string; preimage?: string };
 
 export function lightningReceiptOf(value: any, publicView = false): LightningReceiptData | null {
-  if (!value || value.test_mode || (publicView && value.anonymous)) return null;
+  // A test wallet's order is a REAL order: when the buyer really pays the
+  // invoice, the receipt is real and is shown. A simulated test-pay settles
+  // the order without any payment, so it carries no hash and yields no
+  // receipt — the exclusion is the missing payment, not the test flag.
+  if (!value || (publicView && value.anonymous)) return null;
   const receipt = value.lightning_receipt;
   const hash = paymentHash(receipt?.payment_hash || value.lightning_payment_hash);
   const lightning = receipt || (/lightning/i.test(String(value.network || '')) && /btc/i.test(String(value.coin || value.paid || 'BTC')));

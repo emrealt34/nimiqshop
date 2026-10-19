@@ -20,7 +20,12 @@ func (h *Handlers) LightningProof(ctx *fasthttp.RequestCtx) {
 	id, _ := ctx.UserValue("id").(string)
 	q, err := h.Store.GetQuote(id)
 	private := string(ctx.Method()) == "POST"
-	if err != nil || q.TestMode || !strings.EqualFold(q.Coin, "BTC") || !strings.EqualFold(q.Network, "Lightning") ||
+	// A proof exists only for a purchase that was really payable. A
+	// fabricated (TESTSIM-) order was not, and neither is a test order
+	// with no supplier order behind it. A listed test wallet's order IS a
+	// real order: when the buyer really pays the invoice, the proof is real
+	// and readable like any other buyer's.
+	if err != nil || q.NeverPayable() || !strings.EqualFold(q.Coin, "BTC") || !strings.EqualFold(q.Network, "Lightning") ||
 		(private && q.UserID != middleware.UserID(ctx)) || (!private && q.Anonymous) {
 		writeError(ctx, 404, "payment proof unavailable")
 		return

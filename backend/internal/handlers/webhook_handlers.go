@@ -67,9 +67,11 @@ func (h *Handlers) CryptoRefillsWebhook(ctx *fasthttp.RequestCtx) {
 		writeError(ctx, 503, "order linkage pending")
 		return
 	}
-	// A test-mode order (TESTSIM- supplier id) is driven by the simulated
-	// pay endpoint, never by real supplier webhooks.
-	if q.TestMode {
+	// A fabricated (TESTSIM-) order is driven by the simulated pay
+	// endpoint, never by real supplier webhooks — no supplier order
+	// exists behind it. A listed test wallet's order is a real order, so
+	// the real webhook is what delivers it.
+	if q.SimulatedSupplier() {
 		writeError(ctx, fasthttp.StatusConflict, "test-mode order: not driven by supplier webhooks")
 		return
 	}

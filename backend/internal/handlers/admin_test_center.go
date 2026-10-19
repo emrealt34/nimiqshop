@@ -308,7 +308,7 @@ func (h *Handlers) AdminTestPurchase(ctx *fasthttp.RequestCtx) {
 	// Simulated supplier attach: a fake order id, a rail-correct fake wallet
 	// and the shop's own price as the coin amount — the exact fields the
 	// Cryptorefills attach persists.
-	supplierOrderID := "TESTSIM-" + uuid.NewString()[:8]
+	supplierOrderID := db.SimulatedSupplierPrefix + uuid.NewString()[:8]
 	wallet := simulatedWallet(method, q.ID, coin)
 	amount := simulatedCoinAmount(faceUSD, method, q.ValidatedCoinAmount)
 	expiry := now.Add(cryptorefills.PaymentWindow - cryptorefills.PaymentSafetyBuffer)
@@ -381,7 +381,7 @@ func simulatedCoinAmount(faceUSD float64, method string, validated string) strin
 // to the customer.
 func (h *Handlers) finishSimulatedCreation(ctx *fasthttp.RequestCtx, q db.Quote, faceUSD float64, respond func(db.Quote)) {
 	method := paymentMethodOf(q)
-	supplierOrderID := "TESTSIM-" + uuid.NewString()[:8]
+	supplierOrderID := db.SimulatedSupplierPrefix + uuid.NewString()[:8]
 	wallet := simulatedWallet(method, q.ID, q.Coin)
 	amount := simulatedCoinAmount(faceUSD, method, q.ValidatedCoinAmount)
 	expiry := time.Now().UTC().Add(cryptorefills.PaymentWindow - cryptorefills.PaymentSafetyBuffer)
@@ -406,8 +406,12 @@ func (h *Handlers) finishSimulatedCreation(ctx *fasthttp.RequestCtx, q db.Quote,
 // driveTestQuote walks a test quote through the payment ladder on the SAME
 // state machine the real tracker path uses (ApplySupplierOrder) and fires
 // the same settlement hooks on fulfillment. Shared by the admin test center
-// and the TEST_MODE customer pay button. "auto" walks the whole rail:
-// broadcast → confirmed → delivering → delivered.
+// and the customer test-pay button of a listed test wallet. "auto" walks the
+// whole rail: broadcast → confirmed → delivering → delivered.
+//
+// The ladder is the ONLY simulated part of a listed test wallet's order: the
+// supplier order and the invoice behind it are real, and the payment is what
+// the button pretends to have happened.
 func (h *Handlers) driveTestQuote(q db.Quote, action string) (db.Quote, []string, error) {
 	action = strings.ToLower(strings.TrimSpace(action))
 	if action == "" {
@@ -517,8 +521,16 @@ func simulatedDeliveries(q db.Quote) []cryptorefills.Delivery {
 	// fields a real gift-card delivery carries.
 	d.PinCode = "TEST-CODE-" + strings.ToUpper(q.ID[len(q.ID)-6:])
 	d.PinSerial = "4321"
-	d.RedeemInstructions = "This is a simulated delivery — no real product was purchased (test mode)."
-	d.HowToRedeem = "Nothing to redeem: this code exists only to exercise the delivery views."
+	if q.SimulatedSupplier() {
+		// Fabricated order: nothing was ever bought.
+		d.RedeemInstructions = "This is a simulated delivery — no real product was purchased (simulated order)."
+		d.HowToRedeem = "Nothing to redeem: this code exists only to exercise the delivery views."
+	} else {
+		// A listed test wallet's order: the supplier order and its invoice
+		// are real, only the PAYMENT was simulated, so no code was issued.
+		d.RedeemInstructions = "Simulated payment — the order and its invoice were real, but no money was sent, so the supplier issued no code."
+		d.HowToRedeem = "Nothing to redeem. Pay the invoice for real to receive a working code."
+	}
 	return []cryptorefills.Delivery{d}
 }
 
@@ -546,7 +558,7 @@ func (h *Handlers) AdminTestPay(ctx *fasthttp.RequestCtx) {
 		writeError(ctx, fasthttp.StatusNotFound, "quote not found")
 		return
 	}
-	if !q.TestMode || !strings.HasPrefix(q.SupplierOrderID, "TESTSIM-") {
+	if !q.TestMode || !q.SimulatedSupplier() {
 		writeError(ctx, fasthttp.StatusForbidden, "only admin test-center quotes can be driven by test-pay")
 		return
 	}
