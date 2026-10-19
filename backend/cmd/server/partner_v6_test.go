@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"sync"
@@ -139,5 +140,61 @@ func TestWithoutAPartnerKeyTheSameCheckoutStaysOnV5(t *testing.T) {
 	}
 	if got := cap.matching(http.MethodPost, "/v5/orders")[0].Header.Get("X-CR-Partner-Key"); got != "" {
 		t.Fatalf("no partner header may be sent on v5, got %q", got)
+	}
+}
+
+// TestAdminCanSeeAndCancelTheLivePartnerOrder is the operator's side of the
+// partner integration: a real order of the shop, cancelled from the admin
+// panel instead of waiting for the automatic sweep. It runs against the local
+// supplier mock, so nothing is ever ordered from the real supplier.
+func TestAdminCanSeeAndCancelTheLivePartnerOrder(t *testing.T) {
+	cap := &callCapture{}
+	s := bootStack(t, stackOptions{
+		env:          map[string]string{"CRYPTOREFILLS_PARTNER_KEY": "cr_pk_test_integration"},
+		supplierWrap: cap.wrap,
+	})
+	auth, _ := s.signIn()
+	admin := s.adminHeaders()
+
+	res := s.do(http.MethodPost, "/api/quotes", map[string]any{
+		"product_id": "test-steam", "country": "US", "quantity": 1,
+		"denomination": "50 USD", "product_value": 50, "email": "buyer@example.com",
+	}, auth)
+	if res.status >= 300 {
+		t.Fatalf("quote: %d %s", res.status, truncate(res.body))
+	}
+	quoteID := quoteIDFrom(t, res)
+
+	// The order row exposes the partner facts the operator needs: what it
+	// earns, and whether cancelling is even possible.
+	detail := s.do(http.MethodGet, "/api/admin/orders/"+quoteID, nil, admin)
+	if detail.status != 200 {
+		t.Fatalf("admin detail: %d %s", detail.status, truncate(detail.body))
+	}
+	q, _ := detail.json(t)["quote"].(map[string]any)
+	if q["supplier_order_id"] == nil || q["supplier_order_id"] == "" {
+		t.Fatalf("the partner order id must be visible to the admin: %v", q["supplier_order_id"])
+	}
+	if q["can_cancel"] != true {
+		t.Fatalf("an unpaid partner order must be cancellable by the admin (can_cancel = %v)", q["can_cancel"])
+	}
+	if _, ok := q["supplier_commission_rate"].(float64); !ok {
+		t.Fatalf("the commission the order earns must be visible: %v", q["supplier_commission_rate"])
+	}
+
+	// Cancel it.
+	cancelled := s.do(http.MethodPost, "/api/admin/orders/"+quoteID+"/cancel", map[string]any{}, admin)
+	if cancelled.status != 200 {
+		t.Fatalf("admin cancel: %d %s", cancelled.status, truncate(cancelled.body))
+	}
+	after, _ := s.do(http.MethodGet, "/api/admin/orders/"+quoteID, nil, admin).json(t)["quote"].(map[string]any)
+	if after["supplier_cancel_state"] != "requested" {
+		t.Fatalf("supplier_cancel_state = %v, want requested", after["supplier_cancel_state"])
+	}
+	if after["status"] == "awaiting_payment" {
+		t.Fatal("a cancelled order must stop offering payment")
+	}
+	if got := len(cap.matching(http.MethodDelete, "/v6/partner/orders/"+fmt.Sprint(q["supplier_order_id"]))); got != 1 {
+		t.Fatalf("exactly one partner cancel expected, got %d", got)
 	}
 }

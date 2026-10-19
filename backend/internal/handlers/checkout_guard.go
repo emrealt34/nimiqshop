@@ -129,6 +129,16 @@ func (h *Handlers) existingCheckout(ctx *fasthttp.RequestCtx, user, key, request
 		if !db.BlocksNewPurchaseAt(q, now) {
 			continue
 		}
+		// A lapsed, unpaid invoice blocks only while the shop is still giving
+		// a slow payment time to show up (PaymentGrace). On the v6 partner
+		// API we no longer have to guess with a timer: ask the supplier, and
+		// when it has seen no money, release the order right there and let
+		// the buyer continue immediately. Anything uncertain (cannot ask,
+		// money on the way, supplier refuses) falls back to waiting — the
+		// hold is never lifted on an assumption.
+		if db.LapsedUnpaidInvoice(q, now) && h.releaseLapsedInvoice(ctx, q, now) {
+			continue
+		}
 		if q.PurchaseFingerprint != "" && q.PurchaseFingerprint == purchaseFP && !ack {
 			// A lapsed unpaid invoice is not a checkout to return to: the
 			// buyer pressed "create a fresh invoice", and handing back the
@@ -150,6 +160,45 @@ func (h *Handlers) existingCheckout(ctx *fasthttp.RequestCtx, user, key, request
 	}
 	return false
 }
+
+// releaseLapsedInvoice asks the supplier whether anything was paid on a
+// lapsed invoice and, when nothing was, cancels the order so the buyer is
+// released at once instead of waiting out the grace buffer.
+//
+// It only exists on the v6 partner API (the partner surface is the one with a
+// cancel), and it can only ever end in one of two safe states: the supplier
+// confirmed no money and the order is cancelled (so the invoice can no longer
+// be paid by anyone), or nothing changed and the hold stands.
+func (h *Handlers) releaseLapsedInvoice(ctx *fasthttp.RequestCtx, q db.Quote, now time.Time) bool {
+	if h.CR == nil || !h.CR.PartnerMode() || q.SupplierOrderID == "" || q.SimulatedSupplier() {
+		return false
+	}
+	sctx := cryptorefills.WithEndUserIP(h.supplierContext(ctx), q.EndUserIP)
+	sctx = cryptorefills.WithEndUserAgent(sctx, q.EndUserAgent)
+	fresh, err := h.CR.GetOrderFresh(sctx, q.SupplierOrderID)
+	if err != nil {
+		return false // could not ask: keep the hold, the buffer will expire it
+	}
+	if cryptorefills.MoneyObserved(fresh) || cryptorefills.IsPaidOrBeyond(fresh.Status) {
+		_, _ = settlement.ApplySupplierOrderNotify(h.Store, q.ID, fresh)
+		return false // money is on its way: the hold is doing its job
+	}
+	cancelled, err := h.CR.CancelOrder(sctx, q.SupplierOrderID)
+	if err != nil {
+		return false // the supplier would not release it; wait for the buffer
+	}
+	_ = h.Store.MarkSupplierCancel(q.ID, "requested")
+	// Apply the supplier's own answer (Canceled) so BOTH callers of
+	// BlocksNewPurchaseAt — this pre-check and the atomic gate inside the
+	// create — see the release at the same instant.
+	_, _ = settlement.ApplySupplierOrderNotify(h.Store, q.ID, cancelled)
+	latest, err := h.Store.GetQuote(q.ID)
+	if err != nil {
+		return false
+	}
+	return !db.BlocksNewPurchaseAt(latest, now)
+}
+
 func (h *Handlers) activeCheckoutError(ctx *fasthttp.RequestCtx, q db.Quote) {
 	writeJSON(ctx, 409, map[string]any{"error": "an unresolved checkout already exists", "code": "ACTIVE_CHECKOUT", "quote_id": q.ID, "status": q.Status, "detail": "Check the existing order before starting another payment. Changing or splitting the cart cannot bypass this safety hold."})
 }

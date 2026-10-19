@@ -1135,5 +1135,15 @@ export const adminGetOrder = (id: string) => api('/admin/orders/' + encodeURICom
 export const adminSyncOrder = (id: string) =>
   api('/admin/orders/' + encodeURIComponent(id) + '/sync', { method: 'POST', body: {}, timeoutMs: 30000 });
 
+/**
+ * Cancel an abandoned order at the supplier (v6 PARTNER API,
+ * DELETE /v6/partner/orders/{id}). The backend re-reads the supplier first, so
+ * an order the buyer has just paid is settled instead of cancelled, and the
+ * supplier refuses outright once it has seen money — this can only ever
+ * release an order that is going nowhere.
+ */
+export const adminCancelOrder = (id: string) =>
+  api('/admin/orders/' + encodeURIComponent(id) + '/cancel', { method: 'POST', body: {}, timeoutMs: 30000 });
+
 export const adminTestActivity = () => api('/admin/test-activity');
 export const adminSetTestActivity = (enabled: boolean) => api('/admin/test-activity', {method:'POST',body:{enabled}});

@@ -414,3 +414,69 @@ func TestPartnerEndpointsHaveTheirOwnBudgetNotTheUnknownFallback(t *testing.T) {
 		t.Fatalf("the partner poll policy is too tight: %+v", got)
 	}
 }
+
+// TestPartnerGuideProblemCodesAreAnswerable pins the v6 partner guide's codes
+// that are NOT part of the old v5 catalogue. An unknown code is rendered as a
+// generic "could not approve" sentence, which tells the buyer nothing — and
+// the KYC/velocity codes are exactly the ones a real buyer will hit.
+func TestPartnerGuideProblemCodesAreAnswerable(t *testing.T) {
+	generic := ProblemMessage("SOMETHING_UNHEARD_OF")
+	for _, code := range []string{
+		"FULLNAME_MISSING", "CUSTOMER_BLOCKED", "KYC_MISSING", "KYC_PENDING",
+		"PARTNER_DAILY_ORDER_VELOCITY_EXCEEDED", "PARTNER_MONTHLY_ORDER_VELOCITY_EXCEEDED",
+	} {
+		if _, ok := LookupProblem(code); !ok {
+			t.Fatalf("%s is not in the customer-safe catalogue", code)
+		}
+		if got := ProblemMessage(code); got == "" || got == generic {
+			t.Fatalf("%s falls back to the generic sentence: %q", code, got)
+		}
+	}
+}
+
+// TestRevokedKeyFailsOverToTheBackup pins the partner guide's rotation rule:
+// a 401 (invalid/revoked key) must be served by the configured backup key
+// instead of taking the checkout down until someone deploys.
+func TestRevokedKeyFailsOverToTheBackup(t *testing.T) {
+	seen := []string{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Header.Get("X-CR-Partner-Key"))
+		if r.Header.Get("X-CR-Partner-Key") != "cr_pk_primary" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(partnerOrder))
+			return
+		}
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"error":"unauthorized"}`))
+	}))
+	defer srv.Close()
+	c := NewClient(ClientOptions{
+		BaseURL: srv.URL, PartnerKey: "cr_pk_primary", PartnerKeyBackup: "cr_pk_backup",
+		AppVersion: "test/1.0", UserAgent: "test-agent",
+	})
+	defer c.Close()
+
+	if _, err := c.CreateOrder(context.Background(), giftCardRequest()); err != nil {
+		t.Fatalf("a revoked primary key must be served by the backup: %v", err)
+	}
+	if len(seen) != 2 || seen[0] != "cr_pk_primary" || seen[1] != "cr_pk_backup" {
+		t.Fatalf("expected primary-then-backup, got %v", seen)
+	}
+	// Staying on the backup matters: a revoked primary must not cost a failed
+	// request on every single call afterwards.
+	seen = nil
+	if _, err := c.CreateOrder(context.Background(), giftCardRequest()); err != nil {
+		t.Fatalf("second call: %v", err)
+	}
+	if len(seen) != 1 || seen[0] != "cr_pk_backup" {
+		t.Fatalf("after the switch every call must go straight to the backup, got %v", seen)
+	}
+}
+
+func TestWithoutABackupKeyARevokedKeyIsJustAFailure(t *testing.T) {
+	srv := supplierStub(t, &callRecorder{}, http.StatusUnauthorized, `{"error":"unauthorized"}`)
+	c := partnerClient(t, srv.URL, "cr_pk_primary")
+	if _, err := c.CreateOrder(context.Background(), giftCardRequest()); err == nil {
+		t.Fatal("a rejected key with no backup must fail loudly, not silently")
+	}
+}

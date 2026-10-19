@@ -85,8 +85,16 @@ func (q Quote) PaymentVerifiedUnpaid(now time.Time) bool {
 // so both the pre-check and the atomic gate release at the same instant.
 func BlocksNewPurchaseAt(q Quote, now time.Time) bool {
 	switch q.Status {
-	case "order_creating", "payment_started", "payment_received", "delivering", "manual_review":
+	case "order_creating", "payment_started", "payment_received", "delivering":
 		return true
+	case "manual_review":
+		// A review only blocks when the SUPPLIER may be holding something:
+		// an order exists whose outcome is unknown, or money was seen. A
+		// quote flagged before any order was created (a crashed creation,
+		// an intent the tracker gave up on) has neither — blocking on it
+		// would lock the buyer out of the shop for an incident that is not
+		// theirs. An unresolved order is still the operator's to resolve.
+		return q.SupplierOrderID != "" || q.hasPaymentEvidence()
 	case "awaiting_payment":
 		return !q.PaymentVerifiedUnpaid(now)
 	case "expired":

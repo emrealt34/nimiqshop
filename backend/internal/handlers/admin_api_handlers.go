@@ -550,6 +550,75 @@ func (h *Handlers) AdminSyncOrder(ctx *fasthttp.RequestCtx) {
 	writeJSON(ctx, fasthttp.StatusOK, adminOrderView(order))
 }
 
+// AdminCancelOrder is the operator's "release this abandoned order" button
+// (v6 PARTNER API, DELETE /v6/partner/orders/{id}).
+//
+// It is deliberately the slow, careful version of the automatic sweep: it
+// re-reads the supplier BEFORE asking, so an order that was paid in the last
+// few seconds is settled here rather than cancelled. The supplier refuses
+// (409) once it has seen money anyway — but a refusal surfaced as an error is
+// a worse outcome than simply never asking.
+func (h *Handlers) AdminCancelOrder(ctx *fasthttp.RequestCtx) {
+	id, _ := ctx.UserValue("id").(string)
+	q, err := h.Store.GetQuote(id)
+	if err != nil {
+		writeError(ctx, fasthttp.StatusNotFound, "order or quote not found")
+		return
+	}
+	if h.CR == nil || !h.CR.PartnerMode() {
+		writeError(ctx, fasthttp.StatusConflict, "cancelling an order requires the v6 partner API key")
+		return
+	}
+	if q.SimulatedSupplier() {
+		writeError(ctx, fasthttp.StatusConflict, "simulated test order: nothing to cancel at the supplier")
+		return
+	}
+	if q.SupplierOrderID == "" {
+		writeError(ctx, fasthttp.StatusConflict, "supplier acceptance is unresolved; no supplier id is known")
+		return
+	}
+	sctx := cryptorefills.WithEndUserIP(h.supplierContext(ctx), q.EndUserIP)
+	sctx = cryptorefills.WithEndUserAgent(sctx, q.EndUserAgent)
+
+	// 1) Ask the supplier FIRST. If the buyer paid while this row sat still,
+	//    the poll settles the purchase — and the cancel below is never sent.
+	fresh, ferr := h.CR.GetOrderFresh(sctx, q.SupplierOrderID)
+	if ferr != nil {
+		h.supplierError(ctx, ferr, "could not verify supplier status before cancelling")
+		return
+	}
+	if _, aerr := settlement.ApplySupplierOrderNotify(h.Store, q.ID, fresh); aerr != nil {
+		adminStoreError(ctx)
+		return
+	}
+	q, _ = h.Store.GetQuote(id)
+	if !h.canCancelPartnerOrder(q) {
+		writeError(ctx, fasthttp.StatusConflict, "this order can no longer be cancelled: the supplier reports money for it")
+		return
+	}
+
+	// 2) Ask the supplier to release it.
+	order, cerr := h.CR.CancelOrder(sctx, q.SupplierOrderID)
+	if cerr != nil {
+		var ce *cryptorefills.OrderCancelError
+		if errors.As(cerr, &ce) && !ce.Retryable {
+			_ = h.Store.MarkSupplierCancel(q.ID, "refused")
+			writeError(ctx, fasthttp.StatusConflict, "the supplier refuses to cancel this order: "+ce.Error())
+			return
+		}
+		_ = h.Store.MarkSupplierCancel(q.ID, "failed")
+		h.supplierError(ctx, cerr, "the supplier could not cancel this order right now")
+		return
+	}
+	_ = h.Store.MarkSupplierCancel(q.ID, "requested")
+	// The supplier's own answer (Canceled) is the truth: apply it so the
+	// local row stops offering payment on an invoice that no longer exists.
+	_, _ = settlement.ApplySupplierOrderNotify(h.Store, q.ID, order)
+	h.audit(adminIdentity(ctx).User.ID, "admin.order.cancel", ctx, "cancelled supplier order "+q.SupplierOrderID)
+	latest, _ := h.Store.GetQuote(id)
+	writeJSON(ctx, fasthttp.StatusOK, h.adminQuoteView(latest))
+}
+
 // There is no documented supplier refund-creation endpoint. Do not fabricate
 // a Refunded state from an operator click without a verified supplier response.
 func (h *Handlers) AdminRefundOrder(ctx *fasthttp.RequestCtx) {
@@ -1295,7 +1364,41 @@ func (h *Handlers) adminQuoteView(quote db.Quote) map[string]any {
 	if cb, err := h.Store.GetCashbackByQuote(quote.ID); err == nil {
 		view["cashback"] = adminCashbackView(cb)
 	}
+	// v6 PARTNER API: what this order earns the shop, and what the supplier
+	// answered the last time we asked it to release an abandoned one.
+	// The commission is reported exactly as the supplier stated it
+	// (commission_rate_pct 0.5 = 0.5%) — a fact about the order, never an
+	// input to any price the buyer sees.
+	view["supplier_commission_rate"] = quote.SupplierCommissionRate
+	view["supplier_cancel_state"] = quote.SupplierCancelState
+	if !quote.SupplierCancelAt.IsZero() {
+		view["supplier_cancel_at"] = quote.SupplierCancelAt
+	}
+	// Whether the operator's cancel button is offered at all.
+	view["can_cancel"] = h.canCancelPartnerOrder(quote)
 	return view
+}
+
+// canCancelPartnerOrder decides whether the operator's cancel button is
+// offered at all. It is the SAME rule the automatic sweep uses, because the
+// reason is not bookkeeping: the supplier refuses to cancel an order once it
+// has seen any payment, so asking about an order that money may be arriving
+// for is at best a wasted call and at worst a confusing 409.
+func (h *Handlers) canCancelPartnerOrder(q db.Quote) bool {
+	if h.CR == nil || !h.CR.PartnerMode() {
+		return false // cancellation only exists on the v6 partner API
+	}
+	if q.SupplierOrderID == "" || q.SimulatedSupplier() || q.TestMode {
+		return false
+	}
+	if q.PaymentObserved || cryptorefills.IsPaidOrBeyond(q.SupplierStatus) {
+		return false
+	}
+	switch q.SupplierCancelState {
+	case "requested", "refused":
+		return false // already settled upstream; nothing left to ask
+	}
+	return true
 }
 
 func adminStoreError(ctx *fasthttp.RequestCtx) {

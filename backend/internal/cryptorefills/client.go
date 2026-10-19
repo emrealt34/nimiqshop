@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"math"
 	"net"
 	"net/http"
@@ -51,11 +52,50 @@ type Client struct {
 	// every one of those orders earns commission; empty keeps the v5
 	// user-session API. Never logged, never sent anywhere else.
 	partnerKey string
-	appVer     string
-	userAgent  string
-	http       *http.Client
-	queue      *Scheduler
-	gets       getCache
+	// partnerKeyBackup is an optional second partner key. The partner guide's
+	// rotation recipe is mint → switch → revoke, and a revoked key would
+	// otherwise take the shop's checkout down with 401s until someone
+	// deploys. When the primary is rejected (401/403) the client switches to
+	// this key and stays on it for the rest of the process.
+	partnerKeyBackup string
+	keyMu            sync.Mutex
+	usingBackup      bool
+	appVer           string
+	userAgent        string
+	http             *http.Client
+	queue            *Scheduler
+	gets             getCache
+}
+
+// activePartnerKey is the key the next call authenticates with (see
+// partnerKeyBackup). Empty means this client is not on the partner API.
+func (c *Client) activePartnerKey() string {
+	if c.partnerKeyBackup == "" {
+		return c.partnerKey
+	}
+	c.keyMu.Lock()
+	defer c.keyMu.Unlock()
+	if c.usingBackup {
+		return c.partnerKeyBackup
+	}
+	return c.partnerKey
+}
+
+// switchToBackupKey promotes the backup key after the primary was rejected.
+// It reports whether the switch actually happened, so the caller knows the
+// retry is worth making.
+func (c *Client) switchToBackupKey(rejected string) bool {
+	if c.partnerKeyBackup == "" || rejected == c.partnerKeyBackup {
+		return false
+	}
+	c.keyMu.Lock()
+	defer c.keyMu.Unlock()
+	if c.usingBackup || rejected != c.partnerKey {
+		return false
+	}
+	c.usingBackup = true
+	log.Printf("cryptorefills: the primary partner key was rejected (401/403); switching to the backup key for this process — revoke or fix the primary key")
+	return true
 }
 
 // PartnerMode reports whether this client is on the v6 partner API (the one
@@ -176,12 +216,13 @@ func (g *getCache) doNeg(ttl, negTTL time.Duration, isEmpty func(interface{}) bo
 // ClientOptions builds a Client. Named fields, not positional strings: a
 // transposed key/id pair on a money path must be impossible by construction.
 type ClientOptions struct {
-	BaseURL    string
-	PartnerID  string // X-Cr-Application: the v5 attribution header
-	PartnerKey string // X-CR-Partner-Key: v6 partner API (empty = v5 orders)
-	AppVersion string
-	UserAgent  string
-	Queue      QueueConfig
+	BaseURL          string
+	PartnerID        string // X-Cr-Application: the v5 attribution header
+	PartnerKey       string // X-CR-Partner-Key: v6 partner API (empty = v5 orders)
+	PartnerKeyBackup string // optional second key, used if the first is revoked (401/403)
+	AppVersion       string
+	UserAgent        string
+	Queue            QueueConfig
 }
 
 // NewClient builds a queued client. partnerID is the X-Cr-Application
@@ -189,6 +230,7 @@ type ClientOptions struct {
 // partnerKey switches order traffic to the v6 partner API (see PartnerMode).
 func NewClient(o ClientOptions) *Client {
 	baseURL, partnerID, partnerKey := o.BaseURL, o.PartnerID, strings.TrimSpace(o.PartnerKey)
+	partnerKeyBackup := strings.TrimSpace(o.PartnerKeyBackup)
 	appVer, userAgent, cfg := o.AppVersion, o.UserAgent, o.Queue
 	if appVer == "" {
 		appVer = "1.0"
@@ -212,11 +254,12 @@ func NewClient(o ClientOptions) *Client {
 		ForceAttemptHTTP2:     true,
 	}
 	return &Client{
-		baseURL:    strings.TrimRight(baseURL, "/"),
-		partnerID:  partnerID,
-		partnerKey: partnerKey,
-		appVer:     appVer,
-		userAgent:  userAgent,
+		baseURL:          strings.TrimRight(baseURL, "/"),
+		partnerID:        partnerID,
+		partnerKey:       partnerKey,
+		partnerKeyBackup: partnerKeyBackup,
+		appVer:           appVer,
+		userAgent:        userAgent,
 		http: &http.Client{Timeout: 35 * time.Second, Transport: transport,
 			// Never replay POST /orders through 307/308 or leak partner headers.
 			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
@@ -331,6 +374,7 @@ func (c *Client) do(ctx context.Context, method, path string, body, out interfac
 		}
 	}
 	policy := policyFor(method, path)
+	key := c.activePartnerKey()
 	call := func() error {
 		var reader io.Reader
 		if payload != nil {
@@ -353,8 +397,8 @@ func (c *Client) do(ctx context.Context, method, path string, body, out interfac
 		// order create without the end customer's IP (400
 		// missing_required_header). Both are sent whenever they exist: the
 		// extra headers are ignored by v5 and by catalog endpoints.
-		if c.partnerKey != "" {
-			req.Header.Set("X-CR-Partner-Key", c.partnerKey)
+		if key != "" {
+			req.Header.Set("X-CR-Partner-Key", key)
 		}
 		if ip := endUserIPFromContext(ctx); ip != "" {
 			req.Header.Set("X-Forwarded-For", ip)
@@ -392,6 +436,15 @@ func (c *Client) do(ctx context.Context, method, path string, body, out interfac
 		}
 		if problemErr := responseProblems(raw, resp.StatusCode); problemErr != nil {
 			return problemErr
+		}
+		// 401/403 on the partner API is a KEY problem (unknown, revoked or
+		// mistyped), not a buyer problem: nothing about the order was even
+		// considered. The partner guide's answer is to fail over to a backup
+		// key, which is why one can be configured at all.
+		if (resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden) &&
+			c.switchToBackupKey(key) {
+			key = c.partnerKeyBackup
+			return errKeyRejected
 		}
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			// Observed shapes: {"status","detail","moreDetails"} for
@@ -438,11 +491,23 @@ func (c *Client) do(ctx context.Context, method, path string, body, out interfac
 		}
 		return nil
 	}
-	if c.queue == nil {
-		return call()
+	run := func() error {
+		if c.queue == nil {
+			return call()
+		}
+		return c.queue.Submit(ctx, call, policy)
 	}
-	return c.queue.Submit(ctx, call, policy)
+	runErr := run()
+	if errors.Is(runErr, errKeyRejected) {
+		// One more attempt — the client is on the backup key now.
+		runErr = run()
+	}
+	return runErr
 }
+
+// errKeyRejected is internal: the partner key was refused and the client has
+// switched to its backup, so the same call is worth making once more.
+var errKeyRejected = errors.New("cryptorefills: partner key rejected")
 
 /* ------------------------------ payment vias ------------------------------ */
 

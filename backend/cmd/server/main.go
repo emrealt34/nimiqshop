@@ -292,11 +292,12 @@ func main() {
 	}
 
 	cr := cryptorefills.NewClient(cryptorefills.ClientOptions{
-		BaseURL:    cfg.CRBaseURL,
-		PartnerID:  cfg.CRPartnerID,
-		PartnerKey: cfg.CRPartnerKey,
-		AppVersion: cfg.CRAppVersion,
-		UserAgent:  cfg.CRUserAgent,
+		BaseURL:          cfg.CRBaseURL,
+		PartnerID:        cfg.CRPartnerID,
+		PartnerKey:       cfg.CRPartnerKey,
+		PartnerKeyBackup: cfg.CRPartnerKeyBackup,
+		AppVersion:       cfg.CRAppVersion,
+		UserAgent:        cfg.CRUserAgent,
 		Queue: cryptorefills.QueueConfig{
 			MaxQueue:            cfg.CRQueueMax,
 			MaxQueuePerActor:    cfg.CRQueuePerActorMax,
@@ -988,6 +989,9 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 	r.GET("/api/admin/orders/{id}", adminOnly(h.AdminGetOrderDetail))
 	r.POST("/api/admin/orders/{id}/sync", adminOnly(h.AdminSyncOrder))
 	r.POST("/api/admin/orders/{id}/refund", adminOnly(h.AdminRefundOrder))
+	// v6 partner API: release an abandoned order at the supplier instead of
+	// letting it hold a payment slot until it lapses.
+	r.POST("/api/admin/orders/{id}/cancel", adminOnly(h.AdminCancelOrder))
 	r.GET("/api/admin/quotes", adminOnly(h.AdminListQuotes))
 	// Quiz authoring and manual awards use the separate operator session.
 	r.GET("/api/admin/quiz", adminOnly(h.AdminListQuizzes))

@@ -32,6 +32,7 @@ import {
   adminListQuotes,
   adminGetOrder,
   adminSyncOrder,
+  adminCancelOrder,
 } from '../../lib/api';
 import { fmtDate, fmtNIM, fmtNum, fmtUSD, formatWalletAddress } from '../../lib/format';
 import { siteName } from '../../lib/config';
@@ -1112,6 +1113,7 @@ function OrdersPanel() {
                   path an operator has for a stuck purchase), then inspect what
                   was stored locally. */}
               <SupplierSyncButton id={q.id} onSynced={reload} />
+              <SupplierCancelButton id={q.id} canCancel={!!q.can_cancel} cancelState={q.supplier_cancel_state} onDone={reload} />
               <PaymentInspectionButton id={q.id} />
               {/* Contact the buyer entered for this order (the same values the supplier request is built from). Admin-only view; never logged. */}
               <div className="xs mt-1" style={{ paddingBottom: 8, display: 'flex', flexWrap: 'wrap', gap: 12 }} data-testid="order-contact">
@@ -1567,6 +1569,9 @@ function OrderMoneyRow({ q }: { q: any }) {
     : face;
   const expiry = Date.parse(q?.payment_expiry || q?.expires_at || '');
   const lapsed = Number.isFinite(expiry) && expiry <= Date.now();
+  // commission_rate_pct arrives exactly as the supplier stated it: 0.5 means
+  // 0.5%. It is what THIS order earns the shop — never an input to a price.
+  const commission = Number(q?.supplier_commission_rate);
   const cell = (label: string, value: string, mono = false) => (
     <span className="xs">
       <span className="faint">{label}: </span>
@@ -1584,6 +1589,9 @@ function OrderMoneyRow({ q }: { q: any }) {
         + (q?.network ? ` · ${q.network}` : ''), true) : null}
       {nim > 0 ? cell('NIM', `${fmtNIM(nim)} NIM`) : null}
       {cell('Supplier', `${q?.supplier_status || '—'} → ${q?.status || '—'}`, true)}
+      {Number.isFinite(commission)
+        ? cell('Commission', `${commission}%`, true)
+        : null}
       {Number.isFinite(expiry)
         ? cell('Payment window', `${fmtDate(new Date(expiry))}${lapsed ? ' · lapsed' : ' · open'}`)
         : null}
@@ -1635,6 +1643,52 @@ function SupplierSyncButton({ id, onSynced }: { id: string; onSynced?: () => voi
         supplier says {result.supplier_status || '—'} → local {result.status || '—'}
       </div>
     ) : null}
+  </div>;
+}
+
+/**
+ * SupplierCancelButton — the operator's "release this abandoned order" button
+ * (v6 PARTNER API, DELETE /v6/partner/orders/{id}).
+ *
+ * It is only offered for orders that can still be cancelled (`can_cancel`:
+ * a real partner order with no money anywhere), and it asks for a confirmation
+ * because it is the one admin action the supplier cannot undo. The backend
+ * re-reads the supplier before cancelling, so the worst case is a refusal
+ * ("money has been detected") — never a cancelled order with money on the way.
+ */
+function SupplierCancelButton({ id, canCancel, cancelState, onDone }:
+  { id: string; canCancel?: boolean; cancelState?: string; onDone?: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [ok, setOk] = useState('');
+
+  if (!canCancel) {
+    if (!cancelState) return null;
+    const label = cancelState === 'requested'
+      ? 'Cancelled at the supplier'
+      : cancelState === 'refused'
+        ? 'Supplier refused to cancel (money may have arrived)'
+        : 'Cancel failed — the sweep will retry';
+    return <div className="xs faint mt-1" data-testid="supplier-cancel-state">{label}</div>;
+  }
+  return <div className="mt-1" style={{ display: 'inline-block', marginRight: 8 }}>
+    <button type="button" className="btn btn-outline btn-sm" disabled={busy}
+      data-testid="supplier-cancel"
+      onClick={async () => {
+        if (!window.confirm('Cancel this order at the supplier? It can only be cancelled before any payment is detected, and it cannot be undone.')) return;
+        setBusy(true); setError(''); setOk('');
+        try {
+          const q: any = await adminCancelOrder(id);
+          setOk(q?.supplier_status ? `supplier says ${q.supplier_status}` : 'Order released at the supplier');
+          onDone?.();
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Could not cancel the order');
+        } finally { setBusy(false); }
+      }}>
+      {busy ? 'Cancelling…' : 'Cancel at supplier'}
+    </button>
+    {error ? <div role="alert" className="xs">{error}</div> : null}
+    {ok ? <div className="xs mono" data-testid="supplier-cancel-result">{ok}</div> : null}
   </div>;
 }
 
