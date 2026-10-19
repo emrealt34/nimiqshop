@@ -190,6 +190,10 @@ export function CombinedDeliveryPicker({
         }}
       >
         <input type="checkbox" checked={gift} onChange={(e) => { setGift(e.target.checked); setSelfError(''); api.setError(''); setEmail2Err(''); setNoteEmail2(''); setGiftEmail2(''); }} style={{ accentColor: 'var(--stamp)', width: 18, height: 18, flex: 'none' }} />
+        {/* Same rule as the pinned toggle in DeliverySteps: the stylesheet
+            hides the native control and paints .gbox, so the tick box has to
+            exist in the markup to be seen. */}
+        <span className="gbox" aria-hidden="true" />
         <span style={{ width: 32, height: 32, borderRadius: 999, background: gift ? 'var(--stamp)' : 'var(--surface-2)', border: '1.5px solid var(--line-strong)', display: 'grid', placeItems: 'center', flex: 'none', fontSize: 14 }}>🎁</span>
         <span style={{ minWidth: 0 }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 900, fontSize: 13 }}>

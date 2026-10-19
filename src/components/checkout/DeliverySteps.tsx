@@ -99,6 +99,11 @@ function GiftToggle({ checked, sub, onChange }: { checked: boolean; sub: string;
   return (
     <label className={`gift-toggle gift-toggle--best ${checked ? 'is-on' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', padding: '14px 14px', border: checked ? '2px solid var(--line-strong)' : '1.5px dashed var(--line-mid)', borderRadius: '10px', background: checked ? 'var(--paper-tint)' : 'var(--surface-1)', boxShadow: checked ? '2px 2px 0 rgba(78,61,40,.12)' : 'none', transition: '.15s' }}>
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} style={{ accentColor: 'var(--stamp)', width: '18px', height: '18px', flex: 'none' }} />
+      {/* The visible tick box. The stylesheet hides the native control
+          (.gift-toggle input is opacity 0) and draws .gbox instead, so without
+          this span the toggle had NO checkbox on screen at all — it reads as
+          an icon that failed to load. */}
+      <span className="gbox" aria-hidden="true" />
       <span style={{ width: 36, height: 36, borderRadius: 999, background: checked ? 'var(--stamp)' : 'var(--surface-2)', border: '1.5px solid var(--line-strong)', display: 'grid', placeItems: 'center', flex: 'none', fontSize: 16 }}>🎁</span>
       <span className="gtext" style={{ minWidth: 0 }}>
         <span className="gtitle" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 900, fontSize: 13 }}>
