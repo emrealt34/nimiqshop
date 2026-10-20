@@ -153,7 +153,7 @@ type ProductDetail = {
   country: string;
   currency: string;
   packages: Pkg[] | null;
-  range: { min: number; max: number; step: number; currency: string } | null;
+  range: { min: number; max: number; step: number; currency: string; cap?: RangeCap | null } | null;
   in_stock: boolean;
   /** e-money family: provider may request identity verification (KYC). */
   is_e_money?: boolean;
@@ -167,6 +167,19 @@ type ProductDetail = {
   _family: any;
   _families?: any[];
 };
+
+/** Why a range stops short of the supplier's own maximum. Today the only
+ *  reason the backend sends is the payment partner's per-order ceiling on
+ *  Lightning orders (order total incl. its fee) — see catalog.OrderLimit. */
+export type RangeCap = { reason: string; total_eur: number; supplier_max: number };
+
+function rangeCap(raw: unknown): RangeCap | null {
+  const c = raw && typeof raw === 'object' ? raw as Record<string, unknown> : null;
+  if (!c || typeof c.reason !== 'string') return null;
+  const total = Number(c.total_eur);
+  const supplierMax = Number(c.supplier_max);
+  return { reason: c.reason, total_eur: Number.isFinite(total) ? total : 0, supplier_max: Number.isFinite(supplierMax) ? supplierMax : 0 };
+}
 
 function familyToProduct(family: any, fallbackId: string, countryParam: string): ProductDetail | null {
   if (!family || excludedCatalogItem(family)) return null;
@@ -182,7 +195,7 @@ function familyToProduct(family: any, fallbackId: string, countryParam: string):
     // never collects — cannot be fulfilled, so never offered.
     if (!usableProduct(p)) continue;
     if (p.range) {
-      range = { min: p.range.min, max: p.range.max, step: p.range.step_size || p.range.step || 1, currency: p.range.currency || 'USD' };
+      range = { min: p.range.min, max: p.range.max, step: p.range.step_size || p.range.step || 1, currency: p.range.currency || 'USD', cap: rangeCap(p.range.cap) };
       currency = p.range.currency || currency;
       continue;
     }
@@ -1078,6 +1091,11 @@ function RangeChooser({
           {t('productPage.betweenAmounts', { min: fmtMoney(range.min, rangeCur), max: fmtMoney(range.max, rangeCur) })}
         </div>
       </div>
+      {range.cap?.reason === 'supplier_order_limit' && range.cap.total_eur > 0 && (
+        <div className="xs faint range-cap-note" data-testid="range-cap-note" style={{ marginTop: '6px', lineHeight: 1.45 }}>
+          {t('productPage.rangeCapSupplier', { max: fmtMoney(range.max, rangeCur), total: fmtMoney(range.cap.total_eur, 'EUR') })}
+        </div>
+      )}
       <input
         type="range"
         min={range.min}

@@ -312,6 +312,20 @@ func (h *Handlers) createQuoteInner(ctx *fasthttp.RequestCtx, userID string, req
 		writeError(ctx, fasthttp.StatusForbidden, gerr.Error())
 		return
 	}
+	// The supplier's per-order ceiling (order total incl. its margin, on
+	// the Lightning rail) is checked BEFORE the supplier dry run: the same
+	// face cap the catalog already clamped to, so a stale product page
+	// cannot submit an amount the supplier is known to refuse, and the
+	// buyer hears the real maximum instead of "could not approve".
+	if lerr := h.orderLimit().Gate(faceUSD, meta.Currency); lerr != nil {
+		var limitErr *catalog.OrderLimitError
+		if errors.As(lerr, &limitErr) {
+			writeOrderLimitError(ctx, limitErr)
+			return
+		}
+		writeError(ctx, fasthttp.StatusForbidden, lerr.Error())
+		return
+	}
 
 	// ---- supplier dry run (no order created) -----------------------------
 	// Request shape follows the official CryptoRefills docs

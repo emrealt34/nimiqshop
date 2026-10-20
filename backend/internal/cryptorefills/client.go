@@ -662,6 +662,24 @@ type ValueRange struct {
 	Currency string  `json:"currency"`
 	StepSize float64 `json:"step_size"`
 	Default  string  `json:"default,omitempty"`
+	// Cap is set by the SHOP (never by the supplier) when Max was clamped
+	// below the supplier's own maximum because of a per-order ceiling the
+	// buyer should be told about (see catalog.OrderLimit).
+	Cap *RangeCap `json:"cap,omitempty"`
+}
+
+// RangeCapSupplierOrderLimit: the range stops where the supplier's
+// per-order Lightning limit (order total incl. its fee) would be exceeded.
+const RangeCapSupplierOrderLimit = "supplier_order_limit"
+
+// RangeCap explains a shop-side clamp of a dynamic range.
+type RangeCap struct {
+	Reason string `json:"reason"`
+	// TotalEUR is the supplier's per-order ceiling on the order total.
+	TotalEUR float64 `json:"total_eur"`
+	// SupplierMax is the maximum the supplier lists for the range, in the
+	// range currency, before the clamp.
+	SupplierMax float64 `json:"supplier_max"`
 }
 
 // Product is one purchasable SKU under a family (fixed or range).

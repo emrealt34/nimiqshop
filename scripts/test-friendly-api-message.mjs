@@ -97,3 +97,59 @@ test('an empty error falls back to the caller\'s copy', () => {
 test('a long unhelpful server message falls back to the caller\'s copy', () => {
   assert.equal(say(new ApiError(400, 'x'.repeat(200))), FALLBACK);
 });
+
+/* ---- supplier per-order ceiling (live bug of 2026-10-20) ------------------
+ * Amazon.fr €200 from France: the supplier's Lightning rail caps the order
+ * total at €100 per order. The buyer used to read "Cryptorefills could not
+ * approve this request"; both refusal shapes must now name the numbers. */
+
+test('the shop-side mirror (403 SUPPLIER_ORDER_LIMIT) names the ceiling and the product maximum', () => {
+  const out = say(new ApiError(403, 'this order exceeds the supplier\'s per-order limit', 'SUPPLIER_ORDER_LIMIT', {
+    code: 'SUPPLIER_ORDER_LIMIT', order_limit: { total_eur: 100, max_face_value: 95, currency: 'EUR' },
+  }));
+  assert.match(out, /€100/);
+  assert.match(out, /€95/);
+  assert.doesNotMatch(out, /price cap|could not approve/i);
+});
+
+test('the mirror without a product maximum still names the ceiling', () => {
+  const out = say(new ApiError(403, 'x', 'SUPPLIER_ORDER_LIMIT', { code: 'SUPPLIER_ORDER_LIMIT', order_limit: { total_eur: 100 } }));
+  assert.match(out, /€100/);
+  assert.doesNotMatch(out, /undefined|NaN/);
+});
+
+test('the supplier\'s own LIGHTNING_ORDER_LIMIT_EXCEEDED refusal is phrased with its numbers', () => {
+  // Verbatim live payload (EUR block) of 2026-10-20.
+  const live = {
+    code: 'SUPPLIER_PROBLEMS', error: 'Cryptorefills could not approve this request.', supplier_error: true, upstream_status: 422,
+    problems: [{ problem: 'LIGHTNING_ORDER_LIMIT_EXCEEDED', moreDetails: {
+      kyc_level: 'NOT_REGISTERED',
+      limits: { daily: { amount: 100, currency: 'EUR' }, monthly: { amount: 300, currency: 'EUR' }, per_order: { amount: 100, currency: 'EUR' } },
+      next_level_limits: { daily: { amount: 250, currency: 'EUR' }, monthly: { amount: 1000, currency: 'EUR' }, per_order: { amount: 100, currency: 'EUR' } },
+      order_total: { amount: 208.0707, currency: 'EUR' },
+      spent_this_month: { amount: 0, currency: 'EUR' }, spent_today: { amount: 0, currency: 'EUR' },
+    } }],
+  };
+  const out = say(new ApiError(409, live.error, 'SUPPLIER_PROBLEMS', live));
+  assert.match(out, /€100/, 'per-order ceiling');
+  assert.match(out, /€208\.07/, 'the order total the supplier computed');
+  assert.match(out, /€300/, 'monthly tier');
+  assert.doesNotMatch(out, /could not approve|contact support/i);
+});
+
+test('a daily-ceiling refusal blames the day, not the order size', () => {
+  const body = { supplier_error: true, code: 'SUPPLIER_PROBLEMS', problems: [{ problem: 'LIGHTNING_ORDER_LIMIT_EXCEEDED', moreDetails: {
+    limits: { daily: { amount: 100, currency: 'EUR' }, monthly: { amount: 300, currency: 'EUR' }, per_order: { amount: 100, currency: 'EUR' } },
+    order_total: { amount: 60, currency: 'EUR' }, spent_today: { amount: 50, currency: 'EUR' }, spent_this_month: { amount: 50, currency: 'EUR' },
+  } }] };
+  const out = say(new ApiError(409, 'x', 'SUPPLIER_PROBLEMS', body));
+  assert.match(out, /€50/, 'already spent today');
+  assert.match(out, /€60/, 'this order');
+  assert.match(out, /today|tomorrow/i);
+});
+
+test('a LIGHTNING_ORDER_LIMIT_EXCEEDED without details still gets a specific sentence', () => {
+  const out = say(new ApiError(409, 'x', 'SUPPLIER_PROBLEMS', { supplier_error: true, code: 'SUPPLIER_PROBLEMS', problems: [{ problem: 'LIGHTNING_ORDER_LIMIT_EXCEEDED' }] }));
+  assert.match(out, /Lightning/);
+  assert.doesNotMatch(out, /could not approve|undefined/i);
+});

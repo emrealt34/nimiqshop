@@ -197,6 +197,17 @@ func (h *Handlers) UnavailableFamilies(ctx *fasthttp.RequestCtx) {
 // with a 10-second in-memory cache so every product-card render on the
 // homepage does not hit Badger 20+ times at once.
 func (h *Handlers) rulesForRequest() catalog.Rules {
+	rules := h.storedRules()
+	// The supplier's per-order ceiling is folded into the price cap for
+	// every browse/price response, so a range or denomination the supplier
+	// would refuse at checkout is never offered in the first place.
+	h.orderLimit().Apply(&rules)
+	return rules
+}
+
+// storedRules is the operator policy as persisted (short-cached), without
+// the supplier ceiling folded in.
+func (h *Handlers) storedRules() catalog.Rules {
 	if cached, ok := h.cache.get("catalog:rules"); ok {
 		if rules, ok := cached.(catalog.Rules); ok {
 			return rules
@@ -210,6 +221,20 @@ func (h *Handlers) rulesForRequest() catalog.Rules {
 	}
 	h.cache.setTTL("catalog:rules", rules, 10*time.Second)
 	return rules
+}
+
+// orderLimit is the supplier per-order ceiling the shop mirrors (see
+// catalog.OrderLimit and config.SupplierOrderLimitEUR).
+func (h *Handlers) orderLimit() catalog.OrderLimit {
+	return catalog.OrderLimit{TotalEUR: h.Cfg.SupplierOrderLimitEUR, MarginPct: h.Cfg.SupplierOrderMarginPct}
+}
+
+// writeOrderLimitError answers a purchase that would exceed the supplier's
+// per-order ceiling with the ceiling itself, in machine-readable form, so
+// the storefront can tell the buyer the real maximum in their language.
+func writeOrderLimitError(ctx *fasthttp.RequestCtx, err *catalog.OrderLimitError) {
+	body := map[string]any{"error": err.Error(), "code": "SUPPLIER_ORDER_LIMIT", "order_limit": err.Payload()}
+	writeJSON(ctx, fasthttp.StatusForbidden, body)
 }
 
 /* --------------------------------- brands -------------------------------- */

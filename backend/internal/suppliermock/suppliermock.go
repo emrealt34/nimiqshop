@@ -18,7 +18,9 @@
 //	POST /mock/fault   {"delay_order_response_ms":2000,"auto_advance_ms":500,
 //	                   "force_fail_delivery":true,"payment_window_ms":60000,
 //	                   "webhook_base_url":"http://127.0.0.1:PORT",
-//	                   "webhook_key":"..."}
+//	                   "webhook_key":"...",
+//	                   "lightning_limit_eur":100}   validations above it answer
+//	                   422 LIGHTNING_ORDER_LIMIT_EXCEEDED like production
 //	POST /mock/reset  {}
 //	GET  /mock/state
 //	POST /mock/orders/{id}/pay        simulate customer payment
@@ -109,6 +111,18 @@ func (m *mockState) faultInt(key string) int {
 		case int:
 			return n
 		}
+	}
+	return 0
+}
+
+func (m *mockState) faultFloat(key string) float64 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	switch n := m.faults[key].(type) {
+	case float64:
+		return n
+	case int:
+		return float64(n)
 	}
 	return 0
 }
@@ -1030,6 +1044,35 @@ func (m *mockState) validations(w http.ResponseWriter, r *http.Request) {
 	if len(problems) > 0 {
 		writeJSON(w, 400, map[string]interface{}{"problems": problems})
 		return
+	}
+	// lightning_limit_eur fault: replay the supplier's per-order Lightning
+	// ceiling exactly as production answered on 2026-10-20 (HTTP 422,
+	// LIGHTNING_ORDER_LIMIT_EXCEEDED with the limits/order_total block), so
+	// the backend's translation of that refusal is tested against the real
+	// shape. The mock's USD face total stands in for the EUR order total.
+	if limit := m.faultFloat("lightning_limit_eur"); limit > 0 {
+		if orderTotal := total * 1.0404; orderTotal > limit {
+			money := func(v float64) map[string]interface{} { return map[string]interface{}{"amount": v, "currency": "EUR"} }
+			usd := func(v float64) map[string]interface{} {
+				return map[string]interface{}{"amount": v * 1.1235, "currency": "USD"}
+			}
+			writeJSON(w, 422, map[string]interface{}{"problems": []map[string]interface{}{{
+				"problem": "LIGHTNING_ORDER_LIMIT_EXCEEDED",
+				"moreDetails": map[string]interface{}{
+					"kyc_level":         "NOT_REGISTERED",
+					"limits":            map[string]interface{}{"per_order": money(limit), "daily": money(limit), "monthly": money(limit * 3)},
+					"next_level_limits": map[string]interface{}{"per_order": money(limit), "daily": money(limit * 2.5), "monthly": money(limit * 10)},
+					"order_total":       money(orderTotal),
+					"spent_today":       money(0),
+					"spent_this_month":  money(0),
+					"usd": map[string]interface{}{
+						"limits":      map[string]interface{}{"per_order": usd(limit), "daily": usd(limit), "monthly": usd(limit * 3)},
+						"order_total": usd(orderTotal),
+					},
+				},
+			}}})
+			return
+		}
 	}
 	// Real pricing in the validation too — the same live-rate conversion as
 	// the price endpoint, so a validated order and its quote never disagree.

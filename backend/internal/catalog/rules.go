@@ -60,6 +60,18 @@ type Rules struct {
 	// UpdatedAt/UpdatedBy are audit metadata set by the store/handler.
 	UpdatedAt string `json:"updated_at,omitempty"`
 	UpdatedBy string `json:"updated_by,omitempty"`
+
+	// orderLimit is the supplier per-order ceiling folded into
+	// MaxFaceValueUSD by OrderLimit.Apply for this request. Unexported on
+	// purpose: it is process configuration, never part of the persisted
+	// operator policy.
+	orderLimit OrderLimit
+}
+
+// OrderLimitBinding reports whether the price cap currently in force comes
+// from the supplier's per-order ceiling rather than the operator's own cap.
+func (r *Rules) OrderLimitBinding() bool {
+	return r.orderLimit.Enabled() && r.MaxFaceValueUSD > 0 && r.orderLimit.FaceCapUSD() <= r.MaxFaceValueUSD
 }
 
 // Normalize canonicalises a Rules value in place: trims spaces, uppercases

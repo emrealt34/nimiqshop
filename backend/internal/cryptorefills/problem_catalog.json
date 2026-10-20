@@ -15,6 +15,10 @@
     "scope": "account",
     "message": "Your Cryptorefills monthly spending limit has been reached. Wait for that limit to reset or review your account tier. Splitting the cart does not bypass this limit."
   },
+  "LIGHTNING_ORDER_LIMIT_EXCEEDED": {
+    "scope": "order",
+    "message": "This order is above the Cryptorefills limit for Lightning payments: a per-order ceiling on the order total (including its fee), plus daily and monthly ceilings for the delivery email. Reduce the amount or the quantity before trying again."
+  },
   "PRODUCT_COUNT_EXCEEDED": {
     "scope": "order",
     "message": "The cart contains more products than allowed in one order. Reduce the product quantity before trying again."

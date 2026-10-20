@@ -9,7 +9,7 @@ import { supplierProblemMessage } from './supplierProblems';
 import { CFG, siteName } from './config';
 import { asset } from './asset';
 import { getLang, t as tr } from '../i18n';
-import { uuid as uuid2 } from './format';
+import { uuid as uuid2, fmtMoney } from './format';
 import { canonicalIntent, purchaseIntentPayload, loadOrCreateIntent, saveIntentQuote, releaseIntentForQuote, forgetIntent, checkoutSettled } from './checkoutIntent';
 import { dailyLimitMessage, isDailyLimitError } from './dailyLimit';
 import { countryHint, COUNTRY_HINT_HEADER } from './edgeGeo';
@@ -44,6 +44,20 @@ function isBuyerFacingThrottleMessage(msg: string): boolean {
   return !/rate limit exceeded|supplier rate limit|supplier queue|retry after|retry shortly|too many requests/i.test(msg);
 }
 
+/** 403 SUPPLIER_ORDER_LIMIT payload → localized sentence with the numbers. */
+export function orderLimitMessage(raw: unknown): string {
+  const o = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
+  const totalEUR = Number(o.total_eur);
+  const maxFace = Number(o.max_face_value);
+  const currency = typeof o.currency === 'string' ? o.currency : '';
+  const total = Number.isFinite(totalEUR) && totalEUR > 0 ? fmtMoney(totalEUR, 'EUR') : '';
+  if (total && Number.isFinite(maxFace) && maxFace > 0 && currency) {
+    return tr('api.orderLimit', { total, max: fmtMoney(maxFace, currency) });
+  }
+  if (total) return tr('api.orderLimitTotal', { total });
+  return tr('api.orderLimitGeneric');
+}
+
 /** Buyer-facing copy — never leak status codes or backend hostnames. */
 export function friendlyApiMessage(err: unknown, fallback = tr('api.generic')): string {
   const e = err as { status?: number; message?: string; code?: string; data?: any } | null;
@@ -55,6 +69,10 @@ export function friendlyApiMessage(err: unknown, fallback = tr('api.generic')): 
   // request-rate problem, so it must never be flattened into "too many
   // requests" (and never into "could not lock a live price" downstream).
   if (isDailyLimitError(e)) return dailyLimitMessage(e);
+  // The supplier's per-order ceiling on Lightning orders, mirrored by the
+  // shop (403 SUPPLIER_ORDER_LIMIT): say the real maximum for THIS product,
+  // never a bare "price cap".
+  if (e?.code === 'SUPPLIER_ORDER_LIMIT' || e?.data?.code === 'SUPPLIER_ORDER_LIMIT') return orderLimitMessage(e?.data?.order_limit);
   const supplierMessage = supplierProblemMessage(e);
   if (supplierMessage) return supplierMessage;
   const status = Number(e?.status) || 0;

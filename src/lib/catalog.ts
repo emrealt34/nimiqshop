@@ -25,7 +25,7 @@ export type Product = {
   max_raw: string;
   min_value: number;
   max_value: number;
-  range: { min: number; max: number; step: number; currency: string } | null;
+  range: { min: number; max: number; step: number; currency: string; cap?: { reason: string; total_eur: number; supplier_max: number } | null } | null;
   images: { large?: string };
   product_type: string;
   /** True when any supplier brand of this family sits in the e-money

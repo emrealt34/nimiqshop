@@ -1222,6 +1222,36 @@ func (h *Handlers) AdminGetCatalogRules(ctx *fasthttp.RequestCtx) {
 	writeJSON(ctx, fasthttp.StatusOK, rules)
 }
 
+// AdminCatalogLimits shows the ceiling the storefront is REALLY applying:
+// the operator's own price cap next to the supplier's per-order limit the
+// process mirrors (SUPPLIER_ORDER_LIMIT_EUR), and which one binds. Without
+// it an operator who set a $500 cap and sees ranges stop near €95 has no
+// way to tell policy from bug.
+func (h *Handlers) AdminCatalogLimits(ctx *fasthttp.RequestCtx) {
+	rules, err := h.Store.GetCatalogRules()
+	if err != nil {
+		adminStoreError(ctx)
+		return
+	}
+	limit := h.orderLimit()
+	effective := rules
+	binding := limit.Apply(&effective)
+	writeJSON(ctx, fasthttp.StatusOK, map[string]any{
+		"operator_max_face_value_usd":  rules.MaxFaceValueUSD,
+		"effective_max_face_value_usd": effective.MaxFaceValueUSD,
+		"supplier_order_limit": map[string]any{
+			"enabled":          limit.Enabled(),
+			"total_eur":        limit.TotalEUR,
+			"margin_pct":       limit.MarginPct,
+			"face_cap_eur":     limit.FaceCapEUR(),
+			"face_cap_usd":     limit.FaceCapUSD(),
+			"binding":          binding,
+			"source":           "SUPPLIER_ORDER_LIMIT_EUR",
+			"supplier_problem": "LIGHTNING_ORDER_LIMIT_EXCEEDED",
+		},
+	})
+}
+
 // AdminUpdateCatalogRules replaces the whole policy atomically. Every
 // change is audit-logged with the operator identity + IP.
 func (h *Handlers) AdminUpdateCatalogRules(ctx *fasthttp.RequestCtx) {

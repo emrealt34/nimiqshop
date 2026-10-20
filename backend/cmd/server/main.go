@@ -1100,6 +1100,7 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 	// categories/kinds, country rules) + the UNFILTERED catalog views the
 	// operator uses to see everything before hiding it.
 	r.GET("/api/admin/catalog-rules", adminOnly(h.AdminGetCatalogRules))
+	r.GET("/api/admin/catalog-limits", adminOnly(h.AdminCatalogLimits))
 	r.PUT("/api/admin/catalog-rules", adminOnly(h.AdminUpdateCatalogRules))
 	r.GET("/api/admin/catalog/brands", adminOnly(h.AdminListBrands))
 	r.GET("/api/admin/catalog/products/{productId}", adminOnly(h.AdminGetFamily))

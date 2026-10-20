@@ -36,8 +36,23 @@ type Config struct {
 	DailyOrderLimit      int
 	DailySpendLimitUSD   float64
 	MonthlySpendLimitUSD float64
-	CRBaseURL            string
-	CRPartnerID          string
+	// SupplierOrderLimitEUR mirrors the supplier's per-order ceiling on the
+	// ORDER TOTAL (face value + its margin) for the shop's only payment
+	// rail, BTC Lightning. Live on 2026-10-20 Cryptorefills refused a €200
+	// Amazon.fr order with LIGHTNING_ORDER_LIMIT_EXCEEDED: per_order 100
+	// EUR (daily 100, monthly 300) for kyc_level NOT_REGISTERED, and the
+	// next level keeps per_order at 100. The catalog, the price endpoint
+	// and the purchase gate all derive their face-value cap from it, so a
+	// buyer never reaches the last checkout step with an amount the
+	// supplier cannot sell. 0 disables the mirror (the supplier still
+	// refuses; the buyer then only gets its translated message).
+	SupplierOrderLimitEUR float64
+	// SupplierOrderMarginPct is the allowance for the supplier margin hidden
+	// inside that total when it is turned into a face-value cap
+	// (Amazon.fr FR carried 4.04% on the live refusal).
+	SupplierOrderMarginPct float64
+	CRBaseURL              string
+	CRPartnerID            string
 	// CRPartnerKey is the v6 PARTNER API key (cr_pk_…). Setting it moves
 	// order create/read/cancel from /v5/orders to /v6/partner/orders, which
 	// is the only path that earns commission. Without it the shop keeps
@@ -47,7 +62,7 @@ type Config struct {
 	// rotates keys by minting a new one, switching to it and revoking the
 	// old one; with a backup configured, a revoked primary is failed over
 	// automatically (401/403) instead of taking the checkout down.
-	CRPartnerKeyBackup string
+	CRPartnerKeyBackup   string
 	CRAppVersion         string
 	CRUserAgent          string
 	CRWebhookKey         string
@@ -738,7 +753,11 @@ func Load() Config {
 		// ORDER ceiling stays a separate knob (DAILY_ORDER_LIMIT).
 		DailyOrderLimit: envOrderLimit("DAILY_ORDER_LIMIT", 100), DailySpendLimitUSD: envBudgetUSD("DAILY_SPEND_LIMIT_USD", 500),
 		MonthlySpendLimitUSD: envBudgetUSD("MONTHLY_SPEND_LIMIT_USD", 1000),
-		CRBaseURL:            env("CRYPTOREFILLS_BASE_URL", "https://api.cryptorefills.com"), CRPartnerID: os.Getenv("CRYPTOREFILLS_PARTNER_ID"), CRPartnerKey: strings.TrimSpace(os.Getenv("CRYPTOREFILLS_PARTNER_KEY")), CRPartnerKeyBackup: strings.TrimSpace(os.Getenv("CRYPTOREFILLS_PARTNER_KEY_BACKUP")), CRAppVersion: env("CRYPTOREFILLS_APP_VERSION", "nimshop/1.0"), CRUserAgent: env("CRYPTOREFILLS_USER_AGENT", "nimshop/1.0 +https://"+host), CRWebhookKey: os.Getenv("CRYPTOREFILLS_WEBHOOK_KEY"), PublicWebhookBaseURL: strings.TrimRight(os.Getenv("PUBLIC_WEBHOOK_BASE_URL"), "/"),
+		// Supplier per-order ceiling (see the field comment): 100 EUR total,
+		// 5% margin allowance → face values up to ~95 EUR stay purchasable.
+		SupplierOrderLimitEUR:  envBudgetUSD("SUPPLIER_ORDER_LIMIT_EUR", 100),
+		SupplierOrderMarginPct: envBudgetUSD("SUPPLIER_ORDER_MARGIN_PCT", 5),
+		CRBaseURL:              env("CRYPTOREFILLS_BASE_URL", "https://api.cryptorefills.com"), CRPartnerID: os.Getenv("CRYPTOREFILLS_PARTNER_ID"), CRPartnerKey: strings.TrimSpace(os.Getenv("CRYPTOREFILLS_PARTNER_KEY")), CRPartnerKeyBackup: strings.TrimSpace(os.Getenv("CRYPTOREFILLS_PARTNER_KEY_BACKUP")), CRAppVersion: env("CRYPTOREFILLS_APP_VERSION", "nimshop/1.0"), CRUserAgent: env("CRYPTOREFILLS_USER_AGENT", "nimshop/1.0 +https://"+host), CRWebhookKey: os.Getenv("CRYPTOREFILLS_WEBHOOK_KEY"), PublicWebhookBaseURL: strings.TrimRight(os.Getenv("PUBLIC_WEBHOOK_BASE_URL"), "/"),
 		CRPollSecs: envInt("WORKER_ORDER_POLL_SECS", 5), CRStaleSecs: envInt("WORKER_ORDER_STALE_SECS", 300), TestMode: envBool("TEST_MODE", false),
 		AdminUsername: os.Getenv("ADMIN_USERNAME"), AdminPassword: os.Getenv("ADMIN_PASSWORD"), AdminPasswordHash: os.Getenv("ADMIN_PASSWORD_HASH"), AdminTOTPSecret: os.Getenv("ADMIN_TOTP_SECRET"), AdminSessionSecret: os.Getenv("ADMIN_SESSION_SECRET"),
 		// ADMIN_USERNAME + ADMIN_PASSWORD is the simple production/local
@@ -905,6 +924,12 @@ func (c Config) Validate() error {
 		if math.IsNaN(value) || math.IsInf(value, 0) || value < 0 || value > 9e12 || (value > 0 && value < 0.000001) {
 			return fmt.Errorf("%s must be 0 (disabled) or a finite USD amount from 0.000001 through 9000000000000", name)
 		}
+	}
+	if v := c.SupplierOrderLimitEUR; math.IsNaN(v) || math.IsInf(v, 0) || v < 0 || v > 9e12 || (v > 0 && v < 0.01) {
+		return fmt.Errorf("SUPPLIER_ORDER_LIMIT_EUR must be 0 (disabled) or a finite EUR amount from 0.01 through 9000000000000")
+	}
+	if v := c.SupplierOrderMarginPct; math.IsNaN(v) || math.IsInf(v, 0) || v < 0 || v > 90 {
+		return fmt.Errorf("SUPPLIER_ORDER_MARGIN_PCT must be a percentage from 0 through 90")
 	}
 	if err := c.ClientIPPolicy().Validate(); err != nil {
 		return err

@@ -371,6 +371,19 @@ func (h *Handlers) createQuoteBatchInner(ctx *fasthttp.RequestCtx, userID string
 		}
 		totalUSD += faceUSD
 		totalUnits += it.Quantity
+		// The supplier's per-order ceiling applies to the ORDER total: a
+		// cart of several items under the cap can still exceed it together.
+		// Check the running total so the refusal names the real maximum
+		// (and the line that crossed it) before the supplier dry run.
+		if lerr := h.orderLimit().Gate(totalUSD, meta.Currency); lerr != nil {
+			var limitErr *catalog.OrderLimitError
+			if errors.As(lerr, &limitErr) {
+				writeOrderLimitError(ctx, limitErr)
+				return
+			}
+			writeError(ctx, fasthttp.StatusForbidden, lerr.Error())
+			return
+		}
 
 		brandForDelivery := meta.BrandName
 		if it.Brand != "" {

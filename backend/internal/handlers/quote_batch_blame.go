@@ -94,7 +94,7 @@ func reasonsFromBody(body string) []string {
 	}
 	return out
 }
-func humanProblem(p cryptorefills.Problem) string { return cryptorefills.ProblemMessage(p.Code) }
+func humanProblem(p cryptorefills.Problem) string { return cryptorefills.ProblemDetailMessage(p) }
 func humanProblemCode(code string) string         { return cryptorefills.ProblemMessage(code) }
 
 // diagnoseBatch re-validates every line on its own and returns the ones the

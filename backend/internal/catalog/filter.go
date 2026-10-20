@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 
 	"nimiqshop/internal/cryptorefills"
@@ -250,6 +251,17 @@ func clampValueRange(rules *Rules, r *cryptorefills.ValueRange) *cryptorefills.V
 			return nil
 		}
 		q.Max = localCap
+		// Tell the storefront WHY the slider stops here when the ceiling is
+		// the supplier's per-order limit — a buyer who knows Amazon sells
+		// €2000 cards would otherwise read the short range as a bug.
+		if rules.OrderLimitBinding() {
+			q.Cap = rules.orderLimit.rangeCap(r.Max)
+		}
+		// The supplier default ("2000.0") may now sit above the clamped
+		// maximum; a default outside the range is worse than none.
+		if d, err := strconv.ParseFloat(strings.TrimSpace(q.Default), 64); err == nil && d > q.Max {
+			q.Default = ""
+		}
 		return &q
 	}
 	return r
