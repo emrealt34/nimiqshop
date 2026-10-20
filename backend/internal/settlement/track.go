@@ -641,6 +641,11 @@ func classifyPollError(err error) (permanent bool, reason string) {
 	}
 	var se *cryptorefills.SupplierError
 	if errors.As(err, &se) {
+		if se.Edge {
+			// nginx's "403 Forbidden" page from a WAF or rate limiter in
+			// front of the API: the supplier never looked at the order.
+			return false, fmt.Sprintf("supplier edge HTTP %d (not an API answer)", se.Status)
+		}
 		switch se.Status {
 		case http400, http401, http403, http404:
 			// The supplier definitively refused: order unknown, partner

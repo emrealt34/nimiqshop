@@ -349,6 +349,15 @@ type SupplierError struct {
 	Method      string
 	Path        string
 	MoreDetails any
+	// Edge marks an answer that did not come from the supplier's API at
+	// all but from the infrastructure in front of it: a WAF, a rate
+	// limiter or a proxy answering with nginx's HTML error page. Such a
+	// status says nothing about the order, the product or the partner key
+	// (seen live on 2026-10-20: a burst of order polls right after a
+	// deploy got "403 Forbidden" HTML pages for ten seconds, and every open
+	// invoice was parked as "supplier refuses to serve this order"). An
+	// edge answer is transient — retry later, never conclude from it.
+	Edge bool
 }
 
 func (e *SupplierError) Error() string {
@@ -363,7 +372,42 @@ func (e *SupplierError) Error() string {
 	if detail == "" {
 		detail = "no detail"
 	}
+	if e.Edge {
+		return fmt.Sprintf("cryptorefills edge error (%d %s %s, not an API answer): %s", e.Status, e.Method, e.Path, detail)
+	}
 	return fmt.Sprintf("cryptorefills error (%d %s %s): %s [%s]", e.Status, e.Method, e.Path, detail, code)
+}
+
+// edgeResponse reports whether an error status carries a body the API never
+// produces: the API answers JSON (an object, a problem list, or nothing),
+// while the proxies in front of it answer HTML pages. Content-Type is
+// checked as well as the body, because some error pages come without one.
+func edgeResponse(contentType string, raw []byte) bool {
+	body := bytes.TrimSpace(raw)
+	if len(body) == 0 || json.Valid(body) {
+		return false
+	}
+	ct := strings.ToLower(contentType)
+	return strings.Contains(ct, "text/html") || bytes.HasPrefix(body, []byte("<"))
+}
+
+// edgeDetail condenses an HTML error page to its title ("403 Forbidden")
+// so the reason stays readable in logs and review notes.
+func edgeDetail(raw []byte) string {
+	body := string(raw)
+	if i := strings.Index(strings.ToLower(body), "<title>"); i >= 0 {
+		rest := body[i+len("<title>"):]
+		if j := strings.Index(strings.ToLower(rest), "</title>"); j >= 0 {
+			if title := strings.TrimSpace(rest[:j]); title != "" {
+				return title
+			}
+		}
+	}
+	detail := strings.TrimSpace(body)
+	if len(detail) > 120 {
+		detail = detail[:120]
+	}
+	return detail
 }
 
 // Problem is one entry of the supplier's validations problem list.
@@ -465,6 +509,12 @@ func (c *Client) do(ctx context.Context, method, path string, body, out interfac
 		}
 		if problemErr := responseProblems(raw, resp.StatusCode); problemErr != nil {
 			return problemErr
+		}
+		// An HTML error page is the proxy or WAF in front of the API
+		// talking, not the API: nothing was decided about the request or
+		// the key, so it is neither a refusal nor a reason to fail over.
+		if resp.StatusCode >= 400 && edgeResponse(resp.Header.Get("Content-Type"), raw) {
+			return &SupplierError{Status: resp.StatusCode, Detail: edgeDetail(raw), Method: method, Path: path, Edge: true}
 		}
 		// 401/403 on the partner API is a KEY problem (unknown, revoked or
 		// mistyped), not a buyer problem: nothing about the order was even
@@ -1380,7 +1430,7 @@ func IsOrderNotFound(err error) bool {
 	// *SupplierError (the DELETE cancellation path, for one), and a 404
 	// means the same thing wherever it comes from.
 	var se *SupplierError
-	return errors.As(err, &se) && se.Status == http.StatusNotFound
+	return errors.As(err, &se) && se.Status == http.StatusNotFound && !se.Edge
 }
 
 // notFound upgrades a bare 404 SupplierError from an order read. It wraps
@@ -1388,7 +1438,7 @@ func IsOrderNotFound(err error) bool {
 // errors.As(*SupplierError) keep working.
 func notFound(orderID string, err error) error {
 	var se *SupplierError
-	if err != nil && errors.As(err, &se) && se.Status == http.StatusNotFound {
+	if err != nil && errors.As(err, &se) && se.Status == http.StatusNotFound && !se.Edge {
 		return &OrderNotFoundError{OrderID: orderID, Err: err}
 	}
 	return err
