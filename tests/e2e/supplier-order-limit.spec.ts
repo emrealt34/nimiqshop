@@ -111,7 +111,17 @@ test.describe('supplier per-order ceiling', () => {
     await expect(page.getByText(/Waiting for Nimiq Pay/i)).toHaveCount(0);
     expect(calls).toHaveLength(1);
     expect(calls[0].product_value).toBe(200);
-    await expect(page.getByRole('button', { name: /Back to cart/i })).toBeVisible();
+    // A per-order ceiling is deterministic: no "reopen / retry" button, the
+    // primary action is the cart with a lower amount, and the sentence ends once.
+    await expect(page.getByRole('button', { name: /Reopen the existing/i })).toHaveCount(0);
+    const back = page.getByTestId('order-limit-back-to-cart');
+    await expect(back).toBeVisible();
+    await expect(back).toHaveClass(/btn-gold/);
+    await expect(back).toContainText(/lower the amount/i);
+    await expect(screen).toContainText(/nothing was charged/i);
+    expect((await screen.innerText()).includes('..')).toBe(false);
+    await back.click();
+    await expect(page.getByText(/Checkout paused/i)).toHaveCount(0);
   });
 
   test("the supplier's own refusal is phrased with its numbers", async ({ page }) => {

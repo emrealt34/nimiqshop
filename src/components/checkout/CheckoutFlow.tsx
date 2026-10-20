@@ -672,7 +672,11 @@ export function CheckoutFlow({
           } catch (e) {
             qIssues = supplierIssues(e);
             qLimit = dailyLimitFromError(e);
-            qReason = (e as any)?.code === 'ACTIVE_CHECKOUT' ? 'active-checkout' : qIssues.length ? 'supplier' : 'quote';
+            const qCode = String((e as any)?.code || (e as any)?.data?.code || '');
+            // SUPPLIER_ORDER_LIMIT is the shop's own gate (the supplier caps a
+            // Lightning order at €100 in total): deterministic, so the screen
+            // must not offer "reopen / retry" — only a smaller amount can pass.
+            qReason = qCode === 'ACTIVE_CHECKOUT' ? 'active-checkout' : qCode === 'SUPPLIER_ORDER_LIMIT' ? 'order-limit' : qIssues.length ? 'supplier' : 'quote';
             if (qReason === 'active-checkout') rememberBlockingCheckout(e);
             qErr = qLimit
               ? limitSentence(qLimit, it.name)
@@ -1437,9 +1441,13 @@ function whyFor(reason: string, name: string, msg: string): string {
   // The backend's own sentence belongs on EVERY failure screen, not just the
   // pricing one: a buyer staring at "the checkout paused" needs to know whether
   // it was the wallet, the supplier or the price.
-  const suffix = msg ? ' — ' + msg : '';
+  // The sentences below end with their own full stop; a backend message that
+  // already ends with one would otherwise render as "…quantity..".
+  const clean = msg.replace(/\s*[.。]\s*$/, '');
+  const suffix = clean ? ' — ' + clean : '';
   const map: Record<string, string> = {
     quote: tr('checkout.flowWhyQuote', { name, msg: suffix }),
+    'order-limit': tr('checkout.flowWhyOrderLimit', { name, msg: clean }),
     expired: tr('checkout.flowWhyExpired', { name }),
     timeout: tr('checkout.flowWhyTimeout', { name }),
     failed: tr('checkout.flowWhyFailed', { name }),
@@ -1454,7 +1462,7 @@ function whyFor(reason: string, name: string, msg: string): string {
     updateRequired: tr('wallet.updatePayToast'),
   };
   const base = map[reason] || tr('checkout.flowWhyGeneric', { name });
-  if (reason === 'quote' || !msg) return base;
+  if (reason === 'quote' || reason === 'order-limit' || !clean) return base;
   return base + suffix;
 }
 
@@ -1564,6 +1572,9 @@ function ItemFailedPrompt({ issues = [], it, reason, msg, detail = '', index, to
   const { t } = useT();
   const why = whyFor(reason, it.name, msg);
   const activeCheckout = isActiveCheckoutMessage(reason, msg);
+  // A per-order ceiling refuses the same amount every time: retrying is noise,
+  // changing the amount in the cart is the only way forward.
+  const orderLimit = reason === 'order-limit';
   const remaining = total - index - 1;
   return (
     <div className="center" style={{ padding: '26px 10px', textAlign: 'center' }}>
@@ -1595,7 +1606,7 @@ function ItemFailedPrompt({ issues = [], it, reason, msg, detail = '', index, to
           <button type="button" className="btn btn-gold btn-block" onClick={() => onChoice('force')}>
             <Icon name="bolt" size={14} /> {t('checkout.flowForceContinue')}
           </button>
-        ) : !issues.length ? (
+        ) : !issues.length && !orderLimit ? (
           <button className="btn btn-gold btn-block" onClick={() => onChoice('retry')}>
             {t('checkout.flowReopenCheckout', { name: it.name })}
           </button>
@@ -1610,14 +1621,14 @@ function ItemFailedPrompt({ issues = [], it, reason, msg, detail = '', index, to
             {t('checkout.flowSkipNextItem', { n: remaining })}
           </button>
         )}
-        <button className="btn btn-outline btn-block" onClick={onBackToCart}>
-          {t('checkout.flowBackToCartRemoveChange')}
+        <button className={orderLimit ? 'btn btn-gold btn-block' : 'btn btn-outline btn-block'} data-testid={orderLimit ? 'order-limit-back-to-cart' : undefined} onClick={onBackToCart}>
+          {t(orderLimit ? 'checkout.flowBackToCartChangeAmount' : 'checkout.flowBackToCartRemoveChange')}
         </button>
         <button className="btn btn-ghost btn-block" onClick={() => onChoice('stop')}>
           {t('checkout.flowFinishCheckout')}
         </button>
       </div>
-      <div className="xs faint mt-2">{t('checkout.flowUnfinishedStay')}</div>
+      <div className="xs faint mt-2">{t(orderLimit ? 'checkout.flowUnfinishedStayAmount' : 'checkout.flowUnfinishedStay')}</div>
     </div>
   );
 }
