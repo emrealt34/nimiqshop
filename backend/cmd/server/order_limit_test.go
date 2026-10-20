@@ -240,7 +240,8 @@ func TestSupplierOrderLimitFollowsTheFamilysRealFee(t *testing.T) {
 	}})
 	setMockFault(t, s, map[string]any{"price_margin_pct": map[string]any{"amazon-usa": 20}})
 	flat := catalog.OrderLimit{TotalEUR: 100, MarginPct: 5}
-	real := catalog.OrderLimit{TotalEUR: 100, MarginPct: 20}
+	// The mock quotes +20 %; the shop keeps one point of drift headroom.
+	real := catalog.OrderLimit{TotalEUR: 100, MarginPct: 21}
 	flatCap, realCap := math.Floor(flat.FaceCapUSD()), math.Floor(real.FaceCapUSD())
 	if !(realCap < flatCap) {
 		t.Fatalf("test premise: %v must be below %v", realCap, flatCap)

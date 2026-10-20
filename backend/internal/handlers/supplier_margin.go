@@ -36,6 +36,14 @@ const (
 	// supplierMarginMax bounds what the shop believes: above it the quote
 	// is treated as noise (wrong rate, repriced SKU) and the floor is used.
 	supplierMarginMax = 0.75
+	// supplierMarginHeadroomPct is added to an observed fee before it caps
+	// a range. The shop converts the quote with its own BTC/USD and fiat
+	// rates while the supplier checks the ceiling with its own; measured
+	// live, a cap computed from the bare observed fee landed at €99.7 of
+	// the €100 ceiling (Amazon.co.jp) — accepted, but one rate tick from a
+	// refusal. One point of headroom keeps the maximum on the page an
+	// amount the supplier accepts after ordinary drift.
+	supplierMarginHeadroomPct = 1.0
 )
 
 // orderLimitFor is the per-family twin of orderLimit(): the same ceiling,
@@ -70,7 +78,8 @@ func (h *Handlers) orderLimitFor(ctx context.Context, name, country, currency st
 }
 
 // observeSupplierMargin prices one face value at the supplier and returns
-// the fee it implies, in percent of face, rounded UP to one decimal.
+// the fee it implies, in percent of face, rounded UP to one decimal plus
+// the drift headroom.
 func (h *Handlers) observeSupplierMargin(ctx context.Context, name, country, currency string, probeFace float64) (float64, bool) {
 	if h.CR == nil || probeFace <= 0 || math.IsNaN(probeFace) || math.IsInf(probeFace, 0) {
 		return 0, false
@@ -96,7 +105,7 @@ func (h *Handlers) observeSupplierMargin(ctx context.Context, name, country, cur
 	if margin < 0 {
 		margin = 0
 	}
-	return math.Ceil(margin*1000) / 10, true
+	return math.Ceil(margin*1000)/10 + supplierMarginHeadroomPct, true
 }
 
 // btcUSDNow is the BTC/USD rate the shop converts supplier quotes with.
