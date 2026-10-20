@@ -320,7 +320,7 @@ func (h *Handlers) supplierError(ctx *fasthttp.RequestCtx, err error, fallback s
 		// log line or a client without the catalogue still reads the
 		// reason ("daily Lightning budget for this delivery email is used
 		// up") instead of a generic "could not approve".
-		headline := "Cryptorefills could not approve this request."
+		headline := "Cryptorefills did not approve this payment. You may have an open order, or the amount may be above its limit. Check the Orders tab first, or lower the amount."
 		for _, p := range problems.Problems {
 			if isSupplierCode(p.Code) {
 				headline = cryptorefills.ProblemMessage(p.Code)

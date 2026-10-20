@@ -57,7 +57,7 @@ func ProblemMessage(code string) string {
 	case "COUNTRY_NOT_SUPPORTED":
 		return "This item is not sold in the selected country. Check the intended country."
 	}
-	return "Cryptorefills could not approve this request. Review the order and contact support before trying again."
+	return "Cryptorefills did not approve this payment. You may have an open order, or the amount may be above its limit. Check the Orders tab first, or lower the amount; if neither helps, contact support."
 }
 
 // responseProblems handles the same envelope on success and HTTP-error paths.

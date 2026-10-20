@@ -98,6 +98,12 @@ test.describe('supplier per-email budget', () => {
     const prompt = page.getByTestId('email-limit-prompt');
     await expect(prompt).toBeVisible();
     await expect(prompt).toContainText(/Checkout paused/i);
+    // Owner (2026-10-20): open with the plain guidance, then the partner's
+    // real reason — its numbers and its verbatim code.
+    await expect(prompt).toContainText(/did not approve this payment/i);
+    await expect(prompt).toContainText(/open order/i);
+    await expect(prompt).toContainText(/Orders tab/i);
+    await expect(page.getByTestId('supplier-reason-code')).toContainText('LIGHTNING_DAILY_LIMIT_EXCEEDED');
     await expect(prompt).toContainText(EMAIL);
     await expect(prompt).toContainText('€100');
     await expect(prompt).toContainText('€97.70');

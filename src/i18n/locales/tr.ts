@@ -651,6 +651,8 @@ const tr = {
     qsStakeValidator: '{{validator}} stake et',
     qsDelegates: '{{validator}} doğrulayıcısına devredilir. En az {{min}} NIM. Coin’leriniz sizin kalır.',
     spnHeading: 'Lütfen bu sipariş koşullarını inceleyin',
+    spnLimitLead: 'Cryptorefills bu ödemeyi onaylamadı. Açık bir siparişiniz olabilir ya da fiyat limitini aşmış olabilirsiniz. Önce Siparişler sekmesini kontrol edin ya da aldığınız ürünün tutarını düşürmeyi deneyin.',
+    spnSupplierCode: 'Cryptorefills’in döndürdüğü sebep: {{code}}',
     spnContactSupport: 'Mağaza desteğine yaz',
     spnOpenCryptorefills: 'Cryptorefills’i aç — hesap ve destek',
     qrUnavailable: 'QR kullanılamıyor',
@@ -2110,7 +2112,7 @@ const tr = {
     VERIFICATION_REQUIRED: 'Bu siparişin devam edebilmesi için Cryptorefills ek doğrulama istiyor. Cryptorefills hesabınızı inceleyin; durum sürerse Cryptorefills desteğine başvurun.',
     SUSPENDED_COIN: 'Seçilen ödeme kripto parası Cryptorefills tarafından geçici olarak askıya alındı. Yeniden kullanılabilir hâle gelmesini bekleyin veya bu mağazanın sunduğu başka bir ödeme yöntemini seçin.',
     SUSPENDED_NETWORK: 'Seçilen ödeme ağı Cryptorefills tarafından geçici olarak askıya alındı. Yeniden kullanılabilir hâle gelmesini bekleyin veya bu mağazanın sunduğu başka bir ödeme yöntemini seçin.',
-    unknown: 'Cryptorefills bu talebi onaylayamadı. Tekrar denemeden önce siparişi inceleyin ve desteğe başvurun.',
+    unknown: 'Cryptorefills bu ödemeyi onaylamadı. Açık bir siparişiniz olabilir ya da fiyat limitini aşmış olabilirsiniz. Önce Siparişler sekmesini kontrol edin ya da aldığınız ürünün tutarını düşürmeyi deneyin; ikisi de işe yaramazsa desteğe yazın.',
     cooldown: 'İstekler de geçici olarak duraklatıldı. Tekrar denemeden önce en az {{seconds}} saniye bekleyin.',
   },
 

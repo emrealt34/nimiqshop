@@ -650,6 +650,8 @@ const fr = {
     qsStakeValidator: 'Staker {{validator}}',
     qsDelegates: 'Délégué à {{validator}}. Minimum {{min}} NIM. Vos pièces restent les vôtres.',
     spnHeading: 'Veuillez vérifier ces exigences de commande',
+    spnLimitLead: 'Cryptorefills n’a pas approuvé ce paiement. Vous avez peut-être une commande ouverte, ou le montant dépasse la limite. Vérifiez d’abord l’onglet Commandes, ou essayez de baisser le montant du produit acheté.',
+    spnSupplierCode: 'Motif donné par Cryptorefills : {{code}}',
     spnContactSupport: 'Contacter l’assistance',
     spnOpenCryptorefills: 'Ouvrir Cryptorefills — compte et assistance',
     qrUnavailable: 'QR indisponible',
@@ -2109,7 +2111,7 @@ const fr = {
     VERIFICATION_REQUIRED: 'Cryptorefills exige une vérification supplémentaire avant que cette commande puisse se poursuivre. Vérifiez votre compte Cryptorefills et contactez le support si cela persiste.',
     SUSPENDED_COIN: 'La cryptomonnaie de paiement sélectionnée est temporairement suspendue par Cryptorefills. Attendez qu’elle soit de nouveau disponible ou choisissez une autre option de paiement proposée par cette boutique.',
     SUSPENDED_NETWORK: 'Le réseau de paiement sélectionné est temporairement suspendu par Cryptorefills. Attendez qu’il soit de nouveau disponible ou choisissez une autre option de paiement proposée par cette boutique.',
-    unknown: 'Cryptorefills n’a pas pu approuver cette demande. Vérifiez la commande et contactez le support avant de réessayer.',
+    unknown: 'Cryptorefills n’a pas approuvé ce paiement. Vous avez peut-être une commande ouverte, ou le montant dépasse la limite. Vérifiez d’abord l’onglet Commandes, ou essayez de baisser le montant du produit acheté ; si rien n’y fait, contactez le support.',
     cooldown: 'Les requêtes sont également temporairement suspendues. Attendez au moins {{seconds}} secondes avant de réessayer.',
   },
 

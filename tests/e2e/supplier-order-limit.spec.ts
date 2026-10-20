@@ -133,6 +133,8 @@ test.describe('supplier per-order ceiling', () => {
     await expect(notice).toContainText('€100');
     await expect(notice).toContainText('€208.07');
     await expect(notice).toContainText('€300');
+    await expect(notice).toContainText(/did not approve this payment/i);
+    await expect(page.getByTestId('supplier-reason-code')).toContainText('LIGHTNING_ORDER_LIMIT_EXCEEDED');
     await expect(notice).not.toContainText(/could not approve|contact support before/i);
     await expect(page.getByText(/Waiting for Nimiq Pay/i)).toHaveCount(0);
   });
