@@ -21,7 +21,7 @@ func TestAValueThatWouldTakeTheCheckoutDownIsRefused(t *testing.T) {
 	cases := []struct {
 		key, value string
 	}{
-		{"CRYPTOREFILLS_PARTNER_KEY", "v5-user-session-key"},        // not a partner key
+		{"CRYPTOREFILLS_PARTNER_KEY", "v5-user-session-key"},         // not a partner key
 		{"CRYPTOREFILLS_PARTNER_KEY_BACKUP", "cr_live_other_prefix"}, // wrong prefix
 		{"CRYPTOREFILLS_BASE_URL", "http://api.example.com"},         // plain http
 		{"SITE_HOST", "shop example.com"},                            // not a hostname

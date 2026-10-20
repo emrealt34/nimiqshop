@@ -126,5 +126,21 @@
   "SUSPENDED_NETWORK": {
     "scope": "payment",
     "message": "The selected payment network is temporarily suspended by Cryptorefills. Wait until it is available again, or choose another payment option offered by this shop."
+  },
+  "FULLNAME_MISSING": {
+    "scope": "account",
+    "message": "Cryptorefills needs the full name on the account before this order can be placed. Complete your name there, or contact support."
+  },
+  "CUSTOMER_BLOCKED": {
+    "scope": "account",
+    "message": "Cryptorefills is not accepting orders for this account right now. Contact Cryptorefills support; the shop cannot lift this hold."
+  },
+  "PARTNER_DAILY_ORDER_VELOCITY_EXCEEDED": {
+    "scope": "account",
+    "message": "The shop reached the supplier's daily order limit. No order was placed and nothing was charged — please try again tomorrow."
+  },
+  "PARTNER_MONTHLY_ORDER_VELOCITY_EXCEEDED": {
+    "scope": "account",
+    "message": "The shop reached the supplier's monthly order limit. No order was placed and nothing was charged — please try again later."
   }
 }

@@ -153,3 +153,20 @@ test('a LIGHTNING_ORDER_LIMIT_EXCEEDED without details still gets a specific sen
   assert.match(out, /Lightning/);
   assert.doesNotMatch(out, /could not approve|undefined/i);
 });
+
+/* ---- catalogue ↔ storefront parity ----------------------------------------
+ * Every code the backend knows (problem_catalog.json, embedded via go:embed)
+ * must have a sentence on the storefront too. Four partner-API codes once
+ * lived only in a hand-maintained Go copy and rendered as "supplier.X" keys. */
+test('every catalogue code has a buyer-facing sentence (no raw i18n keys, no generic fallback)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const catalog = JSON.parse(readFileSync(path.join(root, 'backend/internal/cryptorefills/problem_catalog.json'), 'utf8'));
+  const codes = Object.keys(catalog);
+  assert.ok(codes.length >= 36, `catalogue has ${codes.length} codes`);
+  for (const code of codes) {
+    const out = say(new ApiError(409, 'x', 'SUPPLIER_PROBLEMS', { supplier_error: true, code: 'SUPPLIER_PROBLEMS', problems: [{ problem: code }] }));
+    assert.doesNotMatch(out, /supplier\.[A-Z_]+/, `${code} renders a raw key: ${out}`);
+    assert.doesNotMatch(out, /could not approve this request/i, `${code} falls back to the generic sentence`);
+    assert.ok(out.length > 20, `${code}: ${out}`);
+  }
+});

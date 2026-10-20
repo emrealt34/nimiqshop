@@ -11,8 +11,11 @@ for(const width of [320,1280])for(const lang of ['tr','de'] as const)test.descri
    await open(page,path(route));
    const heading=page.locator('#page-content h1, .orders-page .section-head h2, .order-summary-heading h2').first();
    await expect(heading,route).toBeVisible();
-   // The product hero keeps its title on the left, beside the artwork and above the chip row.
-   expect(await heading.evaluate(el=>getComputedStyle(el).textAlign),route).toBe(route.startsWith('/product')?'start':'center');
+   // The product hero keeps its title on the left, beside the artwork and above the chip row;
+   // the order card's own header bar (thumb + name left, status badge right) is not a page heading either.
+   const align=await heading.evaluate(el=>getComputedStyle(el).textAlign);
+   const want=route.startsWith('/product')?['start']:route.startsWith('/order?')?['left','start']:['center'];
+   expect(want,`${route}: text-align ${align}`).toContain(align);
    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),route).toBe(true);
    if(route==='/cashback'){
     const refresh=page.locator('.cb-recent-card .cb-ledger-refresh');await expect(refresh).toBeVisible();
