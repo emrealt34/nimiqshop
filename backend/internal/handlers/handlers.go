@@ -68,6 +68,10 @@ type Handlers struct {
 	// (available $, boost %). Default: the multi-source oracle. Tests
 	// override it with a fixed quote so no network is needed.
 	NIMUSDPrice func(ctx context.Context) (float64, error)
+	// BTCUSDPrice, when set, replaces the oracle snapshot as the BTC/USD
+	// rate used to read supplier price quotes (see supplier_margin.go).
+	// Production leaves it nil; tests pin it next to MOCK_BTC_USD.
+	BTCUSDPrice func() (float64, error)
 	// Admission is the process-wide in-flight shedder, wired at boot. It is
 	// read-only from here: /api/health reports its counters so an operator
 	// can see load approaching the ceiling before requests start failing.

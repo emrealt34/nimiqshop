@@ -317,7 +317,7 @@ func (h *Handlers) createQuoteInner(ctx *fasthttp.RequestCtx, userID string, req
 	// face cap the catalog already clamped to, so a stale product page
 	// cannot submit an amount the supplier is known to refuse, and the
 	// buyer hears the real maximum instead of "could not approve".
-	if lerr := h.orderLimit().Gate(faceUSD, meta.Currency); lerr != nil {
+	if lerr := h.orderLimitFor(h.supplierContext(ctx), priceNameFor(meta, req.ProductID), req.Country, meta.Currency, faceValue).Gate(faceUSD, meta.Currency); lerr != nil {
 		var limitErr *catalog.OrderLimitError
 		if errors.As(lerr, &limitErr) {
 			writeOrderLimitError(ctx, limitErr)

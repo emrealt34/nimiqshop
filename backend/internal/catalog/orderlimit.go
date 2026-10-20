@@ -78,6 +78,17 @@ func (l OrderLimit) FaceCapIn(currency string) float64 {
 	return math.Floor(l.FaceCapUSD() / usdRateOr(code))
 }
 
+// WithMarginFloor returns the limit with the supplier's OBSERVED fee for one
+// product folded in. The configured margin is a floor: an observed fee
+// below it never widens the cap, a higher one tightens it.
+func (l OrderLimit) WithMarginFloor(observedPct float64) OrderLimit {
+	if math.IsNaN(observedPct) || math.IsInf(observedPct, 0) || observedPct <= l.MarginPct {
+		return l
+	}
+	l.MarginPct = observedPct
+	return l
+}
+
 // Apply lowers rules.MaxFaceValueUSD to the supplier face cap when that is
 // the tighter ceiling, so every browse filter (ranges clamped, fixed
 // denominations hidden, families whose minimum is out of reach dropped)

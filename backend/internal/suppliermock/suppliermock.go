@@ -21,9 +21,12 @@
 //	                   "webhook_key":"...",
 //	                   "lightning_limit_eur":100,   validations above it answer
 //	                                                422 LIGHTNING_ORDER_LIMIT_EXCEEDED like production
-//	                   "java_decimals":true}        every coin_amount is written the way
+//	                   "java_decimals":true,        every coin_amount is written the way
 //	                                                Java's BigDecimal.toString() writes it
 //	                                                ("5.2E-7" below 100 sats; seen live 2026-10-20)
+//	                   "price_margin_pct":{"amazon-usa":20}}  /v4/products/price quotes
+//	                                                that family at face × 1.20 (Amazon.co.jp
+//	                                                really costs +20 % over face, 2026-10-20)
 //	POST /mock/reset  {}
 //	GET  /mock/state
 //	POST /mock/orders/{id}/pay        simulate customer payment
@@ -177,6 +180,20 @@ func (m *mockState) wireDecimal(plain string) string {
 		mantissa += "." + unscaled[1:]
 	}
 	return fmt.Sprintf("%sE%d", mantissa, adjusted)
+}
+
+// priceMarginPct is the price_margin_pct fault for one family (0 = none).
+func (m *mockState) priceMarginPct(family string) float64 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	table, _ := m.faults["price_margin_pct"].(map[string]interface{})
+	if table == nil {
+		return 0
+	}
+	if v, ok := table[family].(float64); ok {
+		return v
+	}
+	return 0
 }
 
 func (m *mockState) faultStr(key string) string {
@@ -927,7 +944,13 @@ func (m *mockState) price(w http.ResponseWriter, r *http.Request) {
 	}
 	// Real pricing: the fee is charged in USD, then converted through the
 	// LIVE coin rate (see usdToCoin) — a BTC price is a real BTC amount.
-	amount, err := usdToCoin(value*1.0039, coin)
+	// The price_margin_pct fault replays a family with a higher supplier
+	// fee than the shop's configured margin.
+	fee := 1.0039
+	if pct := m.priceMarginPct(p.family); pct > 0 {
+		fee = 1 + pct/100
+	}
+	amount, err := usdToCoin(value*fee, coin)
 	if err != nil {
 		writeJSON(w, 503, map[string]interface{}{"error": "PRICE_UNAVAILABLE", "detail": err.Error()})
 		return

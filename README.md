@@ -121,7 +121,7 @@ origins outside loopback, missing partner id).
 | `ADMIN_USERNAME`, `ADMIN_PASSWORD_HASH`, `ADMIN_TOTP_SECRET` | Admin console (Argon2id + TOTP SHA-256) |
 | `ALLOWED_ORIGINS` / `FRONTEND_URL` | CORS + CSRF allow-list for split deployments |
 | `CASHBACK_*`, `TREE_PLANTING_*`, `POOL_*` | Staker cashback, tree-planting donations, validator pool ladder |
-| `SUPPLIER_ORDER_LIMIT_EUR`, `SUPPLIER_ORDER_MARGIN_PCT` | The supplier's per-order ceiling on Lightning orders (order total incl. its fee; default `100` EUR, `0` = off) and the fee allowance (default `5` %): ranges and denominations stop at the resulting face cap, over-cap carts are refused with the real maximum, and `GET /api/admin/catalog-limits` shows which ceiling binds. Raise it only after the Cryptorefills account's Lightning limit was raised |
+| `SUPPLIER_ORDER_LIMIT_EUR`, `SUPPLIER_ORDER_MARGIN_PCT` | The supplier's per-order ceiling on Lightning orders (order total incl. its fee; default `100` EUR, `0` = off) and the fee floor (default `5` %; the real fee differs per product — Amazon.co.jp charges ~20 % — so each family's cap is calibrated from the supplier's own price quote and the configured value only ever widens to a tighter cap, never looser): ranges and denominations stop at the resulting face cap, over-cap carts are refused with the real maximum, and `GET /api/admin/catalog-limits` shows which ceiling binds. Raise it only after the Cryptorefills account's Lightning limit was raised |
 | `TEST_MODE` | Sandbox: real catalogue, simulated payments (never on a public host) |
 
 The frontend's API base is the one setting in [`public/config.js`](public/config.js)

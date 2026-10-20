@@ -283,6 +283,9 @@ func (h *Handlers) createQuoteBatchInner(ctx *fasthttp.RequestCtx, userID string
 		writeError(ctx, fasthttp.StatusBadRequest, "a valid email is required (your receipt and the order confirmation are sent to it)")
 		return
 	}
+	// cartLimit: the supplier ceiling the whole cart is held to — the
+	// configured one, tightened to the highest supplier fee seen on a line.
+	cartLimit := h.orderLimit()
 	// allFaceKnown: every item has an ISO currency, so totalFaceUSD is a
 	// trustworthy expectation to check the supplier invoice against.
 	for i, it := range req.Items {
@@ -375,7 +378,12 @@ func (h *Handlers) createQuoteBatchInner(ctx *fasthttp.RequestCtx, userID string
 		// cart of several items under the cap can still exceed it together.
 		// Check the running total so the refusal names the real maximum
 		// (and the line that crossed it) before the supplier dry run.
-		if lerr := h.orderLimit().Gate(totalUSD, meta.Currency); lerr != nil {
+		// Lines carry different supplier fees; the cart is held to the
+		// tightest one seen so far, which can only under-promise.
+		if lim := h.orderLimitFor(h.supplierContext(ctx), priceNameFor(meta, it.ProductID), it.Country, meta.Currency, faceValue); lim.MarginPct > cartLimit.MarginPct {
+			cartLimit = lim
+		}
+		if lerr := cartLimit.Gate(totalUSD, meta.Currency); lerr != nil {
 			var limitErr *catalog.OrderLimitError
 			if errors.As(lerr, &limitErr) {
 				writeOrderLimitError(ctx, limitErr)

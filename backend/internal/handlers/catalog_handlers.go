@@ -551,6 +551,11 @@ func (h *Handlers) respondFamilies(ctx *fasthttp.RequestCtx, fams []cryptorefill
 	// cache (Cloudflare) could hand a German buyer the Turkish payload.
 	ctx.Response.Header.Set("Vary", "Accept-Language")
 	rules := h.rulesForRequest()
+	// The supplier's fee differs per product (Amazon.co.jp charges five
+	// times what Amazon.fr does); the cap the buyer sees is calibrated on
+	// this family's own price quote so the maximum offered is one the
+	// supplier will accept.
+	h.refineOrderLimit(h.supplierContext(ctx), &rules, strings.ToUpper(strings.TrimSpace(string(ctx.QueryArgs().Peek("country")))), fams)
 	filtered := catalog.FilterFamilies(&rules, fams)
 	if len(filtered) == 0 {
 		writeError(ctx, fasthttp.StatusNotFound, "product not found")

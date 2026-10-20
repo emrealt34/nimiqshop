@@ -227,3 +227,85 @@ func supplierOrders(t *testing.T, s *testStack) int {
 	}
 	return st.OrderCount
 }
+
+// The supplier's fee is not one number: Amazon.co.jp costs +20 % over face
+// where Amazon.fr costs +4 % (live, 2026-10-20). With a flat 5 % margin the
+// product page offered ¥16,926 and the supplier refused it at €114 total.
+// The cap is therefore calibrated per family from the supplier's own price
+// quote: the product page stops where that product really fits, and the
+// gate agrees with the page.
+func TestSupplierOrderLimitFollowsTheFamilysRealFee(t *testing.T) {
+	s := bootStack(t, stackOptions{testMode: false, env: map[string]string{
+		"SUPPLIER_ORDER_LIMIT_EUR": "100", "SUPPLIER_ORDER_MARGIN_PCT": "5",
+	}})
+	setMockFault(t, s, map[string]any{"price_margin_pct": map[string]any{"amazon-usa": 20}})
+	flat := catalog.OrderLimit{TotalEUR: 100, MarginPct: 5}
+	real := catalog.OrderLimit{TotalEUR: 100, MarginPct: 20}
+	flatCap, realCap := math.Floor(flat.FaceCapUSD()), math.Floor(real.FaceCapUSD())
+	if !(realCap < flatCap) {
+		t.Fatalf("test premise: %v must be below %v", realCap, flatCap)
+	}
+
+	t.Run("the product page stops where this family really fits", func(t *testing.T) {
+		res := s.do(http.MethodGet, "/api/catalog/products/amazon-usa?country=US", nil, nil)
+		if res.status != 200 {
+			t.Fatalf("product: %d %s", res.status, truncate(res.body))
+		}
+		products, _ := jsonArray(t, res.body)[0]["products"].([]any)
+		rng, _ := products[0].(map[string]any)["range"].(map[string]any)
+		if got, _ := rng["max"].(float64); got != realCap {
+			t.Fatalf("range max %v, want %v (flat-margin cap would be %v)", got, realCap, flatCap)
+		}
+		if capInfo, _ := rng["cap"].(map[string]any); capInfo["reason"] != "supplier_order_limit" {
+			t.Fatalf("cap annotation %+v", capInfo)
+		}
+	})
+
+	t.Run("a family with the ordinary fee is not tightened", func(t *testing.T) {
+		// test-airbnb lists 10–100 USD and costs +0.39 %: its own maximum
+		// is below the configured cap, so nothing is clamped and no cap
+		// annotation appears — the +20 % learnt for amazon-usa must not
+		// leak onto another family.
+		res := s.do(http.MethodGet, "/api/catalog/products/test-airbnb?country=US", nil, nil)
+		if res.status != 200 {
+			t.Fatalf("product: %d %s", res.status, truncate(res.body))
+		}
+		products, _ := jsonArray(t, res.body)[0]["products"].([]any)
+		rng, _ := products[0].(map[string]any)["range"].(map[string]any)
+		if got, _ := rng["max"].(float64); got != 100 {
+			t.Fatalf("range max %v, want the supplier's own 100", got)
+		}
+		if _, capped := rng["cap"]; capped {
+			t.Fatalf("no cap annotation expected: %+v", rng)
+		}
+	})
+
+	auth, _ := s.signIn()
+	headers := func() map[string]string {
+		return map[string]string{"Authorization": auth["Authorization"], "Idempotency-Key": newIdempotencyKey(t)}
+	}
+
+	t.Run("the gate refuses what the page no longer offers, naming the real maximum", func(t *testing.T) {
+		res := s.do(http.MethodPost, "/api/quotes", map[string]any{
+			"product_id": "amazon-usa", "country": "US", "quantity": 1,
+			"denomination": "range", "product_value": flatCap, "email": "verify@nimiqbase.com",
+		}, headers())
+		if res.status != http.StatusForbidden || res.json(t)["code"] != "SUPPLIER_ORDER_LIMIT" {
+			t.Fatalf("want 403 SUPPLIER_ORDER_LIMIT for %v, got %d %s", flatCap, res.status, truncate(res.body))
+		}
+		ol, _ := res.json(t)["order_limit"].(map[string]any)
+		if ol["max_face_value"] != realCap {
+			t.Fatalf("order_limit %+v, want max_face_value %v", ol, realCap)
+		}
+	})
+
+	t.Run("the real maximum still reaches the invoice", func(t *testing.T) {
+		res := s.do(http.MethodPost, "/api/quotes", map[string]any{
+			"product_id": "amazon-usa", "country": "US", "quantity": 1,
+			"denomination": "range", "product_value": realCap, "email": "verify@nimiqbase.com",
+		}, headers())
+		if res.status != http.StatusCreated {
+			t.Fatalf("want 201 for %v, got %d %s", realCap, res.status, truncate(res.body))
+		}
+	})
+}

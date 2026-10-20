@@ -18,6 +18,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -130,6 +131,11 @@ func bootStack(t *testing.T, opts stackOptions) *testStack {
 	h.HostEnv = hostEnv
 	// Fixed display price so no oracle/network is involved.
 	h.NIMUSDPrice = func(context.Context) (float64, error) { return 0.002, nil }
+	// The same BTC/USD the supplier mock prices with (MOCK_BTC_USD), so a
+	// supplier quote converts back to exactly the face value plus its fee.
+	if v, err := strconv.ParseFloat(env["MOCK_BTC_USD"], 64); err == nil && v > 0 {
+		h.BTCUSDPrice = func() (float64, error) { return v, nil }
+	}
 	// The SAME pool + chain wiring production boots with. Tests that fake a
 	// pool and an RPC therefore exercise the real ordering (pool first, chain
 	// as the fallback) instead of a test-only stand-in.
