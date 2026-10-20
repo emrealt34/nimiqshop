@@ -158,7 +158,7 @@ func (h *Handlers) AdminListEnv(ctx *fasthttp.RequestCtx) {
 		} else {
 			hostValue = strings.TrimSpace(os.Getenv(key))
 		}
-		inForce := h.effectiveEnvValue(key, overrides)
+		effective := h.effectiveEnvValue(key, overrides)
 		source := "unset"
 		if strings.TrimSpace(row.Value) != "" {
 			source = "console"
@@ -177,7 +177,7 @@ func (h *Handlers) AdminListEnv(ctx *fasthttp.RequestCtx) {
 			Live:      spec.Live,
 			Known:     known,
 			Source:    source,
-			Value:     config.MaskValue(inForce, spec.Secret),
+			Value:     config.MaskValue(effective, spec.Secret),
 			HostValue: config.MaskValue(hostValue, spec.Secret),
 			UpdatedAt: row.UpdatedAt,
 			UpdatedBy: row.UpdatedBy,
