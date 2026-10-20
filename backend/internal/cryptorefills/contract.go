@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/big"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -99,19 +100,72 @@ func endUserAgentFromContext(ctx context.Context) string {
 	return ""
 }
 
-var decimalPattern = regexp.MustCompile(`^[0-9]+(?:\.[0-9]+)?$`)
+// decimalPattern is a plain or exponent-form decimal: "0.00000052", "52",
+// "5.2E-7". The exponent form is NOT a courtesy: the supplier serialises its
+// BigDecimal amounts with Java semantics, and BigDecimal.toString() switches
+// to scientific notation as soon as the adjusted exponent drops below -6 —
+// i.e. for every Lightning amount under 100 sats. A 50 NGN Airtel top-up
+// (52 sats) came back as "5.2E-7" on the live shop (2026-10-20); the strict
+// pattern refused it as "invalid decimal amount" and a perfectly payable
+// order was parked in manual review with its payment blocked.
+var decimalPattern = regexp.MustCompile(`^([0-9]+)(?:\.([0-9]+))?(?:[eE]([-+]?[0-9]{1,3}))?$`)
 var codePattern = regexp.MustCompile(`^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$`)
 
 func isProblemCode(s string) bool { return codePattern.MatchString(s) }
 
-// PositiveDecimal refuses NaN, Infinity, exponents, trailing garbage and zero.
-// Rational arithmetic keeps BTC amounts exact; no float equality for payments.
-func PositiveDecimal(s string) (*big.Rat, error) {
+// PlainDecimal canonicalises a decimal string to its plain positional form
+// with no exponent, no leading zeros and no trailing fractional zeros
+// ("5.2E-7" → "0.00000052", "1500.00" → "1500", "007" → "7"). It is pure
+// string arithmetic — no float is ever involved — so the value is exact.
+// NaN, Infinity, signs, thousands separators and trailing garbage are
+// refused; exponents beyond ±40 are refused as hostile.
+func PlainDecimal(s string) (string, bool) {
 	s = strings.TrimSpace(s)
-	if len(s) > 80 || !decimalPattern.MatchString(s) {
+	if len(s) > 80 {
+		return "", false
+	}
+	m := decimalPattern.FindStringSubmatch(s)
+	if m == nil {
+		return "", false
+	}
+	intPart, frac, expS := m[1], m[2], m[3]
+	exp := 0
+	if expS != "" {
+		n, err := strconv.Atoi(expS)
+		if err != nil || n < -40 || n > 40 {
+			return "", false
+		}
+		exp = n
+	}
+	digits := intPart + frac
+	point := len(intPart) + exp // index of the decimal point inside digits
+	if point <= 0 {
+		digits = strings.Repeat("0", 1-point) + digits
+		point = 1
+	}
+	if point > len(digits) {
+		digits += strings.Repeat("0", point-len(digits))
+	}
+	whole := strings.TrimLeft(digits[:point], "0")
+	if whole == "" {
+		whole = "0"
+	}
+	fraction := strings.TrimRight(digits[point:], "0")
+	if fraction == "" {
+		return whole, true
+	}
+	return whole + "." + fraction, true
+}
+
+// PositiveDecimal refuses NaN, Infinity, trailing garbage and zero; exponent
+// notation is accepted and read exactly (see PlainDecimal). Rational
+// arithmetic keeps BTC amounts exact; no float equality for payments.
+func PositiveDecimal(s string) (*big.Rat, error) {
+	plain, ok := PlainDecimal(s)
+	if !ok {
 		return nil, fmt.Errorf("invalid decimal amount")
 	}
-	r, ok := new(big.Rat).SetString(s)
+	r, ok := new(big.Rat).SetString(plain)
 	if !ok || r.Sign() <= 0 {
 		return nil, fmt.Errorf("amount must be positive")
 	}
@@ -125,14 +179,32 @@ func normalizeDecimalFields(b []byte, fields ...string) ([]byte, error) {
 	}
 	for _, f := range fields {
 		v := obj[f]
-		if len(v) == 0 || string(v) == "null" || v[0] == '"' {
+		if len(v) == 0 || string(v) == "null" {
+			continue
+		}
+		if v[0] == '"' {
+			// Already a string: canonicalise an exponent form ("5.2E-7")
+			// to its plain decimal so every consumer — the payment guard,
+			// the database, the storefront — sees "0.00000052". Anything
+			// that is not a decimal is left for the guard to refuse.
+			var str string
+			if err := json.Unmarshal(v, &str); err == nil {
+				if plain, ok := PlainDecimal(str); ok {
+					obj[f], _ = json.Marshal(plain)
+				}
+			}
 			continue
 		}
 		var n json.Number
 		if err := json.Unmarshal(v, &n); err != nil {
 			return nil, fmt.Errorf("invalid %s", f)
 		}
-		obj[f], _ = json.Marshal(n.String())
+		// json.Number keeps the wire literal, exponent included.
+		if plain, ok := PlainDecimal(n.String()); ok {
+			obj[f], _ = json.Marshal(plain)
+		} else {
+			obj[f], _ = json.Marshal(n.String())
+		}
 	}
 	return json.Marshal(obj)
 }

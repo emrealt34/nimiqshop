@@ -164,7 +164,7 @@ func TestRemovingAConsoleEnvKeyFallsBackToTheHostValue(t *testing.T) {
 	if row["source"] != "host" {
 		t.Fatalf("source after removal = %v, want host", row["source"])
 	}
-	if strings.Contains(string(row["value"].(string)), hostKey) && row["value"] != hostKey {
+	if strings.Contains(row["value"].(string), hostKey) && row["value"] != hostKey {
 		// A non-secret value is shown whole; a secret is masked. Either way
 		// what comes back must be the host's, never the override's.
 		t.Fatalf("value after removal = %v, want the host value", row["value"])

@@ -75,7 +75,7 @@ func TestPartnerCheckoutCreatesTheOrderOnTheV6Endpoint(t *testing.T) {
 
 	creates := cap.matching(http.MethodPost, "/v6/partner/orders")
 	if len(creates) != 1 {
-		var got []string
+		got := make([]string, 0, len(cap.calls))
 		for _, c := range cap.calls {
 			got = append(got, c.Method+" "+c.Path)
 		}

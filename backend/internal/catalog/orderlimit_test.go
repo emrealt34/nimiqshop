@@ -86,7 +86,7 @@ func TestOrderLimitClampsRangesAndHidesDenominations(t *testing.T) {
 	if len(out) != 1 {
 		t.Fatalf("family must survive, got %d", len(out))
 	}
-	var ids []string
+	ids := make([]string, 0, len(out[0].Products))
 	for _, p := range out[0].Products {
 		ids = append(ids, p.ProductID)
 	}

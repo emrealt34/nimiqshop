@@ -19,8 +19,11 @@
 //	                   "force_fail_delivery":true,"payment_window_ms":60000,
 //	                   "webhook_base_url":"http://127.0.0.1:PORT",
 //	                   "webhook_key":"...",
-//	                   "lightning_limit_eur":100}   validations above it answer
-//	                   422 LIGHTNING_ORDER_LIMIT_EXCEEDED like production
+//	                   "lightning_limit_eur":100,   validations above it answer
+//	                                                422 LIGHTNING_ORDER_LIMIT_EXCEEDED like production
+//	                   "java_decimals":true}        every coin_amount is written the way
+//	                                                Java's BigDecimal.toString() writes it
+//	                                                ("5.2E-7" below 100 sats; seen live 2026-10-20)
 //	POST /mock/reset  {}
 //	GET  /mock/state
 //	POST /mock/orders/{id}/pay        simulate customer payment
@@ -50,6 +53,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -92,6 +96,10 @@ type mockState struct {
 	orders   map[string]*order
 	faults   map[string]interface{}
 	webhooks []string
+	// javaDecimals mirrors faults["java_decimals"] lock-free: wireDecimal
+	// runs inside publicOrder, which callers invoke with m.mu held, and a
+	// faultBool() there would deadlock on the non-reentrant mutex.
+	javaDecimals atomic.Bool
 }
 
 func newState() *mockState {
@@ -134,6 +142,41 @@ func (m *mockState) faultBool(key string) bool {
 		return v
 	}
 	return false
+}
+
+// wireDecimal renders a plain decimal amount the way the real supplier's
+// Java serialiser does when the java_decimals fault is on: BigDecimal's
+// toString() switches to scientific notation ("5.2E-7") as soon as the
+// adjusted exponent is below -6, i.e. for every Lightning amount under
+// 100 sats. Pure string arithmetic, so the value stays exact.
+func (m *mockState) wireDecimal(plain string) string {
+	if !m.javaDecimals.Load() {
+		return plain
+	}
+	intPart, frac := plain, ""
+	if i := strings.IndexByte(plain, '.'); i >= 0 {
+		intPart, frac = plain[:i], plain[i+1:]
+	}
+	digits := intPart + frac
+	first := strings.IndexFunc(digits, func(r rune) bool { return r != '0' })
+	if first < 0 {
+		return "0"
+	}
+	// unscaled value = digits[first:] without trailing zeros; scale = len(frac)
+	unscaled := strings.TrimRight(digits[first:], "0")
+	if unscaled == "" {
+		unscaled = "0"
+	}
+	scale := len(frac) - (len(digits[first:]) - len(unscaled))
+	adjusted := len(unscaled) - 1 - scale
+	if scale <= 0 || adjusted >= -6 {
+		return plain // Java prints these positionally
+	}
+	mantissa := unscaled[:1]
+	if len(unscaled) > 1 {
+		mantissa += "." + unscaled[1:]
+	}
+	return fmt.Sprintf("%sE%d", mantissa, adjusted)
 }
 
 func (m *mockState) faultStr(key string) string {
@@ -464,7 +507,7 @@ func (m *mockState) publicOrder(o *order) map[string]interface{} {
 				"country_code":        d.Country,
 				"beneficiary_account": d.Beneficiary,
 				"delivery_type":       d.DeliveryType,
-				"coin_amount":         d.CoinAmount,
+				"coin_amount":         m.wireDecimal(d.CoinAmount),
 			},
 		}
 		if d.ProductValue != nil {
@@ -485,7 +528,7 @@ func (m *mockState) publicOrder(o *order) map[string]interface{} {
 		"order_state":    o.Status,
 		"payment_state":  paymentStateFor(o.Status),
 		"coin":           o.Coin,
-		"coin_amount":    o.CoinAmount,
+		"coin_amount":    m.wireDecimal(o.CoinAmount),
 		"wallet_address": o.WalletAddress,
 		"network":        o.Network,
 		"payment_method": paymentMethodFor(o.Coin, o.Network),
@@ -891,7 +934,7 @@ func (m *mockState) price(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, 200, map[string]interface{}{
 		"product_id": "mockprod-" + p.family, "is_dynamic": p.dynamic,
-		"coin_amount": amount, "original_coin_amount": amount, "coin": coin,
+		"coin_amount": m.wireDecimal(amount), "original_coin_amount": m.wireDecimal(amount), "coin": coin,
 		"payment_method": coin + "-SOL", "delivery_type": p.deliverBy,
 	})
 }
@@ -1082,7 +1125,7 @@ func (m *mockState) validations(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, map[string]interface{}{
-		"coin": coin, "coin_amount": validAmount, "original_coin_amount": validAmount,
+		"coin": coin, "coin_amount": m.wireDecimal(validAmount), "original_coin_amount": m.wireDecimal(validAmount),
 		"problems":   []any{},
 		"deliveries": []map[string]interface{}{},
 	})
@@ -1323,12 +1366,15 @@ func (m *mockState) control(w http.ResponseWriter, r *http.Request) {
 		} else {
 			m.faults = f
 		}
+		jd, _ := m.faults["java_decimals"].(bool)
+		m.javaDecimals.Store(jd)
 		m.mu.Unlock()
 		writeJSON(w, 200, map[string]bool{"ok": true})
 	case path == "/reset":
 		m.mu.Lock()
 		m.orders = map[string]*order{}
 		m.faults = map[string]interface{}{}
+		m.javaDecimals.Store(false)
 		m.webhooks = nil
 		m.requests = nil
 		m.mu.Unlock()

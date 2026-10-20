@@ -1008,17 +1008,25 @@ func (o *Order) UnmarshalJSON(b []byte) error {
 // (the only shape the amount guards accept), reporting false for anything
 // else (null, object, array).
 func decimalString(v any) (string, bool) {
+	var s string
 	switch t := v.(type) {
 	case nil:
 		return "", false
 	case string:
-		return strings.TrimSpace(t), strings.TrimSpace(t) != ""
+		s = strings.TrimSpace(t)
 	case float64:
-		return strconv.FormatFloat(t, 'f', -1, 64), true
+		s = strconv.FormatFloat(t, 'f', -1, 64)
 	case json.Number:
-		return t.String(), true
+		s = t.String()
+	default:
+		return "", false
 	}
-	return "", false
+	// Same canonical form as normalizeDecimalFields: the nested v6
+	// `payment.coin_amount` may arrive as "5.2E-7" too.
+	if plain, ok := PlainDecimal(s); ok {
+		return plain, true
+	}
+	return s, s != ""
 }
 
 // epochOrString decodes a supplier timestamp that the real API normally

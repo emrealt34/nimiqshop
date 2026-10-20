@@ -58,7 +58,7 @@ type stackOptions struct {
 func bootStack(t *testing.T, opts stackOptions) *testStack {
 	t.Helper()
 
-	var supplierHandler http.Handler = suppliermock.NewHandler()
+	supplierHandler := suppliermock.NewHandler()
 	if opts.supplierWrap != nil {
 		supplierHandler = opts.supplierWrap(supplierHandler)
 	}

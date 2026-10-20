@@ -24,6 +24,13 @@ import (
 // decoder reads: the 35-bit timestamp and an `x` expiry tag.
 func synthInvoice(t *testing.T, created time.Time, expirySeconds int) string {
 	t.Helper()
+	return synthInvoiceHRP(t, created, expirySeconds, "lnbc12760n") // 1276 sats, an amount the decoder accepts
+}
+
+// synthInvoiceHRP is synthInvoice with the caller's human-readable part, so a
+// test can mint an invoice for any amount (e.g. "lnbc520n" = 52 sats).
+func synthInvoiceHRP(t *testing.T, created time.Time, expirySeconds int, hrp string) string {
+	t.Helper()
 	groups := make([]int32, 0, 32)
 	stamp := uint64(created.Unix())
 	for shift := 30; shift >= 0; shift -= 5 {
@@ -46,7 +53,6 @@ func synthInvoice(t *testing.T, created time.Time, expirySeconds int) string {
 	tag(6, digits)                                 // x — the expiry this test is about
 	groups = append(groups, make([]int32, 104)...) // signature is not verified
 
-	hrp := "lnbc12760n" // 1276 sats, an amount the decoder accepts
 	values := bech32HrpExpand(hrp)
 	values = append(values, groups...)
 	values = append(values, make([]int32, 6)...)

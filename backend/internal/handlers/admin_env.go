@@ -152,7 +152,7 @@ func (h *Handlers) AdminListEnv(ctx *fasthttp.RequestCtx) {
 	for _, key := range keys {
 		spec, known := config.ManagedEnvSpec(key)
 		row := stored[key]
-		hostValue := ""
+		var hostValue string
 		if h.HostEnv != nil {
 			hostValue = strings.TrimSpace(h.HostEnv[key])
 		} else {
