@@ -226,7 +226,45 @@ func (h *Handlers) storedRules() catalog.Rules {
 // orderLimit is the supplier per-order ceiling the shop mirrors (see
 // catalog.OrderLimit and config.SupplierOrderLimitEUR).
 func (h *Handlers) orderLimit() catalog.OrderLimit {
-	return catalog.OrderLimit{TotalEUR: h.Cfg.SupplierOrderLimitEUR, MarginPct: h.Cfg.SupplierOrderMarginPct}
+	return catalog.OrderLimit{TotalEUR: h.Cfg.SupplierOrderLimitEUR, MarginPct: h.Cfg.SupplierOrderMarginPct, DailyEUR: h.Cfg.SupplierDailyLimitEUR, MonthlyEUR: h.Cfg.SupplierMonthlyLimitEUR}
+}
+
+// CatalogLimits is the public statement of the supplier's Lightning rule
+// the storefront repeats before the buyer reaches the last step: the
+// per-order ceiling on the order total (mirrored by the catalog caps) and
+// the delivery email's daily and monthly budgets, which the shop cannot
+// enforce — it does not see orders placed elsewhere — but must not hide
+// until the supplier refuses. No operator data, no supplier call.
+func (h *Handlers) CatalogLimits(ctx *fasthttp.RequestCtx) {
+	limit := h.orderLimit()
+	// The largest whole face value per currency that fits the per-order
+	// ceiling at the configured fee floor — what a brand card may promise
+	// before the family's real fee is known (the product page, which prices
+	// the family, can only be lower). The storefront builds its cards from
+	// static brand files, so the backend's own card clamp never reaches it.
+	faceCaps := map[string]float64{}
+	if limit.Enabled() {
+		for code := range catalog.FXTable() {
+			if c := math.Floor(limit.FaceCapIn(code)); c >= 1 {
+				faceCaps[code] = c
+			}
+		}
+	}
+	writeJSON(ctx, fasthttp.StatusOK, map[string]any{
+		"supplier_order_limit": map[string]any{
+			"enabled":     limit.Enabled(),
+			"currency":    "EUR",
+			"total_eur":   limit.TotalEUR,
+			"daily_eur":   limit.DailyEUR,
+			"monthly_eur": limit.MonthlyEUR,
+			"margin_pct":  limit.MarginPct,
+			"face_caps":   faceCaps,
+			// Every order counts against the email's budgets as soon as the
+			// supplier creates it, paid or not, until the day or month ends.
+			"unpaid_orders_count": true,
+			"scope":               "delivery_email",
+		},
+	})
 }
 
 // writeOrderLimitError answers a purchase that would exceed the supplier's
@@ -355,13 +393,15 @@ func (h *Handlers) ListBrands(ctx *fasthttp.RequestCtx) {
 }
 
 func (h *Handlers) listBrands(ctx *fasthttp.RequestCtx) {
-	full, _, ok := h.publicBrands(ctx)
+	full, country, ok := h.publicBrands(ctx)
 	if !ok {
 		return
 	}
 	ctx.Response.Header.Set("Cache-Control", "public, max-age=300")
 	rules := h.rulesForRequest()
-	writeJSON(ctx, fasthttp.StatusOK, catalog.FilterBrands(&rules, full))
+	filtered := catalog.FilterBrands(&rules, full)
+	h.clampBrandMaxima(&rules, country, filtered)
+	writeJSON(ctx, fasthttp.StatusOK, filtered)
 }
 
 func (h *Handlers) listBrandsFiltered(ctx *fasthttp.RequestCtx, kind string) {
@@ -369,12 +409,50 @@ func (h *Handlers) listBrandsFiltered(ctx *fasthttp.RequestCtx, kind string) {
 	if !ok {
 		return
 	}
-	_ = country
 	ctx.Response.Header.Set("Cache-Control", "public, max-age=300")
 	rules := h.rulesForRequest()
 	filtered := catalog.FilterBrands(&rules, full)
+	h.clampBrandMaxima(&rules, country, filtered)
 	out := filterBrandCategories(filtered, kind)
 	writeJSON(ctx, fasthttp.StatusOK, out)
+}
+
+// clampBrandMaxima lowers a brand card's "max" label to what the shop will
+// actually sell. The card used to repeat the supplier's own range ("$5 -
+// $500" for Walmart) while the product page, clamped by the supplier's
+// per-order ceiling, stopped at $104 — the buyer read two different
+// maxima for one product before being refused at the third. The cap is
+// the same one the product page applies: the operator's price cap with
+// the supplier ceiling folded in (rules.MaxFaceValueUSD), tightened by
+// the family's observed supplier fee when that has already been measured
+// (never priced here: a brand list is hundreds of families). FilterBrands
+// hands back copies, so the cached supplier response is untouched.
+func (h *Handlers) clampBrandMaxima(rules *catalog.Rules, country string, resp *cryptorefills.BrandsResponse) {
+	if resp == nil || rules == nil || rules.MaxFaceValueUSD <= 0 {
+		return
+	}
+	for ci := range resp.Categories {
+		brands := resp.Categories[ci].Brands
+		for bi := range brands {
+			b := &brands[bi]
+			v, code := catalog.ParseDenominationLabel(b.Max)
+			if v <= 0 || !catalog.CurrencyKnown(code) {
+				continue
+			}
+			capUSD := rules.MaxFaceValueUSD
+			if lim := h.orderLimitKnown(b.Family, country); lim.Enabled() {
+				if c := lim.FaceCapUSD(); c > 0 && c < capUSD {
+					capUSD = c
+				}
+			}
+			if catalog.ToUSD(v, code) <= capUSD {
+				continue
+			}
+			if clamped := catalog.ClampMoneyLabel(b.Max, capUSD, code); clamped != "" {
+				b.Max = clamped
+			}
+		}
+	}
 }
 
 // filterBrandCategories keeps only the categories matching the requested

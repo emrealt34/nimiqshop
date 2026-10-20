@@ -297,6 +297,31 @@ export function parseCurrencyValue(str: unknown): { currency: string; value: num
   return { currency: value > 0 ? currency : '', value, raw };
 }
 
+/** Rewrites a supplier range label ("$500", "¥16,926", "150.000 IDR") so it
+ * reads `cap` (a whole amount of the same currency) in the label's own style —
+ * symbol placement and digit grouping kept. Returns the label unchanged when
+ * it is not a money label or already within the cap. Brand cards use it so a
+ * card never promises more than the product page will sell (live, 2026-10-20:
+ * the Walmart card said "$5 - $500" while the page stopped at $104). */
+export function clampMoneyLabel(label: string, cap: number): string {
+  const raw = String(label || '').trim();
+  if (!raw || !Number.isFinite(cap) || cap < 1) return raw;
+  const parsed = parseCurrencyValue(raw);
+  if (!(parsed.value > 0) || parsed.value <= cap) return raw;
+  const prefix = raw.match(/^([$€£¥₩₺₹₽﷼]|[A-Z]{3}|TL)\s*/);
+  const suffix = prefix ? null : raw.match(/\s*([$€£¥₩₺₹₽﷼]|[A-Z]{3}|TL)$/);
+  const number = prefix ? raw.slice(prefix[0].length) : suffix ? raw.slice(0, -suffix[0].length) : raw;
+  if (!/^[0-9](?:[0-9.,\s\u00A0\u202F]*[0-9])?$/.test(number)) return raw;
+  let sep = '';
+  for (const cand of [',', '.', ' ', '\u00A0', '\u202F']) {
+    const i = number.indexOf(cand);
+    if (i > 0 && number.length - i - cand.length === 3) { sep = cand; break; }
+  }
+  let digits = String(Math.floor(cap));
+  if (sep) digits = digits.replace(/\B(?=(\d{3})+(?!\d))/g, sep);
+  return (prefix ? prefix[0] : '') + digits + (suffix ? suffix[0] : '');
+}
+
 type FaceValueSource = {
   face_label?: unknown; denomination?: unknown; product_currency?: unknown; currency?: unknown;
   _currency?: unknown; product_value?: unknown; value?: unknown; product_country?: unknown; country?: unknown;

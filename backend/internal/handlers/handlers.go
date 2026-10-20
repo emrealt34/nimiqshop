@@ -316,8 +316,19 @@ func (h *Handlers) supplierError(ctx *fasthttp.RequestCtx, err error, fallback s
 		if problems.HTTPStatus >= 500 {
 			status = fasthttp.StatusBadGateway
 		}
+		// The headline names the first problem the shop understands, so a
+		// log line or a client without the catalogue still reads the
+		// reason ("daily Lightning budget for this delivery email is used
+		// up") instead of a generic "could not approve".
+		headline := "Cryptorefills could not approve this request."
+		for _, p := range problems.Problems {
+			if isSupplierCode(p.Code) {
+				headline = cryptorefills.ProblemMessage(p.Code)
+				break
+			}
+		}
 		writeJSON(ctx, status, map[string]interface{}{
-			"error": "Cryptorefills could not approve this request.",
+			"error": headline,
 			"code":  "SUPPLIER_PROBLEMS", "supplier_error": true,
 			"problems": problems.Problems, "upstream_status": problems.HTTPStatus,
 		})

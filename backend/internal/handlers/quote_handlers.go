@@ -382,7 +382,9 @@ func (h *Handlers) createQuoteInner(ctx *fasthttp.RequestCtx, userID string, req
 	validateRes, err := h.CR.ValidateOrder(h.supplierContext(ctx), validateReq)
 	if err != nil {
 		noteSupplierOutOfStock(err, req.ProductID, req.Country)
-		h.supplierError(ctx, err, "order could not be validated")
+		// A refusal on the delivery email's Lightning budget leaves with
+		// the buyer's own orders for that email attached (email_limit.go).
+		h.supplierError(ctx, h.withEmailLimitContext(err, userID, req.Email, time.Now()), "order could not be validated")
 		return
 	}
 
@@ -514,7 +516,7 @@ func (h *Handlers) createQuoteInner(ctx *fasthttp.RequestCtx, userID string, req
 	}
 	order, err := h.CR.CreateOrder(h.supplierContext(ctx), orderReq)
 	if err != nil {
-		h.supplierCreateFailed(ctx, q, err)
+		h.supplierCreateFailed(ctx, q, h.withEmailLimitContext(err, userID, req.Email, time.Now()))
 		return
 	}
 	h.finishSupplierCreation(ctx, q, order, nil)

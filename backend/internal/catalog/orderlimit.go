@@ -31,6 +31,13 @@ type OrderLimit struct {
 	// TotalEUR is the supplier's per-order ceiling on the order total. 0
 	// disables the shop-side mirror.
 	TotalEUR float64
+	// DailyEUR and MonthlyEUR are the delivery email's budgets under the
+	// same rule (unpaid and expired orders count). The shop cannot
+	// enforce them — it does not see orders placed elsewhere — so they
+	// only ride along to the storefront, which states the whole rule
+	// before the buyer reaches the last step. 0 = not stated.
+	DailyEUR   float64
+	MonthlyEUR float64
 	// MarginPct is the allowance for the supplier margin hidden inside that
 	// total when the ceiling is turned into a face-value cap.
 	MarginPct float64
@@ -162,7 +169,7 @@ func (l OrderLimit) rangeCap(originalMax float64) *cryptorefills.RangeCap {
 	if !l.Enabled() {
 		return nil
 	}
-	return &cryptorefills.RangeCap{Reason: cryptorefills.RangeCapSupplierOrderLimit, TotalEUR: l.TotalEUR, SupplierMax: originalMax}
+	return &cryptorefills.RangeCap{Reason: cryptorefills.RangeCapSupplierOrderLimit, TotalEUR: l.TotalEUR, DailyEUR: l.DailyEUR, MonthlyEUR: l.MonthlyEUR, SupplierMax: originalMax}
 }
 
 // String is for logs and the admin summary.

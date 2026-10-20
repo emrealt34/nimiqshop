@@ -14,7 +14,9 @@ import { flattenBrands, markReportedOutOfStock, type Product } from '../../lib/c
 import { excludedCatalogItem } from '../../lib/catalogVisibility';
 import { UnifiedThumb } from '../ui/UnifiedThumb';
 import { orderedCountries } from '../../lib/countries';
-import { listGiftCards, listTopups, listEsims, listUnavailableFamilies, searchProducts, getProduct, getFXRates, cachedFX, onRatesChange, friendlyApiMessage } from '../../lib/api';
+import { listGiftCards, listTopups, listEsims, listUnavailableFamilies, searchProducts, getProduct, getFXRates, cachedFX, onRatesChange, friendlyApiMessage, getSupplierLimits } from '../../lib/api';
+import type { SupplierLimits } from '../../lib/api';
+import { clampMoneyLabel } from '../../lib/format';
 import {
   catalogHasItems,
   readCachedCatalog,
@@ -658,6 +660,14 @@ function ProductGrid({ products, onBuy, onUnavailable, allowWarm }: { products: 
   const { t } = useT();
   const { navigate } = useRouter();
   const [checking, setChecking] = useState('');
+  // The payment partner's per-order ceiling, so a card's "max" never exceeds
+  // what the product page will actually offer.
+  const [limits, setLimits] = useState<SupplierLimits | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    getSupplierLimits().then((l) => { if (!cancelled) setLimits(l); });
+    return () => { cancelled = true; };
+  }, []);
   const pending = useRef(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   // Warm the family payload + route chunk for cards the shopper can already
@@ -761,10 +771,10 @@ function ProductGrid({ products, onBuy, onUnavailable, allowWarm }: { products: 
               the title. The dashed separator + country chip anchor below. */}
           <span
             className="p-price"
-            title={productPriceText(p, t)}
+            title={productPriceText(p, t, limits)}
             style={{ fontSize: '0.85rem', display: 'block', width: '100%', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', margin: '2px 0 8px' }}
           >
-            {checking === p.id + '|' + p.country ? t('productPage.loadingProduct') : productPriceText(p, t)}
+            {checking === p.id + '|' + p.country ? t('productPage.loadingProduct') : productPriceText(p, t, limits)}
           </span>
           <div className="p-meta" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flexWrap: 'nowrap', width: '100%' }}>
             <span className="chip" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
@@ -805,8 +815,13 @@ function ProductThumb({ p, oos = false }: { p: Product; oos?: boolean }) {
   );
 }
 
-function productPriceText(p: Product, t: (k: string, v?: Record<string, string | number>) => string): string {
-  if (p.min_raw && p.max_raw && p.min_raw !== p.max_raw) return `${p.min_raw} - ${p.max_raw}`;
+function productPriceText(p: Product, t: (k: string, v?: Record<string, string | number>) => string, limits: SupplierLimits | null = null): string {
+  // The supplier's own maximum, lowered to the payment partner's per-order
+  // ceiling (the page applies the same cap, tightened further by the
+  // family's real fee once it has priced it).
+  const cap = limits && p.currency ? limits.faceCaps[p.currency] : undefined;
+  const max = cap ? clampMoneyLabel(p.max_raw, cap) : p.max_raw;
+  if (p.min_raw && max && p.min_raw !== max) return `${p.min_raw} - ${max}`;
   if (p.min_raw) return p.min_raw;
   return p.currency ? t('home.priceIn', { currency: p.currency }) : '';
 }

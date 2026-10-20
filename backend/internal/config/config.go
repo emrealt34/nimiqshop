@@ -51,8 +51,18 @@ type Config struct {
 	// inside that total when it is turned into a face-value cap
 	// (Amazon.fr FR carried 4.04% on the live refusal).
 	SupplierOrderMarginPct float64
-	CRBaseURL              string
-	CRPartnerID            string
+	// SupplierDailyLimitEUR and SupplierMonthlyLimitEUR are the other two
+	// parts of the same supplier rule: for an unregistered buyer every
+	// Lightning order is also counted against the DELIVERY EMAIL's daily
+	// and monthly budget (live 2026-10-20: 100 EUR per day, 300 EUR per
+	// month, unpaid and expired orders included). The shop cannot enforce
+	// these — it does not see orders placed elsewhere — but it tells the
+	// buyer the whole rule up front and explains a refusal with the real
+	// numbers. 0 hides a part of the rule the account does not have.
+	SupplierDailyLimitEUR   float64
+	SupplierMonthlyLimitEUR float64
+	CRBaseURL               string
+	CRPartnerID             string
 	// CRPartnerKey is the v6 PARTNER API key (cr_pk_…). Setting it moves
 	// order create/read/cancel from /v5/orders to /v6/partner/orders, which
 	// is the only path that earns commission. Without it the shop keeps
@@ -755,9 +765,11 @@ func Load() Config {
 		MonthlySpendLimitUSD: envBudgetUSD("MONTHLY_SPEND_LIMIT_USD", 1000),
 		// Supplier per-order ceiling (see the field comment): 100 EUR total,
 		// 5% margin allowance → face values up to ~95 EUR stay purchasable.
-		SupplierOrderLimitEUR:  envBudgetUSD("SUPPLIER_ORDER_LIMIT_EUR", 100),
-		SupplierOrderMarginPct: envBudgetUSD("SUPPLIER_ORDER_MARGIN_PCT", 5),
-		CRBaseURL:              env("CRYPTOREFILLS_BASE_URL", "https://api.cryptorefills.com"), CRPartnerID: os.Getenv("CRYPTOREFILLS_PARTNER_ID"), CRPartnerKey: strings.TrimSpace(os.Getenv("CRYPTOREFILLS_PARTNER_KEY")), CRPartnerKeyBackup: strings.TrimSpace(os.Getenv("CRYPTOREFILLS_PARTNER_KEY_BACKUP")), CRAppVersion: env("CRYPTOREFILLS_APP_VERSION", "nimshop/1.0"), CRUserAgent: env("CRYPTOREFILLS_USER_AGENT", "nimshop/1.0 +https://"+host), CRWebhookKey: os.Getenv("CRYPTOREFILLS_WEBHOOK_KEY"), PublicWebhookBaseURL: strings.TrimRight(os.Getenv("PUBLIC_WEBHOOK_BASE_URL"), "/"),
+		SupplierOrderLimitEUR:   envBudgetUSD("SUPPLIER_ORDER_LIMIT_EUR", 100),
+		SupplierOrderMarginPct:  envBudgetUSD("SUPPLIER_ORDER_MARGIN_PCT", 5),
+		SupplierDailyLimitEUR:   envBudgetUSD("SUPPLIER_DAILY_LIMIT_EUR", 100),
+		SupplierMonthlyLimitEUR: envBudgetUSD("SUPPLIER_MONTHLY_LIMIT_EUR", 300),
+		CRBaseURL:               env("CRYPTOREFILLS_BASE_URL", "https://api.cryptorefills.com"), CRPartnerID: os.Getenv("CRYPTOREFILLS_PARTNER_ID"), CRPartnerKey: strings.TrimSpace(os.Getenv("CRYPTOREFILLS_PARTNER_KEY")), CRPartnerKeyBackup: strings.TrimSpace(os.Getenv("CRYPTOREFILLS_PARTNER_KEY_BACKUP")), CRAppVersion: env("CRYPTOREFILLS_APP_VERSION", "nimshop/1.0"), CRUserAgent: env("CRYPTOREFILLS_USER_AGENT", "nimshop/1.0 +https://"+host), CRWebhookKey: os.Getenv("CRYPTOREFILLS_WEBHOOK_KEY"), PublicWebhookBaseURL: strings.TrimRight(os.Getenv("PUBLIC_WEBHOOK_BASE_URL"), "/"),
 		CRPollSecs: envInt("WORKER_ORDER_POLL_SECS", 5), CRStaleSecs: envInt("WORKER_ORDER_STALE_SECS", 300), TestMode: envBool("TEST_MODE", false),
 		AdminUsername: os.Getenv("ADMIN_USERNAME"), AdminPassword: os.Getenv("ADMIN_PASSWORD"), AdminPasswordHash: os.Getenv("ADMIN_PASSWORD_HASH"), AdminTOTPSecret: os.Getenv("ADMIN_TOTP_SECRET"), AdminSessionSecret: os.Getenv("ADMIN_SESSION_SECRET"),
 		// ADMIN_USERNAME + ADMIN_PASSWORD is the simple production/local
@@ -930,6 +942,11 @@ func (c Config) Validate() error {
 	}
 	if v := c.SupplierOrderMarginPct; math.IsNaN(v) || math.IsInf(v, 0) || v < 0 || v > 90 {
 		return fmt.Errorf("SUPPLIER_ORDER_MARGIN_PCT must be a percentage from 0 through 90")
+	}
+	for name, v := range map[string]float64{"SUPPLIER_DAILY_LIMIT_EUR": c.SupplierDailyLimitEUR, "SUPPLIER_MONTHLY_LIMIT_EUR": c.SupplierMonthlyLimitEUR} {
+		if math.IsNaN(v) || math.IsInf(v, 0) || v < 0 || v > 9e12 || (v > 0 && v < 0.01) {
+			return fmt.Errorf("%s must be 0 (not shown) or a finite EUR amount from 0.01 through 9000000000000", name)
+		}
 	}
 	if err := c.ClientIPPolicy().Validate(); err != nil {
 		return err

@@ -77,6 +77,28 @@ func (h *Handlers) orderLimitFor(ctx context.Context, name, country, currency st
 	return base.WithMarginFloor(pct)
 }
 
+// orderLimitKnown is orderLimitFor without the supplier call: the ceiling
+// with the family's observed fee folded in when it has already been
+// measured (a product page or a quote priced it in the last 15 minutes),
+// otherwise the configured one. For surfaces that list many families.
+func (h *Handlers) orderLimitKnown(name, country string) catalog.OrderLimit {
+	base := h.orderLimit()
+	if !base.Enabled() {
+		return base
+	}
+	name = strings.TrimSpace(name)
+	country = strings.ToUpper(strings.TrimSpace(country))
+	if name == "" || len(country) != 2 {
+		return base
+	}
+	if cached, ok := h.cache.get("margin:" + country + "|" + strings.ToLower(name)); ok {
+		if pct, ok := cached.(float64); ok {
+			return base.WithMarginFloor(pct)
+		}
+	}
+	return base
+}
+
 // observeSupplierMargin prices one face value at the supplier and returns
 // the fee it implies, in percent of face, rounded UP to one decimal plus
 // the drift headroom.

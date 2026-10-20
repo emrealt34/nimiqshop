@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Icon } from '../ui/Icon';
 import { isValidEmail, confirmMatches } from '../../lib/validate';
 import { clearGiftExtras, setGiftExtras, setGiftIdenticon, collectPhoneValue } from '../../lib/delivery';
@@ -13,6 +13,9 @@ import { CashbackCodeField } from '../cashback/CashbackCodeField';
 import { useGiftNote } from './DeliverySteps';
 import type { DeliveryInfo } from '../../lib/delivery';
 import { useT, t as tr } from '../../i18n';
+import { getSupplierLimits } from '../../lib/api';
+import type { SupplierLimits } from '../../lib/api';
+import { fmtMoney } from '../../lib/format';
 
 function preloadGiftAvatar() {
   const addr = getAddress();
@@ -35,11 +38,15 @@ export function CombinedDeliveryPicker({
   items = [],
   onDone,
   onBack,
+  notice = '',
 }: {
   /** The cart lines being bought — decides which contact fields are shown. */
   items?: CartItem[];
   onDone: (info: DeliveryInfo) => void;
   onBack: () => void;
+  /** Why the buyer is back on this step (the payment partner's budget for
+   *  the previous delivery email is used up) — shown above the fields. */
+  notice?: string;
 }) {
   // ROOT RULE: a line delivered by_phone needs a NUMBER, everything else an EMAIL.
   const tops = items.filter((it) => needsPhone(it));
@@ -51,6 +58,19 @@ export function CombinedDeliveryPicker({
   const { on: gift, setOn: setGift } = api;
   const [myEmail, setMyEmail] = useState('');
   const [giftEmail, setGiftEmail] = useState('');
+  // The payment partner's rule per delivery email, stated where the email is
+  // typed: per-order ceiling, daily and monthly budgets (fees included,
+  // unpaid orders count). Live 2026-10-20: a buyer learned it only from a
+  // refusal on the last step.
+  const [limits, setLimits] = useState<SupplierLimits | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    getSupplierLimits().then((l) => { if (!cancelled) setLimits(l); });
+    return () => { cancelled = true; };
+  }, []);
+  const limitsHint = limits && limits.totalEur > 0 && limits.dailyEur > 0 && limits.monthlyEur > 0
+    ? t('delivery.cdpSupplierLimitsHint', { perOrder: fmtMoney(limits.totalEur, 'EUR'), daily: fmtMoney(limits.dailyEur, 'EUR'), monthly: fmtMoney(limits.monthlyEur, 'EUR') })
+    : '';
   const [selfError, setSelfError] = useState('');
   const [phones, setPhones] = useState<string[]>(() => tops.map(() => ''));
   const [phoneErr, setPhoneErr] = useState<string[]>(() => tops.map(() => ''));
@@ -260,6 +280,11 @@ export function CombinedDeliveryPicker({
         );
       })}
 
+      {notice && (
+        <div role="alert" className="alert error" data-testid="delivery-email-notice" style={{ textAlign: 'left', marginBottom: 12, overflowWrap: 'anywhere' }}>
+          <div className="small">{notice}</div>
+        </div>
+      )}
       {gift ? (
         <div style={{ display: 'grid', gap: 10, marginBottom: 14 }}>
           {hasEmail && <div className="note-box info gift-support-notice"><Icon name="info" size={15} /><span>{t('email.giftSupportNotice')}</span></div>}
@@ -360,6 +385,7 @@ export function CombinedDeliveryPicker({
           <div className="small muted" style={{ marginTop: 6, display: 'flex', gap: 6, alignItems: 'flex-start', background: 'var(--paper-tint)', border: '1px dashed rgba(78,61,40,.25)', borderRadius: 8, padding: '8px 10px' }}>
             <span>⚠️</span><span>{hasEmail ? t('delivery.cdpCodeToEmail') : t('delivery.cdpReceiptToEmail')}</span>
           </div>
+          {limitsHint && <div className="xs faint" data-testid="delivery-limits-hint" style={{ marginTop: 6, lineHeight: 1.45 }}>{limitsHint}</div>}
           {selfError && <div className="small" style={{ color: 'var(--stamp)', marginTop: 6 }}>{selfError}</div>}
         </div>
       )}

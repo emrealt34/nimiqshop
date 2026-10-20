@@ -19,6 +19,14 @@
     "scope": "order",
     "message": "This order is above the Cryptorefills limit for Lightning payments: a per-order ceiling on the order total (including its fee), plus daily and monthly ceilings for the delivery email. Reduce the amount or the quantity before trying again."
   },
+  "LIGHTNING_DAILY_LIMIT_EXCEEDED": {
+    "scope": "account",
+    "message": "The payment partner's daily Lightning budget for this delivery email is used up. Every order placed today with this email counts, paid or not, until the day rolls over. Pay the pending order instead of opening another one, use a different delivery email, or try again tomorrow."
+  },
+  "LIGHTNING_MONTHLY_LIMIT_EXCEEDED": {
+    "scope": "account",
+    "message": "The payment partner's monthly Lightning budget for this delivery email is used up. Every order placed this month with this email counts, paid or not, until the month rolls over. Use a different delivery email or wait for the new month."
+  },
   "PRODUCT_COUNT_EXCEEDED": {
     "scope": "order",
     "message": "The cart contains more products than allowed in one order. Reduce the product quantity before trying again."

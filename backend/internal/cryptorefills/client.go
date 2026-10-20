@@ -727,6 +727,10 @@ type RangeCap struct {
 	Reason string `json:"reason"`
 	// TotalEUR is the supplier's per-order ceiling on the order total.
 	TotalEUR float64 `json:"total_eur"`
+	// DailyEUR and MonthlyEUR are the delivery email's budgets under the
+	// same rule (0 = not stated): the storefront shows the whole rule.
+	DailyEUR   float64 `json:"daily_eur,omitempty"`
+	MonthlyEUR float64 `json:"monthly_eur,omitempty"`
 	// SupplierMax is the maximum the supplier lists for the range, in the
 	// range currency, before the clamp.
 	SupplierMax float64 `json:"supplier_max"`

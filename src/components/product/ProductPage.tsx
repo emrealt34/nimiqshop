@@ -170,15 +170,18 @@ type ProductDetail = {
 
 /** Why a range stops short of the supplier's own maximum. Today the only
  *  reason the backend sends is the payment partner's per-order ceiling on
- *  Lightning orders (order total incl. its fee) — see catalog.OrderLimit. */
-export type RangeCap = { reason: string; total_eur: number; supplier_max: number };
+ *  Lightning orders (order total incl. its fee) — see catalog.OrderLimit.
+ *  daily_eur / monthly_eur are the same partner's budgets per delivery
+ *  email, which the page states so the buyer learns the whole rule before
+ *  the last step (live 2026-10-20: a second $104 order with the same email
+ *  was refused by the daily budget). */
+export type RangeCap = { reason: string; total_eur: number; supplier_max: number; daily_eur: number; monthly_eur: number };
 
 function rangeCap(raw: unknown): RangeCap | null {
   const c = raw && typeof raw === 'object' ? raw as Record<string, unknown> : null;
   if (!c || typeof c.reason !== 'string') return null;
-  const total = Number(c.total_eur);
-  const supplierMax = Number(c.supplier_max);
-  return { reason: c.reason, total_eur: Number.isFinite(total) ? total : 0, supplier_max: Number.isFinite(supplierMax) ? supplierMax : 0 };
+  const num = (v: unknown) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : 0; };
+  return { reason: c.reason, total_eur: num(c.total_eur), supplier_max: num(c.supplier_max), daily_eur: num(c.daily_eur), monthly_eur: num(c.monthly_eur) };
 }
 
 function familyToProduct(family: any, fallbackId: string, countryParam: string): ProductDetail | null {
@@ -1094,6 +1097,9 @@ function RangeChooser({
       {range.cap?.reason === 'supplier_order_limit' && range.cap.total_eur > 0 && (
         <div className="xs faint range-cap-note" data-testid="range-cap-note" style={{ marginTop: '6px', lineHeight: 1.45 }}>
           {t('productPage.rangeCapSupplier', { max: fmtMoney(range.max, rangeCur), total: fmtMoney(range.cap.total_eur, 'EUR') })}
+          {range.cap.daily_eur > 0 && range.cap.monthly_eur > 0 && (
+            <> {t('productPage.rangeCapSupplierEmail', { daily: fmtMoney(range.cap.daily_eur, 'EUR'), monthly: fmtMoney(range.cap.monthly_eur, 'EUR') })}</>
+          )}
         </div>
       )}
       <input

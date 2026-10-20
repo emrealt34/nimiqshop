@@ -505,7 +505,7 @@ func (h *Handlers) createQuoteBatchInner(ctx *fasthttp.RequestCtx, userID string
 				return
 			}
 		}
-		h.supplierError(ctx, err, "the cart could not be validated as one order")
+		h.supplierError(ctx, h.withEmailLimitContext(err, userID, req.Email, time.Now()), "the cart could not be validated as one order")
 		return
 	}
 	liveUSD, priceErr := quotedUSD(validateRes.CoinAmount, req.PaymentMethod, currentRates().btcUSD, totalUSD, allPricesKnown)
@@ -635,7 +635,7 @@ func (h *Handlers) createQuoteBatchInner(ctx *fasthttp.RequestCtx, userID string
 	}
 	order, err := h.CR.CreateOrder(h.supplierContext(ctx), orderReq)
 	if err != nil {
-		h.supplierCreateFailed(ctx, q, err)
+		h.supplierCreateFailed(ctx, q, h.withEmailLimitContext(err, userID, req.Email, time.Now()))
 		return
 	}
 	if !faceTotalsComplete {

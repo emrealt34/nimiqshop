@@ -170,3 +170,59 @@ test('every catalogue code has a buyer-facing sentence (no raw i18n keys, no gen
     assert.ok(out.length > 20, `${code}: ${out}`);
   }
 });
+
+/* ---- supplier per-email budgets (live bug of 2026-10-20, Walmart US $104) --
+ * The second order with the same delivery email, while the first was unpaid,
+ * was refused with LIGHTNING_DAILY_LIMIT_EXCEEDED — a code the storefront did
+ * not know, so the buyer read "could not approve this request. Review the
+ * order and contact support". The backend now also appends `shop`: the
+ * buyer's own orders that are holding the budget. */
+
+const liveDaily = {
+  code: 'SUPPLIER_PROBLEMS', error: 'x', supplier_error: true, upstream_status: 422,
+  problems: [{ problem: 'LIGHTNING_DAILY_LIMIT_EXCEEDED', moreDetails: {
+    kyc_level: 'NOT_REGISTERED',
+    limits: { daily: { amount: 100, currency: 'EUR' }, monthly: { amount: 300, currency: 'EUR' }, per_order: { amount: 100, currency: 'EUR' } },
+    next_level_limits: { daily: { amount: 250, currency: 'EUR' }, monthly: { amount: 1000, currency: 'EUR' }, per_order: { amount: 100, currency: 'EUR' } },
+    order_total: { amount: 97.6957, currency: 'EUR' }, spent_today: { amount: 97.6957, currency: 'EUR' }, spent_this_month: { amount: 97.6957, currency: 'EUR' },
+    usd: { limits: { daily: { amount: 112.434, currency: 'USD' }, monthly: { amount: 337.302, currency: 'USD' }, per_order: { amount: 112.434, currency: 'USD' } }, order_total: { amount: 109.8432, currency: 'USD' } },
+    shop: { email: 'buyer@example.com', period: 'daily', pending_count: 1, counted_total_usd: 109.84, orders: [{
+      quote_id: '8d6b7a55-e921-482a-8003-bfa229e09a2c', product_id: 'Walmart', country: 'US', denomination: 'range',
+      product_value: 104, product_currency: 'USD', quantity: 1, status: 'awaiting_payment',
+      created_at: '2026-10-20T19:26:04Z', payment_expiry: '2026-10-20T19:41:04Z', total_usd: 109.8432, pending: true,
+    }] },
+  } }],
+};
+
+test('the live daily refusal names the email, the day budget, the numbers and the unpaid order holding it', () => {
+  const out = say(new ApiError(409, 'x', 'SUPPLIER_PROBLEMS', liveDaily));
+  assert.match(out, /buyer@example\.com/, 'the delivery email the budget belongs to');
+  assert.match(out, /€100/, 'the daily budget');
+  assert.match(out, /€97\.70/, 'already counted / this order');
+  assert.match(out, /Walmart/, 'the pending order by name');
+  assert.match(out, /\$104/, 'its face value');
+  assert.match(out, /\$109\.84/, 'what it holds of the budget, fee included');
+  assert.match(out, /paid or not|whether or not/i, 'unpaid orders count');
+  assert.doesNotMatch(out, /could not approve|contact support|undefined|NaN/i);
+});
+
+test('a monthly refusal without shop context still blames the month with the numbers', () => {
+  const body = { supplier_error: true, code: 'SUPPLIER_PROBLEMS', problems: [{ problem: 'LIGHTNING_MONTHLY_LIMIT_EXCEEDED', moreDetails: {
+    limits: { daily: { amount: 100, currency: 'EUR' }, monthly: { amount: 300, currency: 'EUR' }, per_order: { amount: 100, currency: 'EUR' } },
+    order_total: { amount: 60, currency: 'EUR' }, spent_today: { amount: 0, currency: 'EUR' }, spent_this_month: { amount: 280, currency: 'EUR' },
+  } }] };
+  const out = say(new ApiError(409, 'x', 'SUPPLIER_PROBLEMS', body));
+  assert.match(out, /€300/, 'the monthly budget');
+  assert.match(out, /€280/, 'already counted this month');
+  assert.match(out, /month/i);
+  assert.doesNotMatch(out, /today|could not approve/i);
+});
+
+test('the daily and monthly codes without any details still get their own specific sentence', () => {
+  for (const code of ['LIGHTNING_DAILY_LIMIT_EXCEEDED', 'LIGHTNING_MONTHLY_LIMIT_EXCEEDED']) {
+    const out = say(new ApiError(409, 'x', 'SUPPLIER_PROBLEMS', { supplier_error: true, code: 'SUPPLIER_PROBLEMS', problems: [{ problem: code }] }));
+    assert.match(out, code.includes('DAILY') ? /daily/i : /monthly/i, code);
+    assert.match(out, /delivery email/i, code);
+    assert.doesNotMatch(out, /could not approve|supplier\./i, code);
+  }
+});

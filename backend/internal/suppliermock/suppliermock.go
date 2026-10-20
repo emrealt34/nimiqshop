@@ -19,8 +19,11 @@
 //	                   "force_fail_delivery":true,"payment_window_ms":60000,
 //	                   "webhook_base_url":"http://127.0.0.1:PORT",
 //	                   "webhook_key":"...",
-//	                   "lightning_limit_eur":100,   validations above it answer
-//	                                                422 LIGHTNING_ORDER_LIMIT_EXCEEDED like production
+//	                   "lightning_limit_eur":100,   validations/creations answer 422
+//	                                                LIGHTNING_ORDER_LIMIT_EXCEEDED above it, and
+//	                                                LIGHTNING_DAILY/MONTHLY_LIMIT_EXCEEDED once the
+//	                                                delivery email's orders (paid or not) exceed
+//	                                                it per day / three times it per month
 //	                   "java_decimals":true,        every coin_amount is written the way
 //	                                                Java's BigDecimal.toString() writes it
 //	                                                ("5.2E-7" below 100 sats; seen live 2026-10-20)
@@ -99,6 +102,12 @@ type mockState struct {
 	orders   map[string]*order
 	faults   map[string]interface{}
 	webhooks []string
+	// emailSpent mirrors the supplier's per-email Lightning ledger under
+	// the lightning_limit_eur fault: the order total (fee included) of
+	// EVERY order created for a delivery email, paid or not — exactly what
+	// made a second 104 USD Walmart order with the same email fail live
+	// with LIGHTNING_DAILY_LIMIT_EXCEEDED on 2026-10-20.
+	emailSpent map[string]float64
 	// javaDecimals mirrors faults["java_decimals"] lock-free: wireDecimal
 	// runs inside publicOrder, which callers invoke with m.mu held, and a
 	// faultBool() there would deadlock on the non-reentrant mutex.
@@ -107,8 +116,9 @@ type mockState struct {
 
 func newState() *mockState {
 	return &mockState{
-		orders: map[string]*order{},
-		faults: map[string]interface{}{},
+		orders:     map[string]*order{},
+		faults:     map[string]interface{}{},
+		emailSpent: map[string]float64{},
 	}
 }
 
@@ -989,6 +999,88 @@ func beneficiaryProblem(p *productDef, beneficiary string) map[string]interface{
 	return nil
 }
 
+// orderEmail is the delivery email of a create/validation payload (the
+// identity the supplier's Lightning budgets are kept under).
+func orderEmail(body []byte) string {
+	var req struct {
+		Email string `json:"email"`
+		User  struct {
+			Email string `json:"email"`
+		} `json:"user"`
+	}
+	_ = json.Unmarshal(body, &req)
+	email := strings.TrimSpace(req.Email)
+	if email == "" {
+		email = strings.TrimSpace(req.User.Email)
+	}
+	return strings.ToLower(email)
+}
+
+// lightningLimitRefused replays the supplier's per-email Lightning rule
+// under the lightning_limit_eur fault, exactly as production answered on
+// 2026-10-20 (HTTP 422, one problem with the limits/order_total/spent
+// block): the order total (face × 1.0404, the mock's USD total standing in
+// for EUR) must fit the per-order ceiling, then today's budget (the same
+// amount) and the month's (three times it) — both already charged with
+// every earlier order for that email, paid or not. Returns true when the
+// refusal was written.
+func (m *mockState) lightningLimitRefused(w http.ResponseWriter, body []byte, total float64) bool {
+	limit := m.faultFloat("lightning_limit_eur")
+	if limit <= 0 {
+		return false
+	}
+	orderTotal := total * 1.0404
+	daily, monthly := limit, limit*3
+	email := orderEmail(body)
+	m.mu.Lock()
+	spent := m.emailSpent[email]
+	m.mu.Unlock()
+	var problem string
+	switch {
+	case orderTotal > limit:
+		problem = "LIGHTNING_ORDER_LIMIT_EXCEEDED"
+	case email != "" && spent+orderTotal > daily:
+		problem = "LIGHTNING_DAILY_LIMIT_EXCEEDED"
+	case email != "" && spent+orderTotal > monthly:
+		problem = "LIGHTNING_MONTHLY_LIMIT_EXCEEDED"
+	default:
+		return false
+	}
+	money := func(v float64) map[string]interface{} { return map[string]interface{}{"amount": v, "currency": "EUR"} }
+	usd := func(v float64) map[string]interface{} {
+		return map[string]interface{}{"amount": v * 1.1235, "currency": "USD"}
+	}
+	writeJSON(w, 422, map[string]interface{}{"problems": []map[string]interface{}{{
+		"problem": problem,
+		"moreDetails": map[string]interface{}{
+			"kyc_level":         "NOT_REGISTERED",
+			"limits":            map[string]interface{}{"per_order": money(limit), "daily": money(daily), "monthly": money(monthly)},
+			"next_level_limits": map[string]interface{}{"per_order": money(limit), "daily": money(limit * 2.5), "monthly": money(limit * 10)},
+			"order_total":       money(orderTotal),
+			"spent_today":       money(spent),
+			"spent_this_month":  money(spent),
+			"usd": map[string]interface{}{
+				"limits":           map[string]interface{}{"per_order": usd(limit), "daily": usd(daily), "monthly": usd(monthly)},
+				"order_total":      usd(orderTotal),
+				"spent_today":      usd(spent),
+				"spent_this_month": usd(spent),
+			},
+		},
+	}}})
+	return true
+}
+
+// recordEmailSpend charges a created order to its delivery email's ledger.
+func (m *mockState) recordEmailSpend(body []byte, total float64) {
+	email := orderEmail(body)
+	if email == "" {
+		return
+	}
+	m.mu.Lock()
+	m.emailSpent[email] += total * 1.0404
+	m.mu.Unlock()
+}
+
 func looksLikeEmail(s string) bool {
 	return strings.Contains(s, "@") && strings.Contains(s, ".") && !strings.ContainsAny(s, " \t")
 }
@@ -1077,7 +1169,8 @@ func (m *mockState) parseDeliveries(body []byte) ([]delivery, string, string, er
 }
 
 func (m *mockState) validations(w http.ResponseWriter, r *http.Request) {
-	deliveries, coin, network, err := m.parseDeliveries(readJSONBody(r))
+	body := readJSONBody(r)
+	deliveries, coin, network, err := m.parseDeliveries(body)
 	if err != nil {
 		problem := "INVALID_REQUEST"
 		if strings.HasPrefix(err.Error(), "unknown product") {
@@ -1116,29 +1209,8 @@ func (m *mockState) validations(w http.ResponseWriter, r *http.Request) {
 	// LIGHTNING_ORDER_LIMIT_EXCEEDED with the limits/order_total block), so
 	// the backend's translation of that refusal is tested against the real
 	// shape. The mock's USD face total stands in for the EUR order total.
-	if limit := m.faultFloat("lightning_limit_eur"); limit > 0 {
-		if orderTotal := total * 1.0404; orderTotal > limit {
-			money := func(v float64) map[string]interface{} { return map[string]interface{}{"amount": v, "currency": "EUR"} }
-			usd := func(v float64) map[string]interface{} {
-				return map[string]interface{}{"amount": v * 1.1235, "currency": "USD"}
-			}
-			writeJSON(w, 422, map[string]interface{}{"problems": []map[string]interface{}{{
-				"problem": "LIGHTNING_ORDER_LIMIT_EXCEEDED",
-				"moreDetails": map[string]interface{}{
-					"kyc_level":         "NOT_REGISTERED",
-					"limits":            map[string]interface{}{"per_order": money(limit), "daily": money(limit), "monthly": money(limit * 3)},
-					"next_level_limits": map[string]interface{}{"per_order": money(limit), "daily": money(limit * 2.5), "monthly": money(limit * 10)},
-					"order_total":       money(orderTotal),
-					"spent_today":       money(0),
-					"spent_this_month":  money(0),
-					"usd": map[string]interface{}{
-						"limits":      map[string]interface{}{"per_order": usd(limit), "daily": usd(limit), "monthly": usd(limit * 3)},
-						"order_total": usd(orderTotal),
-					},
-				},
-			}}})
-			return
-		}
+	if m.lightningLimitRefused(w, body, total) {
+		return
 	}
 	// Real pricing in the validation too — the same live-rate conversion as
 	// the price endpoint, so a validated order and its quote never disagree.
@@ -1156,7 +1228,8 @@ func (m *mockState) validations(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *mockState) createOrder(w http.ResponseWriter, r *http.Request) {
-	deliveries, coin, network, err := m.parseDeliveries(readJSONBody(r))
+	body := readJSONBody(r)
+	deliveries, coin, network, err := m.parseDeliveries(body)
 	if err != nil {
 		code := "INVALID_REQUEST"
 		if strings.HasPrefix(err.Error(), "unknown product") {
@@ -1193,6 +1266,13 @@ func (m *mockState) createOrder(w http.ResponseWriter, r *http.Request) {
 		// A product flagged `fails` is not failed here: delivery failure is
 		// exercised explicitly via /advance + force_fail.
 	}
+	// The same per-email ceilings as the dry run — the real supplier checks
+	// them again at creation — and, once the order exists, it counts
+	// against the email whether or not it is ever paid.
+	if m.lightningLimitRefused(w, body, total) {
+		return
+	}
+	m.recordEmailSpend(body, total)
 	// Real pricing on the order itself: USD total (fee included) converted
 	// through the live coin rate. The invoice_price_multiplier fault applies
 	// on the USD side, then converts — same as a supplier repricing.
@@ -1397,6 +1477,7 @@ func (m *mockState) control(w http.ResponseWriter, r *http.Request) {
 		m.mu.Lock()
 		m.orders = map[string]*order{}
 		m.faults = map[string]interface{}{}
+		m.emailSpent = map[string]float64{}
 		m.javaDecimals.Store(false)
 		m.webhooks = nil
 		m.requests = nil

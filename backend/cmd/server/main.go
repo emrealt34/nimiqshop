@@ -1129,6 +1129,7 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 	// directory moves on a supplier timescale, and a stale directory is a
 	// strictly better storefront than a spinner.
 	r.GET("/api/catalog/brands", wrap(publicCached(600, 3600, h.ListBrands)))
+	r.GET("/api/catalog/limits", wrap(publicCached(600, 3600, h.CatalogLimits)))
 	r.GET("/api/catalog/unavailable", wrap(h.UnavailableFamilies))
 	r.GET("/api/catalog/products", wrap(publicCached(300, 1800, h.GetFamily)))
 	// Price is the one catalog field that must not go stale for long: it is

@@ -13,6 +13,7 @@
 package catalog
 
 import (
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -233,4 +234,53 @@ var countryCurrency = map[string]string{
 // when the country is unknown. DISPLAY ONLY — see countryCurrency.
 func CurrencyForCountry(country string) string {
 	return countryCurrency[strings.ToUpper(strings.TrimSpace(country))]
+}
+
+// ClampMoneyLabel rewrites a supplier min/max label ("$500", "¥16,926",
+// "150.000 IDR", "5 000 ₽") so that it reads the largest whole amount of
+// its currency whose USD value fits capUSD, keeping the label's own symbol
+// placement and digit grouping. "" when the label is not a money label or
+// the cap leaves no whole unit.
+func ClampMoneyLabel(label string, capUSD float64, code string) string {
+	code = strings.ToUpper(strings.TrimSpace(code))
+	if capUSD <= 0 || !CurrencyKnown(code) {
+		return ""
+	}
+	capLocal := math.Floor(capUSD / usdRateOr(code))
+	if capLocal < 1 {
+		return ""
+	}
+	raw := strings.TrimSpace(label)
+	prefix, suffix := "", ""
+	if m := moneyPrefix.FindStringSubmatch(raw); m != nil {
+		prefix = m[0]
+		raw = raw[len(m[0]):]
+	} else if m := moneySuffix.FindStringSubmatch(raw); m != nil {
+		suffix = m[0]
+		raw = raw[:len(raw)-len(m[0])]
+	}
+	if !moneyNumber.MatchString(raw) {
+		return ""
+	}
+	// Reuse the label's thousands separator when it had one (a separator
+	// followed by exactly three digits), else write plain digits.
+	sep := ""
+	for _, cand := range []string{",", ".", " ", "\u00A0", "\u202F"} {
+		if i := strings.Index(raw, cand); i > 0 && len(raw)-i-len(cand) == 3 {
+			sep = cand
+			break
+		}
+	}
+	digits := strconv.FormatInt(int64(capLocal), 10)
+	if sep != "" {
+		var b strings.Builder
+		for i, r := range digits {
+			if i > 0 && (len(digits)-i)%3 == 0 {
+				b.WriteString(sep)
+			}
+			b.WriteRune(r)
+		}
+		digits = b.String()
+	}
+	return prefix + digits + suffix
 }

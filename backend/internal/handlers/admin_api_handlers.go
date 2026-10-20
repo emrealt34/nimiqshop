@@ -1242,6 +1242,8 @@ func (h *Handlers) AdminCatalogLimits(ctx *fasthttp.RequestCtx) {
 		"supplier_order_limit": map[string]any{
 			"enabled":          limit.Enabled(),
 			"total_eur":        limit.TotalEUR,
+			"daily_eur":        limit.DailyEUR,
+			"monthly_eur":      limit.MonthlyEUR,
 			"margin_pct":       limit.MarginPct,
 			"face_cap_eur":     limit.FaceCapEUR(),
 			"face_cap_usd":     limit.FaceCapUSD(),

@@ -1,4 +1,4 @@
-import { supplierIssues, type SupplierIssue } from '../../lib/supplierProblems';
+import { supplierIssues, type SupplierIssue, lightningLimitPeriod, parseEmailBudget } from '../../lib/supplierProblems';
 import { SupplierProblemNotice } from './SupplierProblemNotice';
 import { CashbackFeeNotice } from './CashbackFeeNotice';
 import { selectionPayload } from '../../lib/productMoney';
@@ -61,7 +61,7 @@ import { asset, pagePath } from '../../lib/asset';
 import { normalizePath } from '../../lib/router';
 
 type Phase =
-  | { kind: 'delivery' }
+  | { kind: 'delivery'; notice?: string }
   | { kind: 'pick-payment'; info: DeliveryInfo }
   | { kind: 'preparing'; label: string }
   | { kind: 'batch-pay'; quote: any; items: CartItem[] }
@@ -535,7 +535,7 @@ export function CheckoutFlow({
               return;
             }
             // Generic batch failure
-            const c = await new Promise<'retry' | 'onebyone' | 'stop' | 'force'>((resolve) => {
+            const c = await new Promise<'retry' | 'onebyone' | 'stop' | 'force' | 'email'>((resolve) => {
               setPhase({ kind: 'batch-failed', message: batchErr || t('checkout.flowBatchUnconfirmed'), detail: batchDetail, activeCheckout: batchActiveCheckout, items, issues: batchIssues });
               (window as any).__promptResolver = (x: any) => resolve(x);
             });
@@ -543,6 +543,12 @@ export function CheckoutFlow({
             if (c === 'retry') {
               await tryBatch();
               continue;
+            }
+            if (c === 'email') {
+              setActiveItems(items);
+              flowRef.current.started = false;
+              setPhase({ kind: 'delivery', notice: t('delivery.cdpEmailBudgetUsed', { email: emailBudgetEmail(batchIssues) || info.email.trim() }) });
+              return;
             }
             if (c === 'force') {
               // "Continue anyway" is not a promise that a second payment is
@@ -676,7 +682,15 @@ export function CheckoutFlow({
             // SUPPLIER_ORDER_LIMIT is the shop's own gate (the supplier caps a
             // Lightning order at €100 in total): deterministic, so the screen
             // must not offer "reopen / retry" — only a smaller amount can pass.
-            qReason = qCode === 'ACTIVE_CHECKOUT' ? 'active-checkout' : qCode === 'SUPPLIER_ORDER_LIMIT' ? 'order-limit' : qIssues.length ? 'supplier' : 'quote';
+            // The supplier's own per-email budgets (daily / monthly, fee
+            // included, unpaid orders count) are just as deterministic:
+            // the way forward is paying the pending order or another
+            // delivery email, never "reopen the checkout".
+            const qPeriod = lightningLimitPeriod(qIssues);
+            qReason = qCode === 'ACTIVE_CHECKOUT' ? 'active-checkout'
+              : qCode === 'SUPPLIER_ORDER_LIMIT' ? 'order-limit'
+              : qPeriod === 'daily' || qPeriod === 'monthly' ? 'email-limit'
+              : qIssues.length ? 'supplier' : 'quote';
             if (qReason === 'active-checkout') rememberBlockingCheckout(e);
             qErr = qLimit
               ? limitSentence(qLimit, it.name)
@@ -701,12 +715,21 @@ export function CheckoutFlow({
               stop = true;
               continue;
             }
-            const c = await new Promise<'retry' | 'skip' | 'stop' | 'force'>((resolve) => {
+            const c = await new Promise<'retry' | 'skip' | 'stop' | 'force' | 'email'>((resolve) => {
               setPhase({ kind: 'item-failed', it, reason: qReason, msg: qErr, detail: qDetail, index: i, total: items.length, paidCount: paidIdx.length, issues: qIssues });
               (window as any).__promptResolver = (x: any) => resolve(x);
             });
             (window as any).__promptResolver = undefined;
             if (c === 'retry') continue;
+            if (c === 'email') {
+              // Back to the delivery step with the reason on it: the budget
+              // belongs to the address, so a different address is a new
+              // budget. Nothing is resubmitted until the buyer confirms.
+              setActiveItems(items);
+              flowRef.current.started = false;
+              setPhase({ kind: 'delivery', notice: t('delivery.cdpEmailBudgetUsed', { email: emailBudgetEmail(qIssues) || info.email.trim() }) });
+              return;
+            }
             if (c === 'force') {
               const prior = await blockingCheckoutPaid();
               if (prior.paid) {
@@ -856,7 +879,7 @@ export function CheckoutFlow({
   return (
     <div>
       {phase.kind === 'delivery' && (
-        <CombinedDeliveryPicker items={activeItems} onDone={onDeliveryDone} onBack={onClose} />
+        <CombinedDeliveryPicker items={activeItems} onDone={onDeliveryDone} onBack={onClose} notice={phase.notice} />
       )}
       {phase.kind === 'preparing' && <Preparing label={phase.label} />}
       {phase.kind === 'batch-pay' && (
@@ -874,7 +897,7 @@ export function CheckoutFlow({
         />
       )}
       {phase.kind === 'batch-failed' && (
-        <FailurePrompt issues={phase.issues} message={phase.message} detail={phase.detail} activeCheckout={phase.activeCheckout} items={phase.items} onChoice={(c) => resolvePrompt(c)} onBackToCart={onClose} />
+        <FailurePrompt issues={phase.issues} message={phase.message} detail={phase.detail} activeCheckout={phase.activeCheckout} items={phase.items} onChoice={(c) => (c === 'orders' ? goToOrders() : resolvePrompt(c))} onBackToCart={onClose} />
       )}
       {phase.kind === 'batch-blocked' && (
         <BlockedPrompt issues={phase.issues} blocked={phase.blocked} items={phase.items} onChoice={(c) => resolvePrompt(c)} />
@@ -890,7 +913,7 @@ export function CheckoutFlow({
         />
       )}
       {phase.kind === 'item-failed' && (
-        <ItemFailedPrompt issues={phase.issues} it={phase.it} reason={phase.reason} msg={phase.msg} index={phase.index} total={phase.total} paidCount={phase.paidCount} onChoice={(c) => resolvePrompt(c)} onBackToCart={onClose} />
+        <ItemFailedPrompt issues={phase.issues} it={phase.it} reason={phase.reason} msg={phase.msg} index={phase.index} total={phase.total} paidCount={phase.paidCount} onChoice={(c) => (c === 'orders' ? goToOrders() : resolvePrompt(c))} onBackToCart={onClose} />
       )}
       {phase.kind === 'already-paid' && (
         <AlreadyPaidPhase
@@ -1314,12 +1337,28 @@ function PerItemPayPhase({ quote, name, qty = 1, index, total, paidCount, onResu
   return <PayScreen quote={quote} name={name} stepNote={stepNote} youGetLabel={[name, youGetText({ ...quote, quantity: quote.quantity || qty })].filter(Boolean).join(' · ')} onResult={onResult} />;
 }
 
-function FailurePrompt({ issues = [], message, detail = '', activeCheckout = false, items = [], onChoice, onBackToCart }: { issues?: SupplierIssue[]; message: string; detail?: string; activeCheckout?: boolean; items?: CartItem[]; onChoice: (c: 'retry' | 'onebyone' | 'stop' | 'force') => void; onBackToCart: () => void }) {
+function FailurePrompt({ issues = [], message, detail = '', activeCheckout = false, items = [], onChoice, onBackToCart }: { issues?: SupplierIssue[]; message: string; detail?: string; activeCheckout?: boolean; items?: CartItem[]; onChoice: (c: 'retry' | 'onebyone' | 'stop' | 'force' | 'email' | 'orders') => void; onBackToCart: () => void }) {
   const { t } = useT();
   const productLabel = items.length === 1 ? items[0].name : items.length > 1 ? t('checkout.flowTheseItems') : t('checkout.flowYourCart');
   const displayMessage = activeCheckout
     ? t('checkout.flowActiveCheckoutPrice', { name: productLabel })
     : message;
+  // The payment partner's budget for the delivery email is used up: the
+  // sentence above already names the numbers and the pending order; the
+  // buttons are the two honest ways forward.
+  const emailLimit = emailLimitChoices(issues);
+  if (emailLimit) {
+    return (
+      <div className="center" style={{ padding: '26px 10px', textAlign: 'center' }} data-testid="email-limit-prompt">
+        <div style={{ width: 52, height: 52, margin: '0 auto 12px', borderRadius: '50%', background: 'var(--stamp-soft, #f6e3dc)', display: 'grid', placeItems: 'center', color: 'var(--stamp, #c7481d)' }}>
+          <Icon name="alert" size={28} />
+        </div>
+        <div className="strong">{t('checkout.flowCheckoutPaused')}</div>
+        <SupplierProblemNotice issues={issues} actions={false} />
+        <EmailLimitButtons pending={emailLimit.pending} onOrders={() => onChoice('orders')} onEmail={() => onChoice('email')} onBackToCart={onBackToCart} onStop={() => onChoice('stop')} />
+      </div>
+    );
+  }
   return (
     <div className="center" style={{ padding: '26px 10px', textAlign: 'center' }}>
       <div style={{ width: 52, height: 52, margin: '0 auto 12px', borderRadius: '50%', background: 'var(--stamp-soft, #f6e3dc)', display: 'grid', placeItems: 'center', color: 'var(--stamp, #c7481d)' }}>
@@ -1434,6 +1473,49 @@ function takeLastPayDetail(): string {
   return detail;
 }
 
+/** Whether a refusal is the payment partner's per-email budget (daily or
+ *  monthly) and whether the shop knows of a still-payable order holding it. */
+function emailLimitChoices(issues: SupplierIssue[]): { pending: boolean } | null {
+  const period = lightningLimitPeriod(issues);
+  if (period !== 'daily' && period !== 'monthly') return null;
+  const pending = issues.some((issue) => (parseEmailBudget(issue.moreDetails)?.orders || []).some((o) => o.pending));
+  return { pending };
+}
+
+/** The delivery email the backend says the budget belongs to, if it said. */
+function emailBudgetEmail(issues: SupplierIssue[]): string {
+  for (const issue of issues) {
+    const email = parseEmailBudget(issue.moreDetails)?.email;
+    if (email) return email;
+  }
+  return '';
+}
+
+function EmailLimitButtons({ pending, onOrders, onEmail, onBackToCart, onStop }: { pending: boolean; onOrders: () => void; onEmail: () => void; onBackToCart: () => void; onStop: () => void }) {
+  const { t } = useT();
+  return (
+    <>
+      <div style={{ maxWidth: 330, margin: '16px auto 0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {pending && (
+          <button type="button" className="btn btn-gold btn-block" data-testid="email-limit-open-orders" onClick={onOrders}>
+            {t('checkout.flowOpenOrdersPayPending')}
+          </button>
+        )}
+        <button type="button" className={pending ? 'btn btn-outline btn-block' : 'btn btn-gold btn-block'} data-testid="email-limit-change-email" onClick={onEmail}>
+          {t('checkout.flowChangeDeliveryEmail')}
+        </button>
+        <button type="button" className="btn btn-outline btn-block" onClick={onBackToCart}>
+          {t('checkout.flowBackToCartItem')}
+        </button>
+        <button type="button" className="btn btn-ghost btn-block" onClick={onStop}>
+          {t('checkout.flowFinishCheckout')}
+        </button>
+      </div>
+      <div className="xs faint mt-2">{t('checkout.flowUnfinishedStayEmail')}</div>
+    </>
+  );
+}
+
 function whyFor(reason: string, name: string, msg: string): string {
   if (isActiveCheckoutMessage(reason, msg)) {
     return tr('checkout.flowActiveCheckoutPrice', { name });
@@ -1448,6 +1530,7 @@ function whyFor(reason: string, name: string, msg: string): string {
   const map: Record<string, string> = {
     quote: tr('checkout.flowWhyQuote', { name, msg: suffix }),
     'order-limit': tr('checkout.flowWhyOrderLimit', { name, msg: clean }),
+    'email-limit': tr('checkout.flowWhyEmailLimit', { name }),
     expired: tr('checkout.flowWhyExpired', { name }),
     timeout: tr('checkout.flowWhyTimeout', { name }),
     failed: tr('checkout.flowWhyFailed', { name }),
@@ -1462,7 +1545,7 @@ function whyFor(reason: string, name: string, msg: string): string {
     updateRequired: tr('wallet.updatePayToast'),
   };
   const base = map[reason] || tr('checkout.flowWhyGeneric', { name });
-  if (reason === 'quote' || reason === 'order-limit' || !clean) return base;
+  if (reason === 'quote' || reason === 'order-limit' || reason === 'email-limit' || !clean) return base;
   return base + suffix;
 }
 
@@ -1568,7 +1651,7 @@ function LimitBar({ pct }: { pct: number }) {
   );
 }
 
-function ItemFailedPrompt({ issues = [], it, reason, msg, detail = '', index, total, paidCount, onChoice, onBackToCart }: { issues?: SupplierIssue[]; it: CartItem; reason: string; msg: string; detail?: string; index: number; total: number; paidCount: number; onChoice: (c: 'retry' | 'skip' | 'stop' | 'force') => void; onBackToCart: () => void }) {
+function ItemFailedPrompt({ issues = [], it, reason, msg, detail = '', index, total, paidCount, onChoice, onBackToCart }: { issues?: SupplierIssue[]; it: CartItem; reason: string; msg: string; detail?: string; index: number; total: number; paidCount: number; onChoice: (c: 'retry' | 'skip' | 'stop' | 'force' | 'email' | 'orders') => void; onBackToCart: () => void }) {
   const { t } = useT();
   const why = whyFor(reason, it.name, msg);
   const activeCheckout = isActiveCheckoutMessage(reason, msg);
@@ -1576,6 +1659,28 @@ function ItemFailedPrompt({ issues = [], it, reason, msg, detail = '', index, to
   // changing the amount in the cart is the only way forward.
   const orderLimit = reason === 'order-limit';
   const remaining = total - index - 1;
+  // The delivery email's daily/monthly budget at the payment partner is
+  // used up (unpaid orders included): retrying or skipping to the next line
+  // hits the same wall. Pay the pending order, or use another address.
+  const emailLimit = reason === 'email-limit' ? emailLimitChoices(issues) || { pending: false } : null;
+  if (emailLimit) {
+    return (
+      <div className="center" style={{ padding: '26px 10px', textAlign: 'center' }} data-testid="email-limit-prompt">
+        <div style={{ width: 52, height: 52, margin: '0 auto 12px', borderRadius: '50%', background: 'var(--stamp-soft, #f6e3dc)', display: 'grid', placeItems: 'center', color: 'var(--stamp, #c7481d)' }}>
+          <Icon name="alert" size={28} />
+        </div>
+        <div className="strong">{t('checkout.flowCheckoutPaused')}</div>
+        <SupplierProblemNotice issues={issues} actions={false} />
+        {!issues.length && <div className="small muted mt-1" style={{ maxWidth: 380, margin: '6px auto 0' }}>{t('checkout.flowWhyEmailLimit', { name: it.name })}</div>}
+        {paidCount > 0 && (
+          <div className="small mt-2" style={{ color: 'var(--green, #2F5540)', fontWeight: 700 }}>
+            {t('checkout.flowPaidItems', { count: paidCount })}
+          </div>
+        )}
+        <EmailLimitButtons pending={emailLimit.pending} onOrders={() => onChoice('orders')} onEmail={() => onChoice('email')} onBackToCart={onBackToCart} onStop={() => onChoice('stop')} />
+      </div>
+    );
+  }
   return (
     <div className="center" style={{ padding: '26px 10px', textAlign: 'center' }}>
       <div style={{ width: 52, height: 52, margin: '0 auto 12px', borderRadius: '50%', background: 'var(--stamp-soft, #f6e3dc)', display: 'grid', placeItems: 'center', color: 'var(--stamp, #c7481d)' }}>

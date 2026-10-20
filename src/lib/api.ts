@@ -474,6 +474,35 @@ export const listTopups = async (country?: string, test?: boolean) => {
   if (!test) { const s = await staticBrands(country); if (s) return filterKind(s, 'mobile_recharge'); }
   return api(catQS('mobile_recharge', country, test));
 };
+/** The payment partner's Lightning rule for buyers without an account, as
+ * the backend publishes it (GET /api/catalog/limits): the per-order ceiling
+ * on the order total, the delivery email's daily and monthly budgets (fees
+ * included, unpaid orders count) and, per currency, the largest whole face
+ * value a brand card may promise. Null while unknown or switched off. */
+export type SupplierLimits = {
+  totalEur: number; dailyEur: number; monthlyEur: number; marginPct: number;
+  faceCaps: Record<string, number>;
+};
+let _supplierLimits: Promise<SupplierLimits | null> | null = null;
+export const getSupplierLimits = (): Promise<SupplierLimits | null> => {
+  if (!_supplierLimits) {
+    _supplierLimits = api('/catalog/limits').then((j: any) => {
+      const rule = j?.supplier_order_limit;
+      if (!rule || rule.enabled !== true) return null;
+      const caps: Record<string, number> = {};
+      for (const [code, v] of Object.entries(rule.face_caps || {})) {
+        const n = Number(v);
+        if (/^[A-Z]{3}$/.test(code) && Number.isFinite(n) && n > 0) caps[code] = n;
+      }
+      return {
+        totalEur: Number(rule.total_eur) || 0, dailyEur: Number(rule.daily_eur) || 0, monthlyEur: Number(rule.monthly_eur) || 0,
+        marginPct: Number(rule.margin_pct) || 0, faceCaps: caps,
+      };
+    }).catch(() => { _supplierLimits = null; return null; });
+  }
+  return _supplierLimits;
+};
+
 /** Families the backend has seen sold out for a country (refused at checkout). */
 export const listUnavailableFamilies = async (country: string): Promise<string[]> => {
   const cc = String(country || '').toUpperCase().slice(0, 2);
