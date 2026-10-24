@@ -42,6 +42,7 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stockState as classifyStock, validStockRecord, applyStockState, RECHECK_AFTER_MS, STOCK_VERSION } from './catalog-stock.mjs';
+import { familyFaceBounds, applyFaceBoundsToBrand } from './catalog-bounds.mjs';
 import { filterPublicCatalog, excludedCatalogItem } from '../src/lib/catalogVisibility.ts';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -171,7 +172,9 @@ const VERIFY_MAX_COOLDOWNS = 6;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** One product-presence read: 'ok' | 'empty' | 'unknown' (+ the HTTP status seen). */
+/** One product-presence read: 'ok' | 'empty' | 'unknown' (+ the HTTP status seen).
+ *  The parsed products ride along so the SAME response also yields the family's
+ *  real face bounds (the stock check already paid for the request). */
 async function probeOnce(cc, family) {
   if (!await paceVerify()) return { state: 'unknown', status: 'budget' };
   const url = `${BASE}/v5/products/country/${encodeURIComponent(cc)}?family_name=${encodeURIComponent(family)}&lang=en&coin=BTC`;
@@ -187,7 +190,7 @@ async function probeOnce(cc, family) {
     let j;
     try { j = JSON.parse(await res.text()); } catch { return { state: 'unknown', status: 'bad-json' }; }
     if (!Array.isArray(j)) return { state: 'unknown', status: 'bad-shape' };
-    return { state: classifyStock(j), status: 200 };
+    return { state: classifyStock(j), status: 200, products: j };
   } catch (e) {
     return { state: 'unknown', status: e && e.name === 'TimeoutError' ? 'timeout' : 'network' };
   }
@@ -195,7 +198,9 @@ async function probeOnce(cc, family) {
 
 /**
  * Rate limits (403/429) and transient errors are retried with a growing
- * pause; they never count as evidence that a product is missing.
+ * pause; they never count as evidence that a product is missing. Returns the
+ * verdict plus the family's real face bounds (null when the family carries no
+ * money the card could quote; undefined when nothing trustworthy was read).
  */
 async function productPresence(cc, family, stats) {
   const RETRY_DELAYS = [4_000, 12_000];
@@ -208,13 +213,13 @@ async function productPresence(cc, family, stats) {
   }
   if (r.state === 'unknown') {
     stats.status[r.status] = (stats.status[r.status] || 0) + 1;
-    return 'unknown';
+    return { state: 'unknown', bounds: undefined };
   }
-  if (r.state !== 'empty') return r.state;
+  if (r.state !== 'empty') return { state: r.state, bounds: familyFaceBounds(r.products) };
   // Hiding a card is the expensive mistake: confirm an empty answer once more.
   await sleep(1500);
   const again = await probeOnce(cc, family);
-  return again.state;
+  return { state: again.state, bounds: again.products ? familyFaceBounds(again.products) : undefined };
 }
 
 // Stock state survives between runs. Each product-presence answer is stored
@@ -249,7 +254,54 @@ async function saveStockState(state) {
   return Object.keys(kept).length;
 }
 
-async function verifyStock(plan, state) {
+/* ------------------------ card price bounds ------------------------ */
+/*
+ * The brand directory's min/max labels are the supplier's ASPIRATIONAL range
+ * ("€5 – €2,000" for a family that only sells €5/€10/€50/€75). The product
+ * page prices the real SKUs; the card must show the same numbers. The stock
+ * probe already fetched the family's products, so the true face bounds ride
+ * along in the same state record and rewrite the labels at write time — zero
+ * extra supplier requests. The Lightning per-order face cap is applied here
+ * exactly like the backend applies it to the product page (denominations
+ * above the cap hidden, dynamic ranges clamped to it).
+ */
+async function loadFaceOpts() {
+  let fx = null;
+  try {
+    const j = JSON.parse(await readFile(join(ROOT, 'public', 'data', 'market', 'fx.json'), 'utf8'));
+    if (j && j.usd_per_unit && typeof j.usd_per_unit === 'object') fx = j.usd_per_unit;
+  } catch {
+    fx = null;
+  }
+  if (!fx) return null;
+  const num = (k, d) => {
+    const v = Number(process.env[k]);
+    return Number.isFinite(v) && v >= 0 ? v : d;
+  };
+  return {
+    fx,
+    // Same defaults as the backend config (backend/internal/config/config.go).
+    limits: {
+      totalEur: num('SUPPLIER_ORDER_LIMIT_EUR', 100),
+      marginPct: num('SUPPLIER_ORDER_MARGIN_PCT', 5),
+    },
+  };
+}
+
+function applyPriceBounds(data, cc, state, faceOpts, now = Date.now()) {
+  if (!faceOpts || !data || !Array.isArray(data.categories)) return data;
+  for (const cat of data.categories) {
+    for (const b of cat.brands) {
+      const rec = state[`${cc}|${b.family}`];
+      if (!rec || rec.bounds == null) continue;
+      if (!validStockRecord(rec, now) || now - rec.at >= RECHECK_AFTER_MS) continue;
+      applyFaceBoundsToBrand(b, rec.bounds, faceOpts);
+    }
+  }
+  return data;
+}
+
+async function verifyStock(plan, state, faceOpts) {
   const now = Date.now();
   const jobs = [];
   let fresh = 0;
@@ -260,7 +312,11 @@ async function verifyStock(plan, state) {
     }
     for (const family of families) {
       const rec = state[`${cc}|${family}`];
-      if (!VERIFY_FULL && rec && now - rec.at < RECHECK_AFTER_MS) fresh += 1;
+      // A record without learned face bounds is due for a re-read even when
+      // its stock verdict is fresh: the very same probe also prices the card,
+      // and one full pass converges every label to the product page's truth.
+      const stale = !rec || now - rec.at >= RECHECK_AFTER_MS || rec.bounds === undefined;
+      if (!VERIFY_FULL && rec && !stale) fresh += 1;
       else jobs.push({ cc, family });
     }
   }
@@ -288,7 +344,7 @@ async function verifyStock(plan, state) {
       const result = await productPresence(job.cc, job.family, stats);
       stats.checked += 1;
       if (stats.checked % 250 === 0) console.log(`[sync-catalog] progress: ${stats.checked}/${stats.families} checked, ${stats.unresolved} unresolved; ${queue.length} remaining`);
-      if (result === 'unknown') {
+      if (result.state === 'unknown') {
         stats.unresolved += 1;
         unresolvedRun += 1;
         if (unresolvedRun >= VERIFY_UNRESOLVED_BEFORE_COOLDOWN) {
@@ -300,15 +356,20 @@ async function verifyStock(plan, state) {
         continue;
       }
       unresolvedRun = 0;
-      state[`${job.cc}|${job.family}`] = { state: result, at: Date.now(), version: STOCK_VERSION };
-      if (result === 'ok') stats.ok += 1;
+      // bounds: learned face range of the family (null = no money on the
+      // card; undefined = nothing trustworthy read, so relearn next pass).
+      state[`${job.cc}|${job.family}`] = { state: result.state, at: Date.now(), version: STOCK_VERSION, ...(result.bounds !== undefined ? { bounds: result.bounds } : {}) };
+      if (result.state === 'ok') stats.ok += 1;
       else stats.empty += 1;
     }
   }));
   // Apply to every plan entry: a family whose latest trusted answer is "empty"
-  // is out of stock, whether it was read in this run or an earlier one.
+  // is out of stock, whether it was read in this run or an earlier one. The
+  // same trusted record's face bounds rewrite the card's min/max labels to
+  // the product page's own numbers (Lightning cap applied).
   for (const { cc, data } of plan) {
     applyStockState(data, cc, state);
+    applyPriceBounds(data, cc, state, faceOpts);
     for (const cat of data.categories) {
       for (const b of cat.brands) {
         const rec = state[`${cc}|${b.family}`];
@@ -379,11 +440,13 @@ const plan = fetched
   .filter((f) => f.cc !== '_global')
   .sort((a, b) => (a.cc === 'TR' ? -1 : b.cc === 'TR' ? 1 : b.brands - a.brands));
 const stockState = await loadStockState();
-manifest.verified = await verifyStock(plan, stockState);
+const faceOpts = await loadFaceOpts();
+manifest.verified = await verifyStock(plan, stockState, faceOpts);
 manifest.completed_at = new Date().toISOString();
 manifest.complete = manifest.verified.mode === 'full' && manifest.verified.completed && manifest.failed.length === 0;
 for (const f of fetched.filter((f) => f.cc === '_global')) {
   applyStockState(f.data, f.data.country_code || 'TR', stockState);
+  applyPriceBounds(f.data, f.data.country_code || 'TR', stockState, faceOpts);
 }
 manifest.verified.state_records = await saveStockState(stockState);
 const v = manifest.verified;
