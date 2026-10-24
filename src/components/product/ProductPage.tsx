@@ -19,7 +19,7 @@ import { loadCashbackBps, cashbackEarnLine } from '../../lib/cashback';
 import { StakerCashbackLine } from '../staker/StakerCashback';
 import { WalletBalance } from '../wallet/WalletBalance';
 import { brandMetaFor } from '../../lib/catalogMeta';
-import { useCartSafe } from '../../lib/cartStore';
+import { useCartSafe, maxQtyForRow, type CartItem } from '../../lib/cartStore';
 import { useSheet, useToast } from '../AppProviders';
 import {
   countryName,
@@ -379,9 +379,24 @@ export function ProductPage() {
   const [, setPriceState] = useState<{ key?: string; params?: Record<string, string | number>; raw?: string }>({ key: 'productPage.priceSelectAmount' });
 
   const cart = useCartSafe();
-  // The quantity stepper respects the account's daily order allowance too —
-  // you can pick up to what's left of it, never beyond (limit ≠ 10).
-  const maxQty = cart && cart.orderLimit > 0 ? Math.min(MAX_QTY, Math.max(0, cart.orderLimit - cart.count)) : MAX_QTY;
+  // The quantity stepper respects BOTH order ceilings: the account's daily
+  // order allowance AND the payment partner's per-order face ceiling (one
+  // Lightning invoice can only carry so much face value). You can pick up to
+  // what fits either, never beyond — the cart and the quote gate say the
+  // same numbers.
+  const countMaxQty = cart && cart.orderLimit > 0 ? Math.max(0, cart.orderLimit - cart.count) : MAX_QTY;
+  const selPkgForQty = pkg ? (product?.packages || []).find((x: any) => x.package_id === pkg) : null;
+  const selFaceValue = value || selPkgForQty?.value || 0;
+  const moneyMaxQty = cart && product
+    ? maxQtyForRow(cart.items, {
+        id: product.id, pkg: pkg || '', value: selFaceValue,
+        country: String(product.country || '').toUpperCase(),
+        currency: selPkgForQty?.currency || product.currency,
+        qty: 1, denomination: '', coinAmount: 0, unitUSD: selFaceValue,
+        type: '', name: product.name || product.id, image: '', bgColor: '',
+      } as CartItem)
+    : MAX_QTY;
+  const maxQty = Math.min(MAX_QTY, countMaxQty, moneyMaxQty);
   const { openSheet, closeSheet } = useSheet();
   const { toast } = useToast();
   const { navigate } = useRouter();
@@ -771,6 +786,10 @@ export function ProductPage() {
       );
       return;
     }
+    if (ok === 'money') {
+      toast(t('productPage.lightningLimitToast'), 'error');
+      return;
+    }
     if (!ok) {
       const foreign = cart.items[0]?.country;
       toast(
@@ -906,11 +925,15 @@ export function ProductPage() {
                 +
               </button>
             </div>
-            {cart && cart.orderLimit > 0 && qty >= maxQty && (
+            {qty >= maxQty && maxQty < MAX_QTY && (
               <div className="xs faint mt-1">
-                {maxQty === 0
-                  ? t('productPage.limitReachedToday')
-                  : t('productPage.limitRemaining', { max: maxQty })}
+                {moneyMaxQty <= countMaxQty
+                  ? (maxQty === 0
+                      ? t('productPage.lightningLimitReached')
+                      : t('productPage.lightningLimitRemaining', { max: maxQty }))
+                  : (maxQty === 0
+                      ? t('productPage.limitReachedToday')
+                      : t('productPage.limitRemaining', { max: maxQty }))}
               </div>
             )}
           </div>

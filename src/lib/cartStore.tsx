@@ -6,7 +6,7 @@
  */
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { COUNTRY_CCY, MAX_QTY, fmtMoney, fmtNIM, countryName, productFaceLabel } from './format';
-import { cachedNimRate, cachedFX, getAccountLimits } from './api';
+import { cachedNimRate, cachedFX, getAccountLimits, getSupplierLimits } from './api';
 import { isAuthed } from './session';
 
 export type CartItem = {
@@ -107,6 +107,41 @@ export function rowNIM(it: CartItem): number {
   const m = sessionMarket();
   if (usd > 0 && m && Number(m.usd_per_nim) > 0) return usd / Number(m.usd_per_nim);
   return 0;
+}
+
+/* ---------------- Lightning per-order face ceiling ---------------- */
+/*
+ * The payment partner refuses a Lightning order whose TOTAL (face + the
+ * supplier's fee) passes its per-order ceiling. The backend mirrors that
+ * rule at quote time (catalog.OrderLimit) and refuses with the real maximum;
+ * the cart carries the same rule EARLIER — at add and quantity time — so a
+ * cart can never promise an amount the rail cannot sell. The cap is the
+ * largest whole face value in USD that still fits
+ * SUPPLIER_ORDER_LIMIT_EUR / (1 + margin/100), published per currency by
+ * GET /catalog/limits (face_caps). 0 = not loaded (or the mirror is off):
+ * the server remains the hard gate either way.
+ */
+let faceCapUSDCache = 0;
+function loadFaceCap(): void {
+  getSupplierLimits()
+    .then((l) => { faceCapUSDCache = l && l.faceCaps && Number(l.faceCaps.USD) > 0 ? Number(l.faceCaps.USD) : 0; })
+    .catch(() => { faceCapUSDCache = 0; });
+}
+
+/** The per-order face cap in USD (0 = unknown/disabled). */
+export function orderFaceCapUSD(): number {
+  return faceCapUSDCache;
+}
+
+/** Largest quantity of `it` one Lightning order can still carry (0 = none). */
+export function maxQtyForRow(items: CartItem[], it: CartItem): number {
+  const cap = faceCapUSDCache;
+  if (!(cap > 0)) return MAX_QTY;
+  const one = rowUSD({ ...it, qty: 1 });
+  if (!(one > 0)) return MAX_QTY;
+  const key = itemKey(it);
+  const othersUSD = items.filter((o) => itemKey(o) !== key).reduce((s, o) => s + rowUSD(o), 0);
+  return Math.max(0, Math.min(MAX_QTY, Math.floor((cap - othersUSD) / one + 1e-9)));
 }
 
 function approximateCountryMoney(it: CartItem): { amount: number; ccy: string } | null {
@@ -236,9 +271,11 @@ type CartState = {
    * Adds a product to the cart. Returns `false` (without changing the cart)
    * when the product's country differs from what is already in the cart —
    * one cart can only ever hold a single country's items. Returns `'limit'`
-   * when the account's max-order allowance is already fully in the cart.
+   * when the account's max-order allowance is already fully in the cart, and
+   * `'money'` when the Lightning per-order face ceiling leaves no room for
+   * even one unit of this item.
    */
-  addToCart: (p: any, opts?: { pkg?: string; value?: number; qty?: number; denomination?: string; force?: boolean; coinAmount?: number }) => boolean | 'limit';
+  addToCart: (p: any, opts?: { pkg?: string; value?: number; qty?: number; denomination?: string; force?: boolean; coinAmount?: number }) => boolean | 'limit' | 'money';
   setQty: (k: string, qty: number) => void;
   removeItem: (k: string) => void;
   clearCart: () => void;
@@ -303,6 +340,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   // Keep the first client render identical to Astro's server HTML. Reading
   // localStorage during render causes React hydration error 418/423.
   useEffect(() => {
+    loadFaceCap();
     const sync = () => { itemsRef.current = readCart(); setItems(itemsRef.current); };
     sync();
     window.addEventListener('storage', sync);
@@ -347,6 +385,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
       if (entry.delivery_type === 'by_email' && entry.type === 'phone_refill') entry.type = 'gift_card';
       const key = itemKey(entry);
       const existing = current.find((it) => itemKey(it) === key);
+      // The Lightning per-order face ceiling: no cart may carry more than one
+      // Lightning invoice can pay. Clamped like the daily count above —
+      // 'money' when not even one unit of this item still fits.
+      if (!force) {
+        const room = maxQtyForRow(current, entry) - (existing ? existing.qty : 0);
+        if (room <= 0) return 'money';
+        if (addQty > room) addQty = room;
+      }
       const next = existing ? current.map((it) => it === existing ? { ...it, qty: Math.min(MAX_QTY, it.qty + addQty) } : it) : [...current, entry];
       write(next);
       return true;
@@ -358,7 +404,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const current = itemsRef.current;
     const others = current.filter((it) => itemKey(it) !== key).reduce((sum, it) => sum + it.qty, 0);
     const cap = orderLimit > 0 ? Math.max(0, orderLimit - others) : MAX_QTY;
-    write(current.map((it) => itemKey(it) === key ? { ...it, qty: Math.max(0, Math.min(MAX_QTY, cap, Math.floor(qty))) } : it).filter((it) => it.qty > 0));
+    write(current.map((it) => {
+      if (itemKey(it) !== key) return it;
+      const moneyCap = maxQtyForRow(current, it);
+      return { ...it, qty: Math.max(0, Math.min(MAX_QTY, cap, moneyCap, Math.floor(qty))) };
+    }).filter((it) => it.qty > 0));
   }, [write, orderLimit]);
 
   const removeItem = useCallback((key: string) => {

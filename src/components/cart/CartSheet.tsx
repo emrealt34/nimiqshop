@@ -8,7 +8,7 @@ import { productMoney } from '../../lib/productMoney';
 import { useEffect, useState } from 'react';
 import { brandMetaForTitle } from '../../lib/catalogMeta';
 import { Icon } from '../ui/Icon';
-import { useCart, readCart, saveCart, itemKey, cartPriceLabel, cartSubtitle, cartCurrency, cartMoney, rowUSD } from '../../lib/cartStore';
+import { useCart, readCart, saveCart, itemKey, cartPriceLabel, cartSubtitle, cartCurrency, cartMoney, rowUSD, maxQtyForRow } from '../../lib/cartStore';
 import { UnifiedThumb } from '../ui/UnifiedThumb';
 import { useSheet, useToast } from '../AppProviders';
 import { COUNTRY_CCY, MAX_QTY, fmtMoney, fmtNIM } from '../../lib/format';
@@ -71,12 +71,21 @@ export function CartSheetContent({ close }: { close: () => void }) {
 
   const changeQty = (key: string, qty: number) => baseCart.setQty(key, qty);
   const removeStored = (key: string) => changeQty(key, 0);
+  // One Lightning invoice can only carry so much face value (the payment
+  // partner's per-order ceiling): the row's + stops at the same number the
+  // store clamps to, exactly like MAX_QTY and the daily order count.
+  const moneyMax = (it: { id: string; pkg?: string; value?: number | string; country?: string }) => {
+    const row = items.find((o) => itemKey(o) === itemKey(it));
+    return row ? maxQtyForRow(items, row) : MAX_QTY;
+  };
   const tryAdd = (k: string, cur: number) => {
     if (orderLimit > 0 && liveQty() >= orderLimit) {
       toast(t('cartSheet.limitToast', { count: orderLimit }), 'error');
       return;
     }
-    if (cur < MAX_QTY) changeQty(k, cur + 1);
+    const row = items.find((o) => itemKey(o) === k);
+    const moneyRoom = row ? maxQtyForRow(items, row) : MAX_QTY;
+    if (cur < MAX_QTY && cur < moneyRoom) changeQty(k, cur + 1);
   };
 
   useEffect(() => {
@@ -306,6 +315,7 @@ export function CartSheetContent({ close }: { close: () => void }) {
       <div className="cart-list">
         {items.map((it) => {
           const k = itemKey(it);
+          const mMax = moneyMax(it);
           return (
             <div className="cart-row" key={k}>
               {/* Size comes from the row's --cart-thumb track (fixes.css): the
@@ -331,9 +341,9 @@ export function CartSheetContent({ close }: { close: () => void }) {
                 <button
                   className="cart-q"
                   type="button"
-                  disabled={it.qty >= MAX_QTY || (orderLimit > 0 && atLimit)}
+                  disabled={it.qty >= MAX_QTY || (orderLimit > 0 && atLimit) || it.qty >= mMax}
                   aria-label={t('cartSheet.increase')}
-                  style={(it.qty >= MAX_QTY || (orderLimit > 0 && atLimit)) ? { opacity: 0.4, cursor: 'not-allowed' } : {}}
+                  style={(it.qty >= MAX_QTY || (orderLimit > 0 && atLimit) || it.qty >= mMax) ? { opacity: 0.4, cursor: 'not-allowed' } : {}}
                   onClick={() => tryAdd(k, it.qty)}
                 >
                   +
