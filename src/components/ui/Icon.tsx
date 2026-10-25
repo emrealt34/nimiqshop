@@ -1,4 +1,5 @@
 import { asset } from '../../lib/asset';
+import { SVG_NS } from '../../lib/svg';
 /**
  * Icon.tsx — React wrapper around the vendored Lucide icon set. Every shape is
  * a hard-coded, trusted primitive ([tag, attributes]) extracted verbatim from
@@ -127,7 +128,7 @@ export function Icon({
   return (
     <svg
       // @license lucide-static v1.34.0 - ISC
-      xmlns="http://www.w3.org/2000/svg"
+      xmlns={SVG_NS}
       viewBox="0 0 24 24"
       width={size}
       height={size}
