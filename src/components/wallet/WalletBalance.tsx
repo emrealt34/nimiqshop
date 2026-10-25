@@ -35,7 +35,7 @@ import {
   type WalletBalanceState,
 } from '../../lib/walletBalance';
 import { Icon } from '../ui/Icon';
-import { inNimiqPay } from '../../lib/miniapp';
+import { debugEnabled } from '../../lib/debugFlags';
 import { useToast } from '../AppProviders';
 
 // Several wallet strips can mount together; notify once per page instead of
@@ -239,11 +239,17 @@ export function WalletBalance({
 
 
 
-      {inNimiqPay() && state.debugLines && (
+      {/* Diagnostics are OPT-IN (owner, 2026-10-25: "Balance debug satırı
+          kullanıcıya açık görünüyor"). This block used to be printed for every
+          buyer inside Nimiq Pay: wallet addresses, host accounts, luna figures
+          and raw error strings — internal bookkeeping a shopper must never see
+          by accident. It is still here for support, behind `?nimshopDebug=1`
+          or `localStorage['nimshop.debug']='1'` (see lib/debugFlags). */}
+      {debugEnabled() && state.debugLines && state.debugLines.length > 0 && (
         <details className="wal-note xs" style={{ marginTop: 8 }}>
           <summary style={{ cursor: 'pointer' }}>Balance debug</summary>
           <pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', fontSize: 10, margin: '6px 0 0' }}>
-            {state.debugLines.join('\\n')}
+            {state.debugLines.join('\n')}
           </pre>
         </details>
       )}
