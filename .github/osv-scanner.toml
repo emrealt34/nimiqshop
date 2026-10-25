@@ -49,3 +49,37 @@ Retire this entry the moment semgrep's mcp pin reaches 1.30.0 (then regenerate
 the closure with the pip-compile command at the top of semgrep-requirements.txt),
 or if the advisory is withdrawn.
 """
+
+# Owner's CI report (2026-10-25): the OSV job was red on the opentelemetry-api
+# advisory alone. Same shape as the mcp entry above — semgrep's own pin — so it
+# gets the same treatment: a documented, expiring exception with the upgrade
+# path written down.
+[[IgnoredVulns]]
+id = "CVE-2026-114603"
+ignoreUntil = 2027-01-31 # re-check on every semgrep bump; retire when its otel pin reaches 1.45.1
+reason = """
+opentelemetry-api 1.37.0, pulled in by semgrep-requirements.txt in this
+directory. Unbounded `tracestate` parsing in opentelemetry-api lets a crafted
+W3C trace header grow memory without limit (availability only, no
+confidentiality or integrity impact). Published 2026-10-23, fixed in
+opentelemetry-api 1.45.1 (OSV also carries it as GHSA-xcq7-p3pf-p88h; one entry
+covers both, because the scanner matches aliases).
+
+There is nothing to upgrade to inside semgrep's closure. semgrep declares
+`opentelemetry-api~=1.37.0` (i.e. >=1.37.0,<1.38.0), so 1.45.1 cannot be
+installed without breaking the resolver; semgrep 1.179.0, 1.180.0, 1.181.0,
+1.182.0 and 1.182.1 all declare the very same range. semgrep-requirements.txt is
+a hash-pinned closure installed with `pip install --require-hashes`, so a
+hand-bumped opentelemetry-api would fail its hash/lock checks and take the
+Semgrep workflow down with it.
+
+Not reachable in anything this project ships. The file is installed only inside
+the Semgrep GitHub Actions job on an ephemeral runner; the product is a static
+Astro build plus a Go binary, with no Python runtime and no OpenTelemetry
+collector or exporter running anywhere. A malicious `tracestate` header would
+have to reach a live OTLP exporter, and CI runs semgrep as a CLI scanner.
+
+Retire this entry the moment semgrep allows opentelemetry-api >= 1.45.1 (then
+regenerate the closure with the pip-compile command at the top of
+semgrep-requirements.txt), or if the advisory is withdrawn.
+"""
