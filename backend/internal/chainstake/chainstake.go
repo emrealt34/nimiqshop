@@ -28,7 +28,6 @@ package chainstake
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"sync"
 	"time"
@@ -207,30 +206,17 @@ func (v *Verifier) store(addr string, st Staker, now time.Time) {
 }
 
 // isNoStaker recognizes the RPC's "this address has no staking position"
-// answer, which arrives as a JSON-RPC error. Matching on the text keeps the
-// client dependency-free; anything else stays an error (a real outage).
-func isNoStaker(err error) bool {
-	if err == nil {
-		return false
-	}
-	var rpcErr *nimiq.RPCError
-	if !errors.As(err, &rpcErr) {
-		return false
-	}
-	msg := strings.ToLower(rpcErr.Message)
-	for _, needle := range []string{
-		"no staker",
-		"not a staker",
-		"no account",
-		"account not found",
-		"does not exist",
-	} {
-		if strings.Contains(msg, needle) {
-			return true
-		}
-	}
-	return false
-}
+// answer, which arrives as a JSON-RPC error. The rule lives in the RPC client
+// (nimiq.IsNoStaker) because the same verdict is needed by the balance read and
+// the public stake endpoint, and because the providers do not put the sentence
+// in the same field: rpc.nimiqwatch.com answers
+//
+//	message: "Internal error", data: "No staker with address: …"
+//
+// so a check that reads only `message` treats "never staked" as an outage.
+// Anything that is not that verdict stays an error (a real outage must never
+// be cached as "not staked").
+func isNoStaker(err error) bool { return nimiq.IsNoStaker(err) }
 
 func canonical(addr string) string {
 	return strings.ToUpper(strings.ReplaceAll(strings.TrimSpace(addr), " ", ""))

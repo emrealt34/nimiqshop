@@ -94,6 +94,63 @@ func (e *RPCError) Error() string {
 	return fmt.Sprintf("nimiq rpc error %d: %s", e.Code, e.Message)
 }
 
+// ErrNoStaker is the typed answer to "this address has no staking position".
+//
+// It exists because the public RPCs do not say that in ONE place. Live on
+// rpc.nimiqwatch.com (2026-10-25, owner's report — an address that never
+// staked):
+//
+//	{"error":{"code":-32603,"message":"Internal error",
+//	          "data":"No staker with address: NQ14 6MRC …"}}
+//
+// The sentence a caller needs is in `data`, not in `message`; the older
+// NimiqWatch shape put it in `message` ("no staker with this address in this
+// pool"). Matching only `message` therefore read a plain "never staked" as a
+// chain outage: /api/wallet/stake answered 502 and the wallet strip printed
+// "Stake miktarı okunamadı" for an address whose stake is simply zero.
+//
+// Callers ask errors.Is(err, nimiq.ErrNoStaker) — one rule, both shapes, no
+// caller needs to know which wording its provider uses.
+var ErrNoStaker = errors.New("no staking position for this address")
+
+// noStakerNeedles are the wordings the providers are known to use for "this
+// address is not a staker". Kept in one place so the balance read, the public
+// stake endpoint and the chain-verified staking fallback cannot drift apart
+// (they each used to carry their own copy, and one of them was wrong).
+var noStakerNeedles = []string{
+	"no staker",
+	"not a staker",
+	"no account",
+	"account not found",
+	"does not exist",
+}
+
+// IsNoStaker reports whether err is a provider's "no staking position" answer
+// (as opposed to an outage, a timeout or a malformed response).
+//
+// It reads BOTH the JSON-RPC `message` and the JSON-RPC `data` member: the
+// live shape above keeps the useful sentence in `data` while `message` is a
+// generic "Internal error".
+func IsNoStaker(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, ErrNoStaker) {
+		return true
+	}
+	var rpcErr *RPCError
+	if !errors.As(err, &rpcErr) {
+		return false
+	}
+	message := strings.ToLower(rpcErr.Message + " " + rpcErr.Data)
+	for _, needle := range noStakerNeedles {
+		if strings.Contains(message, needle) {
+			return true
+		}
+	}
+	return false
+}
+
 // rpcErrorData renders an error's optional "data" member as plain text: a
 // JSON string is unquoted, anything else is kept as compact JSON.
 func rpcErrorData(raw json.RawMessage) string {
@@ -241,10 +298,18 @@ func (c *Client) GetStaker(ctx context.Context, addr string) (StakerInfo, error)
 	}
 	var raw json.RawMessage
 	if err := c.callURL(ctx, c.urls[0], "getStakerByAddress", []interface{}{addr}, &raw); err != nil {
+		// Both provider shapes ("no staker…" in `message`, or in `data` under a
+		// generic "Internal error") are normalized into the typed verdict, with
+		// the provider's own words kept for the log.
+		if IsNoStaker(err) {
+			return StakerInfo{}, fmt.Errorf("%w: %v", ErrNoStaker, err)
+		}
 		return StakerInfo{}, err
 	}
 	if string(bytes.TrimSpace(raw)) == "null" {
-		return StakerInfo{}, &RPCError{Code: -32004, Message: "No staker found for the given address"}
+		// The provider answered with a bare null: same verdict as the error
+		// shape above, so it is surfaced as the typed no-staker answer.
+		return StakerInfo{}, fmt.Errorf("getStakerByAddress: %w", ErrNoStaker)
 	}
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &fields); err != nil || len(fields["balance"]) == 0 || string(fields["balance"]) == "null" {

@@ -169,8 +169,12 @@ func chainStub(t *testing.T, opts chainStubOptions) *httptest.Server {
 			_, _ = fmt.Fprintf(w, `{"jsonrpc":"2.0","id":1,"result":{"data":{"address":"stub","balance":%d,"type":"basic"},"metadata":{"blockNumber":1}}}`, opts.liquidLuna)
 		case "getStakerByAddress":
 			if !opts.staking {
-				// What the public RPC answers for an address that stakes nothing.
-				_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":1,"error":{"code":-32603,"message":"no staker with this address in this pool"}}`))
+				// What rpc.nimiqwatch.com ACTUALLY answers for an address that
+				// stakes nothing (captured 2026-10-25): the verdict lives in
+				// `data`, while `message` is a generic "Internal error". The
+				// strip used to carry the older message-only wording, which is
+				// why a 502 for unstaked wallets never showed up in CI.
+				_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":1,"error":{"code":-32603,"message":"Internal error","data":"No staker with address: NQ14 6MRC 30QR YDCB U9N8 CVGA 1TH7 K5D1 X2H6"}}`))
 				return
 			}
 			_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":1,"result":{"data":{"address":"stub","balance":10000000,"delegation":"NQ49 N8MB XYCR XBUP 404C KXKK L49M A7BT F082","inactiveBalance":500,"retiredBalance":0},"metadata":{"blockNumber":1}}}`))
@@ -236,6 +240,63 @@ func TestPublicWalletStakeWithoutShopLogin(t *testing.T) {
 	}
 	if atomic.LoadInt64(&calls) != first+1 {
 		t.Fatal("invalid address reached RPC")
+	}
+}
+
+// The owner's report (2026-10-25): "Hiç stake etmemiş bir adresle girince
+// 'Stake miktarı okunamadı' çıkıyor … /api/wallet/stake 502 dönüyor. Örnek
+// adres: NQ14 6MRC 30QR YDCB U9N8 CVGA 1TH7 K5D1 X2H6".
+//
+// An address that never staked has a stake of ZERO — that is a fact about the
+// chain, not a failed read. The public endpoint must answer 200 with 0, and the
+// session balance read must report its stake as known-zero (no
+// "stake could not be read" line), for the exact response shape the live
+// provider sends (verdict in `data`, "Internal error" in `message`).
+func TestPublicWalletStakeForANeverStakedAddressIsZeroNot502(t *testing.T) {
+	const address = "NQ146MRC30QRYDCBU9N8CVGA1TH7K5D1X2H6"
+	rpc := chainStub(t, chainStubOptions{liquidLuna: 12400000})
+	s := bootStack(t, stackOptions{env: map[string]string{"NIMIQ_RPC_URL": rpc.URL}})
+
+	res := s.do(http.MethodGet, "/api/wallet/stake?address="+address, nil, nil)
+	if res.status != http.StatusOK {
+		t.Fatalf("never-staked address: %d %s — want 200 with zero stake", res.status, res.body)
+	}
+	j := res.json(t)
+	if got := str(j["address"]); normaliseAddress(got) != address {
+		t.Fatalf("address = %q, want %q", got, address)
+	}
+	for _, key := range []string{"staked_nim", "inactive_nim", "retired_nim"} {
+		if got := num(j[key]); got != 0 {
+			t.Fatalf("%s = %v, want 0", key, got)
+		}
+	}
+
+	// The same rule through the signed-in balance read: the stake is KNOWN and
+	// zero, so the strip must not print "Stake miktarı okunamadı".
+	auth, _ := s.signIn()
+	bal := s.do(http.MethodGet, "/api/wallet/balance", nil, auth)
+	if bal.status != http.StatusOK {
+		t.Fatalf("wallet balance for an unstaked wallet: %d %s", bal.status, bal.body)
+	}
+	bj := bal.json(t)
+	if got := num(bj["staked_nim"]); got != 0 {
+		t.Fatalf("staked_nim = %v, want 0", got)
+	}
+	if available, exists := bj["stake_available"]; exists && available == false {
+		t.Fatalf("stake_available = false for a definitive zero: %s", bal.body)
+	}
+}
+
+// An address that DOES stake must keep working after the same normalization.
+func TestPublicWalletStakeForAStakingAddressStillReads(t *testing.T) {
+	rpc := chainStub(t, chainStubOptions{staking: true})
+	s := bootStack(t, stackOptions{env: map[string]string{"NIMIQ_RPC_URL": rpc.URL}})
+	res := s.do(http.MethodGet, "/api/wallet/stake?address=NQ49N8MBXYCRXBUP404CKXKKL49MA7BTF082", nil, nil)
+	if res.status != http.StatusOK {
+		t.Fatalf("staked address: %d %s", res.status, res.body)
+	}
+	if got := num(res.json(t)["staked_nim"]); got != 100 {
+		t.Fatalf("staked_nim = %v, want 100", got)
 	}
 }
 

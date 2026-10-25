@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"sync"
 	"time"
@@ -59,12 +58,15 @@ func (h *Handlers) readWalletStake(address string, fresh bool) (walletStakeEntry
 	defer cancel()
 	st, err := h.NIMRPC.GetStaker(cctx, address)
 	if err != nil {
-		var rpcErr *nimiq.RPCError
-		if !errors.As(err, &rpcErr) {
-			return walletStakeEntry{}, false
-		}
-		message := strings.ToLower(rpcErr.Message)
-		if !strings.Contains(message, "no staker") && !strings.Contains(message, "not a staker") {
+		// "This address never staked" is an ANSWER, not a failure: it is zero
+		// stake, and the endpoint must say 0 — not 502. That verdict is read
+		// through nimiq.IsNoStaker, which looks at the JSON-RPC `data` member
+		// too: the live provider answers
+		//   message: "Internal error", data: "No staker with address: …"
+		// and matching only `message` here turned every unstaked address into
+		// "Stake miktarı okunamadı" (owner's report, 2026-10-25: "Hiç stake
+		// etmemiş bir adresle girince … 502 dönüyor").
+		if !nimiq.IsNoStaker(err) {
 			return walletStakeEntry{}, false
 		}
 	}
