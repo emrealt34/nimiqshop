@@ -1,6 +1,10 @@
 module nimiqshop
 
-go 1.27
+// Patch level matters: CVE-2026-111943 (crypto/x509, HIGH) is a standard
+// library advisory fixed in 1.27.3. Every workflow reads this file through
+// `go-version-file: backend/go.mod`, so the number here is the toolchain CI
+// builds and scans with, and the Dockerfile pins the same patch level.
+go 1.27.3
 
 require (
 	github.com/dgraph-io/badger/v4 v4.9.6
