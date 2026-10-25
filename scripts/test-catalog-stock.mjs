@@ -88,7 +88,7 @@ test('the real sync script persists stock and preserves a failed country without
   const dir = await mkdtemp(join(tmpdir(), 'catalog-sync-'));
   try {
     for (const d of ['scripts/data', 'src/lib', 'public/data/catalog/brands']) await mkdir(join(dir, d), { recursive: true });
-    for (const f of ['scripts/sync-catalog.mjs', 'scripts/catalog-stock.mjs', 'src/lib/catalogAvailability.ts', 'src/lib/catalogVisibility.ts']) {
+    for (const f of ['scripts/sync-catalog.mjs', 'scripts/catalog-stock.mjs', 'scripts/catalog-bounds.mjs', 'src/lib/catalogAvailability.ts', 'src/lib/catalogVisibility.ts', 'src/lib/productMoney.ts']) {
       await copyFile(new URL('../' + f, import.meta.url), join(dir, f));
     }
     await writeFile(join(dir, 'package.json'), '{"type":"module"}');
