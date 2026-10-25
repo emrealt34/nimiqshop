@@ -634,7 +634,7 @@ const de = {
     lpPayExactlyPre: 'Zahle genau ',
     lpNimAmountBelow: 'den NIM-Betrag unten',
     lpPayExactlyPost: ' mit einer beliebigen Lightning-Wallet — eine Lieferantenrechnung, direkt aus deiner Wallet beglichen. Die Lieferung startet automatisch, sobald die Rechnung bezahlt ist.',
-    lpCopyRequest: 'BTC-Lightning-Zahlungsanforderung kopieren',
+    lpCopyRequest: 'Nimiq-Pay-Zahlungsanforderung kopieren',
     lpVerifySlow: 'Die erneute Prüfung beim Server war nicht möglich (Verbindung oder Zeitüberschreitung). Die Rechnung ist offen — du kannst bezahlen und danach den Bestellstatus prüfen.',
     lpScanOnce: 'Einmal mit Nimiq Pay oder einer beliebigen Wallet mit Lightning-Unterstützung scannen und die Zahlung bestätigen.',
     qsStakeSent: 'Stake gesendet — tx {{hash}}…',

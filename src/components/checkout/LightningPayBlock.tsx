@@ -24,6 +24,7 @@ import { launchLightningUri, isQuotePayable, quoteBolt11 } from '../../lib/pay';
 import { payLightningInvoice, isTerminalOutcome } from '../../lib/nimiqPay';
 import { saveLightningFunding } from '../../lib/api';
 import { ApiError, authorizePaymentLaunch, getQuote, friendlyApiMessage, cachedNimRate } from '../../lib/api';
+import { copyPaymentRequest } from '../../lib/paymentHandoff';
 import { nimAmountFor } from '../../lib/nim';
 import { siteName } from '../../lib/config';
 import { asset } from '../../lib/asset';
@@ -88,19 +89,61 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, hidePayButt
     return () => { alive = false; clearTimeout(timer); };
   }, [quoteId, invoice, t]);
 
+  /**
+   * COPY IS LOCAL; THE STAMP IS NOT (owner, 2026-10-25: "nimiq pay ödeme
+   * talebini kopyala … çalışmıyor").
+   *
+   * The copy used to share the pay button's handler, which awaits the
+   * server-side `payment-launch` verification first. Two things were wrong
+   * with that:
+   *
+   *  • `document.execCommand('copy')` only works while the click's user
+   *    activation is alive. After an awaited network round trip (Chromium:
+   *    ~5 s; WebKit: the next task) it is gone, so Clipboard.copy returned
+   *    false and the buyer got "Kopyalama tamamlanmadı" — most often exactly
+   *    when the supplier was slow.
+   *  • A 4xx from that POST (expired session, order held, supplier
+   *    unreachable) threw BEFORE the copy ran, so the shop refused to hand
+   *    over the invoice in the very situation where it has to be copied by
+   *    hand.
+   *
+   * Now the clipboard is written first, synchronously, and the audit stamp
+   * (`payment_launch` → ClaimPaymentHandoff, audit only on the backend) is
+   * fired afterwards, fire-and-forget, with its failure swallowed. Copying is
+   * never gated on the server, on the 5-second status poll, or on a pay
+   * handoff already being in flight: the invoice is public, single-use data
+   * that is already printed on the buyer's screen.
+   */
+  const copyRequest = useCallback(() => {
+    const outcome = copyPaymentRequest(invoice, {
+      copy: (text) => Clipboard.copy(text),
+      stamp: () => {
+        onLaunch?.();
+        return authorizePaymentLaunch(quoteId);
+      },
+    });
+    if (outcome === 'copied') {
+      toast(t('checkout.lpInvoiceCopied'), 'info');
+      return;
+    }
+    // 'failed' (the browser refused the clipboard) and 'empty' (no invoice on
+    // this screen — refresh the order) are both a real "nothing was copied".
+    toast(t('checkout.lpCopyIncomplete'), 'warn');
+  }, [invoice, quoteId, onLaunch, toast, t]);
+
   // Simple flow: one clear Pay button. A single supplier Lightning invoice can
   // only ever be paid once, so re-opening the same invoice is always safe and
   // never a duplicate charge — no "already opened" barrier of any kind.
-  const handoff = async (action: 'pay' | 'copy') => {
+  const handoff = async () => {
     if (flight.current) return;
     // Owner (2026-10-05): a click must NEVER be silent. Pending/unverifiable
     // status and an already-submitted payment answer with a toast instead of
     // a dead disabled button.
-    if (action === 'pay' && payLocked) {
+    if (payLocked) {
       toast(t('orderPage.nimiqPay.submitted'), 'info');
       return;
     }
-    if (action === 'pay' && !allowed) {
+    if (!allowed) {
       toast(t(msgKey === 'checkout.lpCannotVerify' ? 'checkout.lpCannotVerify' : 'checkout.lpPending'), 'warn');
       return;
     }
@@ -135,7 +178,7 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, hidePayButt
       }
       onLaunch?.();
       if (verifyUnavailable) toast(t('checkout.lpVerifySlow'), 'warn');
-      if (action === 'pay' && insidePay) {
+      if (insidePay) {
         const res = await payLightningInvoice(invoice);
         if (isTerminalOutcome(res)) {
           if ('hash' in res || 'swapId' in res) void saveLightningFunding(quoteId, res.hash || '', res.swapId).catch(() => {});
@@ -188,12 +231,6 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, hidePayButt
         }
         throw new Error('message' in res ? res.message : t('checkout.lpWalletNotOpened'));
       }
-      if (action === 'copy') {
-        const ok = Clipboard.copy(invoice);
-        if (!ok) throw new Error(t('checkout.lpCopyIncomplete'));
-        toast(t('checkout.lpInvoiceCopied'), 'info');
-        return;
-      }
       // Owner (2026-10-05): outside Nimiq Pay the button must DO something.
       // Desktop has no wallet to launch — the POPUP (QR-below hint + Nimiq Pay
       // download links) is the hand-off there, shown at once; mobile tries the
@@ -212,11 +249,15 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, hidePayButt
       <div className="xs faint mt-1" role="status">{t(msgKey, { site: siteName() })}</div>
 
       {!hidePayButton && (
-        <button type="button" className="btn btn-gold btn-block btn-lg mt-2" disabled={busy} onClick={() => handoff('pay')}>
+        <button type="button" className="btn btn-gold btn-block btn-lg mt-2" disabled={busy} onClick={handoff}>
           <span className="btn-label">{busy ? t('checkout.verifying') : payLocked ? t('orderPage.nimiqPay.submitted') : insidePay ? t('orderPage.nimiqPay.idle') : t('checkout.flowPayWithNim')}</span>
         </button>
       )}
-      <button className="btn btn-outline btn-block mt-1" disabled={busy} onClick={() => handoff('copy')}><Icon name="copy" size={16} /> {t('checkout.lpCopyRequest')}</button>
+      {/* Deliberately NOT disabled by `busy`: copying is a local clipboard
+          write, so a pay handoff still verifying against the supplier (up to
+          30 s) must never freeze the one control that hands the buyer their
+          invoice. */}
+      <button type="button" className="btn btn-outline btn-block mt-1" onClick={copyRequest}><Icon name="copy" size={16} /> {t('checkout.lpCopyRequest')}</button>
       {/* The QR is part of the card, not a reveal: owner removed the
           "Verify & show QR" button and the hide control — a Lightning invoice
           is public data, and one less step between the buyer and the pay. */}
