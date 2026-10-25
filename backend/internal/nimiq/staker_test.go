@@ -128,8 +128,8 @@ func TestGetStakerReadsAPosition(t *testing.T) {
 //
 //	NIMIQ_LIVE=1 go test ./internal/nimiq -run LiveNoStaker -v
 //
-// Owner's report (2026-10-25): "Hiç stake etmemiş bir adresle girince 'Stake
-// miktarı okunamadı' çıkıyor … /api/wallet/stake 502 dönüyor. Örnek adres:
+// Owner's report (2026-10-25): "Hiç stake etmemiş bir hesapla girince 'Stake
+// miktarı okunamadı' çıkıyor … /api/wallet/stake 502 dönüyor. Örnek:
 // NQ14 6MRC 30QR YDCB U9N8 CVGA 1TH7 K5D1 X2H6".
 func TestLiveNoStakerVerdict(t *testing.T) {
 	if os.Getenv("NIMIQ_LIVE") != "1" {
