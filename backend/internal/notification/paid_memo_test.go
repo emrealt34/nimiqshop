@@ -155,7 +155,7 @@ func TestPaidMemoIsFixedTextWithoutOrderID(t *testing.T) {
 func TestMemosFitTheChainLimit(t *testing.T) {
 	prev := ShopName
 	defer func() { ShopName = prev }()
-	for _, name := range []string{"nimshop.io", "a-very-long-shop-domain.example.co.uk", strings.Repeat("x", 80)} {
+	for _, name := range []string{"nimshop", "a-very-long-shop-domain.example.co.uk", strings.Repeat("x", 80)} {
 		ShopName = name
 		for _, r := range Reasons() {
 			if m := Memo(r, testOrderID); len(m) > maxMemoLen {

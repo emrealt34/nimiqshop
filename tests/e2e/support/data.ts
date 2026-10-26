@@ -63,7 +63,7 @@ export const I18N_NAMESPACES: string[] = (() => {
   return [...src.matchAll(/^ {2}([a-zA-Z]+): \{/gm)].map((m) => m[1]);
 })();
 /** Every real `namespace.key` in en.ts. A raw-key hit must be an actual key —
- *  brand names/domains that merely look dotted ("nimshop.io") never match. */
+ *  brand names/domains that merely look dotted ("nimshop") never match. */
 export const I18N_KEYS: Record<string, string[]> = (() => {
   const src = readFileSync(fileURLToPath(new URL('../../../src/i18n/locales/en.ts', import.meta.url)), 'utf8');
   const out: Record<string, string[]> = {};

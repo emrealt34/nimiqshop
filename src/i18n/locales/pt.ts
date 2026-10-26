@@ -72,7 +72,7 @@ const pt = {
     updateReady: 'Nova versão — toque para atualizar',
   },
   meta: {
-    defaultTitle: 'nimshop.io — Cartões-presente, eSIM e recargas móveis',
+    defaultTitle: 'nimshop — Cartões-presente, eSIM e recargas móveis',
     defaultDescription: 'Compre cartões-presente, eSIM e recargas móveis. Pague com Nimiq (NIM). Sem custódia, global, entregue em segundos.',
   },
 
@@ -89,7 +89,7 @@ const pt = {
   },
   quiz: {
     uniqueCodePending: "O teu código pessoal desbloqueia após concluíres o quiz",
-    cashbackIntro: "Aprende como funciona nimshop.io e desbloqueia um código cashback de uso único.",
+    cashbackIntro: "Aprende como funciona nimshop e desbloqueia um código cashback de uso único.",
     cashbackMinScore: "Pontuação necessária: pelo menos {{score}}%.",
 
     cashbackRewardTitle: "Código cashback",
@@ -120,7 +120,7 @@ const pt = {
     winnerAll: "Ganha quem enviar todas as respostas antes do prazo.",
     rangeBounds: "Introduza um inteiro entre {{min}} e {{max}}. A resposta mais próxima recebe mais pontos.",
     resultWinners: "Vencedores confirmados",
-    title: "Concurso nimshop.io",
+    title: "Concurso nimshop",
     intro: "Descobre a loja, mostra o que sabes e compete por um prémio.",
     loginRequired: "Inicia sessão para participar",
     loginHint: "É necessário iniciar sessão com a carteira para ver concursos e responder às perguntas.",

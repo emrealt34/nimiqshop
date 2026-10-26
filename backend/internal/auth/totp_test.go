@@ -68,8 +68,8 @@ func TestVerifyTOTPWindowAndShape(t *testing.T) {
 }
 
 func TestTOTPProvisioningURI(t *testing.T) {
-	got := TOTPProvisioningURI("nimshop.io", "ops admin", " jbsw y3dp ehpk-3pxp=")
-	want := "otpauth://totp/nimshop.io:ops%20admin?algorithm=SHA256&digits=6&issuer=nimshop.io&period=30&secret=JBSWY3DPEHPK3PXP"
+	got := TOTPProvisioningURI("nimshop", "ops admin", " jbsw y3dp ehpk-3pxp=")
+	want := "otpauth://totp/nimshop:ops%20admin?algorithm=SHA256&digits=6&issuer=nimshop&period=30&secret=JBSWY3DPEHPK3PXP"
 	if got != want {
 		t.Fatalf("uri = %s\nwant %s", got, want)
 	}

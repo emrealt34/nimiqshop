@@ -112,7 +112,7 @@ func (h *Handlers) AdminBootstrap(ctx *fasthttp.RequestCtx) {
 	// authenticator, since hand-typed entries default to SHA-1.
 	issuer := h.Cfg.SiteHost
 	if issuer == "" {
-		issuer = "nimshop.io"
+		issuer = "nimshop"
 	}
 	writeJSON(ctx, fasthttp.StatusCreated, map[string]any{
 		"id":             user.ID,

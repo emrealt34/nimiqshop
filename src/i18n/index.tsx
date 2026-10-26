@@ -1,5 +1,5 @@
 /**
- * i18n — ultra-lightweight, fully-typed, runtime translation layer for nimshop.io.
+ * i18n — ultra-lightweight, fully-typed, runtime translation layer for nimshop.
  *
  * WHY WE WROTE OUR OWN (and did NOT pull i18next / react-i18next)
  * ----------------------------------------------------------------

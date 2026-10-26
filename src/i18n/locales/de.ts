@@ -72,7 +72,7 @@ const de = {
     updateReady: 'Neue Version — zum Aktualisieren tippen',
   },
   meta: {
-    defaultTitle: 'nimshop.io — Geschenkkarten, eSIM & Handy-Aufladungen',
+    defaultTitle: 'nimshop — Geschenkkarten, eSIM & Handy-Aufladungen',
     defaultDescription: 'Geschenkkarten, eSIM und Handy-Aufladungen kaufen. Mit Nimiq (NIM) bezahlen. Ohne Verwahrung, global, in Sekunden geliefert.',
   },
 
@@ -89,7 +89,7 @@ const de = {
   },
   quiz: {
     uniqueCodePending: "Dein persönlicher Code wird nach Abschluss freigeschaltet",
-    cashbackIntro: "Lerne nimshop.io kennen und schalte einen einmaligen Cashback-Code frei.",
+    cashbackIntro: "Lerne nimshop kennen und schalte einen einmaligen Cashback-Code frei.",
     cashbackMinScore: "Erforderliche Punktzahl: mindestens {{score}}%.",
 
     cashbackRewardTitle: "Cashback-Code",
@@ -120,7 +120,7 @@ const de = {
     winnerAll: "Jeder gewinnt, der alle Antworten vor Ablauf der Frist absendet.",
     rangeBounds: "Ganze Zahl von {{min}} bis {{max}} eingeben. Die nächste Antwort erhält die meisten Punkte.",
     resultWinners: "Bestätigte Gewinner",
-    title: "nimshop.io Wissensquiz",
+    title: "nimshop Wissensquiz",
     intro: "Entdecke den Shop, zeige dein Wissen und spiele um einen Preis.",
     loginRequired: "Zum Mitmachen anmelden",
     loginHint: "Eine Wallet-Anmeldung ist nötig, um Wettbewerbe zu sehen und Fragen zu beantworten.",

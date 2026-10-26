@@ -3,7 +3,7 @@
 The sender domain verified in Mailtrap is `shop.nimiqbase.com`. The default
 address is `hello@shop.nimiqbase.com`; check the production
 `MAILTRAP_FROM_EMAIL` override before configuring a different sender domain.
-The display name `nimshop.io` does not change which domain is authenticated.
+The display name `nimshop` does not change which domain is authenticated.
 
 ## Logo
 

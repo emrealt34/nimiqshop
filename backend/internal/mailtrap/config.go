@@ -18,7 +18,7 @@
 //	                      sending: a verified sending domain, or the demo
 //	                      domain demomailtrap.co (e.g. hello@demomailtrap.co).
 //	                      Sending anything else returns 422 unverified_domain.
-//	MAILTRAP_FROM_NAME    optional.  Display name, default "nimshop.io".
+//	MAILTRAP_FROM_NAME    optional.  Display name, default "nimshop".
 //	MAILTRAP_REPLY_TO     optional.  Where a recipient's reply lands. Put the
 //	                      SUPPORT inbox here, not the buyer's address: a gift
 //	                      recipient replying must not reach the gifter's inbox
@@ -48,7 +48,7 @@ import (
 // (Enabled() reports false) — these are what ConfigFromEnv fills in when the
 // environment is silent.
 const (
-	DefaultFromName  = "nimshop.io"
+	DefaultFromName  = "nimshop"
 	DefaultFromEmail = "hello@shop.nimiqbase.com"
 	DefaultCategory  = "nimshop"
 	DefaultTimeout   = 10 * time.Second

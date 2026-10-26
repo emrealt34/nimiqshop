@@ -43,7 +43,7 @@ func TestBuildBasicTransactionReturnsCanonicalHash(t *testing.T) {
 
 func TestSignedTxInfoMatchesCanonicalHashAndRejectsTampering(t *testing.T) {
 	v := vectors(t)
-	for _, memo := range []string{"", "nimshop.io prize #1: 2000 NIM"} {
+	for _, memo := range []string{"", "nimshop prize #1: 2000 NIM"} {
 		raw, hash, err := BuildBasicTransaction(v["tx.seed"], v["tx.to"], 100000, 1, 1000000, NetworkTestnet, []byte(memo))
 		if err != nil {
 			t.Fatal(err)

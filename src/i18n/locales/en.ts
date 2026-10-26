@@ -78,7 +78,7 @@ const en = {
     updateReady: 'New version — tap to refresh',
   },
   meta: {
-    defaultTitle: 'nimshop.io — Gift cards, eSIMs & mobile top-ups',
+    defaultTitle: 'nimshop — Gift cards, eSIMs & mobile top-ups',
     defaultDescription: 'Buy gift cards, eSIMs and mobile top-ups. Pay with Nimiq (NIM). Non-custodial, global, delivered in seconds.',
   },
 
@@ -97,7 +97,7 @@ const en = {
   },
   quiz: {
     uniqueCodePending: "Your personal code unlocks after completion",
-    cashbackIntro: "Learn how nimshop.io works and unlock a single-use cashback code.",
+    cashbackIntro: "Learn how nimshop works and unlock a single-use cashback code.",
     cashbackMinScore: "Required score: at least {{score}}%.",
 
     cashbackRewardTitle: "Cashback code",
@@ -128,7 +128,7 @@ const en = {
     winnerAll: "Every participant who submits all answers before the deadline wins.",
     rangeBounds: "Enter a whole number from {{min}} to {{max}}. The closest answer earns the most points.",
     resultWinners: "Confirmed winners",
-    title: "nimshop.io Knowledge Quiz",
+    title: "nimshop Knowledge Quiz",
     intro: "Explore the shop, show what you know and compete for a prize.",
     loginRequired: "Sign in to participate",
     loginHint: "A wallet login is required to see competitions and answer questions.",

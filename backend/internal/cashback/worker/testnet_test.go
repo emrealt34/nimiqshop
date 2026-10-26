@@ -47,11 +47,11 @@ func TestLiveNimiqTestnetPayoutRecovery(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = store.Close() }()
-	first, err := store.QueueManualCashback(to, "nimshop.io testnet recovery", 100000, time.Now())
+	first, err := store.QueueManualCashback(to, "nimshop testnet recovery", 100000, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := store.QueueManualCashback(to, "nimshop.io testnet recovery", 100000, time.Now())
+	second, err := store.QueueManualCashback(to, "nimshop testnet recovery", 100000, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}

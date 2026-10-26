@@ -90,7 +90,7 @@ func (s *Store) FinalizeDueQuizPayouts(now time.Time) error {
 				} else if !errors.Is(err, ErrNotFound) {
 					return err
 				}
-				row := QuizPayout{CompetitionID: c.ID, Cashback: Cashback{ID: id, QuoteID: c.ID, UserID: user.ID, Recipient: nimiq.NormalizeAddress(user.NimiqAddress), ProductID: c.Title, CashbackSource: "quiz_prize", AmountLuna: c.Payout.PerWinnerNIM * 100_000, Memo: fmt.Sprintf("nimshop.io #%d %d NIM %s", len(winners)+1, c.Payout.PerWinnerNIM, quizMemoReference(c.ID)), Status: CashbackQueued, CreatedAt: now.UTC(), UpdatedAt: now.UTC()}}
+				row := QuizPayout{CompetitionID: c.ID, Cashback: Cashback{ID: id, QuoteID: c.ID, UserID: user.ID, Recipient: nimiq.NormalizeAddress(user.NimiqAddress), ProductID: c.Title, CashbackSource: "quiz_prize", AmountLuna: c.Payout.PerWinnerNIM * 100_000, Memo: fmt.Sprintf("nimshop #%d %d NIM %s", len(winners)+1, c.Payout.PerWinnerNIM, quizMemoReference(c.ID)), Status: CashbackQueued, CreatedAt: now.UTC(), UpdatedAt: now.UTC()}}
 				if err := putQuizJSON(tx, quizPayoutKey(id), row); err != nil {
 					return err
 				}

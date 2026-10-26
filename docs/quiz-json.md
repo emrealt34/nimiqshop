@@ -5,7 +5,7 @@ Upload or paste JSON in Admin → Quiz. Loading opens an editable draft; saving 
 ```json
 {
   "schema_version": 1,
-  "title": "How does nimshop.io work?",
+  "title": "How does nimshop work?",
   "description": "Complete the quiz to unlock your cashback code.",
   "starts_at": "2026-10-13T12:00:00+03:00",
   "ends_at": "2026-11-11T12:00:00+03:00",

@@ -118,14 +118,12 @@ export function SiteShell({ activeKey }: { activeKey: ShellKey }) {
 
 function Brand() {
   const { t } = useT();
-  /* The navbar wordmark is the product brand ("nimshop.io"), not the live
-     hostname (owner, 2026-10-05). The host still drives titles, share links
-     and copy via siteName(). */
+  /* Keep the short product wordmark separate from the canonical hostname.
+     Deployment URLs and share links continue to use shop.nimiqbase.com. */
   const name = BRAND_NAME;
   const [logoFailed, setLogoFailed] = useState(false);
-  // Break after the FIRST dot ("nim." / "shop"): both halves stay balanced if
-  // the wordmark ever has to wrap. At 7 glyphs it now fits every rail — the
-  // 430px band that used to cut "nimiqbase.com" has room to spare.
+  // A dot in a future brand can split into balanced visual halves; the current
+  // seven-letter “nimshop” wordmark stays on one line without a domain suffix.
   const i = name.indexOf('.');
   const before = i > 0 && i < name.length - 1 ? name.slice(0, i) : null;
   const after = before !== null ? name.slice(i + 1) : null;

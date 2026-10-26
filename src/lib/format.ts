@@ -451,7 +451,7 @@ export function cleanBatchProductLabels(value: unknown): string[] {
  *    and DAI on Lightning Network, Avalanche, Polygon, Fantom, Binance Chain,
  *    and Arbitrum."
  *
- * nimshop.io only ever pays with Nimiq Pay, so every one of those sentences is
+ * nimshop only ever pays with Nimiq Pay, so every one of those sentences is
  * removed before supplier text reaches the screen. Applied to BOTH the
  * supplier terms (`cleanSupplierTerms`) and the product blurb
  * (`cleanDescription` in ProductPage), so the copy can never leak a coin or

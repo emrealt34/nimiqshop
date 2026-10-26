@@ -1,4 +1,4 @@
-# nimshop.io installer (Windows) — downloads the latest GitHub Release (backend
+# nimshop installer (Windows) — downloads the latest GitHub Release (backend
 # binary + frontend .zip) and wires a one-command CLI. No Go/Node compile needed.
 #
 #   irm https://github.com/emrealt34/nimiqshop/releases/latest/download/install.ps1 | iex

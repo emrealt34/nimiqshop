@@ -163,7 +163,7 @@ func fixture(t *testing.T) (*db.Store, string, db.Cashback, *faultChain, *nimiq.
 	if err != nil {
 		t.Fatal(err)
 	}
-	row, err := store.QueueManualCashback(to, "nimshop.io recovery test", 100000, time.Now())
+	row, err := store.QueueManualCashback(to, "nimshop recovery test", 100000, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}

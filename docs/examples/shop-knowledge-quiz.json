@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "title": "nimshop.io’u Ne Kadar Tanıyorsun?",
+  "title": "nimshop’u Ne Kadar Tanıyorsun?",
   "description": "10 soruyu tamamla, hesabında tek kullanımlık cashback kodunu aç.",
   "winner_count": 5,
   "prize": {
@@ -243,7 +243,7 @@
     },
     {
       "type": "choice",
-      "prompt": "nimshop.io’da ülke olarak Fransa’yı seçip Carrefour hediye çeki aldın. Bu çek hangi ülkede geçerlidir?",
+      "prompt": "nimshop’da ülke olarak Fransa’yı seçip Carrefour hediye çeki aldın. Bu çek hangi ülkede geçerlidir?",
       "options": [
         "Carrefour bulunan bütün ülkelerde.",
         "Türkiye’deki CarrefourSA mağazalarında.",
@@ -252,7 +252,7 @@
       "correct_index": 2,
       "translations": {
         "tr": {
-          "prompt": "nimshop.io’da ülke olarak Fransa’yı seçip Carrefour hediye çeki aldın. Bu çek hangi ülkede geçerlidir?",
+          "prompt": "nimshop’da ülke olarak Fransa’yı seçip Carrefour hediye çeki aldın. Bu çek hangi ülkede geçerlidir?",
           "options": [
             "Carrefour bulunan bütün ülkelerde.",
             "Türkiye’deki CarrefourSA mağazalarında.",
@@ -260,7 +260,7 @@
           ]
         },
         "en": {
-          "prompt": "You selected France on nimshop.io and bought a Carrefour gift card. In which country is this card valid?",
+          "prompt": "You selected France on nimshop and bought a Carrefour gift card. In which country is this card valid?",
           "options": [
             "In every country with Carrefour stores.",
             "At CarrefourSA stores in Türkiye.",
@@ -268,7 +268,7 @@
           ]
         },
         "de": {
-          "prompt": "Du hast auf nimshop.io Frankreich ausgewählt und einen Carrefour-Gutschein gekauft. In welchem Land ist dieser Gutschein gültig?",
+          "prompt": "Du hast auf nimshop Frankreich ausgewählt und einen Carrefour-Gutschein gekauft. In welchem Land ist dieser Gutschein gültig?",
           "options": [
             "In allen Ländern mit Carrefour-Filialen.",
             "In CarrefourSA-Filialen in der Türkei.",
@@ -276,7 +276,7 @@
           ]
         },
         "fr": {
-          "prompt": "Tu as sélectionné la France sur nimshop.io et acheté une carte cadeau Carrefour. Dans quel pays cette carte est-elle valable ?",
+          "prompt": "Tu as sélectionné la France sur nimshop et acheté une carte cadeau Carrefour. Dans quel pays cette carte est-elle valable ?",
           "options": [
             "Dans tous les pays où Carrefour est présent.",
             "Dans les magasins CarrefourSA en Turquie.",
@@ -284,7 +284,7 @@
           ]
         },
         "es": {
-          "prompt": "Has seleccionado Francia en nimshop.io y comprado una tarjeta regalo Carrefour. ¿En qué país es válida esta tarjeta?",
+          "prompt": "Has seleccionado Francia en nimshop y comprado una tarjeta regalo Carrefour. ¿En qué país es válida esta tarjeta?",
           "options": [
             "En todos los países donde hay Carrefour.",
             "En las tiendas CarrefourSA de Turquía.",
@@ -292,7 +292,7 @@
           ]
         },
         "pt": {
-          "prompt": "Selecionaste França na nimshop.io e compraste um cartão-presente Carrefour. Em que país é válido este cartão?",
+          "prompt": "Selecionaste França na nimshop e compraste um cartão-presente Carrefour. Em que país é válido este cartão?",
           "options": [
             "Em todos os países onde existe Carrefour.",
             "Nas lojas CarrefourSA na Turquia.",
@@ -604,27 +604,27 @@
   ],
   "translations": {
     "tr": {
-      "title": "nimshop.io’u Ne Kadar Tanıyorsun?",
+      "title": "nimshop’u Ne Kadar Tanıyorsun?",
       "description": "10 soruyu tamamla, hesabında tek kullanımlık cashback kodunu aç."
     },
     "en": {
-      "title": "How Well Do You Know nimshop.io?",
+      "title": "How Well Do You Know nimshop?",
       "description": "Complete 10 questions to unlock a single-use cashback code for your account."
     },
     "de": {
-      "title": "Wie gut kennst du nimshop.io?",
+      "title": "Wie gut kennst du nimshop?",
       "description": "Beantworte 10 Fragen und schalte einen einmaligen Cashback-Code für dein Konto frei."
     },
     "fr": {
-      "title": "Connais-tu bien nimshop.io ?",
+      "title": "Connais-tu bien nimshop ?",
       "description": "Réponds aux 10 questions pour débloquer un code cashback à usage unique pour ton compte."
     },
     "es": {
-      "title": "¿Cuánto conoces nimshop.io?",
+      "title": "¿Cuánto conoces nimshop?",
       "description": "Completa 10 preguntas para desbloquear un código de cashback de un solo uso para tu cuenta."
     },
     "pt": {
-      "title": "Quanto sabes sobre a nimshop.io?",
+      "title": "Quanto sabes sobre a nimshop?",
       "description": "Completa 10 perguntas para desbloquear um código cashback de utilização única na tua conta."
     }
   },

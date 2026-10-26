@@ -63,7 +63,7 @@ export const CFG: AppConfig = new Proxy({ ...DEFAULTS }, {
 
 
 /** Display brand for customer-facing text. Deployment URLs use CFG independently. */
-export const BRAND_NAME = 'nimshop.io';
+export const BRAND_NAME = 'nimshop';
 export function siteName(): string { return BRAND_NAME; }
 
 export function siteURL(): string {

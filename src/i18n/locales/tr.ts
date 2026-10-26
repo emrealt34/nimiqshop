@@ -72,7 +72,7 @@ const tr = {
     updateReady: 'Yeni sürüm — yenilemek için dokun',
   },
   meta: {
-    defaultTitle: 'nimshop.io — Hediye kartları, eSIM ve mobil kontör',
+    defaultTitle: 'nimshop — Hediye kartları, eSIM ve mobil kontör',
     defaultDescription: 'Hediye kartı, eSIM ve mobil kontör satın al. Nimiq (NIM) ile öde. Saklama gerektirmez, global, saniyeler içinde teslim.',
   },
 
@@ -89,7 +89,7 @@ const tr = {
   },
   quiz: {
     uniqueCodePending: "Kişisel kodun quiz tamamlanınca açılır",
-    cashbackIntro: "nimshop.io’nun işleyişini öğren, tek kullanımlık cashback kodunu aç.",
+    cashbackIntro: "nimshop’nun işleyişini öğren, tek kullanımlık cashback kodunu aç.",
     cashbackMinScore: "Gerekli puan: en az %{{score}}.",
 
     cashbackRewardTitle: "Cashback kodu",
@@ -120,7 +120,7 @@ const tr = {
     winnerAll: "Süre bitmeden tüm soruları cevaplayıp gönderen herkes kazanır.",
     rangeBounds: "{{min}}–{{max}} arasında bir tam sayı gir. Doğru değere en yakın cevap en çok puanı kazanır.",
     resultWinners: "Onaylanan kazananlar",
-    title: "nimshop.io Bilgi Yarışması",
+    title: "nimshop Bilgi Yarışması",
     intro: "Mağazayı keşfet, bilgini göster ve ödül için yarış.",
     loginRequired: "Katılmak için giriş yap",
     loginHint: "Yarışmaları görmek ve soruları cevaplamak için cüzdanla giriş gerekli.",

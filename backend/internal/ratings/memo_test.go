@@ -83,7 +83,7 @@ func TestParseMemoRoundTrip(t *testing.T) {
 
 func TestParseMemoRejectsForeignLines(t *testing.T) {
 	for _, m := range []string{
-		"", "0", "6", "x", "5x", "5  double", "5 bad!", "5 ", "nimshop.io rating 5/5 order ab",
+		"", "0", "6", "x", "5x", "5  double", "5 bad!", "5 ", "nimshop rating 5/5 order ab",
 		"5 " + strings.Repeat("a", MaxComment+1),
 	} {
 		if _, _, ok := ParseMemo(m); ok {

@@ -88,7 +88,7 @@ func TestAutomaticQuizPayoutsDeadlineIdempotenceMemoAndAccounting(t *testing.T) 
 				rank = index + 1
 			}
 		}
-		wantMemo := fmt.Sprintf("nimshop.io #%d 2000 NIM %s", rank, quizMemoReference(c.ID))
+		wantMemo := fmt.Sprintf("nimshop #%d 2000 NIM %s", rank, quizMemoReference(c.ID))
 		if rank == 0 || row.AmountLuna != 2000*100000 || row.Memo != wantMemo || len([]byte(row.Memo)) > nimiq.MaxMemoLen {
 			t.Fatal("wrong amount/memo", row)
 		}

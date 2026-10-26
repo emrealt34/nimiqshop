@@ -31,7 +31,7 @@ for (const width of [1200, 1280, 1366, 1440, 1600, 1920]) {
         });
         expect(info.shown, 'desktop nav shown ≥1200px').toBe(true);
         expect(info.tabbarShown, 'bottom tab bar hidden when the desktop nav is shown').toBe(false);
-        expect(info.wmClipped, 'wordmark "nimshop.io" cut off').toBe(false);
+        expect(info.wmClipped, 'wordmark "nimshop" cut off').toBe(false);
         for (const s of info.sizes) expect(s, 'nav font-size px').toBeGreaterThanOrEqual(10.5);
         expect(info.clipped, 'ellipsized nav labels').toEqual([]);
         for (const b of info.links) {
