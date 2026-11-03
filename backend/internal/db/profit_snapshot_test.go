@@ -5,6 +5,10 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/dgraph-io/badger/v4"
+
+	"nimiqshop/internal/stakeledger"
 )
 
 func TestProfitSnapshotNeverCreditsRegressionsOrReplayedMonths(t *testing.T) {
@@ -73,9 +77,18 @@ func TestProfitSnapshotsAreIdempotentAcrossRacesAndRestart(t *testing.T) {
 		}()
 	}
 	wg.Wait()
-	l, _, err := s.ReadStakeLedger(address)
-	if err != nil || math.Abs(l.A-8) > 1e-9 {
-		t.Fatalf("duplicate credit %v %v", l.A, err)
+	// Read the STORED ledger, not ReadStakeLedger: that accessor deliberately
+	// applies the pending month-end carry rule against the WALL CLOCK
+	// (l.A *= Q, i.e. the 10% that survives into the next month) without
+	// persisting it. The snapshots above are dated 2026-10, so the moment the
+	// real calendar moved into November every read of this fixture came back
+	// with A = 8 * 0.1 = 0.8 and this assertion failed — the shop's on-disk
+	// balance was correct all along. Pinning the assertion to the raw record
+	// keeps it about the thing under test (no duplicate credit) instead of
+	// about what month the CI machine happens to be in.
+	l := readStoredLedger(t, s, address)
+	if math.Abs(l.A-8) > 1e-9 {
+		t.Fatalf("duplicate credit %v", l.A)
 	}
 	if err = s.Close(); err != nil {
 		t.Fatal(err)
@@ -119,4 +132,17 @@ func TestNoRealizedFeeMeansNoBoostCredit(t *testing.T) {
 			t.Fatalf("accepted multiplier %v", multiplier)
 		}
 	}
+}
+
+// readStoredLedger returns the persisted ledger exactly as written, with no
+// wall-clock rollover applied — the state the next writer will build on.
+func readStoredLedger(t *testing.T, s *Store, address string) stakeledger.Ledger {
+	t.Helper()
+	var l stakeledger.Ledger
+	if err := s.View(func(tx *badger.Txn) error {
+		return getJSON(tx, stakeLedgerKey(canonicalStakeAddr(address)), &l)
+	}); err != nil {
+		t.Fatalf("read stored ledger: %v", err)
+	}
+	return l
 }
