@@ -100,19 +100,19 @@ in GitHub showed a failure, because no deploy had been attempted.
 
 Two rules follow, and both are cheap:
 
-  * after fixing a red CI, **redeploy the backend explicitly** — the green run
-    does not replay the deploy Railway skipped. Either hit *Redeploy* on the
-    service, or `railway up --service zetas`, or touch a file under
-    `backend/**` in a commit of its own.
-  * never verify a backend change by waiting. Ask the process which commit it
-    is running:
+- after fixing a red CI, **redeploy the backend explicitly** — the green run
+  does not replay the deploy Railway skipped. Either hit *Redeploy* on the
+  service, or `railway up --service zetas`, or touch a file under
+  `backend/**` in a commit of its own.
+- never verify a backend change by waiting. Ask the process which commit it
+  is running:
 
-    ```bash
-    curl -s https://shopapi.nimiqbase.com/api/health | jq -r .runtime.commit
-    ```
+  ```bash
+  curl -s https://shopapi.nimiqbase.com/api/health | jq -r .runtime.commit
+  ```
 
-    `RAILWAY_GIT_COMMIT_SHA` is stamped into the environment and reported as
-    `runtime.commit`, so the answer is the deployed SHA, not a guess.
+  `RAILWAY_GIT_COMMIT_SHA` is stamped into the environment and reported as
+  `runtime.commit`, so the answer is the deployed SHA, not a guess.
 
 When checking whether a backend change is live, do not guess from timing: hit an
 endpoint that names what you changed. (`/api/geo` gained `country_hint` and
