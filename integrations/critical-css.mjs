@@ -242,7 +242,37 @@ const ALWAYS_INLINE_SELECTORS = [
   // The wallet balance strip sits directly under the home hero and above the
   // buy buttons on a product page: its dashed card chrome is first-paint
   // layout, not decoration. Inline it, or the row appears a beat late.
-  '.wal-bal',
+  // The whole wallet family, not just the card: `.wal-head`, `.wal-bal-fig`,
+  // `.wal-nim` and the refresh chip were still deferred, so on a signed-in
+  // home page the balance row painted with inline-block/inline-flex defaults
+  // and then re-laid itself out (4.4 px) the moment the sheet landed. Same
+  // reason as `.card` above — a build-time tour is signed out, so nothing under
+  // `.wal-*` is ever in the capture.
+  '.wal-',
+  // GENERIC PRIMITIVES — the capture can never see a signed-in page.
+  //
+  // The tour runs signed out, so `.card`, `.wal-card` and the `.mt-*` spacing
+  // utilities matched nothing on the home page and were deferred whole. A
+  // signed-in visitor gets the wallet card (`div.card.wal-bal.wal-card.mt-3`)
+  // at first paint with NO padding and NO top margin, and when the deferred
+  // sheet landed the card grew 24 px of margin + 28 px of padding — everything
+  // below it (how-strip, toolbar, the whole grid, the footer) dropped 53.2 px
+  // in one frame. Found 2026-11-03 by the signed-in e2e pass, which is the
+  // only thing that renders that card at all.
+  //
+  // Primitives are the wrong thing to key on a capture: they are used by
+  // widgets that only exist after a session/fetch (wallet card, toasts,
+  // sheets, error states), exactly the DOM a build-time tour can never see.
+  // They are also tiny — the whole `.card` family is a few hundred bytes.
+  '.card', '.wal-card', '.mt-', '.mb-', '.row',
+  // Typography utilities. Same reason, measured the same night: the wallet
+  // card's "loading"/signed-out line is `<span class="small muted">`, and both
+  // utilities were deferred, so that line painted at 16px and shrank to
+  // 13.68px when the sheet landed. These classes are used by React-rendered
+  // content on every page, they are a few dozen bytes each, and every one of
+  // them was in the "missing from this page" list that made the site look
+  // broken.
+  '.small', '.xs', '.muted', '.faint', '.strong', '.gold-text', '.mono', '.center',
   // The products grid's column rules exist TWICE in the sheet (readable +
   // minified section). When one copy stayed inline and its duplicate went
   // deferred, the deferred copy landed later in the document and out-ranked
@@ -279,6 +309,49 @@ function alwaysInline(rule) {
   if ((rule.selector || '').includes('data-theme')) return true;
   return ALWAYS_INLINE_SELECTORS.some((sel) => (rule.selector || '').includes(sel));
 }
+
+/**
+ * THE FLIP MUST NOT DEPEND ON AN EXTERNAL FILE — and it must not wait for `load`.
+ *
+ * The deferred sheet is inert until `#late-css` flips from media="print" to
+ * "all". Until 2026-11-03 that flip lived ONLY in css-late.js (a 1.3 KB
+ * external file) and only ran ~180 ms after `window.load`. Measured
+ * consequences, both reproduced in the e2e harness:
+ *
+ *   • css-late.js blocked/slow (ad-blocker rule, flaky CDN, an edge that has
+ *     not picked the new hash up yet) → `media` stays "print", `href` stays
+ *     empty, and the page keeps ONLY its inline critical rules: the whole
+ *     deferred half of the design is missing. Symptom, in the owner's words:
+ *     "sayfalar arası geçerken yeni sayfada CSS yüklenmiyor". The external
+ *     script is a single point of failure for every deferred rule in the app.
+ *   • `load` never fires (one hung image or beacon on a bad mobile connection
+ *     delays it by seconds) → same result: an unstyled page for as long as
+ *     that resource hangs.
+ *
+ * So the bootstrap below is inline (part of the document, cannot 404, and the
+ * CSP hashes are derived from the built HTML), it flips on the first animation
+ * frames after the critical CSS has painted, and it keeps `load` and a hard
+ * timer as fallbacks. css-late.js still flips the link too — idempotently —
+ * but nothing depends on it any more.
+ */
+const buildFlipBootstrap = (cssUrl) => `(function () {
+  var l = document.getElementById('${LINK_ID}');
+  if (!l) return;
+  var flipped = false;
+  function flip() {
+    if (flipped) return;
+    flipped = true;
+    if (!l.getAttribute('href')) l.setAttribute('href', '${cssUrl}');
+    l.media = 'all';
+  }
+  // Two frames: the first paints the inline critical CSS, the second flips.
+  if (window.requestAnimationFrame) requestAnimationFrame(function () { requestAnimationFrame(flip); });
+  else setTimeout(flip, 16);
+  // Fallbacks. A background tab throttles rAF; a hung subresource delays load.
+  setTimeout(flip, 1200);
+  window.addEventListener('load', flip, { once: true });
+  document.addEventListener('visibilitychange', flip, { once: true });
+})();`;
 
 const buildLoader = (islandScriptBody) => `/* css-late.js — apply the deferred stylesheet and hydrate islands after first paint. */
 (function () {
@@ -355,9 +428,6 @@ export default function criticalCss() {
         const { default: postcss } = await import('postcss');
 
         const deferred = new Map(); // rule text -> nothing, insertion-ordered
-        // Selectors some page needs inline at load; never deferred (see the
-        // cascade-integrity note in the per-page split below).
-        const inlineSelectorsEverywhere = new Set();
         const htmlFiles = [];
         for await (const file of walk(outDir)) if (file.endsWith('.html')) htmlFiles.push(file);
 
@@ -367,6 +437,27 @@ export default function criticalCss() {
         let islandScriptBody = '';
         let repCss = '';
 
+        // TWO PASSES, and the reason matters.
+        //
+        // A selector that ANY page needs inline must be inline on EVERY page
+        // before its copies may be dropped from the shared deferred sheet.
+        // Doing both in one pass per page is not enough: the global set is
+        // still growing while later pages are being written, so a page visited
+        // early misses the selectors discovered later. That is not a theory —
+        // it shipped on 2026-11-03: `pruneDeferred` removed ~320 selectors
+        // from the shared sheet while only inlining them on the pages whose
+        // static markup happened to carry them. Every other page then had
+        // NEITHER copy, and the React-rendered parts of those pages (activity
+        // tiles, cashback cards, order rows — markup that exists only after
+        // hydration, so a build-time capture can never see it) rendered
+        // unstyled. The owner saw it as "sayfalar bozuldu" while clicking
+        // through the nav. Measured on the deployed build: shared sheet 1648 →
+        // 1146 rules, 320 selectors gone, ~430 rules missing per page.
+        //
+        // Pass 1 therefore only collects. Pass 2 splits with the finished set
+        // ("if it is inline anywhere, inline it everywhere"), which is what
+        // makes pruning the shared sheet safe: after it, every page that can
+        // ever use a selector already carries its own copy.
         for (const file of htmlFiles) {
           const html = await readFile(file, 'utf8');
           for (const t of scanTags(html, 'script')) {
@@ -470,14 +561,14 @@ export default function criticalCss() {
           // aside and deferred the base rule, and the shared file out-ranked
           // the home page's own override). Anything kept inline anywhere is
           // therefore never deferred anywhere.
-          for (const sel of keepSelectors) inlineSelectorsEverywhere.add(sel);
           if (splitSelectors.size) {
             logger.info(`critical CSS: ${splitSelectors.size} selector(s) kept inline in full because a copy renders at load (e.g. ${[...splitSelectors].slice(0, 3).join(', ')})`);
           }
           // A rule moves only when NO copy of ANY of its selectors is needed
           // inline.
           const keepRuleInline = (node, context) =>
-            willKeepRule(node, context) || selectorParts(node).some((part) => splitSelectors.has(part));
+            willKeepRule(node, context) ||
+            selectorParts(node).some((part) => splitSelectors.has(part));
 
           /**
            * Split a container into the two halves. At-rules are rebuilt around
@@ -562,38 +653,7 @@ export default function criticalCss() {
         // Every page carries the same full sheet, so positions in one
         // representative copy give the canonical order; rules absent from it
         // keep their first-seen order at the end (stable sort).
-        // A rule whose selector is needed inline by ANY page is dropped from
-        // the shared sheet. Those selectors are fully inlined on the pages that
-        // use them (see keepRuleInline), and a page that does not use one has
-        // nothing to style — so removing it from the late sheet costs that page
-        // nothing while keeping every page's own cascade intact.
-        // Filter INSIDE each entry: a deferred entry is often a whole
-        // `@media (...)` block rather than a single rule, and a block that
-        // keeps one selector a page needs inline re-introduces exactly the
-        // cascade inversion this guard exists to prevent (the 719px block
-        // carries `.toolbar.filters .field`, `label.oos-toggle` and
-        // `input.input` — all first-paint layout on a phone). Walk the block,
-        // drop the rules whose selector some page keeps inline, and keep the
-        // rest of the block.
-        const pruneDeferred = (text) => {
-          let root;
-          try {
-            root = postcss.parse(text);
-          } catch {
-            return text;
-          }
-          let kept = false;
-          root.walkRules((rule) => {
-            const parts = norm(rule.selector || '').split(',').map((part) => norm(part));
-            if (parts.some((part) => inlineSelectorsEverywhere.has(part))) rule.remove();
-            else kept = true;
-          });
-          root.walkAtRules((at) => {
-            if (at.nodes && at.nodes.length === 0) at.remove();
-          });
-          return kept ? root.toString() : '';
-        };
-        const deferredRules = [...deferred.keys()].map(pruneDeferred).filter(Boolean);
+        const deferredRules = [...deferred.keys()];
         const droppedAsInline = deferred.size - deferredRules.length;
         if (droppedAsInline > 0) {
           logger.info(`critical CSS: ${droppedAsInline} deferred rule(s) dropped because another page keeps that selector inline`);
@@ -615,9 +675,34 @@ export default function criticalCss() {
         for (const [file, { html, styleBlock, inline, prefix }] of rewritten) {
           const cssUrl = `${prefix}${ASSET_DIR}/${cssName}`;
           const jsUrl = `${prefix}${ASSET_DIR}/${jsName}`;
+          // ORDER: link first, inline block SECOND.
+          //
+          // The deferred sheet is shared by every page, so it re-states rules a
+          // page may already carry inline. When two declarations tie on
+          // specificity, the one that comes LATER IN THE DOCUMENT wins — and
+          // that used to be the deferred copy, because the inline <style> was
+          // emitted before the <link>. `.kf-pkg` is the measured example: the
+          // page inlines `@media (min-width:900px){.kf-pkg{margin-top:0}}`,
+          // the shared sheet re-states the base `.kf-pkg{margin-top:26px}`,
+          // and after the flip the base rule out-ranked the override — the
+          // hero's aside dropped 13 px and every card below it moved with it.
+          //
+          // Putting the inline block AFTER the link makes the page's own
+          // first-paint rules the tie-breaker instead: whatever the deferred
+          // sheet repeats, the values that were already painted stay. Rules
+          // the sheet adds (elements that appear later, e.g. after
+          // hydration) are unaffected — nothing inline competes with them.
+          // This is also why the shared sheet can keep EVERY rule now: it no
+          // longer has to be pruned to protect the cascade, so no page can
+          // lose a rule (that pruning is what shipped a half-styled site).
           const replacement =
+            // `href` is present from the first byte: the download starts while
+            // the page is still parsing, and no script failure can leave the
+            // link pointing at nothing. `media="print"` still keeps it from
+            // blocking first paint, which is the whole point of the split.
+            `<link id="${LINK_ID}" rel="stylesheet" media="print" fetchpriority="low" href="${cssUrl}" data-href="${cssUrl}">` +
             `<style>${inline}</style>` +
-            `<link id="${LINK_ID}" rel="stylesheet" media="print" data-href="${cssUrl}">` +
+            `<script>${buildFlipBootstrap(cssUrl)}</script>` +
             `<script defer fetchpriority="low" src="${jsUrl}"></script>` +
             `<noscript><link rel="stylesheet" href="${cssUrl}"></noscript>`;
           const nextHtml = hideBodyClose(stripIslandScripts(html.replace(styleBlock, replacement)));
