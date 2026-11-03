@@ -5,9 +5,14 @@ import { useT } from '../../i18n';
 import { asset } from '../../lib/asset';
 import { fmtDate } from '../../lib/format';
 
-export function StatusView() {
+export function StatusView({ initial }: { initial?: any } = {}) {
   const { t } = useT();
-  const [data, setData] = useState<any>(null);
+  // `initial` is the report the build already had on disk (see status.astro).
+  // Rendering it from the first byte means the table's real row heights are in
+  // place before hydration; the fetch below then only ever replaces equal-sized
+  // content. Without it the placeholder card grew 202 px on sheet arrival and
+  // another 180 px when the data landed.
+  const [data, setData] = useState<any>(initial ?? null);
   const [error, setError] = useState(false);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -53,22 +58,33 @@ export function StatusView() {
       <div aria-hidden="true"><Skel w="90%" h={14} /></div>
     </div>}
     {data ? <div className="card pad mt-2">
+      {/* The date cells carry suppressHydrationWarning on purpose.
+       *
+       * A wall-clock time is the viewer's local time, and the build machine
+       * only knows its own (UTC): the same instant prints as "01:04 PM" in the
+       * HTML and "04:04 PM" in a browser in Istanbul. React treats a text
+       * difference like that as a failed hydration (#418) and throws away the
+       * server HTML for the subtree — which would put back exactly the reflow
+       * this whole change removes, only worse. The payload is re-read the
+       * moment the island mounts, so the strings are corrected against the
+       * viewer's zone immediately, and they are the same length in the same
+       * box: no shift, so the warning is the thing to suppress, not the data. */}
       <dl className="refresh-status-list">
-        <dt>{t('refreshStatus.catalog')}</dt><dd>{date(data.catalog.generated_at)}</dd>
-        <dt>{t('refreshStatus.finished')}</dt><dd>{date(data.catalog.completed_at)}</dd>
-        <dt>{t('refreshStatus.market')}</dt><dd>{date(data.market.generated_at)}</dd>
+        <dt>{t('refreshStatus.catalog')}</dt><dd suppressHydrationWarning>{date(data.catalog.generated_at)}</dd>
+        <dt>{t('refreshStatus.finished')}</dt><dd suppressHydrationWarning>{date(data.catalog.completed_at)}</dd>
+        <dt>{t('refreshStatus.market')}</dt><dd suppressHydrationWarning>{date(data.market.generated_at)}</dd>
         <dt>{t('refreshStatus.countries')}</dt><dd>{data.catalog.countries} · {t('refreshStatus.retained')}: {data.catalog.retained_countries?.join(', ') || '—'}</dd>
         <dt>{t('refreshStatus.stock')}</dt><dd>{t('refreshStatus.stockCounts', { checked: data.catalog.stock?.checked || 0, pending: data.catalog.stock?.skipped || 0, unresolved: data.catalog.stock?.unresolved || 0 })}</dd>
-        <dt>NIM / USD</dt><dd>{data.market.nim?.usd_per_nim ?? '—'} · {date(data.market.nim?.observed_at)}</dd>
-        <dt>BTC / USD</dt><dd>{data.market.btc?.usd_per_btc ?? '—'} · {date(data.market.btc?.observed_at)}</dd>
-        <dt>{t('refreshStatus.fiat')}</dt><dd>{date(data.market.fx?.observed_at)} · {data.market.fx?.currencies ?? '—'}</dd>
+        <dt>NIM / USD</dt><dd suppressHydrationWarning>{data.market.nim?.usd_per_nim ?? '—'} · {date(data.market.nim?.observed_at)}</dd>
+        <dt>BTC / USD</dt><dd suppressHydrationWarning>{data.market.btc?.usd_per_btc ?? '—'} · {date(data.market.btc?.observed_at)}</dd>
+        <dt>{t('refreshStatus.fiat')}</dt><dd suppressHydrationWarning>{date(data.market.fx?.observed_at)} · {data.market.fx?.currencies ?? '—'}</dd>
       </dl>
       <p className="small muted">{t('refreshStatus.explanation')}</p>
     </div> : null}
     <a className="btn btn-outline mt-2" href={run} target="_blank" rel="noopener noreferrer">{t('refreshStatus.actions')}</a>
   </section>;
 }
-export function StatusPage() { return <AppRoot activeKey="none" initialPath="/status"><StatusView /></AppRoot>; }
+export function StatusPage({ initial }: { initial?: any } = {}) { return <AppRoot activeKey="none" initialPath="/status"><StatusView initial={initial} /></AppRoot>; }
 
 function StatusSkeletonRow({ index }: { index: number }) {
   return <><dt><Skel w={index % 2 ? 120 : 150} h={14} /></dt><dd><Skel w="70%" h={14} /></dd></>;

@@ -278,3 +278,34 @@ test('capture was taken with product cards on screen @smoke', async () => {
     `the capture (${capture.capturedAt}) deferred the base .product-card rule — it was taken without a filled grid. Re-run: node scripts/critical-css.mjs --capture <url> --country TR`,
   ).toEqual([]);
 });
+
+/**
+ * THE REFRESH REPORT IS IN THE FIRST BYTE.
+ *
+ * /status used to paint eight 14 px placeholder bars and then swap in the real
+ * table once `/data/market/refresh.json` resolved: the card grew 202 px when
+ * the deferred sheet turned the <dl> into a grid, then another 180 px when the
+ * data landed — 0.1131 CLS on a throttled phone load, the second-largest shift
+ * in the app after the fonts.
+ *
+ * The report is a file the catalog workflow commits before the build runs, so
+ * there is no reason for the page to invent a shape first. status.astro reads
+ * it and hands it to the island as `initial`. This test is not about CLS
+ * numbers — it is the cheap, deterministic version: with scripting OFF, the
+ * table must already show served values. If someone puts the placeholder back
+ * (or the build stops finding the report), the first paint is a lie again and
+ * this fails.
+ */
+test('status report is server-rendered, not fetched into an empty table', async ({ browser }) => {
+  const context = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 390, height: 900 } });
+  const page = await context.newPage();
+  await page.goto(`${BASE}/status/`, { waitUntil: 'load' });
+
+  const values = await page.locator('.refresh-status-list dd').allInnerTexts();
+  expect(values.length, 'the report table must be in the HTML').toBeGreaterThanOrEqual(8);
+  // One em dash is the placeholder that used to grow into a real row.
+  expect(values.filter((v) => v.trim() && v.trim() !== '—').length,
+    'every row must carry a served value, not a placeholder').toBeGreaterThanOrEqual(6);
+
+  await context.close();
+});

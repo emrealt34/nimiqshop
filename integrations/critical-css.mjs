@@ -273,6 +273,15 @@ const ALWAYS_INLINE_SELECTORS = [
   // them was in the "missing from this page" list that made the site look
   // broken.
   '.small', '.xs', '.muted', '.faint', '.strong', '.gold-text', '.mono', '.center',
+  // The refresh-status table on /status. Its rules live in one line of
+  // fixes.css and they switch LAYOUT at 480 px: `display:grid` with a
+  // two-track template on desktop, one track + `dd{margin-bottom:14px}` on
+  // phones. Deferred, a phone painted the <dl> as a plain block (16 stacked
+  // lines) and then jumped 202 px when the sheet landed — measured at
+  // t≈2430 ms, before the page had even fetched its data. A rule that
+  // changes `display` or margins on markup that exists at first paint cannot
+  // be deferred, on any page: keep the family inline.
+  '.refresh-status-list',
   // The products grid's column rules exist TWICE in the sheet (readable +
   // minified section). When one copy stayed inline and its duplicate went
   // deferred, the deferred copy landed later in the document and out-ranked

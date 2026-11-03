@@ -1,7 +1,53 @@
 ---
+import { readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
 import BaseLayout from '../layouts/Base.astro';
 import { StatusPage } from '../components/status/StatusPage';
+
+/** The refresh report is a static file the catalog workflow commits before this
+ * build runs, so its contents are known here. Reading it at build time lets the
+ * page paint the real table instead of eight placeholder rows that turn into
+ * real rows ~1.3 s later (measured 0.1116 CLS on a throttled phone load: the
+ * card grew 202 px when the sheet landed, then another 180 px when the fetch
+ * resolved). The client still re-fetches every 60 s — it just no longer renders
+ * a different shape first.
+ *
+ * Same two sources, same order as the client, so the markup it hydrates against
+ * is the markup the fetch would produce:
+ *   1. /data/market/refresh.json (written by the refresh workflow)
+ *   2. the older snapshot path: catalog + market manifests, composed
+ * Anything missing or malformed falls through to null and the page keeps the
+ * placeholder behaviour it had before. */
+function readJson(rel: string): any {
+  const file = join(process.cwd(), 'public', rel);
+  try {
+    return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : null;
+  } catch {
+    return null;
+  }
+}
+
+function buildTimeReport() {
+  const direct = readJson('data/market/refresh.json');
+  if (direct?.catalog && direct?.market) return direct;
+  const catalog = readJson('data/catalog/manifest.json');
+  const market = readJson('data/market/manifest.json');
+  if (!catalog || !market) return null;
+  return {
+    catalog: {
+      generated_at: catalog.generated_at,
+      completed_at: catalog.completed_at,
+      complete: catalog.complete,
+      countries: Object.keys(catalog.countries || {}).length,
+      retained_countries: (catalog.failed || []).map((f: any) => f.country),
+      stock: catalog.verified || {},
+    },
+    market,
+  };
+}
+
+const initialReport = buildTimeReport();
 ---
 <BaseLayout title="Refresh status" titleKey="refreshStatus.title" activeKey="none">
-  <StatusPage client:load />
+  <StatusPage client:load initial={initialReport} />
 </BaseLayout>
