@@ -114,6 +114,24 @@ Two rules follow, and both are cheap:
   `RAILWAY_GIT_COMMIT_SHA` is stamped into the environment and reported as
   `runtime.commit`, so the answer is the deployed SHA, not a guess.
 
+**"Wait for CI" waits for every required check, including the security scans
+(hit again on 2026-11-03).** The ruleset carries 22 required status checks, and
+a red one holds the deploy exactly like a red test does — the deploy is skipped,
+not queued. That day the hold-up was `OSV dependency scan`, red since
+2026-10-30 on four advisories that no upgrade could fix (minimatch 10.2.6/3.1.5,
+patched only in 11.0.1 while every published eslint still pins `^10.2.6` or
+`^3.1.5`; and three mcp 1.29.0 findings while semgrep still pins `mcp==1.29.0`).
+The commits that fixed the shop's own code were green in every other job and
+still rolled nothing.
+
+So when a deploy "should have happened and did not", read the whole check list,
+not just the test jobs. Fixing it is the same either way: clear the red check —
+here with the documented exceptions in `osv-scanner.toml` and
+`.github/osv-scanner.toml`, verified locally with the pinned scanner before
+pushing — then give Railway a commit it is allowed to build. `0bf260c` (a
+`backend/**` docs commit) went out two minutes after its run finished and
+reported itself as `runtime.commit` without any manual step.
+
 When checking whether a backend change is live, do not guess from timing: hit an
 endpoint that names what you changed. (`/api/geo` gained `country_hint` and
 `ip_hint` fields, which is how the edge-attribution work was confirmed on the
