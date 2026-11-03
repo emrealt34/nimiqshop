@@ -40,7 +40,51 @@
 # exceptions for other ecosystems belong next to their own manifest and have no
 # counterpart in the npm gate.
 #
-# No exceptions are currently outstanding for the root manifests.
+# One exception is outstanding for the root manifests (minimatch), below.
+
+# Added 2026-11-03 — GHSA-g3hv-75wg-m249 / CVE-2026-118764, minimatch < 11.0.1.
+# Covers BOTH findings the scan reports from package-lock.json (10.2.6 hoisted
+# and 3.1.5 nested), because an ignore matches the vulnerability, not the
+# package instance. osv-scanner records the CVE id in the SARIF output, so that
+# is the id used here; the GHSA alias in this comment is for humans following
+# the advisory link.
+[[IgnoredVulns]]
+id = "CVE-2026-118764"
+ignoreUntil = 2027-01-31 # re-check on every eslint bump; retire when ^11 is in range
+reason = """
+minimatch, dev-only, two instances in package-lock.json: 10.2.6 hoisted (eslint
+10.11.0 declares `minimatch: ^10.2.6`, @eslint/config-array declares ^10.2.4)
+and 3.1.5 nested (eslint 8.57.1, pulled in as a real dependency of
+@microsoft/eslint-formatter-sarif 3.1.0, via @eslint/eslintrc,
+@humanwhocodes/config-array and glob 7.2.3). A pattern containing repeated
+`**/../` segments makes firstPhasePreProcess() clone globParts entries inside
+its do/while fixpoint loop, and secondPhasePreProcess() then compares every pair
+of them, so one attacker-supplied pattern costs quadratic CPU and memory
+(CWE-405, CVSS 6.9, availability only). Published 2026-10-30, fixed in
+minimatch 11.0.1. There is no 10.x and no 3.x patch: the fix is semver-major.
+
+Upgrading everything to latest does not clear it. At the time of writing eslint
+10.14.0 still declares `minimatch: ^10.2.6`, @eslint/config-array 0.23.5 still
+declares `^10.2.4`, and @eslint/eslintrc 3.3.7 still declares `^3.1.5`, so no
+published release accepts 11.0.1. Forcing it through the `overrides` block is
+not available either: @eslint/eslintrc and glob 7 call the minimatch v3 callable
+API (`require('minimatch')(path, pattern)`) that v10 removed, so a blanket
+override hands them an object and takes the ESLint job down with it.
+
+Not reachable in anything this project ships. `npm ls minimatch --omit=dev` is
+empty — minimatch arrives only through ESLint's config-file and ignore matching,
+and every pattern it is given comes from this repository's own
+eslint.config.mjs, .eslintignore-era defaults or ESLint's own file enumeration.
+No request, user input or build artifact ever reaches it. The product is a
+static Astro build on Cloudflare Pages plus a Go binary on Railway.
+
+`npm audit` rates the same advisory moderate (6.9), so it is outside
+scripts/audit-gate.mjs, which blocks high/critical only; the two lists therefore
+disagree on this one entry by design, and the note next to ALLOWED says so.
+
+Retire this entry the moment eslint and @eslint/eslintrc accept minimatch >= 11
+(then `npm install` and delete this block), or if the advisory is withdrawn.
+"""
 
 # Retired 2026-10-17 — GHSA-ch52-4w7c-c8xp (CVE-2026-93748, http-cache-semantics
 # <= 4.2.0, max-stale cross-user cache disclosure). Added on 2026-10-03 when

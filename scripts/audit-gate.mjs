@@ -25,6 +25,14 @@ import { pathToFileURL } from 'node:url';
 // 4.3.0 has been locked since 2026-10-06, so the exception had nothing left to
 // cover. It was removed from osv-scanner.toml too, where leaving it in place
 // made the scan fail with "unused ignores".
+//
+// Deliberately absent — GHSA-g3hv-75wg-m249 / CVE-2026-118764 (minimatch <
+// 11.0.1, dev-only ReDoS via `**/../` pattern amplification). npm rates it
+// moderate, and this gate only blocks high/critical, so it never reaches
+// ALLOWED. osv-scanner.toml carries the documented exception with the full
+// reasoning (no 10.x/3.x patch exists and every published eslint still pins
+// the vulnerable range). The two lists disagree on this one advisory by
+// design; nothing here changes unless npm raises the severity.
 export const ALLOWED = new Map([
   [
     'https://github.com/advisories/GHSA-68fv-2mgg-jv7q',

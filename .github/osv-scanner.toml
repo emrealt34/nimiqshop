@@ -83,3 +83,86 @@ Retire this entry the moment semgrep allows opentelemetry-api >= 1.45.1 (then
 regenerate the closure with the pip-compile command at the top of
 semgrep-requirements.txt), or if the advisory is withdrawn.
 """
+
+# Added 2026-11-03 — three MCP Python SDK advisories published 2026-10-27, all
+# fixed in mcp 1.30.0 / 2.2.0, all blocked on the same pin as the entry above.
+# Each gets its own block because osv-scanner matches an ignore to one finding:
+# CVE-2026-116685 is the cross-origin redirect leak, CVE-2026-116686 the
+# outputSchema $ref fetch, CVE-2026-116684 the resource-server token confusion.
+[[IgnoredVulns]]
+id = "CVE-2026-116685"
+ignoreUntil = 2026-12-31 # re-check on every semgrep bump; retire when its mcp pin moves
+reason = """
+mcp 1.29.0, pulled in by semgrep-requirements.txt in this directory. The SDK's
+HTTP *client* transports (streamable_http_client, streamablehttp_client,
+sse_client, ClientSessionGroup, OAuth, create_mcp_http_client) enable
+follow_redirects and follow a redirect to a different origin while still
+forwarding caller-supplied credential headers — and the request body on 307/308
+(CVSS 5.9). Published 2026-10-27, fixed in mcp 1.30.0 and 2.2.0; OSV also carries
+it as GHSA-5h93-6whr-6q8j, and one entry covers both ids because the scanner
+matches aliases.
+
+There is nothing to upgrade to. mcp reaches this tree only as semgrep's own hard
+pin `mcp==1.29.0`, and the current semgrep 1.183.0 still declares exactly that
+pin. semgrep-requirements.txt is a hash-pinned closure installed with
+`pip install --require-hashes`, so a hand-bumped mcp makes the install
+unresolvable and takes the Semgrep workflow down with it.
+
+Not reachable in anything this project ships, and not reachable from the CI job
+either: the vulnerable path is an MCP client talking HTTP to a remote server.
+semgrep runs as a CLI scanner over local files — no MCP client is constructed,
+no remote MCP endpoint is contacted, and no credential headers exist in the job
+beyond the ephemeral GITHUB_TOKEN that semgrep's upload step uses.
+
+Retire this entry the moment semgrep's mcp pin reaches 1.30.0 (then regenerate
+the closure with the pip-compile command at the top of semgrep-requirements.txt),
+or if the advisory is withdrawn.
+"""
+
+[[IgnoredVulns]]
+id = "CVE-2026-116686"
+ignoreUntil = 2026-12-31 # re-check on every semgrep bump; retire when its mcp pin moves
+reason = """
+mcp 1.29.0, pulled in by semgrep-requirements.txt in this directory. While
+validating a server-declared outputSchema, ClientSession/ClientSessionGroup/tool
+calls use jsonschema's default resolver, so an unresolved `$ref` makes the client
+fetch an HTTP, HTTPS or file URL from its own network and filesystem context,
+synchronously on the event loop and with no timeout (CVSS 6.5). Published
+2026-10-27, fixed in mcp 1.30.0 and 2.2.0; OSV also carries it as
+GHSA-rwrf-2pqf-9j8j.
+
+Nothing to upgrade to, for the same reason as CVE-2026-116685 above: semgrep
+1.183.0 pins `mcp==1.29.0` and the requirements file is a hash-pinned closure.
+
+Not reachable in anything this project ships. Exploiting it needs an MCP client
+to call a hostile MCP server that answers with a booby-trapped outputSchema;
+semgrep in CI is a local CLI over repository files and never speaks MCP, so no
+server-chosen document is ever validated here. The product itself is a static
+Astro build plus a Go binary and contains no Python at all.
+
+Retire this entry the moment semgrep's mcp pin reaches 1.30.0, or if the
+advisory is withdrawn.
+"""
+
+[[IgnoredVulns]]
+id = "CVE-2026-116684"
+ignoreUntil = 2026-12-31 # re-check on every semgrep bump; retire when its mcp pin moves
+reason = """
+mcp 1.29.0, pulled in by semgrep-requirements.txt in this directory. Server-side
+bearer authentication configured through AuthSettings with a TokenVerifier that
+does not check `aud` accepts a token minted for a different resource server when
+one authorization server fronts several of them (CVSS 6.8). Published
+2026-10-27, fixed in mcp 1.30.0 and 2.2.0; OSV also carries it as
+GHSA-w4fh-qvv9-3v23.
+
+Nothing to upgrade to: semgrep 1.183.0 pins `mcp==1.29.0`, and the hash-pinned
+closure cannot take 1.30.0.
+
+Not reachable in anything this project ships. The vulnerable code is an MCP
+*server* auth layer, and no MCP server is deployed anywhere here — the product
+is a static Astro build on Cloudflare Pages plus a Go binary on Railway, and the
+CI job runs semgrep as a CLI, not as a network-facing MCP server.
+
+Retire this entry the moment semgrep's mcp pin reaches 1.30.0, or if the
+advisory is withdrawn.
+"""
