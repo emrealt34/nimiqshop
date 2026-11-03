@@ -31,6 +31,7 @@ import (
 	"nimiqshop/internal/httpx"
 	"nimiqshop/internal/i18n"
 	"nimiqshop/internal/mailtrap"
+	"nimiqshop/internal/memguard"
 	"nimiqshop/internal/middleware"
 	"nimiqshop/internal/nimiq"
 	"nimiqshop/internal/notification"
@@ -211,6 +212,31 @@ func main() {
 	if cfg.MaxConnsAuto {
 		log.Printf("runtime: held-connection ceiling %d (derived from the memory budget; MAX_CONCURRENT_CONNS overrides)",
 			cfg.MaxConcurrentConns)
+	}
+
+	// Idle memory hand-back (internal/memguard). The Go runtime gives memory
+	// back to the kernel at its own pace, and a hosting platform meters the
+	// container's cgroup — which counts the kernel's page cache on top of this
+	// process — so a shop that is quiet still reads as if it were busy. The
+	// guard watches the request clock and, once the shop has been quiet for
+	// MEM_RECLAIM_IDLE_SECS, returns what the runtime is holding (and, when the
+	// operator opted in, the volume's clean page cache).
+	//
+	// Health probes deliberately do NOT count as activity: Railway asks
+	// /api/health every 30 s, and treating that as traffic would mean the
+	// process is never idle and the reclaimer would never run.
+	memory := memguard.New(memguard.Config{
+		Interval:      time.Duration(cfg.MemoryReclaimIntervalSecs) * time.Second,
+		IdleAfter:     time.Duration(cfg.MemoryReclaimIdleSecs) * time.Second,
+		MinReleasable: uint64(cfg.MemoryReclaimMinMB) << 20,
+		PageCache:     cfg.MemoryReclaimPageCache,
+		DataDir:       cfg.BadgerDir,
+		Logger:        log.Default(),
+	})
+	if cfg.MemoryReclaim {
+		go memory.Start(ctx)
+		log.Printf("runtime: idle memory reclaimer armed (quiet %ds, check %ds, page cache %v)",
+			cfg.MemoryReclaimIdleSecs, cfg.MemoryReclaimIntervalSecs, cfg.MemoryReclaimPageCache)
 	}
 
 	// BadgerDB is embedded: this opens a directory on disk rather than
@@ -562,7 +588,7 @@ func main() {
 	// END_USER_IP and END_USER_AGENT on every call; a synthetic cache-warming
 	// actor has neither. Existing visual snapshots can still seed the UI.
 
-	r := buildRouter(h, cfg)
+	r := buildRouter(h, cfg, memory)
 
 	// Top-level panic logger. fasthttp already recovers handler panics
 	// per-connection, but it swallows the stack trace silently. Wrapping the
@@ -612,6 +638,11 @@ func main() {
 	maxKeepalive := keepaliveDuration(cfg)
 	server := &fasthttp.Server{
 		Handler: func(ctx *fasthttp.RequestCtx) {
+			// One atomic store per real request: the idle clock the memory
+			// reclaimer reads. Liveness probes are excluded — see memguard.
+			if !memguard.IsHealthPath(ctx.Path()) {
+				memory.Touch()
+			}
 			func() {
 				defer func() {
 					if p := recover(); p != nil {
@@ -708,7 +739,7 @@ func writeHealthJSON(ctx *fasthttp.RequestCtx, v any) {
 // runtime is configured around it — the numbers an operator needs when a
 // container starts dying, and the ones the console's Server card shows. Kept
 // separate from the sampler so it can be read without touching /proc.
-func runtimeEnvelope(cfg config.Config) map[string]any {
+func runtimeEnvelope(cfg config.Config, memory *memguard.Guard) map[string]any {
 	var ms runtime.MemStats
 	runtime.ReadMemStats(&ms)
 	out := map[string]any{
@@ -737,6 +768,26 @@ func runtimeEnvelope(cfg config.Config) map[string]any {
 		// it.
 		out["badger_dir"] = dir
 	}
+	// Where the memory actually goes. heap_bytes/sys_bytes above are the GO
+	// side; the numbers below are what the hosting dashboard meters, which is
+	// the cgroup total — anon (this process) PLUS file (the kernel's cache of
+	// the volume). Separating the two is what turns "150 MB, why?" into either
+	// "the process holds it" or "the kernel is caching the database", and those
+	// two have completely different fixes.
+	if u := memguard.ReadUsage(); u.CgroupBytes > 0 || u.RSSBytes > 0 {
+		out["rss_bytes"] = u.RSSBytes
+		out["cgroup_used_bytes"] = u.CgroupBytes
+		out["cgroup_anon_bytes"] = u.CgroupAnonBytes
+		out["cgroup_file_bytes"] = u.CgroupFileBytes
+		if u.CgroupLimit > 0 {
+			out["cgroup_limit_bytes"] = u.CgroupLimit
+		}
+	}
+	// What the reclaimer has handed back so far, and how long the shop has
+	// been quiet. "idle_seconds" climbing while "released_bytes" stays put is
+	// the honest signal that there was nothing left to give.
+	out["reclaim"] = memory.Stats()
+
 	// Which build is answering. Railway stamps the deployed commit into the
 	// container's environment; the source is public, so the short sha is
 	// not a secret — it is how "is the fix live yet?" gets answered without
@@ -815,7 +866,7 @@ var (
 	tierPool     *httpx.BucketPool
 )
 
-func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
+func buildRouter(h *handlers.Handlers, cfg config.Config, memory *memguard.Guard) *router.Router {
 	r := router.New()
 	// CORS: supports separate frontend/backend domains.
 	// Set ALLOWED_ORIGINS to your frontend origin(s), e.g. https://shop.nimiqbase.com,https://www.shop.nimiqbase.com
@@ -1292,7 +1343,7 @@ func buildRouter(h *handlers.Handlers, cfg config.Config) *router.Router {
 			// needs first when a container starts being killed, and it names
 			// where the budget came from. Values are numbers and built-in
 			// strings — no configuration secret is exposed.
-			"runtime": runtimeEnvelope(cfg),
+			"runtime": runtimeEnvelope(cfg, memory),
 		})
 	})
 

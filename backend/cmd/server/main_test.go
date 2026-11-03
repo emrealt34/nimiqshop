@@ -148,7 +148,7 @@ func bootStack(t *testing.T, opts stackOptions) *testStack {
 	tracker := &settlement.OrderTracker{Store: store, CR: cr, Interval: 150 * time.Millisecond, StaleAfter: 30 * time.Second}
 	tracker.Run(trackerCtx)
 
-	r := buildRouter(h, cfg)
+	r := buildRouter(h, cfg, nil)
 	srv := &fasthttp.Server{Handler: r.Handler, ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second}
 	ln := opts.listener
 	if ln == nil {

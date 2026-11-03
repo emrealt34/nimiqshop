@@ -429,6 +429,30 @@ type Config struct {
 	// configured, so the runtime log says where 50 came from.
 	GCPercentAuto bool
 
+	// MemoryReclaim hands idle memory back to the operating system (see
+	// internal/memguard). The runtime returns memory lazily, and hosting
+	// platforms meter the container's cgroup, which also counts the kernel's
+	// page cache — so a quiet shop can read as "150 MB" while using a fraction
+	// of that. Default ON: it only ever runs after MemoryReclaimIdleSecs with no
+	// real request, and the worst case is one extra collection on a box nobody
+	// is waiting on.
+	MemoryReclaim bool
+	// MemoryReclaimIdleSecs is how long the process must be quiet first. 0
+	// selects the package default (60 s).
+	MemoryReclaimIdleSecs int
+	// MemoryReclaimIntervalSecs is how often the idle clock is checked. 0
+	// selects the package default (30 s).
+	MemoryReclaimIntervalSecs int
+	// MemoryReclaimMinMB is the smallest amount of idle-but-held heap worth a
+	// forced collection. Below it the GC cycle costs more than it saves. 0
+	// selects the package default (16 MB).
+	MemoryReclaimMinMB int
+	// MemoryReclaimPageCache additionally drops the kernel's CLEAN page cache
+	// for the data directory (POSIX_FADV_DONTNEED). Off by default: it trades a
+	// few re-reads from the volume for memory a platform otherwise bills for.
+	// Only the operator knows whether their volume can afford the trade.
+	MemoryReclaimPageCache bool
+
 	// MaxKeepaliveDurationSecs bounds how long one TCP connection may keep
 	// being reused (enforced by the server handler via "Connection: close",
 	// see cmd/server). Without it a single client can pin a connection (and
@@ -819,29 +843,34 @@ func Load() Config {
 		BurnNimAddress: strings.TrimSpace(env("BURN_NIM_ADDRESS", "NQ07 0000 0000 0000 0000 0000 0000 0000 0000")),
 
 		// --- Edge hardening & scale envelope ---
-		MaxInFlight:              envIntOrZero("MAX_IN_FLIGHT_REQUESTS", 0),
-		ResponseCompression:      envBool("RESPONSE_COMPRESSION", true),
-		CompressLevel:            envIntOrZero("RESPONSE_COMPRESS_LEVEL", 5),
-		CompressMinBytes:         envIntOrZero("RESPONSE_COMPRESS_MIN_BYTES", 1024),
-		HSTS:                     envBool("HSTS_ENABLED", true),
-		HSTSPreload:              envBool("HSTS_PRELOAD", true),
-		ServerHeader:             env("SERVER_HEADER", "nimshop"),
-		CDNCachePublic:           envBool("CDN_CACHE_PUBLIC_API", true),
-		DailyQuoteAttemptLimit:   envIntOrZero("DAILY_QUOTE_ATTEMPT_LIMIT", defaultDailyQuoteAttemptLimit),
-		TierRateOverrides:        parseTierRateOverrides(os.Getenv("RATE_TIER_OVERRIDES")),
-		BadgerSyncWrites:         envBool("BADGER_SYNC_WRITES", true),
-		BadgerValueThresholdKB:   envIntOrZero("BADGER_VALUE_THRESHOLD_KB", 1024),
-		GCPercent:                envIntOrZero("GO_GC_PERCENT", 0),
-		MemoryLimitMB:            envIntOrZero("GO_MEMORY_LIMIT_MB", 0),
-		MaxKeepaliveDurationSecs: envIntOrZero("MAX_KEEPALIVE_DURATION_SECS", 75),
-		IdleTimeoutSecs:          envIntOrZero("IDLE_TIMEOUT_SECS", 30),
-		HTTPReadBufferBytes:      envIntOrZero("HTTP_READ_BUFFER_BYTES", 8192),
-		HTTPWriteBufferBytes:     envIntOrZero("HTTP_WRITE_BUFFER_BYTES", 8192),
-		HTTPReduceMemoryUsage:    envBool("HTTP_REDUCE_MEMORY_USAGE", true),
-		SessionCookieSecure:      envBool("SESSION_COOKIE_SECURE", true),
-		SessionCookieSameSite:    strings.ToLower(strings.TrimSpace(env("SESSION_COOKIE_SAME_SITE", "lax"))),
-		SessionCookieDomain:      strings.TrimSpace(os.Getenv("SESSION_COOKIE_DOMAIN")),
-		MaxConcurrentConns:       envIntOrZero("MAX_CONCURRENT_CONNS", 262144),
+		MaxInFlight:               envIntOrZero("MAX_IN_FLIGHT_REQUESTS", 0),
+		ResponseCompression:       envBool("RESPONSE_COMPRESSION", true),
+		CompressLevel:             envIntOrZero("RESPONSE_COMPRESS_LEVEL", 5),
+		CompressMinBytes:          envIntOrZero("RESPONSE_COMPRESS_MIN_BYTES", 1024),
+		HSTS:                      envBool("HSTS_ENABLED", true),
+		HSTSPreload:               envBool("HSTS_PRELOAD", true),
+		ServerHeader:              env("SERVER_HEADER", "nimshop"),
+		CDNCachePublic:            envBool("CDN_CACHE_PUBLIC_API", true),
+		DailyQuoteAttemptLimit:    envIntOrZero("DAILY_QUOTE_ATTEMPT_LIMIT", defaultDailyQuoteAttemptLimit),
+		TierRateOverrides:         parseTierRateOverrides(os.Getenv("RATE_TIER_OVERRIDES")),
+		BadgerSyncWrites:          envBool("BADGER_SYNC_WRITES", true),
+		BadgerValueThresholdKB:    envIntOrZero("BADGER_VALUE_THRESHOLD_KB", 1024),
+		GCPercent:                 envIntOrZero("GO_GC_PERCENT", 0),
+		MemoryLimitMB:             envIntOrZero("GO_MEMORY_LIMIT_MB", 0),
+		MemoryReclaim:             envBool("MEM_RECLAIM", true),
+		MemoryReclaimIdleSecs:     envIntOrZero("MEM_RECLAIM_IDLE_SECS", 60),
+		MemoryReclaimIntervalSecs: envIntOrZero("MEM_RECLAIM_INTERVAL_SECS", 30),
+		MemoryReclaimMinMB:        envIntOrZero("MEM_RECLAIM_MIN_MB", 16),
+		MemoryReclaimPageCache:    envBool("MEM_RECLAIM_PAGE_CACHE", false),
+		MaxKeepaliveDurationSecs:  envIntOrZero("MAX_KEEPALIVE_DURATION_SECS", 75),
+		IdleTimeoutSecs:           envIntOrZero("IDLE_TIMEOUT_SECS", 30),
+		HTTPReadBufferBytes:       envIntOrZero("HTTP_READ_BUFFER_BYTES", 8192),
+		HTTPWriteBufferBytes:      envIntOrZero("HTTP_WRITE_BUFFER_BYTES", 8192),
+		HTTPReduceMemoryUsage:     envBool("HTTP_REDUCE_MEMORY_USAGE", true),
+		SessionCookieSecure:       envBool("SESSION_COOKIE_SECURE", true),
+		SessionCookieSameSite:     strings.ToLower(strings.TrimSpace(env("SESSION_COOKIE_SAME_SITE", "lax"))),
+		SessionCookieDomain:       strings.TrimSpace(os.Getenv("SESSION_COOKIE_DOMAIN")),
+		MaxConcurrentConns:        envIntOrZero("MAX_CONCURRENT_CONNS", 262144),
 	}
 	// Reconcile the quote-attempt ceiling with the daily ORDER limit.
 	//
