@@ -215,3 +215,82 @@ jobs:
             --branch=main
             --commit-hash=${{ steps.source.outputs.sha }}
             --commit-dirty=false
+
+      # A DEPLOY IS NOT DONE WHEN WRANGLER RETURNS.
+      #
+      # On 2026-11-03 the live site was still serving the build of 6f50558
+      # (`<meta name="shop-build">` in the HTML) three pushes after that — the
+      # uploads reported success, the production alias never moved, and the
+      # first-paint fix that had merged hours earlier was never seen by a
+      # visitor. Nothing in the pipeline noticed, because the only thing it
+      # checked was wrangler's exit code.
+      #
+      # So: read the marker the site stamps into every page (Base.astro writes
+      # GITHUB_SHA into `meta[name=shop-build]`) and require it to BE this
+      # commit within five minutes. Pages propagates in seconds, so a mismatch
+      # after that is a real deployment problem — a project whose production
+      # branch is not `main`, a deployment stuck in "queued", or an alias that
+      # points at an older build — and the job should be red instead of green.
+      # EVERY page must come back with its own stylesheet, and that stylesheet
+      # must be fetchable. A deploy that lands half-way (or an HTML cached from
+      # an older build whose hashed CSS was pruned) shows up as a page with no
+      # CSS at all — the exact complaint on 2026-11-03 ("sayfalar arası geçerken
+      # yeni sayfada CSS yüklenmiyor"). Wrangler's exit code says nothing about
+      # this, so check it here.
+      - name: Verify every page can reach its stylesheet
+        env:
+          SITE: https://shop.nimiqbase.com
+        run: |
+          set -euo pipefail
+          fail=0
+          for path in / /cart/ /orders/ /track/ /cashback/ /quiz/ /support/ /status/ /activity/ /product/ /admin/; do
+            html="$(curl -fsS --max-time 20 "${SITE}${path}?css-check=${RANDOM}" || true)"
+            css="$(grep -o '/_assets/full\.[0-9a-f]*\.css' <<<"$html" | head -1 || true)"
+            if [[ -z "$css" ]]; then
+              echo "::error::${path} did not reference a deferred stylesheet at all"
+              fail=1
+              continue
+            fi
+            code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "${SITE}${css}")"
+            inline="$(grep -c '<link id=\"late-css\"' <<<"$html" || true)"
+            printf '%-13s %s → %s   (late-css link: %s)\n' "$path" "$css" "$code" "$inline"
+            [[ "$code" == "200" ]] || { echo "::error::${path} references ${css}, which answers ${code}"; fail=1; }
+            [[ "$inline" != "0" ]] || { echo "::error::${path} has no <link id=\"late-css\"> — the deferred stylesheet can never apply"; fail=1; }
+          done
+          exit $fail
+
+      - name: Verify the live site is serving THIS commit
+        env:
+          EXPECTED: ${{ steps.source.outputs.sha }}
+          SITE: https://shop.nimiqbase.com/
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 300))
+          while :; do
+            got="$(curl -fsS --max-time 20 "${SITE}?build-check=${RANDOM}" 2>/dev/null \
+              | grep -o 'name="shop-build" content="[0-9a-f]*' | head -1 | sed 's/.*content="//' || true)"
+            if [[ "$got" == "$EXPECTED" ]]; then
+              echo "Live site is serving ${EXPECTED:0:8} — deployment confirmed." | tee -a "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            if (( SECONDS > deadline )); then
+              {
+                echo "### Deployment did not reach production"
+                echo
+                echo "Wrangler uploaded \`${EXPECTED:0:8}\` but ${SITE} still answers \`${got:-nothing}\` after five minutes."
+                echo
+                echo "Check 1 (project): Cloudflare dashboard → Workers & Pages → the Pages project →"
+                echo "Settings → Build & deployments → *Production branch* must be \`main\`. When it is"
+                echo "not, \`pages deploy --branch=main\` only creates a PREVIEW deployment and the"
+                echo "production alias keeps serving an older build."
+                echo "Check 2 (deployment): Deployments list — is the newest production deployment"
+                echo "the commit above, or is it stuck in *queued*/*failed*? Retry it, or promote it"
+                echo "from the dashboard."
+                echo "Check 3 (cache): \`curl -sI ${SITE} | grep -i cf-cache-status\` — DYNAMIC is"
+                echo "uncached (expected); anything else means a cache rule is pinning the HTML."
+              } >> "$GITHUB_STEP_SUMMARY"
+              echo "::error::Production still serves '${got:-nothing}', not ${EXPECTED}. See the job summary."
+              exit 1
+            fi
+            sleep 15
+          done

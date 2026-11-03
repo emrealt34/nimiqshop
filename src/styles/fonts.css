@@ -140,9 +140,84 @@
 
 @font-face {
   font-family: "Fraunces Fallback";
-  src: local("Liberation Serif"), local("Times New Roman"), local("DejaVu Serif");
+  src: local("Liberation Serif"), local("Times New Roman"), local("Times");
   ascent-override: 97.8%;
   descent-override: 25.5%;
   line-gap-override: 0%;
-  size-adjust: 116.7%;
+  size-adjust: 122%;
+}
+
+/* --- One width ratio cannot describe several fallbacks (2026-11-03) ---------
+ *
+ * The block above used to list `local("DejaVu Serif")` as its LAST source. That
+ * is harmless on the machines this file was tuned on (Liberation Serif / Times
+ * New Roman win the `local()` race there) and WRONG everywhere else: on any
+ * system that has DejaVu but not Liberation/Times — a plain Linux box, and the
+ * headless image the release build runs in — the 116.7% width ratio, which
+ * describes Liberation Serif, was applied to DejaVu Serif, which is a much
+ * WIDER face. Measured on the live site at a 390 px viewport with the webfont
+ * delayed by ~1.2 s: the hero heading laid out in FOUR lines (114 px) as the
+ * fallback and THREE lines (86 px) once Fraunces landed, so everything below
+ * the hero moved 28 px and the page scored CLS 0.0920 — every phone that does
+ * not happen to have Liberation Serif or Times New Roman installed.
+ *
+ * The same trap exists on Android, where none of the sans `local()` names
+ * above resolve either (no Arial, no Liberation, no Helvetica): the tuned
+ * 103.6% face is skipped entirely and body copy swaps from Roboto/Noto to
+ * Nunito with no metric matching at all. Android is where most of this shop's
+ * traffic reads the page, so it gets its own faces rather than an inherited
+ * ratio.
+ *
+ * Hence: one @font-face per real fallback font, each with the width ratio
+ * measured against that font (character-weighted median over ~55 sans and
+ * ~540 serif text samples taken from the live pages at 390/1366 px, measured
+ * in the DOM so bold synthesis is included; the vertical overrides stay the
+ * webfont's own metrics, so the line boxes are identical whichever face wins):
+ *
+ *   Nunito   vs Arial/Liberation 103.6%   vs Roboto 104.3%
+ *            vs Noto Sans 101.5%          vs DejaVu Sans 92%
+ *   Fraunces vs Liberation/Times 122%      vs Noto Serif 113.2%
+ *            vs DejaVu Serif 95.4%
+ *
+ * A face whose `local()` does not resolve is skipped by the browser, so
+ * listing all of them costs nothing on the platforms that do not need them:
+ * Windows/macOS/iOS stop at the first face, Android at Roboto, Debian at
+ * DejaVu. If the copy or the type scale changes, re-measure: the spec
+ * `home: the fallback font lays out like the webfont` (tests/e2e/
+ * layout-stability.spec.ts) loads the page with the woff2 files blocked and
+ * names the exact element that moved, on whatever font the runner has. */
+@font-face {
+  font-family: "Nunito Fallback Roboto";
+  src: local("Roboto");
+  ascent-override: 101.1%;
+  descent-override: 35.3%;
+  line-gap-override: 0%;
+  size-adjust: 104.3%;
+}
+
+@font-face {
+  font-family: "Nunito Fallback Noto";
+  src: local("Noto Sans");
+  ascent-override: 101.1%;
+  descent-override: 35.3%;
+  line-gap-override: 0%;
+  size-adjust: 101.5%;
+}
+
+@font-face {
+  font-family: "Fraunces Fallback Noto";
+  src: local("Noto Serif");
+  ascent-override: 97.8%;
+  descent-override: 25.5%;
+  line-gap-override: 0%;
+  size-adjust: 113.2%;
+}
+
+@font-face {
+  font-family: "Fraunces Fallback DejaVu";
+  src: local("DejaVu Serif");
+  ascent-override: 97.8%;
+  descent-override: 25.5%;
+  line-gap-override: 0%;
+  size-adjust: 95.4%;
 }

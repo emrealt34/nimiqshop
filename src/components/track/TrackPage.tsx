@@ -107,7 +107,24 @@ export function TrackView() {
   }, [load]);
   useInterval(() => { if (id && document.visibilityState === 'visible') load(); }, 15000, [id]);
 
-  if (queryReady && !id) {
+  // NO ORDER ID = THE SEARCH FORM, INCLUDING BEFORE HYDRATION.
+  //
+  // This page is static: `?order=` is only readable in the browser, so the
+  // HTML built at build time cannot know whether the visitor deep-linked. The
+  // gate below used to require `queryReady` (a post-hydration flag), which
+  // meant the built page always fell through to the `loading` branch and
+  // painted the 6-row KvSkeleton — then the hydration effect flipped
+  // `queryReady`, the search form replaced the skeleton, and everything under
+  // it (the note, the activity button, the footer) jumped 66 px in one frame.
+  // Measured on the live site at a 390 px viewport: CLS 0.0896 on /track, the
+  // largest shift left in the whole app after the hero fix.
+  //
+  // The overwhelmingly common entry is /track with no query string, so that
+  // is what the first paint must show. A deep-link (`?order=…`) now sees this
+  // form for one frame before the skeleton takes over, which is a change of
+  // shape that visitor was going to get anyway (skeleton → order card); the
+  // alternative was making every plain /track visit pay for it.
+  if (!queryReady || !id) {
     return (
       <div className="container">
         <BackRow />

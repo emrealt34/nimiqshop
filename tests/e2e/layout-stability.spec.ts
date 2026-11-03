@@ -19,6 +19,13 @@
  * protects: if either is weakened, or the capture goes stale again, this test
  * fails with the exact selectors that moved.
  *
+ * NAVIGATION: always via BASE (`/nimiqshop/`), never `'/'`. The e2e server
+ * (tests/e2e/support/serve.mjs) mimics GitHub Pages, so every path outside
+ * BASE is a plain 404 — a spec that navigates to `'/'` measures the 404 page,
+ * finds no elements at all, and passes no matter what the stylesheet does.
+ * That is how the first version of this file looked green while the live site
+ * was jumping 28 px.
+ *
  * HOW IT MEASURES
  *   Load the page twice — once with the deferred sheet allowed to apply, once
  *   with the request aborted — and diff the boxes of the elements that sit in
@@ -26,6 +33,7 @@
  *   two runs moved because of that sheet, by definition.
  */
 import { test, expect } from './support/fixtures';
+import { BASE } from './support/data';
 import type { Page } from '@playwright/test';
 
 /** Elements that are on screen at first paint on the pages under test. */
@@ -56,6 +64,14 @@ const WATCHED = [
 
 /** First-viewport boxes of everything in WATCHED. */
 async function boxes(page: Page): Promise<Record<string, [number, number, number, number] | null>> {
+  return boxesOf(page, WATCHED);
+}
+
+/** Boxes for an explicit selector list. */
+async function boxesOf(
+  page: Page,
+  sels: string[],
+): Promise<Record<string, [number, number, number, number] | null>> {
   return page.evaluate((sels) => {
     const out: Record<string, [number, number, number, number] | null> = {};
     for (const s of sels) {
@@ -68,7 +84,7 @@ async function boxes(page: Page): Promise<Record<string, [number, number, number
       out[s] = [r.x, r.y, r.width, r.height].map((n) => Math.round(n * 10) / 10) as [number, number, number, number];
     }
     return out;
-  }, WATCHED);
+  }, sels);
 }
 
 /**
@@ -90,6 +106,13 @@ async function settledBoxes(page: Page, url: string, blockLateCss: boolean) {
   return result;
 }
 
+/** Hero-region boxes for the fallback-vs-webfont comparison. Deliberately
+ * narrow: these are the elements the owner saw move, they are laid out by text
+ * alone (no geo/country state, no fetched data), and they sit in the first
+ * viewport at both sizes. A heading that takes a different number of lines
+ * moves every one of them. */
+const FONT_WATCHED = ['header .topbar', '.hero h1', '.hero .lede', '.hero-actions', '.kf-pkg', '.how-strip', '.come-back'];
+
 const VIEWPORTS = [
   { name: 'desktop', width: 1280, height: 800 },
   { name: 'phone', width: 390, height: 844 },
@@ -98,8 +121,8 @@ const VIEWPORTS = [
 for (const vp of VIEWPORTS) {
   test(`home: the deferred stylesheet does not move anything (${vp.name}) @smoke`, async ({ page }) => {
     await page.setViewportSize({ width: vp.width, height: vp.height });
-    const withLate = await settledBoxes(page, '/', false);
-    const withoutLate = await settledBoxes(page, '/', true);
+    const withLate = await settledBoxes(page, BASE, false);
+    const withoutLate = await settledBoxes(page, BASE, true);
 
     const moved: string[] = [];
     for (const sel of WATCHED) {
@@ -123,6 +146,119 @@ for (const vp of VIEWPORTS) {
     ).toEqual([]);
   });
 }
+
+/**
+ * THE FALLBACK FACE MAY NOT LAY OUT DIFFERENTLY FROM THE WEBFONT.
+ *
+ * Both webfonts are `font-display: swap` (the owner rejected `optional`: it
+ * locks a whole pageview into the fallback face whenever the ~100 ms window is
+ * missed). With `swap` the fallback paints first and the real face replaces it
+ * as soon as it lands, so the only thing standing between a cold visitor and a
+ * visible jump is the metric-matched `@font-face` blocks in src/styles/fonts.css
+ * — ascent/descent overrides for the line box and a measured `size-adjust` for
+ * the advance widths.
+ *
+ * Those blocks are per FONT, not per family: one width ratio cannot describe
+ * several fallbacks, and `local()` silently skips the ones that are not
+ * installed on the machine doing the rendering. On 2026-11-03 the serif block
+ * listed `local("DejaVu Serif")` as its last source with Liberation Serif's
+ * 116.7% ratio, so every device without Liberation/Times — a plain Linux box,
+ * and Android, where neither the Arial nor the Liberation sans names resolve
+ * either — swapped the hero heading from four lines to three: 28 px of
+ * movement and CLS 0.0920 on the live site.
+ *
+ * This test is font-agnostic: it loads the page once with the woff2 files
+ * blocked (fallback only) and once normally, and requires the same boxes. It
+ * fails on whatever font the runner happens to have, which is the point — the
+ * ratios must hold for DejaVu and Liberation (what CI and most Linux desktops
+ * have) as well as for the Arial-class faces.
+ */
+for (const vp of VIEWPORTS) {
+  test(`home: the fallback font lays out like the webfont (${vp.name}) @smoke`, async ({ page }) => {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    const withWebfont = await settledBoxes(page, BASE, false);
+
+    await page.route('**/*.woff2', (route) => route.abort());
+    await page.goto(BASE, { waitUntil: 'load' });
+    await page.waitForTimeout(2500);
+    const fallbackOnly = await boxesOf(page, FONT_WATCHED);
+    await page.unroute('**/*.woff2');
+
+    // Only the FLOW is compared: `y` (where the element sits) and, for
+    // elements that are not page-tall accumulators, `height`. Intrinsic
+    // widths are deliberately ignored — a segmented control measures 670 px
+    // in Nunito and 652 px in the fallback on some hosts (a fraction of a
+    // percent per glyph) without moving anything, and failing on that would
+    // make the guard noise instead of signal. What must not happen is text
+    // taking a different number of LINES, and that shows up as `y`/`height`.
+    const moved: string[] = [];
+    for (const sel of FONT_WATCHED) {
+      const a = withWebfont[sel];
+      const b = fallbackOnly[sel];
+      if (!a && !b) continue;
+      if (!a || !b) {
+        moved.push(`${sel}: ${a ? 'only with the webfont' : 'only in the fallback run'}`);
+        continue;
+      }
+      const dy = Math.abs(a[1] - b[1]);
+      const dh = a[3] <= 1000 ? Math.abs(a[3] - b[3]) : 0;
+      if (dy > 1 || dh > 1) {
+        moved.push(`${sel}: y/height webfont=[${a[1]},${a[3]}] fallback=[${b[1]},${b[3]}]`);
+      }
+    }
+    expect(
+      moved,
+      'the fallback face wraps or sizes text differently from the webfont, so the swap moves the page — give the fallback font its OWN @font-face with a measured size-adjust (src/styles/fonts.css has the current ratios)',
+    ).toEqual([]);
+  });
+}
+
+/**
+ * THE DEFERRED STYLESHEET MUST SURVIVE A DEAD ISLAND LOADER.
+ *
+ * `full.<hash>.css` is inert (`media="print"`) until something flips it to
+ * "all". Until 2026-11-03 that flip existed only inside `css-late.js` — a
+ * 1.3 KB external file — so blocking, delaying or 404ing that one request left
+ * the page with nothing but its inline critical rules: half the design simply
+ * missing. The owner hit it while clicking through the nav ("yeni sayfada CSS
+ * yüklenmiyor"), and it reproduced in one line: abort the css-late script, then
+ * count the external sheets — zero, and `#late-css` still said media="print".
+ *
+ * The flip is now an inline bootstrap (part of the document, hashed into the
+ * CSP) that runs on the first animation frames and keeps `load` plus a timer
+ * as fallbacks, and the link carries its `href` from the first byte so a
+ * script failure can no longer leave it pointing at nothing.
+ *
+ * This test blocks the loader on purpose and requires the sheet to apply.
+ */
+test('the deferred stylesheet applies even when the island loader never runs @smoke', async ({ page }) => {
+  await page.route('**/css-late*.js', (route) => route.abort());
+  await page.goto(BASE, { waitUntil: 'load' });
+  await page.waitForFunction(
+    () => (document.getElementById('late-css') as HTMLLinkElement | null)?.media === 'all',
+    null,
+    { timeout: 5000 },
+  );
+
+  const state = await page.evaluate(() => {
+    const link = document.getElementById('late-css') as HTMLLinkElement | null;
+    const href = link?.getAttribute('href') || '';
+    const sheet = [...document.styleSheets].find((s) => s.href && /\/full\.[0-9a-f]+\.css$/.test(s.href));
+    let rules = 0;
+    try {
+      rules = sheet?.cssRules.length ?? 0;
+    } catch {
+      rules = 0;
+    }
+    return { href, rules, media: link?.media ?? null };
+  });
+
+  // The href must exist in the markup itself: an empty href + a dead script was
+  // exactly the "no CSS on the new page" state.
+  expect(state.href, 'the <link id="late-css"> must carry its href in the HTML, not only in data-href').toMatch(/\/full\.[0-9a-f]+\.css$/);
+  expect(state.media, 'the deferred stylesheet never flipped to media="all"').toBe('all');
+  expect(state.rules, 'the deferred stylesheet did not parse — every rule behind it is missing').toBeGreaterThan(100);
+});
 
 /**
  * The capture itself must have been taken with a market whose catalog renders.
