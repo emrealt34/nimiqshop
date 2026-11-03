@@ -90,7 +90,7 @@ function sourceCssHash() {
   return h.digest('hex').slice(0, 16);
 }
 
-async function capture(baseUrl, { withApi = true }) {
+async function capture(baseUrl, { withApi = true, country = 'TR' } = {}) {
   const { chromium } = await import('playwright');
   const postcss = (await import('postcss')).default;
   const browser = await chromium.launch({ args: ['--no-sandbox'] });
@@ -100,6 +100,21 @@ async function capture(baseUrl, { withApi = true }) {
   try {
     for (const viewport of VIEWPORTS) {
       const context = await browser.newContext({ viewport });
+      // Pin the visitor's market to the build's seed market.
+      //
+      // WHY THIS EXISTS (2026-11-03): the capture that shipped before this
+      // line was taken from a runner whose detected country differed from the
+      // seed's, so Base.astro set data-market-hold and the product grid was
+      // replaced by a spinner for the whole tour. `.product-card`,
+      // `.p-name`, `.thumb`, `.p-meta` and `.p-price` therefore "never
+      // matched", the build deferred them to the late stylesheet, and every
+      // card on the home page changed height by 3 px — and dragged the hero
+      // 13 px — the moment that sheet landed. A capture has to see the grid it
+      // is describing, so the tour states its market instead of inheriting
+      // whatever the runner's IP resolves to.
+      await context.addInitScript((cc) => {
+        try { localStorage.setItem('nimshop_country', cc); } catch (e) {}
+      }, country);
       if (!withApi) await context.route('**/api/**', (r) => r.abort());
       const page = await context.newPage();
       for (const path of PAGES) {
@@ -136,9 +151,11 @@ async function capture(baseUrl, { withApi = true }) {
 
 async function main() {
   const args = process.argv.slice(2);
+  const countryIdx = args.indexOf('--country');
+  const country = countryIdx !== -1 ? String(args[countryIdx + 1] || 'TR').toUpperCase() : 'TR';
   const captureIdx = args.indexOf('--capture');
   if (captureIdx === -1) {
-    console.error('usage: node scripts/critical-css.mjs --capture <baseUrl>');
+    console.error('usage: node scripts/critical-css.mjs --capture <baseUrl> [--country TR]');
     process.exit(2);
   }
   const baseUrl = args[captureIdx + 1];
@@ -152,7 +169,7 @@ async function main() {
   const matched = new Set();
   let loads = 0;
   for (const withApi of [true, false]) {
-    const r = await capture(baseUrl, { withApi });
+    const r = await capture(baseUrl, { withApi, country });
     for (const k of r.allKeys) allKeys.add(k);
     for (const k of r.matched) matched.add(k);
     loads += r.loads;

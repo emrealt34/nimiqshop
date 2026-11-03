@@ -232,6 +232,13 @@ const ALWAYS_INLINE_SELECTORS = [
   // A few KB of card chrome in the first frame buys a grid whose card boxes
   // are final from the moment they exist — before any logo even loads.
   '.thumb', '.product-img', '.product-card',
+  // Card CONTENT geometry (measured 2026-11-03): `.p-meta .chip` and
+  // `.p-meta .p-price` were deferred, and when the late sheet landed the chip's
+  // padding and the price's font-size changed under the card — every card on
+  // the home page grew 0.56 px, and with it the whole grid. Sub-pixel on its
+  // own, but it is the same class of bug as the 3 px one above, and the fix is
+  // a few hundred bytes: a card's text boxes are first-paint layout.
+  '.p-meta', '.p-name', '.p-price',
   // The wallet balance strip sits directly under the home hero and above the
   // buy buttons on a product page: its dashed card chrome is first-paint
   // layout, not decoration. Inline it, or the row appears a beat late.
@@ -348,6 +355,9 @@ export default function criticalCss() {
         const { default: postcss } = await import('postcss');
 
         const deferred = new Map(); // rule text -> nothing, insertion-ordered
+        // Selectors some page needs inline at load; never deferred (see the
+        // cascade-integrity note in the per-page split below).
+        const inlineSelectorsEverywhere = new Set();
         const htmlFiles = [];
         for await (const file of walk(outDir)) if (file.endsWith('.html')) htmlFiles.push(file);
 
@@ -404,24 +414,70 @@ export default function criticalCss() {
            *  the flip — the grid re-columned 5->6 mid-load from exactly this.
            *  Pass 1 records which (context, selector) keys land on each
            *  side; pass 2 keeps every copy of a selector that would have
-           *  been split, so a selector lives in exactly one sheet. */
+           *  been split, so a selector lives in exactly one sheet.
+           *
+           *  CORRECTED 2026-11-03. That guard compared (context, selector),
+           *  which is not the unit the cascade works on. `.kf-pkg` exists as
+           *  a base rule (`margin-top: 26px`) AND inside
+           *  `@media (min-width: 900px)` (`margin-top: 0`); the two copies
+           *  have different keys, so one was deferred and the other inlined,
+           *  and when the deferred sheet landed its base rule out-ranked the
+           *  media override that was already in the document — the hero's
+           *  aside jumped 13 px and every product card 1 px, on every load,
+           *  measured. The guard therefore keys on the SELECTOR ALONE: if a
+           *  selector is needed at load, every copy of it — base rules and
+           *  media-query overrides alike — stays inline, so the split can
+           *  never reorder one selector's own cascade. The cost is bytes
+           *  (the deferred sheet gives up a few rules that only apply at
+           *  other widths); the alternative is a page that moves. */
           const ruleKey = (node, context) => `${context.replace(/ \| $/, '')}\u0000${norm(node.selector || '')}`;
+          // A rule's selector is usually a LIST (".a, .b .c, #d"). The guard
+          // compares individual parts: a deferred rule like
+          // `.toolbar.filters .input, .toolbar.filters .btn-country` carries a
+          // selector that a page keeps inline, and if it were deferred its
+          // higher specificity would win after the flip — that is the mobile
+          // one: the country button's font-size changed 16px -> 14.4px at the
+          // flip and the filter row jumped 21px.
+          const selectorParts = (node) =>
+            norm(node.selector || '')
+              .split(',')
+              .map((part) => norm(part))
+              .filter(Boolean);
           const willKeepRule = (node, context) => {
             const key = ruleKey(node, context);
             const isPageCritical = /\.(?:cb-|pt-)/.test(node.selector || '');
             return alwaysInline(node) || ((!deferrable.has(key) || isPageCritical) && selectorMatchesPage(node.selector));
           };
-          const keepKeys = new Set();
-          const moveKeys = new Set();
+          const keepSelectors = new Set();
+          const moveSelectors = new Set();
           const scan = (container, context) => {
             container.each((node) => {
               if (node.type === 'atrule' && /keyframes|font-face/.test(node.name)) return;
               if (node.type === 'atrule' && node.nodes) { scan(node, `${context}@${node.name} ${node.params} | `); return; }
               if (node.type !== 'rule') return;
-              (willKeepRule(node, context) ? keepKeys : moveKeys).add(ruleKey(node, context));
+              const parts = selectorParts(node);
+              for (const part of parts) (willKeepRule(node, context) ? keepSelectors : moveSelectors).add(part);
             });
           };
           scan(root, '');
+          const splitSelectors = new Set([...keepSelectors].filter((sel) => moveSelectors.has(sel)));
+          // The deferred sheet is SHARED BY EVERY PAGE, so "this rule does not
+          // match on this page" is not a licence to defer it: another page may
+          // keep the same selector inline, and once the shared sheet lands it
+          // re-applies the deferred copy AFTER that page's inline one. That is
+          // exactly how `.kf-pkg`'s `margin-top: 26px` came back at desktop
+          // (the home page inlines the `@media` override, the cart page has no
+          // aside and deferred the base rule, and the shared file out-ranked
+          // the home page's own override). Anything kept inline anywhere is
+          // therefore never deferred anywhere.
+          for (const sel of keepSelectors) inlineSelectorsEverywhere.add(sel);
+          if (splitSelectors.size) {
+            logger.info(`critical CSS: ${splitSelectors.size} selector(s) kept inline in full because a copy renders at load (e.g. ${[...splitSelectors].slice(0, 3).join(', ')})`);
+          }
+          // A rule moves only when NO copy of ANY of its selectors is needed
+          // inline.
+          const keepRuleInline = (node, context) =>
+            willKeepRule(node, context) || selectorParts(node).some((part) => splitSelectors.has(part));
 
           /**
            * Split a container into the two halves. At-rules are rebuilt around
@@ -463,9 +519,7 @@ export default function criticalCss() {
                 if (seenRootVars) return;
                 seenRootVars = true;
               }
-              const key = ruleKey(node, context);
-              const splitAcrossSheets = keepKeys.has(key) && moveKeys.has(key);
-              if (node.type === 'atrule' || willKeepRule(node, context) || splitAcrossSheets) {
+              if (node.type === 'atrule' || keepRuleInline(node, context)) {
                 keep.push(text);
                 inlineBytes += text.length;
               } else {
@@ -508,7 +562,43 @@ export default function criticalCss() {
         // Every page carries the same full sheet, so positions in one
         // representative copy give the canonical order; rules absent from it
         // keep their first-seen order at the end (stable sort).
-        const deferredCss = [...deferred.keys()]
+        // A rule whose selector is needed inline by ANY page is dropped from
+        // the shared sheet. Those selectors are fully inlined on the pages that
+        // use them (see keepRuleInline), and a page that does not use one has
+        // nothing to style — so removing it from the late sheet costs that page
+        // nothing while keeping every page's own cascade intact.
+        // Filter INSIDE each entry: a deferred entry is often a whole
+        // `@media (...)` block rather than a single rule, and a block that
+        // keeps one selector a page needs inline re-introduces exactly the
+        // cascade inversion this guard exists to prevent (the 719px block
+        // carries `.toolbar.filters .field`, `label.oos-toggle` and
+        // `input.input` — all first-paint layout on a phone). Walk the block,
+        // drop the rules whose selector some page keeps inline, and keep the
+        // rest of the block.
+        const pruneDeferred = (text) => {
+          let root;
+          try {
+            root = postcss.parse(text);
+          } catch {
+            return text;
+          }
+          let kept = false;
+          root.walkRules((rule) => {
+            const parts = norm(rule.selector || '').split(',').map((part) => norm(part));
+            if (parts.some((part) => inlineSelectorsEverywhere.has(part))) rule.remove();
+            else kept = true;
+          });
+          root.walkAtRules((at) => {
+            if (at.nodes && at.nodes.length === 0) at.remove();
+          });
+          return kept ? root.toString() : '';
+        };
+        const deferredRules = [...deferred.keys()].map(pruneDeferred).filter(Boolean);
+        const droppedAsInline = deferred.size - deferredRules.length;
+        if (droppedAsInline > 0) {
+          logger.info(`critical CSS: ${droppedAsInline} deferred rule(s) dropped because another page keeps that selector inline`);
+        }
+        const deferredCss = deferredRules
           .sort((a, b) => {
             const ia = repCss.indexOf(a);
             const ib = repCss.indexOf(b);

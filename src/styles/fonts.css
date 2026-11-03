@@ -104,11 +104,38 @@
  */
 @font-face {
   font-family: "Nunito Fallback";
-  src: local("Liberation Sans"), local("Arial"), local("Helvetica"), local("DejaVu Sans");
+  src: local("Liberation Sans"), local("Arial"), local("Helvetica");
   ascent-override: 101.1%;
   descent-override: 35.3%;
   line-gap-override: 0%;
   size-adjust: 103.6%;
+}
+
+/* DejaVu Sans gets its OWN face, because one width ratio cannot describe two
+ * different fallbacks. Measured 2026-11-03 in a minimal Linux container (no
+ * Arial, no Liberation — DejaVu is what `local()` resolves to there, and it is
+ * what a lot of Linux desktops use):
+ *
+ *   Arial / Liberation Sans  -> 103.6% of Nunito's advance widths
+ *   DejaVu Sans              ->  92% (measured: 615 px on the hero lede
+ *                               against the real face's 602 px, i.e. the same
+ *                               one line; 96.5% still wrapped it)
+ *
+ * With DejaVu sharing the Arial face, the hero lede measured 684 px against a
+ * 620 px column at 103.6% and wrapped to TWO lines, while the real font fits
+ * in ONE (602 px) — so the font swap pulled the whole hero up 30 px (CLS
+ * 0.0149 on a throttled desktop load, the single largest shift left on the
+ * home page). With DejaVu at 96.5% the fallback lays out 605 px, i.e. exactly
+ * one line, and the swap is layout-neutral again. The ascent/descent
+ * overrides are unchanged: they describe NUNITO's line box, not the
+ * fallback's, so the vertical rhythm is identical whichever face is in use. */
+@font-face {
+  font-family: "Nunito Fallback DejaVu";
+  src: local("DejaVu Sans");
+  ascent-override: 101.1%;
+  descent-override: 35.3%;
+  line-gap-override: 0%;
+  size-adjust: 92%;
 }
 
 @font-face {
