@@ -89,6 +89,31 @@ Deploys are triggered by pushes to `main` (GitHub trigger
 `serviceInstanceDeploy`. Watch Paths is `backend/**`, so a docs- or
 frontend-only push must not be expected to roll the API.
 
+**THE TRAP THIS SETS (hit for real on 2026-11-03).** A backend fix had landed on
+`main` (`c1746c7`, the idle-memory reclaimer) while CI was red for an unrelated
+reason. Railway answers a push whose CI never went green by *skipping that
+deploy entirely* — it does not queue it and run it later when CI recovers. The
+next commit (`6f50558`) fixed the test and CI went green, but the commit after
+that was frontend-only, so Watch Paths (`backend/**`) had nothing to build:
+`/api/health` still reported the previous commit two hours later, and nothing
+in GitHub showed a failure, because no deploy had been attempted.
+
+Two rules follow, and both are cheap:
+
+  * after fixing a red CI, **redeploy the backend explicitly** — the green run
+    does not replay the deploy Railway skipped. Either hit *Redeploy* on the
+    service, or `railway up --service zetas`, or touch a file under
+    `backend/**` in a commit of its own.
+  * never verify a backend change by waiting. Ask the process which commit it
+    is running:
+
+    ```bash
+    curl -s https://shopapi.nimiqbase.com/api/health | jq -r .runtime.commit
+    ```
+
+    `RAILWAY_GIT_COMMIT_SHA` is stamped into the environment and reported as
+    `runtime.commit`, so the answer is the deployed SHA, not a guess.
+
 When checking whether a backend change is live, do not guess from timing: hit an
 endpoint that names what you changed. (`/api/geo` gained `country_hint` and
 `ip_hint` fields, which is how the edge-attribution work was confirmed on the
@@ -188,6 +213,16 @@ railway logs --build -p <project-id> -e production -s zetas
 
 # Manual deploy
 railway up --service zetas            # or serviceInstanceDeploy over the API
+
+# Idle-memory reclaimer (internal/memguard, added 2026-11-03): the runtime
+# hands idle memory back once the shop has been quiet for 60 s. The health
+# endpoint shows what it is holding and what it has given back — and, because
+# the platform meters the whole cgroup, how much of the total is the kernel's
+# cache of the volume rather than this process:
+curl -s https://shopapi.nimiqbase.com/api/health \
+  | jq '.runtime | {rss_bytes, cgroup_anon_bytes, cgroup_file_bytes, reclaim}'
+# If cgroup_file_bytes dominates, set MEM_RECLAIM_PAGE_CACHE=true to let the
+# reclaimer drop the volume's clean page cache as well (see backend/.env.example).
 ```
 
 Railway's free plan forces `sleepApplication=true`, so an idle service sleeps
