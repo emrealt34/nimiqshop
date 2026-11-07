@@ -251,10 +251,26 @@ jobs:
               fail=1
               continue
             fi
-            code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "${SITE}${css}")"
+            # Wrangler returning is NOT the same as the edge having the file.
+            # On 2026-11-07 this check failed the deploy of 745f268 although the
+            # deploy had landed: `/` was probed first and got 404 for
+            # full.63d8b77c.css, while the ten pages probed after it got 200 for
+            # the SAME url — which answers 200 ever since, from the alias that
+            # serves exactly that commit. A brand-new hashed asset can 404 for
+            # the few seconds Pages needs to propagate it, so ask again before
+            # calling it missing. Six tries over ~50 s: long enough to outlast
+            # propagation, short enough that a stylesheet which really was
+            # pruned still turns the job red. The marker check below already
+            # waits five minutes for the alias itself to move.
+            code=""
+            for attempt in 1 2 3 4 5 6; do
+              code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "${SITE}${css}")"
+              if [[ "$code" == "200" ]]; then break; fi
+              if (( attempt < 6 )); then sleep 10; fi
+            done
             inline="$(grep -c '<link id=\"late-css\"' <<<"$html" || true)"
             printf '%-13s %s → %s   (late-css link: %s)\n' "$path" "$css" "$code" "$inline"
-            [[ "$code" == "200" ]] || { echo "::error::${path} references ${css}, which answers ${code}"; fail=1; }
+            [[ "$code" == "200" ]] || { echo "::error::${path} references ${css}, which still answers ${code} after six tries over ~50 s"; fail=1; }
             [[ "$inline" != "0" ]] || { echo "::error::${path} has no <link id=\"late-css\"> — the deferred stylesheet can never apply"; fail=1; }
           done
           exit $fail

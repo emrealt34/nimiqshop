@@ -11,7 +11,7 @@ require (
 	github.com/fasthttp/router v1.5.4
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
-	github.com/klauspost/compress v1.20.1
+	github.com/klauspost/compress v1.20.3
 	github.com/mailtrap/mailtrap-go v0.3.0
 	github.com/valyala/fasthttp v1.74.0
 	golang.org/x/image v0.46.0
