@@ -1192,7 +1192,6 @@ const de = {
     payNotInstalled: 'Nimiq Pay ist nicht installiert. App-Store wird geöffnet …',
     payOpenFailed: 'Nimiq Pay konnte nicht geöffnet werden.',
     openInPay: 'In Nimiq Pay öffnen',
-    cashbackAnyRail: 'Cashback folgt deinem Stake, nicht deiner Zahlungs-App. Bezahle mit Karte, mit NIM oder in Nimiq Pay — der Staker-Tarif kommt vom Staking bei uns, und alle Wallets, mit denen du stakst, kannst du in deinem Konto verknüpfen.',
     openInPayHint: 'Nur ein Schnellzugriff — bezahlen geht auch direkt hier, und Cashback funktioniert so oder so.',
     packageAria: 'Was im Paket enthalten ist',
     insidePackage: 'Im Paket enthalten',

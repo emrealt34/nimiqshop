@@ -1193,7 +1193,6 @@ const tr = {
     payNotInstalled: 'Nimiq Pay kurulu değil. Uygulama mağazası açılıyor…',
     payOpenFailed: 'Nimiq Pay açılamadı.',
     openInPay: 'Nimiq Pay\'de aç',
-    cashbackAnyRail: 'Cashback ödeme uygulamanı değil, stake\'ini takip eder. Kartla, NIM ile ya da Nimiq Pay içinden öde — staker oranı bizde stake etmenden gelir; stake ettiğin cüzdanların hepsini de hesabından bağlayabilirsin.',
     openInPayHint: 'Sadece hızlı erişim — burada da ödeyebilirsin, cashback ikisinde de çalışır.',
     packageAria: 'Paketin içinde ne var',
     insidePackage: 'Paketin içinde',

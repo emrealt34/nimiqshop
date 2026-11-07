@@ -361,9 +361,6 @@ export function HomePage() {
               </button>
             )}
           </div>
-          {/* Cashback is earned by STAKING, not by the app you pay with — the one
-              thing the hero used to get wrong. Stated where the confusion starts. */}
-          <p className="hero-any-rail" style={{ marginTop: 14, maxWidth: '34rem', opacity: 0.9 }}>{t('home.cashbackAnyRail')}</p>
         </div>
         <aside className="kf-pkg" aria-label={t('home.packageAria')}>
           <div className="kf-pkg-head">
