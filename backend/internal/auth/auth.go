@@ -237,4 +237,3 @@ func ParseStakeLinkInviteChallenge(secret, raw, targetUserID string) (*Challenge
 	}
 	return claims, nil
 }
-

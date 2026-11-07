@@ -16,7 +16,7 @@ import (
 // `staker`, and claims it directly onto Device 1's account without sharing
 // session cookies.
 func TestStakeAddressInviteLinksPhonePayAndPCHubSeamlessly(t *testing.T) {
-	account := newLinkTestWallet(t)  // PC account (0 NIM staked)
+	account := newLinkTestWallet(t)   // PC account (0 NIM staked)
 	payStaker := newLinkTestWallet(t) // Phone Nimiq Pay wallet (500 NIM staked)
 	hubStaker := newLinkTestWallet(t) // Second staking wallet (300 NIM staked)
 	unstaked := newLinkTestWallet(t)  // Wallet with 0 stake

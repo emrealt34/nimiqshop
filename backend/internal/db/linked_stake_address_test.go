@@ -753,4 +753,3 @@ func TestMultipleSaturatedLinkedWalletsCapBoostAtCeilingAndCountBaseOnce(t *test
 		t.Fatalf("second wallet ledger A changed from %v to %v despite wallet 1 filling MaxBoostBps", lBeforeSecond.A, lAfterSecond.A)
 	}
 }
-
