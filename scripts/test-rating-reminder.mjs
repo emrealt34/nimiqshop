@@ -11,7 +11,7 @@ test('rating reminder accepts new deliveries, excludes invalid/rated purchases, 
  try {
   const file=join(dir,'reminder.cjs');
   buildSync({entryPoints:[new URL('../src/lib/ratingReminder.ts',import.meta.url).pathname],bundle:true,platform:'node',format:'cjs',outfile:file,logLevel:'silent'});
-  const {unratedPurchases,ratingReminderKey}=createRequire(import.meta.url)(file);
+  const {unratedPurchases,ratingReminderKey,ratingReminderRatedKey,rememberRatedPurchase,isPurchaseLocallyRated}=createRequire(import.meta.url)(file);
   const now=Date.parse('2026-10-12T12:00:00Z');
   const old={id:'old',status:'delivered',delivered_at:'2026-10-10T12:00:00Z',product_id:'Amazon',rating:0};
   assert.deepEqual(unratedPurchases([old],[],now),[{kind:'order',id:'old',name:'Amazon'}]);
@@ -26,5 +26,11 @@ test('rating reminder accepts new deliveries, excludes invalid/rated purchases, 
   assert.deepEqual(unratedPurchases(null,{items:[quote]},now),[]);
   assert.notEqual(ratingReminderKey('one'),ratingReminderKey('two'));
   assert.notEqual(ratingReminderKey('one',{kind:'quote',id:'a',name:''}),ratingReminderKey('one',{kind:'quote',id:'b',name:''}));
+  const stored=new Map();
+  globalThis.localStorage={setItem:(k,v)=>stored.set(k,v),getItem:(k)=>stored.get(k)||null};
+  assert.equal(isPurchaseLocallyRated('quote','rated-id'),false);
+  rememberRatedPurchase('quote','rated-id');
+  assert.equal(stored.get(ratingReminderRatedKey('quote','rated-id')),'1');
+  assert.equal(isPurchaseLocallyRated('quote','rated-id'),true);
  } finally {await rm(dir,{recursive:true,force:true});}
 });

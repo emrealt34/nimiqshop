@@ -67,6 +67,9 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AppRoot } from '../AppRoot';
 import { Icon } from '../ui/Icon';
 import { StakePositionCard } from './StakePositionCard';
+import { LinkedStakeWallet } from './LinkedStakeWallet';
+import { captureStakeLinkIntent, clearStakeLinkIntent } from '../../lib/stakeLinkIntent';
+import { formatWalletAddress } from '../../lib/format';
 import { useStakePosition, type StakePosition } from '../../lib/stakePosition';
 import { getUid, getAddress } from '../../lib/session';
 import { CashbackCalculator } from './CashbackCalculator';
@@ -249,6 +252,11 @@ function WalletRedirectSheet({ guide }: { guide: WalletGuide }) {
 export function CashbackView() {
   const { t } = useT();
   const authed = useSession();
+  // A staking wallet that arrived as ?link_stake=… (see lib/stakeLinkIntent).
+  // Captured once on arrival and kept across sign-in until the buyer links or
+  // dismisses it; the URL itself is cleaned so a refresh cannot reopen it.
+  const [linkIntent, setLinkIntent] = useState('');
+  useEffect(() => { setLinkIntent(captureStakeLinkIntent()); }, []);
   const { position, loading: positionLoading, error: positionError, refresh: refreshPosition, owner: positionOwner } = useStakePosition(authed);
   const stakeSending = useRef(false);
   const [pendingStake, setPendingStake] = useState<{ owner: string; hash: string; before: string } | null>(null);
@@ -417,6 +425,16 @@ export function CashbackView() {
   async function recheckPosition() {
     const fresh = await refreshPosition();
     if (fresh && pending && positionKey(fresh) !== pending.before) savePending(null);
+  }
+  /**
+   * Linking or unlinking a staking wallet changes WHICH wallet every stake and
+   * ledger read describes, so both views have to be re-read: the rate card and
+   * the on-chain position now answer for a different address.
+   */
+  async function refreshAfterLinkChange() {
+    const fresh = await refreshMyStake();
+    if (fresh) { setMineOwner(positionOwner); setMine(fresh); }
+    await recheckPosition();
   }
   // The universal base (non-stakers; 0 by default) and the pool's staker
   // base (any positive stake). Both come from the API — the pool's number,
@@ -703,6 +721,15 @@ export function CashbackView() {
   const stakeFooter = (
     <div id="cb-stake-form">
       {authed && <StakePositionCard position={position} loading={positionLoading || (!position && !positionError)} error={positionError} pool={validator} busy={!!busy || !!pending} onRefresh={() => { void recheckPosition(); }} onMove={doMove} onWallet={showWalletRedirect} />}
+      {/* "Which wallet earns my cashback?" — the question a buyer who stakes from
+          one wallet and pays from another cannot answer from the rate alone. */}
+      {authed && <LinkedStakeWallet mine={mine} onChanged={() => { void refreshAfterLinkChange(); }} intent={linkIntent} onIntentDone={() => { clearStakeLinkIntent(); setLinkIntent(''); }} />}
+      {!authed && linkIntent && (
+        <div className="cb-link-note mt-1" data-testid="stake-link-signin">
+          <Icon name="info" size={16} />
+          <div className="small">{t('stakeLink.intentSignIn', { address: formatWalletAddress(linkIntent) })}</div>
+        </div>
+      )}
       {pending && <div className="alert info" role="status">{t('stakePosition.pending')} <code style={{ overflowWrap: 'anywhere' }}>{pending.hash}</code><button className="btn btn-sm" onClick={() => { void recheckPosition(); }} disabled={positionLoading}>{t('common.refresh')}</button><button className="btn btn-sm btn-outline" onClick={showWalletRedirect}>{t('stakePosition.manageWallet')}</button></div>}
       {err && !showStakeForm && <div className="alert error" role="alert">{err}</div>}
       {!showStakeForm ? null : (

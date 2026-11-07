@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { getRatingConfig, listOrders, listQuotes } from '../../lib/api';
 import { getUid, isAuthed, subscribeSession } from '../../lib/session';
-import { RATING_REMINDER_COOLDOWN_MS, ratingReminderKey, unratedPurchases, type UnratedPurchase } from '../../lib/ratingReminder';
+import { RATING_REMINDER_COOLDOWN_MS, ratingReminderKey, isPurchaseLocallyRated, unratedPurchases, type UnratedPurchase } from '../../lib/ratingReminder';
 import { pagePath } from '../../lib/asset';
 import { useT } from '../../i18n';
 import { useSheet } from '../AppProviders';
@@ -65,7 +65,7 @@ export function RatingReminder() {
           if (!cfg?.enabled || cancelled) return;
           const [orders, quotes] = await Promise.all([listOrders(), listQuotes()]);
           if (cancelled || !isAuthed() || getUid() !== uid) return;
-          const purchases = unratedPurchases(orders, quotes).filter(purchase => !snoozed(ratingReminderKey(uid, purchase)));
+          const purchases = unratedPurchases(orders, quotes).filter(purchase => !isPurchaseLocallyRated(purchase.kind, purchase.id) && !snoozed(ratingReminderKey(uid, purchase)));
           if (!purchases.length) return;
           // Snooze when shown, including X/backdrop/Escape dismissal and
           // navigation to the purchase. No repeated nagging on every visit.

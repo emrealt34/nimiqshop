@@ -41,6 +41,16 @@ test('reminder waits for an existing sheet and opens when it closes', async ({ p
   await expect(page.locator('.sheet')).toContainText('Henüz değerlendirmediğin alışverişlerin var');
 });
 
+test('a locally confirmed rating suppresses a stale alternate-kind history row', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('nimshop.rating-reminder.rated-id.v1:unrated-real-shape', '1'));
+  await page.route('**/api/ratings/config', route => route.fulfill({ json: { enabled: true } }));
+  await page.route('**/api/orders', route => route.fulfill({ json: [purchase] }));
+  await page.route('**/api/quotes', route => route.fulfill({ json: [] }));
+  await open(page, path('/'));
+  await expect(page.locator('.hero')).toBeVisible();
+  await expect(page.locator('.sheet')).toHaveCount(0);
+});
+
 test('a newly delivered purchase is not suppressed by an older purchase or legacy snooze', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('nimshop.rating-reminder.v1:u1', String(Date.now()+7*86400000));

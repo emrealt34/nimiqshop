@@ -78,7 +78,7 @@ func TestConfigEnvironmentAndValidation(t *testing.T) {
 		t.Setenv(key, "")
 	}
 	c := ConfigFromEnv()
-	if c.FromName != "nimshop" {
+	if c.FromName != "NimShop" {
 		t.Fatal("default sender name must match the current website brand")
 	}
 	if c.Enabled() || c.FromEmail != DefaultFromEmail || c.FromName != DefaultFromName || c.Category != DefaultCategory || c.Timeout != DefaultTimeout {

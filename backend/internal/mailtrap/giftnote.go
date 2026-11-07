@@ -907,7 +907,7 @@ var shopLogoPNG []byte
 
 // shopLogoImg is the logo as an inline image. It is trusted, constant markup;
 // the alt text is what a client with images blocked shows.
-const shopLogoImg = `<img src="cid:` + shopLogoContentID + `" width="48" height="48" alt="nimshop" style="display:block;margin:0 auto;width:48px;height:48px;border:0;outline:none">`
+const shopLogoImg = `<img src="cid:` + shopLogoContentID + `" width="48" height="48" alt="NimShop" style="display:block;margin:0 auto;width:48px;height:48px;border:0;outline:none">`
 
 func shopLogoAttachment() Attachment {
 	return Attachment{Filename: "nimiqshop-logo.png", ContentType: "image/png", Data: shopLogoPNG, ContentID: shopLogoContentID}

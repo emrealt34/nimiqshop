@@ -101,8 +101,53 @@ export type StakerProgram = {
 };
 
 /** The signed-in buyer's standing from /api/poolstake/me. */
-export type MyStake = {
+/**
+ * One wallet inside a buyer's earning set, as reported by /poolstake/me.
+ *
+ * `linked` is false for the wallet the account signed in with — it always earns
+ * and can never be removed — and true for a staking wallet the buyer proved
+ * ownership of. Its `stake_nim` and `boost_bps` are that wallet's own share of
+ * the account's totals.
+ */
+export type StakeWalletRow = {
   address: string;
+  linked?: boolean;
+  /** ISO timestamp; absent for the sign-in wallet. */
+  linked_at?: string;
+  staked?: boolean;
+  stake_nim?: number;
+  boost_bps?: number;
+  loyalty_days?: number;
+  /** Where the answer came from: pool | chain | local_watch | mixed. */
+  source?: string;
+  /** Set when THIS wallet delegates to a different validator. */
+  other_validator?: string;
+};
+
+export type MyStake = {
+  /**
+   * The wallet whose stake earns this cashback. It is `account_address` unless
+   * a separate staking wallet has been linked, so a buyer who stakes from his
+   * regular wallet but checks out through Nimiq Pay still earns as a staker.
+   * Payouts never follow this field: they go to `account_address`.
+   */
+  address: string;
+  /** The wallet this account signed in with, and the wallet cashback is paid to. */
+  account_address?: string;
+  /** True when at least one separate staking wallet is linked (ownership proven by signature). */
+  stake_address_linked?: boolean;
+  /** ISO timestamp of the primary link; empty when nothing is linked. */
+  stake_address_linked_at?: string;
+  /**
+   * Every wallet whose stake is summed into this rate, sign-in wallet first.
+   * `stake_nim` and `boost_bps` above are the TOTALS over this list; the staker
+   * base is applied once per account, not once per wallet.
+   */
+  earning_addresses?: string[];
+  /** The per-wallet breakdown behind those totals. */
+  stake_addresses?: StakeWalletRow[];
+  /** How many wallets one account may link (the server enforces it). */
+  linked_wallet_limit?: number;
   staked: boolean;
   stake_luna: number;
   stake_nim: number;
@@ -267,10 +312,49 @@ export function clearStakerProgramCache() {
   }
 }
 
+/** Addresses as the backend sends them: a list of strings, possibly absent. */
+function normAddressList(v: any): string[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const out = v.map(a => String(a || '').trim()).filter(Boolean);
+  return out.length ? out : undefined;
+}
+
+/** The per-wallet breakdown; a row without an address is not a row. */
+function normStakeWalletRows(v: any): StakeWalletRow[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const out: StakeWalletRow[] = [];
+  for (const entry of v) {
+    const address = String(entry?.address || '').trim();
+    if (!address) continue;
+    out.push({
+      address,
+      linked: !!entry?.linked,
+      linked_at: entry?.linked_at ? String(entry.linked_at) : undefined,
+      staked: !!entry?.staked,
+      stake_nim: Number(entry?.stake_nim) > 0 ? Number(entry.stake_nim) : 0,
+      boost_bps: Number(entry?.boost_bps) > 0 ? Number(entry.boost_bps) : 0,
+      loyalty_days: Number.isFinite(Number(entry?.loyalty_days)) ? Number(entry.loyalty_days) : undefined,
+      source: entry?.source ? String(entry.source) : undefined,
+      other_validator: entry?.other_validator ? String(entry.other_validator) : undefined,
+    });
+  }
+  return out.length ? out : undefined;
+}
+
 function parseMyStake(r: any): MyStake | null {
   if (!r || !r.address) return null;
   return {
     address: String(r.address),
+    // The three link fields have to survive the parse or the cashback page can
+    // never tell "earned by your own wallet" from "earned by a linked one":
+    // MyStake declares them, but every read goes through this function, and a
+    // type alone does not carry data. (Found by the link e2e, 2026-10-17.)
+    account_address: r.account_address ? String(r.account_address) : undefined,
+    stake_address_linked: !!r.stake_address_linked,
+    stake_address_linked_at: r.stake_address_linked_at ? String(r.stake_address_linked_at) : undefined,
+    earning_addresses: normAddressList(r.earning_addresses),
+    stake_addresses: normStakeWalletRows(r.stake_addresses),
+    linked_wallet_limit: Number(r.linked_wallet_limit) > 0 ? Number(r.linked_wallet_limit) : undefined,
     staked: !!r.staked,
     stake_luna: Number(r.stake_luna) || 0,
     stake_nim: Number(r.stake_nim) || 0,

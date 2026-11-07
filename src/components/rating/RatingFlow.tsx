@@ -44,6 +44,7 @@ export interface RatingCommentItem {
   tx?: string;
 }
 import { ratingStars } from '../../lib/ratingStars';
+import { rememberRatedPurchase } from '../../lib/ratingReminder';
 
 export interface RatingCurrent {
   rated: boolean;
@@ -116,6 +117,7 @@ export function RatingFlow({
     setPhase('waiting');
     awaitRatingSaved(kind, id, { stars: pending.stars, comment: pending.comment, tx_hash: pending.hash })
       .then((res) => {
+        rememberRatedPurchase(kind, id);
         clearPendingRating();
         if (!mounted.current) return;
         setPendingSubmission(false);
@@ -150,6 +152,7 @@ export function RatingFlow({
       setPhase('waiting');
       try {
         const result = await awaitRatingSaved(kind, id, { stars: pending.stars, comment: pending.comment, tx_hash: pending.hash });
+        rememberRatedPurchase(kind, id);
         clearPendingRating(); setPendingSubmission(false); setPhase('saved'); onSaved?.(result);
       } catch (err) { setPhase('idle'); setError(messageFor(err, t)); }
       return;
@@ -178,6 +181,7 @@ export function RatingFlow({
       if (!mounted.current) return;
       setPhase('waiting');
       const res = await awaitRatingSaved(kind, id, { stars, comment: c, tx_hash: paid.hash });
+      rememberRatedPurchase(kind, id);
       clearPendingRating();
       if (!mounted.current) return;
       setPendingSubmission(false);

@@ -4020,6 +4020,14 @@ body { padding-bottom: 0; }
 .cb-position-balances dd { margin: 5px 0 0; font-weight: 800; overflow-wrap: anywhere; }
 @media (max-width: 480px) { .cb-position-balances { grid-template-columns: 1fr; gap: 8px; } .cb-position-balances > div { display: flex; justify-content: space-between; gap: 12px; } .cb-position-balances dd { margin: 0; } }
 
+/* Linked staking wallets card (LinkedStakeWallet). Its own class names: the
+   .cb-position rules above belong to the stake position card and must not
+   restyle this one. */
+.cb-linked-wallet { padding-bottom: 18px; margin-bottom: 18px; border-bottom: 1px dashed var(--line); }
+.cb-linked-wallet h3 { margin: 0; }
+.cb-link-note { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--muted) 10%, transparent); }
+.cb-link-note > svg { flex: none; margin-top: 2px; }
+
 /* Compact cashback receipt: one complete hero, two actions, no vacant columns. */
 .pt-card.pt-impact { max-width: 760px; margin-inline: auto; }
 .pt-card.pt-impact .pt-impact-summary { display: block; padding: var(--ic-x); border-bottom: none; }
@@ -4172,3 +4180,23 @@ body { padding-bottom: 0; }
 .rating-comments > li { min-width: 0; }
 /* The same card inside another card (the track page) drops its own frame. */
 .rating-comment-plain { border: 0; background: none; padding: 0; }
+
+/* Cashback staking wallets: distinct Nimiq identicon rows, clear total and one-tap linking. */
+.cb-linked-wallet { margin: 16px 0; padding: 18px; border: 1px solid var(--line); border-radius: var(--r-l); background: var(--surface-1); box-shadow: 2px 3px 0 rgba(78,61,40,.08); }
+.cb-linked-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.cb-linked-heading h3 { margin: 3px 0 0; font-family: Fraunces, serif; }
+.cb-linked-heading .eyebrow { color: var(--ink-dim); font-size: .62rem; font-weight: 900; letter-spacing: .14em; }
+.cb-linked-list { display: grid; gap: 8px; margin: 12px 0; padding: 0; list-style: none; }
+.cb-linked-row { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 9px 10px; border: 1px solid var(--line); border-radius: var(--r-m); background: var(--surface-0); }
+.cb-linked-avatar { width: 34px; height: 34px; flex: none; border: 1px solid var(--line); border-radius: 50%; background: var(--surface-2); }
+.cb-linked-avatar-fallback { display: grid; place-items: center; color: var(--stamp); font-weight: 900; }
+.cb-linked-wallet-meta { display: grid; gap: 2px; min-width: 0; }
+.cb-linked-address { overflow-wrap: anywhere; }
+.cb-linked-remove { margin-left: auto; flex: none; }
+.cb-linked-total { margin: 10px 0 4px; padding: 10px 12px; border-radius: var(--r-m); background: var(--green-soft); color: var(--green-ink, var(--ink)); font-weight: 900; }
+.cb-linked-count { margin: 10px 0; }
+@media (max-width: 520px) {
+  .cb-linked-wallet { padding: 14px; }
+  .cb-linked-row { align-items: flex-start; }
+  .cb-linked-remove { margin-left: auto; }
+}

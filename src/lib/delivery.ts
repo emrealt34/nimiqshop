@@ -91,9 +91,11 @@ export function buildOrderRequest(
   if (avatar && !anonymous) req.gifter_identicon = avatar;
   if (isTopUp) {
     req.phone_number = phone || '';
-    if (gift && ch && (email || '').trim()) {
-      req.email = (email || '').trim();
-    }
+    // Top-ups are phone-delivered, but the supplier still needs the buyer's
+    // email for receipts and order confirmation. Keep it on ordinary top-ups
+    // too; otherwise the buyer's valid email is silently replaced with an
+    // empty field and the supplier rejects the quote.
+    req.email = (email || '').trim();
   } else {
     req.email = (email || '').trim();
   }
