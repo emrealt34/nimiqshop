@@ -707,3 +707,50 @@ func TestStakeRecheckWatchesEveryLinkedWallet(t *testing.T) {
 		t.Errorf("the resolved re-check was not cleared: %d left", len(remaining))
 	}
 }
+
+// TestMultipleSaturatedLinkedWalletsCapBoostAtCeilingAndCountBaseOnce verifies
+// both hard caps when a buyer links the maximum 5 staking wallets and saturates
+// every wallet's ledger book:
+//  1. Base rate is counted ONCE (100 bps = 1.00%, never 5 × 100 = 500 bps).
+//  2. Summed boost rate never exceeds MaxBoostBps (1000 bps = 10.00%), so total
+//     rate is 100 + 1000 = 1100 bps (11.00%), never 5 × 1000 = 5000 bps (50%).
+//  3. Excess credit in wallets 2..5 is NOT burned once wallet 1 already fills
+//     the 10% ceiling for that order.
+func TestMultipleSaturatedLinkedWalletsCapBoostAtCeilingAndCountBaseOnce(t *testing.T) {
+	b := newLinkedStakeBuyer(t, "cap-ceiling", []int64{
+		500_00000, 500_00000, 500_00000, 500_00000, 500_00000,
+	})
+	// Saturate all 5 linked wallets up to the $10 ledger cap (10% boost each on $100).
+	for _, wallet := range b.wallets {
+		if err := b.store.ObserveStakeLedger(wallet, 500_00000, b.now); err != nil {
+			t.Fatalf("observe ledger: %v", err)
+		}
+		// Large realized fee at $0.01/NIM saturates A at AMaxUSD/$0.01 = 1,000 NIM ($10).
+		if _, err := b.store.ApplyProfitSnapshot(wallet, b.now.Format("2006-01"), 500_000_000, 0.01, 1825, 1.0, 500_00000, b.now); err != nil {
+			t.Fatalf("profit snapshot: %v", err)
+		}
+	}
+
+	lBeforeSecond, ok, err := b.store.ReadStakeLedger(b.wallets[1])
+	if err != nil || !ok || lBeforeSecond.A <= 0 {
+		t.Fatalf("expected funded second wallet ledger before purchase, got ok=%v A=%v err=%v", ok, lBeforeSecond.A, err)
+	}
+
+	row := b.fulfill(t)
+	if row.Status != CashbackQueued {
+		t.Fatalf("status = %q (skip=%q), want queued", row.Status, row.SkipReason)
+	}
+	// Base is 100 bps (counted ONCE across 5 wallets) + MaxBoostBps 1000 bps = 1100 bps (11.00%).
+	if row.Bps != 1100 {
+		t.Fatalf("bps = %d, want 1100 (single 100 bps base + 1000 bps max boost ceiling)", row.Bps)
+	}
+	// Wallet 1 already covered the full 1000 bps ceiling, so wallet 2's credit stays intact!
+	lAfterSecond, ok, err := b.store.ReadStakeLedger(b.wallets[1])
+	if err != nil || !ok {
+		t.Fatalf("read second wallet ledger after purchase: ok=%v err=%v", ok, err)
+	}
+	if lAfterSecond.A != lBeforeSecond.A {
+		t.Fatalf("second wallet ledger A changed from %v to %v despite wallet 1 filling MaxBoostBps", lBeforeSecond.A, lAfterSecond.A)
+	}
+}
+

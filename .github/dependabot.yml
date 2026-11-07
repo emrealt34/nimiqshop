@@ -13,6 +13,13 @@ updates:
     open-pull-requests-limit: 0
     cooldown:
       default-days: 7
+    ignore:
+      # eslint 10.x pins minimatch ^3.1.2 / ^9.0.x; bumping minimatch to 11.x
+      # breaks npm peer resolution and causes Dependabot security-update check
+      # runs to fail on main, aborting Railway Wait-for-CI deploys.
+      - dependency-name: minimatch
+        versions:
+          - '>= 11.0.0'
     groups:
       # Astro + its integrations move together; splitting them produces
       # pull requests that cannot pass the build on their own.

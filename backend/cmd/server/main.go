@@ -1252,6 +1252,14 @@ func buildRouter(h *handlers.Handlers, cfg config.Config, memory *memguard.Guard
 	r.POST("/api/poolstake/stake-address/challenge", authedTiered(aPool, h.StakeAddressChallenge))
 	r.POST("/api/poolstake/stake-address", authedTiered(aPool, h.StakeAddressLink))
 	r.DELETE("/api/poolstake/stake-address", authedTiered(aPool, h.StakeAddressUnlink))
+	// Cross-device account-bound pairing link (?stake_link=<token>): lets a
+	// signed-in buyer generate a short-lived pairing URL on one device (PC or
+	// Nimiq Pay) and open + sign it on the other device/wallet without sharing
+	// session cookies.
+	r.POST("/api/poolstake/stake-address/invite", authedTiered(aPool, h.StakeAddressInviteCreate))
+	r.GET("/api/poolstake/stake-address/invite", tiered(tPool, pinPrivate(h.StakeAddressInviteInfo)))
+	r.POST("/api/poolstake/stake-address/invite/challenge", tiered(tPool, pinPrivate(h.StakeAddressInviteChallenge)))
+	r.POST("/api/poolstake/stake-address/invite/claim", tiered(tPool, pinPrivate(h.StakeAddressInviteClaim)))
 	// The buyer just broadcast a stake to our pool; the pool has NOT indexed
 	// it yet. Record the pending note so the fulfillment path never pays a
 	// real staker the base rate during the index-latency window.

@@ -198,3 +198,95 @@ test.describe('Link opened from a URL, signed out @smoke', () => {
     await expect(page.getByTestId('stake-link-signin')).toBeVisible();
   });
 });
+
+test.describe('Cross-device pairing link (?stake_link=<token>) @smoke', () => {
+  const VALID_INVITE = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOiJ1MSIsImFjY291bnQiOiJOUTA3MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAifQ.abcdefghijklmnopqrstuvwxyz0123456789_-ABCDE';
+
+  test('signed-in buyer creates a pairing link and sees the QR + copy panel', async ({ page }) => {
+    await page.route('**/api/poolstake/me', route => route.fulfill({ json: poolStakeMe([]) }));
+    await page.route('**/api/poolstake/stake-address/invite', route => {
+      if (route.request().method() === 'POST') {
+        return route.fulfill({
+          json: {
+            invite_token: VALID_INVITE,
+            account_address: ADDRESS.replace(/ /g, ''),
+            expires_at: Math.floor(Date.now() / 1000) + 900,
+            ttl_seconds: 900,
+            linked_count: 0,
+            linked_wallet_limit: 5,
+          },
+        });
+      }
+      return route.continue();
+    });
+    await open(page, path('/cashback'));
+
+    const card = page.getByTestId('linked-stake-wallet');
+    await card.getByTestId('stake-link-create-invite').click();
+    await expect(card.getByTestId('stake-link-invite-box')).toBeVisible();
+    await expect(card.getByTestId('stake-link-invite-copy')).toBeVisible();
+  });
+
+  test.describe('receiving device (signed out)', () => {
+    test.use({ lang: 'en', api: { authed: false, mode: 'ok', orders: 0, preference: 'cashback' } });
+
+    test('signed-out browser opens ?stake_link=, sees Hub + Nimiq Pay options, signs and links directly', async ({ page }) => {
+      await fakeHub(page);
+      const claims: Record<string, unknown>[] = [];
+      await page.route('**/api/poolstake/stake-address/invite**', route => {
+        const url = route.request().url();
+        if (url.includes('/challenge')) {
+          return route.fulfill({
+            json: {
+              nonce: 'inv-n',
+              message: `nimshop.io link staking wallet to account ${ADDRESS.replace(/ /g, '')}: inv-n`,
+              challenge_token: 'inv-chal-tok',
+              account_address: ADDRESS.replace(/ /g, ''),
+            },
+          });
+        }
+        if (url.includes('/claim')) {
+          claims.push(route.request().postDataJSON());
+          return route.fulfill({
+            json: {
+              linked: true,
+              via_invite: true,
+              account_address: ADDRESS.replace(/ /g, ''),
+              stake_address: STAKE_ADDRESS.replace(/ /g, ''),
+              stake_nim: 500,
+              stake_source: 'chain',
+              linked_count: 1,
+              linked_wallet_limit: 5,
+            },
+          });
+        }
+        return route.fulfill({
+          json: {
+            valid: true,
+            account_address: ADDRESS.replace(/ /g, ''),
+            expires_at: Math.floor(Date.now() / 1000) + 900,
+            at_limit: false,
+            linked_count: 0,
+            linked_wallet_limit: 5,
+          },
+        });
+      });
+
+      await open(page, path(`/cashback?stake_link=${VALID_INVITE}`));
+      const claimCard = page.getByTestId('stake-invite-claim-card');
+      await expect(claimCard).toBeVisible();
+      expect(page.url()).not.toContain('stake_link');
+      await expect(claimCard.getByTestId('stake-invite-claim-hub')).toBeVisible();
+      await expect(claimCard.getByTestId('stake-invite-open-pay')).toBeVisible();
+
+      await claimCard.getByTestId('stake-invite-claim-hub').click();
+      await expect.poll(() => claims.length).toBe(1);
+      expect(claims[0]).toMatchObject({
+        invite_token: VALID_INVITE,
+        challenge_token: 'inv-chal-tok',
+        stake_address: STAKE_ADDRESS.replace(/ /g, ''),
+      });
+      await expect(claimCard.getByTestId('stake-invite-claimed')).toBeVisible();
+    });
+  });
+});

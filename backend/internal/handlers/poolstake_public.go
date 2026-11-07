@@ -184,7 +184,7 @@ func (h *Handlers) ledgerBoostBpsBestEffort(userID string) int {
 	// same rule when they pay). Reading only the primary wallet would show a
 	// buyer with three staking wallets a third of the boost they actually get.
 	settings, _ := h.Store.GetAdminSettings(0)
-	params := settings.EffectiveStakeCashback()
+	params := stakeledger.Normalize(settings.EffectiveStakeCashback())
 	total := 0
 	for _, address := range user.EarningStakeAddresses() {
 		l, ok, err := h.Store.ReadStakeLedger(address)
@@ -192,6 +192,9 @@ func (h *Handlers) ledgerBoostBpsBestEffort(userID string) int {
 			continue
 		}
 		total += stakeledger.BoostBps(&l, nimUsd, params)
+	}
+	if total > params.MaxBoostBps {
+		total = params.MaxBoostBps
 	}
 	return total
 }
@@ -537,6 +540,10 @@ func (h *Handlers) buildStakeMeView(ctx *fasthttp.RequestCtx, user db.User) (map
 	poolBase := 0
 	if staked {
 		poolBase = stakerBase
+	}
+	maxBoostBps := stakeledger.Normalize(settings.EffectiveStakeCashback()).MaxBoostBps
+	if boostBps > maxBoostBps {
+		boostBps = maxBoostBps
 	}
 	base := db.StakerStake{Staked: staked, StakeLuna: stakeLuna, BaseBps: poolBase}.EffectiveBaseBps(operatorBase)
 	totalBps := base + boostBps

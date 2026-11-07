@@ -33,7 +33,8 @@ import { TestPayButton } from './TestPayButton';
 import { LightningRailPills } from './payRailKit';
 import { NimiqPayPayButton } from './NimiqPayPayButton';
 import { saveLightningFunding } from '../../lib/api';
-import { inNimiqPay, detectMobilePlatform } from '../../lib/miniapp';
+import { inNimiqPay, detectMobilePlatform, openInNimiqPay } from '../../lib/miniapp';
+import { NimiqPayInstallBody } from '../ui/NimiqPayInstallDialog';
 import { PaymentCountdown } from './PaymentCountdown';
 import { lightningPaymentURI, rememberLightningPayment } from '../../lib/hub';
 import { PAID_STATUSES, paymentWatchOver, quoteBolt11, quoteIdOf, isQuotePayable, launchLightningUri, paidOrderHandedBack, liveOrderHandedBack } from '../../lib/pay';
@@ -265,6 +266,24 @@ export function openSingleBuyFlow(opts: {
             <Icon name="nimiq" size={18} />
             <span className="btn-label">{tr('checkout.flowConnectNimiqWallet')}</span>
           </button>
+          {!inNimiqPay() && (
+            <button
+              type="button"
+              className="btn btn-outline btn-block mt-1"
+              onClick={() => {
+                openInNimiqPay(() => {
+                  openSheet({
+                    title: tr('login.payInstallTitle'),
+                    render: () => <NimiqPayInstallBody only={detectMobilePlatform()} />,
+                  });
+                });
+              }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}
+            >
+              <Icon name="nimiq" size={16} />
+              <span className="btn-label">{tr('login.openInPay')}</span>
+            </button>
+          )}
         </div>
       ),
     });

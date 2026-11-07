@@ -177,47 +177,63 @@ func (h *Handlers) StakeAddressLink(ctx *fasthttp.RequestCtx) {
 		writeError(ctx, fasthttp.StatusUnauthorized, "challenge expired or invalid, request a new one")
 		return
 	}
-	if err := nimiq.ValidateAddress(req.StakeAddress); err != nil {
-		writeError(ctx, fasthttp.StatusBadRequest, "malformed nimiq address")
+
+	linked, _, _, source, ok := h.completeStakeAddressLink(ctx, user, claims.Nonce, req.StakeAddress, req.PublicKey, req.Signature)
+	if !ok {
 		return
 	}
-	stakeAddress := nimiq.NormalizeAddress(req.StakeAddress)
+	h.writeLinkResult(ctx, linked, source)
+}
+
+// completeStakeAddressLink runs the shared verification + persistence ladder
+// for both in-session linking and cross-device invite linking.
+func (h *Handlers) completeStakeAddressLink(
+	ctx *fasthttp.RequestCtx,
+	user db.User,
+	nonce, rawStakeAddress, rawPubKey, rawSig string,
+) (linked db.User, stakeAddress string, stakeLuna int64, source string, ok bool) {
+	if err := nimiq.ValidateAddress(rawStakeAddress); err != nil {
+		writeError(ctx, fasthttp.StatusBadRequest, "malformed nimiq address")
+		return db.User{}, "", 0, "", false
+	}
+	stakeAddress = nimiq.NormalizeAddress(rawStakeAddress)
 	account := nimiq.NormalizeAddress(user.NimiqAddress)
 	if stakeAddress == account {
 		writeError(ctx, fasthttp.StatusConflict,
 			"that is the wallet this account signed in with; it already earns your cashback")
-		return
+		return db.User{}, "", 0, "", false
 	}
 
-	pubKey, err := decodeFlexible(req.PublicKey)
+	pubKey, err := decodeFlexible(rawPubKey)
 	if err != nil {
 		writeError(ctx, fasthttp.StatusBadRequest, "public_key must be hex or base64")
-		return
+		return db.User{}, "", 0, "", false
 	}
-	sig, err := decodeFlexible(req.Signature)
+	sig, err := decodeFlexible(rawSig)
 	if err != nil {
 		writeError(ctx, fasthttp.StatusBadRequest, "signature must be hex or base64")
-		return
+		return db.User{}, "", 0, "", false
 	}
 
 	// Rebuild the message from the challenge, not from the request: the nonce
-	// comes from the server-signed token, the account from the session, and the
-	// wallet from the (re-validated) body. VerifySignedMessage also checks that
-	// pubKey derives to stakeAddress, so this is genuine proof of ownership.
-	message := stakeLinkMessage(h.Cfg.SiteName(), account, claims.Nonce)
+	// comes from the server-signed token, the account from the session/invite,
+	// and the wallet from the (re-validated) body. VerifySignedMessage also
+	// checks that pubKey derives to stakeAddress, so this is genuine proof of
+	// ownership.
+	message := stakeLinkMessage(h.Cfg.SiteName(), account, nonce)
 	if err := nimiq.VerifySignedMessage(pubKey, sig, message, stakeAddress); err != nil {
 		writeError(ctx, fasthttp.StatusUnauthorized, "signature verification failed")
-		return
+		return db.User{}, "", 0, "", false
 	}
 
 	// One wallet, one account: a stake may only feed the cashback of a single
 	// buyer, otherwise two accounts could both claim the same delegation.
 	if existing, err := h.Store.GetUserByStakeAddress(stakeAddress); err == nil && existing.ID != user.ID {
 		writeError(ctx, fasthttp.StatusConflict, "that staking wallet is already linked to another account")
-		return
+		return db.User{}, "", 0, "", false
 	} else if err != nil && !errors.Is(err, db.ErrNotFound) {
 		writeError(ctx, fasthttp.StatusInternalServerError, "could not check the staking wallet")
-		return
+		return db.User{}, "", 0, "", false
 	}
 
 	// Require a real delegation to OUR validator before the rate follows this
@@ -225,7 +241,9 @@ func (h *Handlers) StakeAddressLink(ctx *fasthttp.RequestCtx) {
 	// that earns nothing and then wonder why; the pool → chain → local-watch
 	// ladder is the same one the standing page uses, so the answer here and
 	// there cannot disagree.
-	staked, stakeLuna, source, elsewhere := h.verifyLinkableStake(ctx, stakeAddress)
+	var staked bool
+	var elsewhere string
+	staked, stakeLuna, source, elsewhere = h.verifyLinkableStake(ctx, stakeAddress)
 	if !staked {
 		msg := "that wallet has no stake with our validator yet, so there is nothing to earn from"
 		if elsewhere != "" {
@@ -237,20 +255,20 @@ func (h *Handlers) StakeAddressLink(ctx *fasthttp.RequestCtx) {
 			"staked":          false,
 			"other_validator": elsewhere,
 		})
-		return
+		return db.User{}, "", 0, "", false
 	}
 
 	now := time.Now().UTC()
-	linked, err := h.Store.AddStakeAddress(user.ID, stakeAddress, now)
+	linked, err = h.Store.AddStakeAddress(user.ID, stakeAddress, now)
 	switch {
 	case errors.Is(err, db.ErrTooManyStakeAddresses):
 		writeError(ctx, fasthttp.StatusConflict, stakeWalletLimitMessage)
-		return
+		return db.User{}, "", 0, "", false
 	case err != nil:
 		log.Printf("poolstake: could not link stake wallet %s to account %s: %v",
 			poolstake.CanonicalAddress(stakeAddress), user.ID, err)
 		writeError(ctx, fasthttp.StatusInternalServerError, "could not link the staking wallet")
-		return
+		return db.User{}, "", 0, "", false
 	}
 	log.Printf("poolstake: account %s now earns from %d wallet(s), latest %s (%s NIM via %s)",
 		user.ID, len(linked.EarningStakeAddresses()), poolstake.CanonicalAddress(stakeAddress), fmtNIM(stakeLuna), source)
@@ -265,7 +283,187 @@ func (h *Handlers) StakeAddressLink(ctx *fasthttp.RequestCtx) {
 		_ = watch
 	}
 
-	h.writeLinkResult(ctx, linked, source)
+	return linked, stakeAddress, stakeLuna, source, true
+}
+
+// inviteUser resolves the target account of a cross-device pairing link token.
+func (h *Handlers) inviteUser(ctx *fasthttp.RequestCtx, rawToken string) (db.User, *auth.StakeLinkInviteClaims, bool) {
+	claims, err := auth.ParseStakeLinkInvite(h.Cfg.JWTSecret, strings.TrimSpace(rawToken))
+	if err != nil {
+		writeError(ctx, fasthttp.StatusUnauthorized, "invite link expired or invalid")
+		return db.User{}, nil, false
+	}
+	user, err := h.Store.GetUser(claims.UserID)
+	if err != nil || user.NimiqAddress == "" || poolstake.CanonicalAddress(user.NimiqAddress) != poolstake.CanonicalAddress(claims.Account) {
+		writeError(ctx, fasthttp.StatusUnauthorized, "invite link expired or invalid")
+		return db.User{}, nil, false
+	}
+	return user, claims, true
+}
+
+// POST /api/poolstake/stake-address/invite
+//
+// Mint a short-lived account-bound pairing token so the buyer can open a link
+// on another device/wallet (e.g. Phone Nimiq Pay ↔ PC Nimiq Hub) and attach
+// that wallet directly to THIS account without sharing session cookies.
+func (h *Handlers) StakeAddressInviteCreate(ctx *fasthttp.RequestCtx) {
+	user, ok := h.linkUser(ctx)
+	if !ok {
+		return
+	}
+	if len(user.LinkedStakeWallets()) >= db.MaxLinkedStakeAddresses {
+		writeError(ctx, fasthttp.StatusConflict, stakeWalletLimitMessage)
+		return
+	}
+	account := nimiq.NormalizeAddress(user.NimiqAddress)
+	token, exp, err := auth.IssueStakeLinkInvite(h.Cfg.JWTSecret, user.ID, account)
+	if err != nil {
+		writeError(ctx, fasthttp.StatusInternalServerError, "could not create invite link")
+		return
+	}
+	writeJSON(ctx, fasthttp.StatusOK, map[string]any{
+		"invite_token":        token,
+		"account_address":     account,
+		"expires_at":          exp.Unix(),
+		"ttl_seconds":         int(auth.StakeLinkInviteTTL.Seconds()),
+		"linked_count":        len(user.LinkedStakeWallets()),
+		"linked_wallet_limit": db.MaxLinkedStakeAddresses,
+	})
+}
+
+// GET /api/poolstake/stake-address/invite?token=...
+//
+// Inspect an account-bound pairing link on the receiving device before signing.
+// Returns only the target account's public address and remaining capacity — no
+// private order/ledger history is exposed.
+func (h *Handlers) StakeAddressInviteInfo(ctx *fasthttp.RequestCtx) {
+	rawToken := strings.TrimSpace(string(ctx.QueryArgs().Peek("token")))
+	if rawToken == "" {
+		writeError(ctx, fasthttp.StatusBadRequest, "token is required")
+		return
+	}
+	user, claims, ok := h.inviteUser(ctx, rawToken)
+	if !ok {
+		return
+	}
+	linkedCount := len(user.LinkedStakeWallets())
+	var expUnix int64
+	if claims.ExpiresAt != nil {
+		expUnix = claims.ExpiresAt.Unix()
+	}
+	writeJSON(ctx, fasthttp.StatusOK, map[string]any{
+		"valid":               true,
+		"account_address":     nimiq.NormalizeAddress(user.NimiqAddress),
+		"expires_at":          expUnix,
+		"at_limit":            linkedCount >= db.MaxLinkedStakeAddresses,
+		"linked_count":        linkedCount,
+		"linked_wallet_limit": db.MaxLinkedStakeAddresses,
+	})
+}
+
+// POST /api/poolstake/stake-address/invite/challenge
+//
+// Step 1 of cross-device pairing: issue a purpose-bound challenge pinned to the
+// inviting account. Works whether the receiving device is signed out or signed
+// into a different wallet.
+func (h *Handlers) StakeAddressInviteChallenge(ctx *fasthttp.RequestCtx) {
+	var req struct {
+		InviteToken  string `json:"invite_token"`
+		StakeAddress string `json:"stake_address"`
+	}
+	if err := readJSON(ctx, &req); err != nil {
+		writeError(ctx, fasthttp.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if strings.TrimSpace(req.InviteToken) == "" {
+		writeError(ctx, fasthttp.StatusBadRequest, "invite_token is required")
+		return
+	}
+	if req.StakeAddress != "" {
+		if err := nimiq.ValidateAddress(req.StakeAddress); err != nil {
+			writeError(ctx, fasthttp.StatusBadRequest, "malformed nimiq address")
+			return
+		}
+	}
+	user, _, ok := h.inviteUser(ctx, req.InviteToken)
+	if !ok {
+		return
+	}
+	account := nimiq.NormalizeAddress(user.NimiqAddress)
+	if req.StakeAddress != "" && poolstake.CanonicalAddress(req.StakeAddress) == poolstake.CanonicalAddress(account) {
+		writeError(ctx, fasthttp.StatusConflict,
+			"that is the wallet this account signed in with; it already earns your cashback")
+		return
+	}
+	if len(user.LinkedStakeWallets()) >= db.MaxLinkedStakeAddresses &&
+		(req.StakeAddress == "" || user.StakeAddressLinkedAt(req.StakeAddress).IsZero()) {
+		writeError(ctx, fasthttp.StatusConflict, stakeWalletLimitMessage)
+		return
+	}
+	nonce, err := auth.NewNonce()
+	if err != nil {
+		writeError(ctx, fasthttp.StatusInternalServerError, "could not generate challenge")
+		return
+	}
+	token, err := auth.IssueStakeLinkInviteChallenge(h.Cfg.JWTSecret, nonce, user.ID)
+	if err != nil {
+		writeError(ctx, fasthttp.StatusInternalServerError, "could not issue challenge")
+		return
+	}
+	writeJSON(ctx, fasthttp.StatusOK, map[string]any{
+		"nonce":           nonce,
+		"message":         stakeLinkMessage(h.Cfg.SiteName(), account, nonce),
+		"challenge_token": token,
+		"account_address": account,
+	})
+}
+
+// POST /api/poolstake/stake-address/invite/claim
+//
+// Step 2 of cross-device pairing: verify the wallet signature and delegation,
+// then attach the staking wallet directly to the inviting account.
+func (h *Handlers) StakeAddressInviteClaim(ctx *fasthttp.RequestCtx) {
+	var req struct {
+		InviteToken    string `json:"invite_token"`
+		ChallengeToken string `json:"challenge_token"`
+		StakeAddress   string `json:"stake_address"`
+		PublicKey      string `json:"public_key"`
+		Signature      string `json:"signature"`
+	}
+	if err := readJSON(ctx, &req); err != nil {
+		writeError(ctx, fasthttp.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if req.InviteToken == "" || req.ChallengeToken == "" || req.StakeAddress == "" || req.PublicKey == "" || req.Signature == "" {
+		writeError(ctx, fasthttp.StatusBadRequest,
+			"invite_token, challenge_token, stake_address, public_key, and signature are required")
+		return
+	}
+	user, _, ok := h.inviteUser(ctx, req.InviteToken)
+	if !ok {
+		return
+	}
+	claims, err := auth.ParseStakeLinkInviteChallenge(h.Cfg.JWTSecret, req.ChallengeToken, user.ID)
+	if err != nil {
+		writeError(ctx, fasthttp.StatusUnauthorized, "challenge expired or invalid, request a new one")
+		return
+	}
+	linked, stakeAddress, stakeLuna, source, ok := h.completeStakeAddressLink(
+		ctx, user, claims.Nonce, req.StakeAddress, req.PublicKey, req.Signature,
+	)
+	if !ok {
+		return
+	}
+	writeJSON(ctx, fasthttp.StatusOK, map[string]any{
+		"linked":              true,
+		"via_invite":          true,
+		"account_address":     nimiq.NormalizeAddress(linked.NimiqAddress),
+		"stake_address":       stakeAddress,
+		"stake_nim":           float64(stakeLuna) / 100_000.0,
+		"stake_source":        source,
+		"linked_count":        len(linked.LinkedStakeWallets()),
+		"linked_wallet_limit": db.MaxLinkedStakeAddresses,
+	})
 }
 
 // DELETE /api/poolstake/stake-address

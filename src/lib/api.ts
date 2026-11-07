@@ -954,6 +954,38 @@ export const unlinkStakeAddress = (address?: string) =>
     ? api(`/poolstake/stake-address?address=${encodeURIComponent(address)}`, { auth: true, method: 'DELETE' })
     : api('/poolstake/stake-address', { auth: true, method: 'DELETE' });
 
+export interface StakeInviteCreated {
+  invite_token: string;
+  account_address: string;
+  expires_at: number;
+  ttl_seconds: number;
+  linked_count: number;
+  linked_wallet_limit: number;
+}
+export interface StakeInviteInfo {
+  valid: boolean;
+  account_address: string;
+  expires_at: number;
+  at_limit: boolean;
+  linked_count: number;
+  linked_wallet_limit: number;
+}
+/** Mint an account-bound cross-device pairing link (?stake_link=<token>). */
+export const createStakeLinkInvite = (): Promise<StakeInviteCreated> =>
+  api('/poolstake/stake-address/invite', { auth: true, method: 'POST', body: {} }) as Promise<StakeInviteCreated>;
+/** Inspect an account-bound pairing link before signing on the receiving device. */
+export const getStakeLinkInviteInfo = (token: string): Promise<StakeInviteInfo> =>
+  api(`/poolstake/stake-address/invite?token=${encodeURIComponent(token)}`) as Promise<StakeInviteInfo>;
+/** Step 1 of cross-device pairing: challenge pinned to the inviting account. */
+export const stakeLinkInviteChallenge = (inviteToken: string, stakeAddress?: string) =>
+  api('/poolstake/stake-address/invite/challenge', {
+    method: 'POST',
+    body: stakeAddress ? { invite_token: inviteToken, stake_address: stakeAddress } : { invite_token: inviteToken },
+  });
+/** Step 2 of cross-device pairing: verify signature + attach wallet to the inviting account. */
+export const claimStakeLinkInvite = (req: Record<string, unknown>) =>
+  api('/poolstake/stake-address/invite/claim', { method: 'POST', body: req });
+
 /* ---------------- FX / NIM rate (sessionStorage cached) ---------------- */
 const FX_CACHE_KEY = 'nim_fx';
 const FX_CACHE_TTL_MS = 5 * 60 * 1000;

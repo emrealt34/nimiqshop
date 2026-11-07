@@ -8,7 +8,7 @@
  * transaction. This module owns that loop and the resume-after-redirect state.
  */
 import { ApiError, submitRating, type RatingBody, type RatingKind } from './api';
-import { inNimiqPay, initNimiqMiniApp } from './miniapp';
+import { getNimiqProvider, inNimiqPay, initNimiqMiniApp } from './miniapp';
 import { sendRatingWithHub } from './hub';
 import { classifyWalletError } from './walletErrors';
 import { getAddress, getUid } from './session';
@@ -102,7 +102,7 @@ export function clearPendingRating(): void {
 export async function payRatingIntent(intent: RatingIntent): Promise<{ hash?: string }> {
   try {
     if (inNimiqPay()) {
-      const provider = (await initNimiqMiniApp()) as any;
+      const provider = ((await initNimiqMiniApp()) || getNimiqProvider()) as any;
       if (!provider || typeof provider.sendBasicTransactionWithData !== 'function') {
         throw new RatingError('unavailable', 'update-required');
       }

@@ -68,7 +68,8 @@ import { AppRoot } from '../AppRoot';
 import { Icon } from '../ui/Icon';
 import { StakePositionCard } from './StakePositionCard';
 import { LinkedStakeWallet } from './LinkedStakeWallet';
-import { captureStakeLinkIntent, clearStakeLinkIntent } from '../../lib/stakeLinkIntent';
+import { StakeInviteClaimCard } from './StakeInviteClaimCard';
+import { captureStakeInviteToken, captureStakeLinkIntent, clearStakeInviteToken, clearStakeLinkIntent } from '../../lib/stakeLinkIntent';
 import { formatWalletAddress } from '../../lib/format';
 import { useStakePosition, type StakePosition } from '../../lib/stakePosition';
 import { getUid, getAddress } from '../../lib/session';
@@ -256,7 +257,11 @@ export function CashbackView() {
   // Captured once on arrival and kept across sign-in until the buyer links or
   // dismisses it; the URL itself is cleaned so a refresh cannot reopen it.
   const [linkIntent, setLinkIntent] = useState('');
-  useEffect(() => { setLinkIntent(captureStakeLinkIntent()); }, []);
+  const [inviteToken, setInviteToken] = useState('');
+  useEffect(() => {
+    setLinkIntent(captureStakeLinkIntent());
+    setInviteToken(captureStakeInviteToken());
+  }, []);
   const { position, loading: positionLoading, error: positionError, refresh: refreshPosition, owner: positionOwner } = useStakePosition(authed);
   const stakeSending = useRef(false);
   const [pendingStake, setPendingStake] = useState<{ owner: string; hash: string; before: string } | null>(null);
@@ -615,6 +620,8 @@ export function CashbackView() {
    * is the visitor's actual situation; the rest of the page explains the
    * programme where the numbers come from, not above them.
    */
+  const displayStakeNIM = Math.max(mine?.stake_nim ?? 0, poolPosition ? (position?.active_nim ?? 0) : 0);
+
   const rateStrip = (
     <div className="card mt-2 fade-in cb-rate-strip">
       {authed ? (
@@ -632,7 +639,7 @@ export function CashbackView() {
             <span className="small muted">
               {stakedHere
                 ? t('cashback.heroStaked', {
-                    nim: fmtStakeNIM(position?.active_nim ?? mine?.stake_nim ?? 0),
+                    nim: fmtStakeNIM(displayStakeNIM),
                     loyalty: (mine?.loyalty_days || 0) > 0 ? t('cashback.heroLoyalty', { days: String(mine?.loyalty_days) }) : '',
                   })
                 : t('cashback.heroNoStake', { pct: pct(stakerBaseBps), max: String(params?.max_boost_percent ?? '?') })}
@@ -643,7 +650,7 @@ export function CashbackView() {
             {stakedHere && (
               <div>
                 <div className="xs faint">{t('cashback.statYourStake')}</div>
-                <div className="strong">{fmtStakeNIM(position?.active_nim ?? mine?.stake_nim ?? 0)} <NimUnit size={13} /></div>
+                <div className="strong">{fmtStakeNIM(displayStakeNIM)} <NimUnit size={13} /></div>
               </div>
             )}
             {myLedger && (
@@ -842,6 +849,14 @@ export function CashbackView() {
   return (
     <div className="container">
       <Header />
+
+      {inviteToken && (
+        <StakeInviteClaimCard
+          inviteToken={inviteToken}
+          onDismiss={() => { clearStakeInviteToken(); setInviteToken(''); }}
+          onLinked={() => { if (authed) void refreshAfterLinkChange(); }}
+        />
+      )}
 
       {/* ------------------------------------------------------ your card */}
       {/* ORDER (owner, 2026-10-05: "en üste o sayfada cashback kartınızı

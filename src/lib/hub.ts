@@ -6,11 +6,12 @@
 import { CFG } from './config';
 import { bytesToHex } from './format';
 import { detectMobilePlatform, getNimiqProvider, inNimiqPay, initNimiqMiniApp, openInNimiqPay } from './miniapp';
-import { authChallenge, hubLogin as apiHubLogin, stakeAddressChallenge, linkStakeAddress } from './api';
+import { authChallenge, hubLogin as apiHubLogin, stakeAddressChallenge, linkStakeAddress, stakeLinkInviteChallenge, claimStakeLinkInvite } from './api';
 import { saveSession } from './session';
 import { ensureLib } from './vendorLoad';
 import { saneBolt11 } from './pay';
-import { pickHostSigner, sameStakeAddress } from './stakeLinkIntent';
+import { clearStakeInviteToken, pickHostSigner, sameStakeAddress } from './stakeLinkIntent';
+import { classifyWalletError } from './walletErrors';
 import { t as tr } from '../i18n';
 
 let hub: any = null;
@@ -62,6 +63,9 @@ function clearPending(key: string) {
 }
 
 export function friendlyHubError(err: unknown): string {
+  if (classifyWalletError(err) === 'denied') {
+    return tr('hub.cancelled');
+  }
   const msg = String((err && ((err as Error).message || String(err))) || '');
   if (/cancel|rejected|abort|closed/i.test(msg)) {
     return tr('hub.cancelled');
@@ -449,6 +453,99 @@ async function finishStakeLink(challengeToken: string, signed: any, expectedAddr
   });
 }
 
+/**
+ * Claim an account-bound cross-device pairing link (?stake_link=<token>) with
+ * either Nimiq Pay (inside the app) or Nimiq Hub (in a browser). Works whether
+ * the receiving device is signed out or signed into a different wallet.
+ */
+export async function claimStakingWalletInvite(
+  inviteToken: string,
+  via: 'auto' | 'hub' | 'pay' = 'auto',
+): Promise<Record<string, any> | { redirecting: true }> {
+  const token = String(inviteToken || '').trim();
+  if (!token) throw new Error(tr('hub.failed'));
+  const usePay = via === 'pay' || (via === 'auto' && inNimiqPay());
+  return usePay ? claimInviteWithNimiqPay(token) : claimInviteWithHub(token);
+}
+
+async function claimInviteWithHub(inviteToken: string): Promise<Record<string, any> | { redirecting: true }> {
+  if (!(window as any).HubApi) await loadHubApi();
+  const challenge: any = await stakeLinkInviteChallenge(inviteToken);
+  const message = String(challenge?.message || '');
+  const challengeToken = String(challenge?.challenge_token || '');
+  if (!message || !challengeToken) throw new Error(tr('hub.failed'));
+
+  savePending(LINK_KEY, { challenge_token: challengeToken, invite_token: inviteToken });
+  let response: ReturnType<typeof hubSignMessage>;
+  try {
+    response = hubSignMessage(message);
+  } catch (err) {
+    clearPending(LINK_KEY);
+    throw err;
+  }
+  const result = await response;
+  if ('redirecting' in result) return { redirecting: true };
+  clearPending(LINK_KEY);
+  return finishStakeInviteClaim(inviteToken, challengeToken, result.signed);
+}
+
+async function claimInviteWithNimiqPay(inviteToken: string): Promise<Record<string, any>> {
+  const sdkProvider = await initNimiqMiniApp();
+  const payProvider: any = sdkProvider || getNimiqProvider();
+  if (!canUsePayProvider(payProvider)) throw new Error(tr('hub.bridgeFailed'));
+  if (typeof payProvider.sign !== 'function') throw new Error(tr('hub.incomplete'));
+
+  if (payProvider.connected === false && payProvider.connect) await payProvider.connect();
+  const accounts = await payProvider.listAccounts();
+  const held = (Array.isArray(accounts) ? accounts : [])
+    .map((account: unknown) => String(account || '').trim())
+    .filter(Boolean);
+  const signer = pickHostSigner(held);
+  if (!signer) throw new Error(tr('hub.incomplete'));
+
+  const challenge: any = await stakeLinkInviteChallenge(inviteToken, signer);
+  const message = String(challenge?.message || '');
+  const challengeToken = String(challenge?.challenge_token || '');
+  if (!message || !challengeToken) throw new Error(tr('hub.failed'));
+
+  savePending(LINK_KEY, { challenge_token: challengeToken, invite_token: inviteToken, expected_stake_address: signer });
+  try {
+    const signed: any = await payProvider.sign(message);
+    clearPending(LINK_KEY);
+    if (!signed || signed.error || !signed.publicKey || !signed.signature) throw new Error(tr('hub.incomplete'));
+    const claimed = await claimStakeLinkInvite({
+      invite_token: inviteToken,
+      challenge_token: challengeToken,
+      stake_address: signer,
+      public_key: toHex(signed.publicKey),
+      signature: toHex(signed.signature),
+    });
+    clearStakeInviteToken();
+    return claimed;
+  } catch (err) {
+    clearPending(LINK_KEY);
+    throw err;
+  }
+}
+
+async function finishStakeInviteClaim(inviteToken: string, challengeToken: string, signed: any): Promise<Record<string, any>> {
+  if (!signed || typeof signed !== 'object') throw new Error(tr('hub.incomplete'));
+  const signer = String(signed.signer || signed.address || '').trim();
+  const publicKey =
+    signed.signerPublicKey || signed.publicKey || (signed.signer instanceof Uint8Array ? signed.signer : undefined);
+  const signature = signed.signature;
+  if (!signer || !publicKey || !signature) throw new Error(tr('hub.incomplete'));
+  const claimed = await claimStakeLinkInvite({
+    invite_token: inviteToken,
+    challenge_token: challengeToken,
+    stake_address: signer,
+    public_key: toHex(publicKey),
+    signature: toHex(signature),
+  });
+  clearStakeInviteToken();
+  return claimed;
+}
+
 /* ---------------- Nimiq Pay: direct Nimiq Pay ---------------- */
 export function lightningPaymentURI(invoice: string): string {
   const raw = String(invoice || '').trim();
@@ -484,15 +581,21 @@ export function initHubRedirectHandling({ onLogin }: { onLogin?: (address: strin
           if (linking) {
             clearPending(LINK_KEY);
             try {
-              const linked = await finishStakeLink(
-                String(linking.challenge_token || ''),
-                result,
-                String(linking.expected_stake_address || ''),
-              );
+              const linked = linking.invite_token
+                ? await finishStakeInviteClaim(
+                    String(linking.invite_token),
+                    String(linking.challenge_token || ''),
+                    result,
+                  )
+                : await finishStakeLink(
+                    String(linking.challenge_token || ''),
+                    result,
+                    String(linking.expected_stake_address || ''),
+                  );
               window.dispatchEvent(new CustomEvent('nimshop:stake-linked', { detail: linked }));
             } catch (e) {
               window.dispatchEvent(
-                new CustomEvent('nimshop:hub-error', { detail: { message: friendlyHubError(e) } })
+                new CustomEvent('nimshop:hub-error', { detail: { message: e instanceof Error ? e.message : friendlyHubError(e), error: e } })
               );
             }
             return;

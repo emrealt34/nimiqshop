@@ -18,7 +18,7 @@ import { useCart } from '../../lib/cartStore';
 import { useSheet, useToast } from '../AppProviders';
 import { isAuthed, getAddress, signOut, subscribeSession } from '../../lib/session';
 import { formatWalletAddress, shortAddr } from '../../lib/format';
-import { applyNimiqPayChrome, inNimiqPay, initNimiqMiniApp } from '../../lib/miniapp';
+import { applyNimiqPayChrome, inNimiqPay, initNimiqMiniApp, openInNimiqPay } from '../../lib/miniapp';
 import { NimiqPayInstallDialog } from '../ui/NimiqPayInstallDialog';
 import { loginWithHub, loginWithNimiqPay, prefetchHubLogin, initHubRedirectHandling, friendlyHubError } from '../../lib/hub';
 import { listQuotes, listOrders } from '../../lib/api';
@@ -559,6 +559,18 @@ function LoginSheetContent({ close }: { close: () => void }) {
           <Icon name="nimiq" size={20} />
           <span className="btn-label">{t('login.continueWith', { hub: inPay ? t('account.pay') : t('account.hub') })}</span>
         </button>
+        {!inPay && (
+          <button
+            type="button"
+            className="btn btn-outline btn-block"
+            disabled={!!busy}
+            onClick={() => { openInNimiqPay(() => setShowPayInstall(true)); }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', width: '100%', justifyContent: 'center' }}
+          >
+            <Icon name="nimiq" size={18} />
+            <span className="btn-label">{t('login.openInPay')}</span>
+          </button>
+        )}
         {error && (
           <div className="alert error mt-2 login-error" style={{ marginBottom: 0 }}>
             <Icon name="alert" size={19} />

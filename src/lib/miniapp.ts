@@ -137,8 +137,11 @@ export function hostLanguage(): string {
     || 'en';
 }
 
-export function openInNimiqPay(onUnavailable?: (info: { isIOS: boolean; isAndroid: boolean; deeplink: string }) => void): string {
-  const target = location.origin + location.pathname + location.search;
+export function openInNimiqPay(
+  onUnavailable?: (info: { isIOS: boolean; isAndroid: boolean; deeplink: string }) => void,
+  targetUrl?: string,
+): string {
+  const target = targetUrl || (location.origin + location.pathname + location.search);
   const deeplink = 'nimiqpay://miniapp?url=' + encodeURIComponent(target);
   const platform = detectMobilePlatform();
   const isIOS = platform === 'ios';

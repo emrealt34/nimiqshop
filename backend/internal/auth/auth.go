@@ -27,7 +27,28 @@ const (
 	// PurposeStakeLink proves ownership of a staking wallet so that it can be
 	// linked to an already signed-in shop account.
 	PurposeStakeLink = "stake_link"
+	// PurposeStakeLinkInvite authorises another device/wallet (e.g. Nimiq Pay
+	// on a phone or Nimiq Hub on a PC) to attach a staking wallet directly to
+	// the inviting buyer's account without sharing a login session.
+	PurposeStakeLinkInvite = "stake_link_invite"
+	// PurposeStakeLinkInviteChallenge pins a cross-device stake-link challenge
+	// to the invited target account so it cannot be replayed elsewhere.
+	PurposeStakeLinkInviteChallenge = "stake_link_invite_challenge"
 )
+
+// StakeLinkInviteTTL is how long a cross-device pairing URL stays valid.
+const StakeLinkInviteTTL = 15 * time.Minute
+
+// StakeLinkInviteClaims backs the short-lived pairing token embedded in
+// ?stake_link=<token> URLs. It carries NO session authority (it cannot read
+// orders, quotes, or account history) — it only names which account a newly
+// signed staking wallet will be attached to.
+type StakeLinkInviteClaims struct {
+	UserID  string `json:"uid"`
+	Account string `json:"account"`
+	Purpose string `json:"purpose"`
+	jwt.RegisteredClaims
+}
 
 // ChallengeClaims backs the short-lived challenge issued by
 // /api/auth/challenge. The Hub-signed message embeds the nonce, so this
@@ -38,6 +59,9 @@ type ChallengeClaims struct {
 	// before purposes existed leave it empty; ParseChallengeFor treats that as
 	// PurposeLogin so in-flight logins survive a deploy.
 	Purpose string `json:"purpose,omitempty"`
+	// TargetUserID optionally binds a cross-device challenge to the exact
+	// inviting account.
+	TargetUserID string `json:"target_uid,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -135,3 +159,82 @@ func ParseToken(secret, raw string) (*Claims, error) {
 	}
 	return claims, nil
 }
+
+// IssueStakeLinkInvite mints a short-lived cross-device pairing token bound to
+// userID + account so another device (Phone Nimiq Pay or PC Hub) can sign and
+// attach its staking wallet directly to this account without sharing cookies.
+func IssueStakeLinkInvite(secret, userID, account string) (string, time.Time, error) {
+	if userID == "" || account == "" {
+		return "", time.Time{}, fmt.Errorf("user id and account are required")
+	}
+	now := time.Now().UTC()
+	exp := now.Add(StakeLinkInviteTTL)
+	claims := StakeLinkInviteClaims{
+		UserID:  userID,
+		Account: account,
+		Purpose: PurposeStakeLinkInvite,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(exp),
+			IssuedAt:  jwt.NewNumericDate(now),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signed, err := token.SignedString([]byte(secret))
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	return signed, exp, nil
+}
+
+// ParseStakeLinkInvite verifies a cross-device pairing token and refuses any
+// token not explicitly minted for PurposeStakeLinkInvite.
+func ParseStakeLinkInvite(secret, raw string) (*StakeLinkInviteClaims, error) {
+	claims := &StakeLinkInviteClaims{}
+	token, err := jwt.ParseWithClaims(raw, claims, func(t *jwt.Token) (interface{}, error) {
+		if t.Method.Alg() != jwt.SigningMethodHS256.Alg() {
+			return nil, fmt.Errorf("unexpected signing method")
+		}
+		return []byte(secret), nil
+	})
+	if err != nil || !token.Valid {
+		return nil, fmt.Errorf("invalid or expired invite: %w", err)
+	}
+	if claims.Purpose != PurposeStakeLinkInvite || claims.UserID == "" || claims.Account == "" {
+		return nil, fmt.Errorf("token was not issued as a stake-link invite")
+	}
+	return claims, nil
+}
+
+// IssueStakeLinkInviteChallenge mints a 5-minute wallet-signature challenge
+// bound to a specific inviting account.
+func IssueStakeLinkInviteChallenge(secret, nonce, targetUserID string) (string, error) {
+	if targetUserID == "" {
+		return "", fmt.Errorf("target user id is required")
+	}
+	now := time.Now().UTC()
+	claims := ChallengeClaims{
+		Nonce:        nonce,
+		Purpose:      PurposeStakeLinkInviteChallenge,
+		TargetUserID: targetUserID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(now.Add(challengeExpiry)),
+			IssuedAt:  jwt.NewNumericDate(now),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(secret))
+}
+
+// ParseStakeLinkInviteChallenge verifies a cross-device stake-link challenge
+// and confirms it belongs to targetUserID.
+func ParseStakeLinkInviteChallenge(secret, raw, targetUserID string) (*ChallengeClaims, error) {
+	claims, err := ParseChallengeFor(secret, raw, PurposeStakeLinkInviteChallenge)
+	if err != nil {
+		return nil, err
+	}
+	if targetUserID == "" || claims.TargetUserID != targetUserID {
+		return nil, fmt.Errorf("challenge does not match target account")
+	}
+	return claims, nil
+}
+

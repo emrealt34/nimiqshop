@@ -11,7 +11,7 @@ import { openLoginSheet } from '../shell/SiteShell';
 import { friendlyApiMessage, getAccountLimits } from '../../lib/api';
 import { isAuthed, getAddress } from '../../lib/session';
 import { useSession } from '../../lib/useSession';
-import { inNimiqPay } from '../../lib/miniapp';
+import { useInNimiqPay } from '../../lib/miniapp';
 import { fmtUSD, formatWalletAddress, fmtCountdown } from '../../lib/format';
 import { useInterval } from '../../lib/useInterval';
 import { useSheet, useToast } from '../AppProviders';
@@ -81,6 +81,7 @@ export function ProfileView() {
 
   // 1s countdown tick
   useInterval(() => setState((s) => ({ ...s, tick: s.tick + 1 })), state.resetsAt ? 1000 : null);
+  const inPay = useInNimiqPay();
 
   if (authed === null) {
     return (
@@ -180,7 +181,7 @@ export function ProfileView() {
                 {formatWalletAddress(addr)}
               </div>
               <div className="xs faint">
-                {inNimiqPay() ? t('accountPage.connectedViaPay') : t('accountPage.connectedViaHub')}
+                {inPay ? t('accountPage.connectedViaPay') : t('accountPage.connectedViaHub')}
               </div>
             </div>
             <CopyButton getText={addr} label={t('accountPage.copyAddress')} />

@@ -15,6 +15,7 @@ import (
 	"nimiqshop/internal/db"
 	"nimiqshop/internal/middleware"
 	"nimiqshop/internal/money"
+	"nimiqshop/internal/stakeledger"
 )
 
 type quoteCashbackView struct {
@@ -283,19 +284,30 @@ func (h *Handlers) attachQuoteCashbackEstimate(resp map[string]interface{}, q db
 			// The fulfillment transaction remains the only debit operation.
 			if user, err := h.Store.GetUser(q.UserID); err == nil && q.NimUsdRate > 0 {
 				settings, _ := h.Store.GetAdminSettings(0)
-				params := settings.EffectiveStakeCashback()
+				params := stakeledger.Normalize(settings.EffectiveStakeCashback())
+				remBps := params.MaxBoostBps
 				// EVERY earning wallet's book contributes, each capped by its
-				// own eligible spend — the same rule the fulfillment
-				// transaction applies when it really debits them
-				// (ApplyLedgerPurchaseAllInTx). Previewing one wallet of
+				// own eligible spend and combined up to MaxBoostBps — the same
+				// rule the fulfillment transaction applies when it really debits
+				// them (ApplyLedgerPurchaseAllInTx). Previewing one wallet of
 				// several would under-promise what the buyer is about to earn.
 				for _, address := range user.EarningStakeAddresses() {
+					if remBps <= 0 {
+						break
+					}
 					ledger, ok, err := h.Store.ReadStakeLedger(address)
 					if err != nil || !ok {
 						continue
 					}
-					_, boost := ledger.Purchase(float64(q.ProductUSD)/1_000_000, q.NimUsdRate, params, time.Now().UTC())
+					pw := params
+					pw.MaxBoostBps = remBps
+					bps := stakeledger.BoostBps(&ledger, q.NimUsdRate, pw)
+					if bps <= 0 {
+						continue
+					}
+					_, boost := ledger.Purchase(float64(q.ProductUSD)/1_000_000, q.NimUsdRate, pw, time.Now().UTC())
 					luna += int64(boost*100000 + 0.5)
+					remBps -= bps
 				}
 			}
 		}

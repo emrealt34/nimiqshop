@@ -40,7 +40,14 @@ try {
 } finally {
   await rm(dir, { recursive: true, force: true });
 }
-const { pickHostSigner, sameStakeAddress, normalizeStakeAddress, canonicalStakeAddress } = intent;
+const {
+  pickHostSigner,
+  sameStakeAddress,
+  normalizeStakeAddress,
+  canonicalStakeAddress,
+  sanitizeStakeInviteToken,
+  buildStakeInviteUrl,
+} = intent;
 
 /** Two wallets, in the spaced display form a host may well report. */
 const A = 'NQ860123456789ABCDEFGHJKLMNPQRSTUVXY';
@@ -101,4 +108,17 @@ test('canonicalisation compares without validating, normalisation still validate
   assert.equal(normalizeStakeAddress(`NQ86${'1'.repeat(31)}`), '', 'one character short');
   assert.equal(normalizeStakeAddress(`NQ86${'1'.repeat(32)}9`), '', 'one too many');
   assert.equal(normalizeStakeAddress(`NQ86${'I'.repeat(32)}`), '', 'I is not in the Nimiq alphabet');
+});
+
+test('cross-device pairing invite tokens validate JWT shape and build clean URLs', () => {
+  const validJwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOiJ1MSIsImFjY291bnQiOiJOUTA3MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAifQ.abcdefghijklmnopqrstuvwxyz0123456789_-ABCDE';
+  assert.equal(sanitizeStakeInviteToken(validJwt), validJwt);
+  assert.equal(sanitizeStakeInviteToken(`  ${validJwt}  `), validJwt);
+  assert.equal(sanitizeStakeInviteToken('not-a-jwt'), '');
+  assert.equal(sanitizeStakeInviteToken('a.b.c'), '', 'segments too short');
+  assert.equal(sanitizeStakeInviteToken(''), '');
+
+  const url = buildStakeInviteUrl('https://shop.nimiqbase.com/cashback?link_stake=NQ0700000000000000000000000000000000#top', validJwt);
+  assert.equal(url, `https://shop.nimiqbase.com/cashback?stake_link=${validJwt}`);
+  assert.equal(buildStakeInviteUrl('https://shop.nimiqbase.com/cashback', 'bad'), '');
 });

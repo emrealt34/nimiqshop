@@ -43,6 +43,7 @@ func ledgerBoostBpsAllInTx(tx *badger.Txn, addresses []string, nimUsd float64, p
 	if nimUsd <= 0 {
 		return 0
 	}
+	norm := stakeledger.Normalize(p)
 	total := 0
 	seen := make(map[string]bool, len(addresses))
 	for _, address := range addresses {
@@ -51,7 +52,10 @@ func ledgerBoostBpsAllInTx(tx *badger.Txn, addresses []string, nimUsd float64, p
 			continue
 		}
 		seen[addr] = true
-		total += ledgerBoostBpsInTx(tx, address, nimUsd, p)
+		total += ledgerBoostBpsInTx(tx, address, nimUsd, norm)
+	}
+	if total > norm.MaxBoostBps {
+		total = norm.MaxBoostBps
 	}
 	return total
 }

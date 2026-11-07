@@ -19,9 +19,13 @@
 
 const KEY = 'nimshop.stakeLinkIntent';
 const PARAM = 'link_stake';
+const INVITE_KEY = 'nimshop.stakeLinkInviteToken';
+const INVITE_PARAM = 'stake_link';
 
 /** The canonical Nimiq address form the backend stores (unspaced, upper case). */
 const ADDRESS_RE = /^NQ\d{2}[0-9A-HJ-NP-VXY]{32}$/;
+/** Compact HS256 JWT form issued by POST /api/poolstake/stake-address/invite. */
+const INVITE_TOKEN_RE = /^[A-Za-z0-9_-]{8,512}\.[A-Za-z0-9_-]{8,1024}\.[A-Za-z0-9_-]{16,256}$/;
 
 /**
  * Comparison form of an address: no spaces, upper case, NO validation.
@@ -109,4 +113,56 @@ export function peekStakeLinkIntent(): string {
 
 export function clearStakeLinkIntent(): void {
   try { sessionStorage.removeItem(KEY); } catch { /* nothing stored */ }
+}
+
+/** Validate the shape of a cross-device pairing token (?stake_link=<token>). */
+export function sanitizeStakeInviteToken(raw: string | null | undefined): string {
+  const token = String(raw || '').trim();
+  return INVITE_TOKEN_RE.test(token) ? token : '';
+}
+
+/** Build the shareable pairing URL for an account-bound invite token. */
+export function buildStakeInviteUrl(baseUrl: string, token: string): string {
+  const clean = sanitizeStakeInviteToken(token);
+  if (!clean) return '';
+  const url = new URL(baseUrl);
+  url.searchParams.delete(PARAM);
+  url.searchParams.set(INVITE_PARAM, clean);
+  url.hash = '';
+  return url.toString();
+}
+
+/**
+ * Capture `?stake_link=<token>` from the current URL, persist in sessionStorage
+ * across mobile wallet redirects / WebView reloads, and clean the URL bar.
+ */
+export function captureStakeInviteToken(): string {
+  if (typeof window === 'undefined') return '';
+  const url = new URL(window.location.href);
+  if (url.searchParams.has(INVITE_PARAM)) {
+    const token = sanitizeStakeInviteToken(url.searchParams.get(INVITE_PARAM));
+    url.searchParams.delete(INVITE_PARAM);
+    try {
+      window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+    } catch {
+      /* ignore locked-down history */
+    }
+    if (token) {
+      try { sessionStorage.setItem(INVITE_KEY, token); } catch { /* private mode */ }
+      return token;
+    }
+  }
+  return peekStakeInviteToken();
+}
+
+export function peekStakeInviteToken(): string {
+  try {
+    return sanitizeStakeInviteToken(sessionStorage.getItem(INVITE_KEY));
+  } catch {
+    return '';
+  }
+}
+
+export function clearStakeInviteToken(): void {
+  try { sessionStorage.removeItem(INVITE_KEY); } catch { /* nothing stored */ }
 }

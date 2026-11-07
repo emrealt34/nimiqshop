@@ -275,19 +275,27 @@ func ApplyLedgerPurchaseAllInTx(tx *badger.Txn, addresses []string, xUSD, nimUsd
 	if xUSD <= 0 || nimUsd <= 0 {
 		return 0, 0, nil
 	}
+	norm := stakeledger.Normalize(p)
+	remBps := norm.MaxBoostBps
 	seen := make(map[string]bool, len(addresses))
 	for _, address := range addresses {
+		if remBps <= 0 {
+			break
+		}
 		addr := canonicalStakeAddr(address)
 		if addr == "" || seen[addr] {
 			continue
 		}
 		seen[addr] = true
-		luna, bps, e := ApplyLedgerPurchaseInTx(tx, address, xUSD, nimUsd, p, now)
+		pw := norm
+		pw.MaxBoostBps = remBps
+		luna, bps, e := ApplyLedgerPurchaseInTx(tx, address, xUSD, nimUsd, pw, now)
 		if e != nil {
 			return 0, 0, e
 		}
 		boostLuna += luna
 		boostBps += bps
+		remBps -= bps
 	}
 	return boostLuna, boostBps, nil
 }
