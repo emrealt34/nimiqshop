@@ -10,6 +10,7 @@ import { authChallenge, hubLogin as apiHubLogin, stakeAddressChallenge, linkStak
 import { saveSession } from './session';
 import { ensureLib } from './vendorLoad';
 import { saneBolt11 } from './pay';
+import { pickHostSigner, sameStakeAddress } from './stakeLinkIntent';
 import { t as tr } from '../i18n';
 
 let hub: any = null;
@@ -285,6 +286,29 @@ async function finishLogin(challengeToken: string, signed: any): Promise<{ addre
 /* ---------------- Linking a staking wallet ---------------- */
 
 /**
+ * Raised when the buyer asks to link a wallet the HOST cannot sign for.
+ *
+ * Nimiq Pay's provider signs with the account it holds and takes no signer
+ * (`sign(message)` has no address parameter, unlike Hub's `signMessage`), so a
+ * `?link_stake=` URL naming a wallet that is not in Pay cannot be fulfilled
+ * there. Guessing would link the account Pay does hold — the buyer would only
+ * learn it was the wrong one when his stake never moved the rate. Its own type
+ * so the cashback card can say "that wallet is not in your Pay" instead of the
+ * generic "could not be linked".
+ */
+export class StakeLinkWalletNotInHostError extends Error {
+  readonly expected: string;
+  /** The accounts the host CAN sign for — what the buyer has to choose from. */
+  readonly available: string[];
+  constructor(expected: string, available: string[]) {
+    super(`Nimiq Pay holds ${available.length} wallet(s), none of them ${expected}`);
+    this.name = 'StakeLinkWalletNotInHostError';
+    this.expected = expected;
+    this.available = available;
+  }
+}
+
+/**
  * Proves ownership of a staking wallet so the shop can read this account's
  * cashback from it.
  *
@@ -292,18 +316,30 @@ async function finishLogin(challengeToken: string, signed: any): Promise<{ addre
  * checks out through Nimiq Pay: the shop signs him in as whichever wallet he
  * picks there, and since one account == one address, his stake was invisible to
  * the account that actually buys. He signs ONE message with the staking wallet —
- * the same Hub signMessage() login uses — and the backend verifies both the
- * signature and that the wallet delegates to our validator before it records
- * the link.
+ * the same message login signs — and the backend verifies both the signature
+ * and that the wallet delegates to our validator before it records the link.
+ *
+ * Which wallet app signs is the host's decision, exactly as it is for login
+ * (SiteShell and CheckoutFlow both branch on `inNimiqPay()`): inside Nimiq Pay
+ * the wallet IS Pay, and outside it the wallet is Hub. A link that ignored that
+ * and always went to Hub opened hub.nimiq.com inside the Pay app, which is the
+ * "logo page" dead end CheckoutFlow already documents for login.
  *
  * Returns the server's link response (which carries the refreshed cashback
  * view), or { redirecting: true } when Hub took over the page on a phone;
  * initHubRedirectHandling finishes the link when Hub sends the buyer back.
  */
 export async function linkStakingWallet(expectedAddress?: string): Promise<Record<string, any> | { redirecting: true }> {
-  if (!(window as any).HubApi) await loadHubApi();
   const expected = String(expectedAddress || '').trim();
-  const challenge: any = await stakeAddressChallenge();
+  return inNimiqPay() ? linkWithNimiqPay(expected) : linkWithHub(expected);
+}
+
+/** The Hub half: a wallet picker (desktop popup, phone redirect). */
+async function linkWithHub(expected: string): Promise<Record<string, any> | { redirecting: true }> {
+  if (!(window as any).HubApi) await loadHubApi();
+  // Hand over the expected wallet so the backend can refuse a wallet that would
+  // exceed the limit before Hub asks the buyer to sign for it.
+  const challenge: any = await stakeAddressChallenge(expected || undefined);
   const message = String(challenge?.message || '');
   const token = String(challenge?.challenge_token || '');
   if (!message || !token) throw new Error(tr('hub.failed'));
@@ -323,12 +359,84 @@ export async function linkStakingWallet(expectedAddress?: string): Promise<Recor
   return finishStakeLink(token, result.signed, expected);
 }
 
+/**
+ * The Nimiq Pay half: sign through the Mini App provider, never through Hub.
+ *
+ * Mirrors loginWithNimiqPay step for step — same provider lookup, same
+ * `connect()` guard, same `listAccounts()` / `sign()` pair — with two
+ * differences the link flow needs. The challenge comes from the stake-link
+ * endpoint rather than the login one (the backend binds each to its purpose),
+ * and the address is NOT assumed: Pay's `SignatureResult` is
+ * `{ publicKey, signature }` with no address, so the signer is the account Pay
+ * reported, and when the buyer asked for a specific wallet it has to be one of
+ * them.
+ *
+ * There is no redirect and no install sheet here: the buyer is already inside
+ * the app, so a provider that never arrived is a bridge failure and nothing
+ * else can be offered.
+ */
+async function linkWithNimiqPay(expected: string): Promise<Record<string, any>> {
+  const sdkProvider = await initNimiqMiniApp();
+  const payProvider: any = sdkProvider || getNimiqProvider();
+  if (!canUsePayProvider(payProvider)) throw new Error(tr('hub.bridgeFailed'));
+  if (typeof payProvider.sign !== 'function') throw new Error(tr('hub.incomplete'));
+
+  // Ask Pay which wallets it holds BEFORE requesting a challenge. Pay signs with
+  // the account it has and takes no signer, so the wallet that will sign is
+  // knowable here and now — and naming it in the challenge is what lets the
+  // backend refuse a wallet that would exceed the limit before the buyer is
+  // asked to sign anything, while still allowing one that is already linked.
+  if (payProvider.connected === false && payProvider.connect) await payProvider.connect();
+  const accounts = await payProvider.listAccounts();
+  const held = (Array.isArray(accounts) ? accounts : [])
+    .map((account: unknown) => String(account || '').trim())
+    .filter(Boolean);
+  if (!held.length) throw new Error(tr('hub.incomplete'));
+  const signer = pickHostSigner(held, expected);
+  if (!signer) throw new StakeLinkWalletNotInHostError(expected, held);
+
+  const challenge: any = await stakeAddressChallenge(signer);
+  const message = String(challenge?.message || '');
+  const token = String(challenge?.challenge_token || '');
+  if (!message || !token) throw new Error(tr('hub.failed'));
+
+  savePending(LINK_KEY, { challenge_token: token, expected_stake_address: signer });
+  try {
+    const signed: any = await payProvider.sign(message);
+    clearPending(LINK_KEY);
+    // Pay's SignatureResult is { publicKey, signature } and carries no address,
+    // so the address is the account Pay reported — exactly what login does.
+    if (!signed || signed.error || !signed.publicKey || !signed.signature) throw new Error(tr('hub.incomplete'));
+    return linkStakeAddress({
+      challenge_token: token,
+      stake_address: signer,
+      public_key: toHex(signed.publicKey),
+      signature: toHex(signed.signature),
+    });
+  } catch (err) {
+    clearPending(LINK_KEY);
+    throw err;
+  }
+}
+
+/**
+ * Which account signs, and whether two addresses name the same wallet, both live
+ * in lib/stakeLinkIntent — pure functions, so scripts/test-stake-link-host.mjs
+ * pins them on every push instead of only in a browser. `toHex` is the helper
+ * that does belong here: Hub answers with Uint8Array, Pay with hex strings, and
+ * the backend takes either.
+ */
+function toHex(value: unknown): string {
+  return value instanceof Uint8Array ? bytesToHex(value) : String(value);
+}
+
 async function finishStakeLink(challengeToken: string, signed: any, expectedAddress = ''): Promise<Record<string, any>> {
   if (!signed || typeof signed !== 'object') throw new Error(tr('hub.incomplete'));
   const signer = String(signed.signer || signed.address || '').trim();
-  const expected = String(expectedAddress || '').replace(/\s+/g, '').toUpperCase();
-  const actual = signer.replace(/\s+/g, '').toUpperCase();
-  if (!signer || (expected && actual !== expected)) throw new Error(tr('hub.incomplete'));
+  // Hub reports the wallet that actually signed. A link URL names an
+  // expectation; if Hub answered with a different wallet the proof is for the
+  // wrong one and must not be recorded.
+  if (!signer || (expectedAddress && !sameStakeAddress(signer, expectedAddress))) throw new Error(tr('hub.incomplete'));
   const publicKey =
     signed.signerPublicKey || signed.publicKey || (signed.signer instanceof Uint8Array ? signed.signer : undefined);
   const signature = signed.signature;
@@ -336,8 +444,8 @@ async function finishStakeLink(challengeToken: string, signed: any, expectedAddr
   return linkStakeAddress({
     challenge_token: challengeToken,
     stake_address: signer,
-    public_key: publicKey instanceof Uint8Array ? bytesToHex(publicKey) : String(publicKey),
-    signature: signature instanceof Uint8Array ? bytesToHex(signature) : String(signature),
+    public_key: toHex(publicKey),
+    signature: toHex(signature),
   });
 }
 

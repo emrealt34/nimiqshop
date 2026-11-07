@@ -103,7 +103,22 @@ func (h *Handlers) StakeAddressChallenge(ctx *fasthttp.RequestCtx) {
 	}
 
 	account := nimiq.NormalizeAddress(user.NimiqAddress)
-	if links := user.LinkedStakeWallets(); len(links) >= db.MaxLinkedStakeAddresses {
+	// The cap is refused HERE, before a signature, whenever the client names the
+	// wallet it wants: making a buyer sign in his wallet only to be told no is
+	// the worst place to discover a limit he can act on. Two requests stay
+	// allowed at the cap.
+	//
+	//   - no address named: there is nothing to judge yet, and the link step
+	//     still refuses a wallet that would be new (AddStakeAddress returns
+	//     ErrTooManyStakeAddresses, which becomes the same 409);
+	//   - an address that is ALREADY linked: AddStakeAddress documents a
+	//     duplicate as a successful no-op that consumes no slot, so a refresh or
+	//     a double click must not fail the buyer — and refusing the challenge
+	//     would make that two-step flow impossible to complete for an operation
+	//     that changes nothing.
+	if len(user.LinkedStakeWallets()) >= db.MaxLinkedStakeAddresses &&
+		legacy.StakeAddress != "" &&
+		user.StakeAddressLinkedAt(legacy.StakeAddress).IsZero() {
 		writeError(ctx, fasthttp.StatusConflict, stakeWalletLimitMessage)
 		return
 	}

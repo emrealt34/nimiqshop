@@ -287,6 +287,17 @@ func TestStakeWalletLimitIsEnforcedBeforeASignature(t *testing.T) {
 		t.Fatalf("linked_count = %d after a duplicate link, want 5 (no slot consumed)", got)
 	}
 
+	// The same refusal-shaped request, but NAMING the wallet. The cap is about a
+	// wallet that would be new, not about re-linking: a real client sends the
+	// address whenever it knows it (a ?link_stake= URL, or Nimiq Pay's own
+	// account list, which is read before the challenge is requested), so this is
+	// the path buyers actually take and it has to end in a signature, not a 409.
+	named := s.do(http.MethodPost, "/api/poolstake/stake-address/challenge",
+		map[string]any{"stake_address": stakers[0].address}, auth)
+	if named.status != 200 {
+		t.Fatalf("challenge naming an already linked wallet at the cap = %d, want 200 (%s)", named.status, named.body)
+	}
+
 	// Removing one frees a slot, and the sixth wallet then links normally.
 	del := s.do(http.MethodDelete, unlinkURL(stakers[4].address), nil, auth)
 	if del.status != 200 {

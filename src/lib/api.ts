@@ -924,9 +924,22 @@ export const refreshPoolStake = () => api('/poolstake/refresh', { method: 'POST'
  * wallet with the same Hub signature login uses, and have the shop read the
  * stake, the loyalty ledger and the rate from it. The payout recipient stays the
  * wallet he signed in with — see MyStake.account_address. */
-/** Step 1: a purpose-bound challenge naming both wallets and a nonce. */
-export const stakeAddressChallenge = () =>
-  api('/poolstake/stake-address/challenge', { auth: true, method: 'POST', body: {} });
+/**
+ * Step 1: a purpose-bound challenge naming both wallets and a nonce.
+ *
+ * Naming the target wallet is optional, and worth doing whenever it is known:
+ * the backend can only refuse a wallet that would exceed the limit BEFORE the
+ * buyer signs when it knows which wallet is being asked for. An unnamed request
+ * at the limit is granted and refused one step later, after a signature that
+ * was never going to be used. The address never enters the signed text — it
+ * only decides whether the challenge is issued at all.
+ */
+export const stakeAddressChallenge = (stakeAddress?: string) =>
+  api('/poolstake/stake-address/challenge', {
+    auth: true,
+    method: 'POST',
+    body: stakeAddress ? { stake_address: stakeAddress } : {},
+  });
 /** Step 2: hand back the Hub signature; the server verifies it and the stake. */
 export const linkStakeAddress = (req: Record<string, unknown>) =>
   api('/poolstake/stake-address', { auth: true, method: 'POST', body: req });

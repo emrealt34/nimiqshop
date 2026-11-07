@@ -91,6 +91,7 @@ const fr = {
     "openLink": "Lier le portefeuille avec lequel vous stakez",
     "addAnother": "Lier un autre portefeuille",
     "signHint": "Hub ouvre le sélecteur de portefeuilles. Choisissez celui qui stake ; la signature prouve que vous le contrôlez, sans déplacer de NIM.",
+    "signHintPay": "Nimiq Pay signe avec le portefeuille qu’il contient. La signature prouve que vous le contrôlez, sans déplacer de NIM.",
     "confirm": "Signer et lier",
     "busy": "En attente de votre portefeuille…",
     "cancel": "Annuler",
@@ -107,6 +108,7 @@ const fr = {
     "errNotLinked": "Ce portefeuille n’est pas lié à votre compte.",
     "errSignature": "Cette signature ne provient pas de ce portefeuille. Signez avec le portefeuille qui stake.",
     "errLimit": "Vous pouvez lier jusqu’à {{max}} portefeuilles de staking. Retirez-en un d’abord.",
+    "errNotInHost": "Nimiq Pay ne peut signer que pour le portefeuille qu’il contient, et ce n’est pas {{address}}. Ouvrez la boutique dans votre navigateur pour lier ce portefeuille avec Nimiq Hub.",
     "errGeneric": "Le portefeuille de staking n’a pas pu être lié. Réessayez.",
   },
 

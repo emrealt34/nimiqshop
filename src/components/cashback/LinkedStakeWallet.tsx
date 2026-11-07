@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ApiError, friendlyApiMessage, unlinkStakeAddress } from '../../lib/api';
-import { linkStakingWallet } from '../../lib/hub';
+import { StakeLinkWalletNotInHostError, linkStakingWallet } from '../../lib/hub';
+import { useInNimiqPay } from '../../lib/miniapp';
 import { type MyStake, type StakeWalletRow, fmtStakeNIM } from '../../lib/stakerCashback';
 import { POOL_VALIDATOR_NAME } from '../../lib/stake';
 import { formatWalletAddress } from '../../lib/format';
@@ -14,9 +15,10 @@ const FALLBACK_WALLET_LIMIT = 5;
 
 /**
  * Shows each earning wallet separately, sums their stake, and names the
- * signed-in payout wallet. Linking is a single explicit action: Hub selects
- * the staking wallet and proves it with a signature; the shop never asks the
- * buyer to type or paste an address.
+ * signed-in payout wallet. Linking is a single explicit action: the host wallet
+ * app proves ownership with a signature — Nimiq Pay when the shop runs inside
+ * it, Hub in a browser — and the shop never asks the buyer to type or paste an
+ * address.
  */
 export function LinkedStakeWallet({ mine, onChanged, intent, onIntentDone }: {
   mine: MyStake | null;
@@ -26,6 +28,10 @@ export function LinkedStakeWallet({ mine, onChanged, intent, onIntentDone }: {
 }) {
   const { t } = useT();
   const { toast } = useToast();
+  // Hydration-safe: the static build renders outside Pay, so the first client
+  // render must agree with the server HTML and only then learn the truth. The
+  // hint under the button is first paint, so it goes through the hook.
+  const inPay = useInNimiqPay();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [avatars, setAvatars] = useState<Record<string, string>>({});
@@ -94,6 +100,12 @@ export function LinkedStakeWallet({ mine, onChanged, intent, onIntentDone }: {
   }, [onChanged, onIntentDone, expectedAddress, t, toast]);
 
   function explain(e: unknown): string {
+    // Nimiq Pay signs only with the wallet it holds, so a link naming a
+    // different one cannot be fulfilled here. Name the wallet and the way out:
+    // "could not be linked" would just send the buyer tapping again.
+    if (e instanceof StakeLinkWalletNotInHostError) {
+      return t('stakeLink.errNotInHost', { address: pretty(e.expected) });
+    }
     const status = e instanceof ApiError ? e.status : 0;
     const msg = e instanceof ApiError ? String(e.message || '') : '';
     if (status === 422) {
@@ -197,7 +209,7 @@ export function LinkedStakeWallet({ mine, onChanged, intent, onIntentDone }: {
           <button className="btn btn-gold btn-block" onClick={() => { void link(); }} disabled={busy} data-testid="stake-link-confirm">
             <Icon name="lock" size={14} />{busy ? t('stakeLink.busy') : linked ? t('stakeLink.addAnother') : t('stakeLink.confirm')}
           </button>
-          <p className="xs faint">{t('stakeLink.signHint')}</p>
+          <p className="xs faint">{inPay ? t('stakeLink.signHintPay') : t('stakeLink.signHint')}</p>
         </div>
       )}
 

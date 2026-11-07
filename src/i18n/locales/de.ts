@@ -91,6 +91,7 @@ const de = {
     "openLink": "Staking-Wallet verknüpfen",
     "addAnother": "Weitere Wallet verknüpfen",
     "signHint": "Hub öffnet die Wallet-Auswahl. Wähle die Wallet mit deinem Stake; die Signatur bestätigt deine Kontrolle — NIM wird nicht bewegt.",
+    "signHintPay": "Nimiq Pay signiert mit der Wallet, die es verwahrt. Die Signatur bestätigt deine Kontrolle — NIM wird nicht bewegt.",
     "confirm": "Signieren und verknüpfen",
     "busy": "Warten auf deine Wallet …",
     "cancel": "Abbrechen",
@@ -107,6 +108,7 @@ const de = {
     "errNotLinked": "Diese Wallet ist nicht mit deinem Konto verknüpft.",
     "errSignature": "Diese Signatur stammt nicht aus dieser Wallet. Signiere mit der Wallet, die stakt.",
     "errLimit": "Du kannst höchstens {{max}} Staking-Wallets verknüpfen. Entferne zuerst eine.",
+    "errNotInHost": "Nimiq Pay kann nur für die Wallet signieren, die es verwahrt, und das ist nicht {{address}}. Öffne den Shop im Browser, um diese Wallet mit Nimiq Hub zu verknüpfen.",
     "errGeneric": "Die Staking-Wallet konnte nicht verknüpft werden. Versuche es erneut.",
   },
 

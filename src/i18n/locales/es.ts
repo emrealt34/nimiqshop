@@ -91,6 +91,7 @@ const es = {
     "openLink": "Vincular el monedero con el que haces staking",
     "addAnother": "Vincular otro monedero",
     "signHint": "Hub abre el selector de monederos. Elige el que tiene el stake; la firma demuestra que lo controlas y no mueve NIM.",
+    "signHintPay": "Nimiq Pay firma con el monedero que guarda. La firma demuestra que lo controlas y no mueve NIM.",
     "confirm": "Firmar y vincular",
     "busy": "Esperando a tu monedero…",
     "cancel": "Cancelar",
@@ -107,6 +108,7 @@ const es = {
     "errNotLinked": "Ese monedero no está vinculado a tu cuenta.",
     "errSignature": "Esa firma no proviene de este monedero. Firma con el monedero que hace staking.",
     "errLimit": "Puedes vincular hasta {{max}} monederos de staking. Quita uno primero.",
+    "errNotInHost": "Nimiq Pay solo puede firmar por el monedero que guarda, y ese no es {{address}}. Abre la tienda en tu navegador para vincular ese monedero con Nimiq Hub.",
     "errGeneric": "No se pudo vincular el monedero de staking. Inténtalo de nuevo.",
   },
 

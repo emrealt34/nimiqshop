@@ -91,6 +91,7 @@ const pt = {
     "openLink": "Ligar a carteira com que faz staking",
     "addAnother": "Ligar outra carteira",
     "signHint": "O Hub abre a seleção de carteiras. Escolha a carteira que faz staking; a assinatura prova que a controla — sem mover NIM.",
+    "signHintPay": "O Nimiq Pay assina com a carteira que guarda. A assinatura prova que a controla — sem mover NIM.",
     "confirm": "Assinar e ligar",
     "busy": "À espera da sua carteira…",
     "cancel": "Cancelar",
@@ -107,6 +108,7 @@ const pt = {
     "errNotLinked": "Essa carteira não está ligada à sua conta.",
     "errSignature": "Essa assinatura não veio desta carteira. Assine com a carteira que faz staking.",
     "errLimit": "Pode ligar até {{max}} carteiras de staking. Remova uma primeiro.",
+    "errNotInHost": "O Nimiq Pay só consegue assinar pela carteira que guarda, e essa não é {{address}}. Abra a loja no seu navegador para ligar essa carteira com o Nimiq Hub.",
     "errGeneric": "Não foi possível ligar a carteira de staking. Tente novamente.",
   },
 

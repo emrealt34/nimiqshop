@@ -91,6 +91,7 @@ const tr = {
     "openLink": "Stake ettiğin cüzdanı bağla",
     "addAnother": "Başka bir cüzdan bağla",
     "signHint": "Hub cüzdan seçicisini açar. Stake ettiğin cüzdanı seç; imza kontrolün sende olduğunu kanıtlar, NIM göndermez.",
+    "signHintPay": "Nimiq Pay, içinde tuttuğu cüzdanla imzalar. İmza kontrolün sende olduğunu kanıtlar, NIM göndermez.",
     "confirm": "İmzala ve bağla",
     "busy": "Cüzdanın bekleniyor…",
     "cancel": "Vazgeç",
@@ -107,6 +108,7 @@ const tr = {
     "errNotLinked": "Bu cüzdan hesabına bağlı değil.",
     "errSignature": "Bu imza bu cüzdandan gelmedi. Stake eden cüzdanla imzala.",
     "errLimit": "En fazla {{max}} stake cüzdanı bağlayabilirsin. Önce birini kaldır.",
+    "errNotInHost": "Nimiq Pay yalnızca içinde tuttuğu cüzdan için imzalayabilir ve o {{address}} değil. Bu cüzdanı Nimiq Hub ile bağlamak için mağazayı tarayıcında aç.",
     "errGeneric": "Stake cüzdanı bağlanamadı. Tekrar dene.",
   },
 

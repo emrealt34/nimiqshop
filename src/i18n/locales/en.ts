@@ -97,6 +97,7 @@ const en = {
     "openLink": "Link the wallet you stake from",
     "addAnother": "Link another wallet",
     "signHint": "Hub opens your wallet picker. Choose the wallet that stakes; signing proves you control it — no NIM moves.",
+    "signHintPay": "Nimiq Pay signs with the wallet it holds. Signing proves you control it — no NIM moves.",
     "confirm": "Sign and link",
     "busy": "Waiting for your wallet…",
     "cancel": "Cancel",
@@ -113,6 +114,7 @@ const en = {
     "errNotLinked": "That wallet is not linked to your account.",
     "errSignature": "That signature did not come from this wallet. Sign with the wallet that stakes.",
     "errLimit": "You can link up to {{max}} staking wallets. Remove one first.",
+    "errNotInHost": "Nimiq Pay can only sign for the wallet it holds, and that is not {{address}}. Open the shop in your browser to link that wallet with Nimiq Hub.",
     "errGeneric": "The staking wallet could not be linked. Try again.",
   },
 
