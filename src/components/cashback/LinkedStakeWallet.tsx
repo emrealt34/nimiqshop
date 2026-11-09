@@ -140,6 +140,7 @@ export function LinkedStakeWallet({ mine, onChanged, intent, onIntentDone }: {
       if (/maximum|limit/i.test(msg)) return t('stakeLink.errLimit', { max: limit });
       if (/another account/i.test(msg)) return t('stakeLink.errTaken');
       if (/not linked/i.test(msg)) return t('stakeLink.errNotLinked');
+      if (/challenge.*used/i.test(msg)) return t('stakeLink.errSignature');
       return t('stakeLink.errOwnAddress');
     }
     if (status === 401) return t('stakeLink.errSignature');
@@ -202,7 +203,7 @@ export function LinkedStakeWallet({ mine, onChanged, intent, onIntentDone }: {
       // Inside Nimiq Pay, Pay holds only the wallet already signed in, so a
       // direct sign answers 409 own-wallet. Automatically open the cross-device
       // pairing link so the buyer can attach their PC/other wallet immediately.
-      if (inPay && (e instanceof StakeLinkWalletNotInHostError || (status === 409 && !/maximum|limit|another account|not linked/i.test(msg)))) {
+      if (inPay && (e instanceof StakeLinkWalletNotInHostError || (status === 409 && !/maximum|limit|another account|not linked|challenge.*used/i.test(msg)))) {
         setErr(t('stakeLink.ownWalletLinkHint'));
         if (!inviteUrl) void generateInvite();
       } else {
@@ -244,6 +245,8 @@ export function LinkedStakeWallet({ mine, onChanged, intent, onIntentDone }: {
       <p className="small muted" data-testid="stake-link-paid-to">
         {t('stakeLink.paidTo', { address: pretty(account) })}
       </p>
+
+      <p className="small muted" data-testid="stake-group-notice">{t('stakeLink.groupNotice')}</p>
 
       <div className="cb-link-note" data-testid="stake-link-rail"><Icon name="info" size={16} /><div className="small">{t('stakeLink.anyRail')}</div></div>
 

@@ -290,3 +290,18 @@ test.describe('Cross-device pairing link (?stake_link=<token>) @smoke', () => {
     });
   });
 });
+
+test('a group change made elsewhere refreshes on returning to the account', async ({ page }) => {
+  let links = [STAKE_ADDRESS];
+  await page.route('**/api/poolstake/me', route => route.fulfill({ json: poolStakeMe(links) }));
+  await open(page, path('/cashback'));
+  const card = page.getByTestId('linked-stake-wallet');
+  await expect(card.getByTestId('stake-link-wallet')).toHaveCount(2);
+  await expect(card.getByTestId('stake-group-notice')).toContainText('Any member');
+  links = [STAKE_ADDRESS, OTHER_ADDRESS];
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(card.getByTestId('stake-link-wallet')).toHaveCount(3);
+  await expect(card.getByTestId('stake-link-total')).toContainText('250');
+  await expect(card.getByTestId('stake-link-paid-to')).toContainText('NQ07');
+  await expect(card.getByTestId('stake-link-unlink-all')).toContainText('Leave group');
+});

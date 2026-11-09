@@ -317,6 +317,12 @@ func New(dir string, cfgs ...Options) (*Store, error) {
 	}
 
 	s := &Store{db: bdb}
+	// Finish legacy wallet-group migration before sessions or payouts can read
+	// partially mirrored groups. A failed migration must not serve wrong data.
+	if err := s.migrateStakeGroups(); err != nil {
+		_ = bdb.Close()
+		return nil, err
+	}
 	go s.runValueLogGC()
 
 	// Build the checkout-safety index in the background. Reads keep taking

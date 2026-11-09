@@ -430,44 +430,35 @@ func TestStakeAddressLinkRefusesAWalletThatDoesNotStakeWithUs(t *testing.T) {
 	}
 }
 
-// TestStakeAddressLinkIsOneAccountPerWallet stops two accounts from claiming
-// the same delegation, which would let one stake pay two buyers' boosts.
-func TestStakeAddressLinkIsOneAccountPerWallet(t *testing.T) {
-	s, _, staker, auth := linkStack(t, linkStackOptions{})
+// A second account can join an existing group only with a fresh signature by
+// the linked wallet. Both accounts then see the same stake group.
+func TestStakeAddressLinkMergesAccountsWithProof(t *testing.T) {
+	s, account, staker, auth := linkStack(t, linkStackOptions{})
 	message, token := requestLinkChallenge(t, s, auth, staker.address)
-	if res := s.do(http.MethodPost, "/api/poolstake/stake-address", map[string]any{
-		"challenge_token": token,
-		"stake_address":   staker.address,
-		"public_key":      hex.EncodeToString(staker.pub),
-		"signature":       staker.signMessage(message),
-	}, auth); res.status != 200 {
+	body := map[string]any{"challenge_token": token, "stake_address": staker.address, "public_key": hex.EncodeToString(staker.pub), "signature": staker.signMessage(message)}
+	if res := s.do(http.MethodPost, "/api/poolstake/stake-address", body, auth); res.status != 200 {
 		t.Fatalf("first link: %d %s", res.status, res.body)
 	}
-
-	// A second, genuinely different account tries to link the same wallet. It
-	// can produce a perfectly valid signature for it (the same person could own
-	// both wallets), so what has to stop it is the rule that one delegation
-	// feeds exactly one account — not the ownership proof.
 	rival := newLinkTestWallet(t)
 	otherAuth, _ := s.signInAs(rival.pub, rival.priv)
 	message2, token2 := requestLinkChallenge(t, s, otherAuth, staker.address)
-	res := s.do(http.MethodPost, "/api/poolstake/stake-address", map[string]any{
-		"challenge_token": token2,
-		"stake_address":   staker.address,
-		"public_key":      hex.EncodeToString(staker.pub),
-		"signature":       staker.signMessage(message2),
-	}, otherAuth)
-	// Signing in with the staking wallet makes it that account's OWN address,
-	// which is a different (and also rejected) case: no link is needed.
-	if res.status != 409 {
-		t.Fatalf("a second account claiming the same wallet = %d, want 409 (%s)", res.status, res.body)
+	if res := s.do(http.MethodPost, "/api/poolstake/stake-address", map[string]any{"challenge_token": token2, "stake_address": staker.address, "public_key": hex.EncodeToString(staker.pub), "signature": staker.signMessage(message2)}, otherAuth); res.status != 200 {
+		t.Fatalf("join: %d %s", res.status, res.body)
 	}
-	if !strings.Contains(string(res.body), "another account") {
-		t.Fatalf("the refusal should say the wallet is linked elsewhere: %s", res.body)
+	for _, entry := range []struct {
+		auth map[string]string
+		own  string
+	}{{auth, account.address}, {otherAuth, rival.address}} {
+		view := s.do(http.MethodGet, "/api/poolstake/me", nil, entry.auth).json(t)
+		if len(stakeAddressRows(t, view)) != 3 || canonAddress(str(view["account_address"])) != canonAddress(entry.own) {
+			t.Fatalf("wrong shared group or payout: %v", view)
+		}
 	}
-	// The first account keeps its link.
-	if me := s.do(http.MethodGet, "/api/poolstake/me", nil, auth).json(t); me["stake_address_linked"] != true {
-		t.Fatalf("the refused attempt disturbed the existing link: %v", me)
+	if res := s.do(http.MethodDelete, unlinkURL(staker.address), nil, auth); res.status != 200 {
+		t.Fatalf("unlink: %d %s", res.status, res.body)
+	}
+	if res := s.do(http.MethodPost, "/api/poolstake/stake-address", body, auth); res.status != 409 {
+		t.Fatalf("replayed signature = %d, want 409", res.status)
 	}
 }
 

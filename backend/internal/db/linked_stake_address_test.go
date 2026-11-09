@@ -138,8 +138,14 @@ func TestStakeAddressLinkPrimitives(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GetUserByStakeAddress(%s): %v", addr, err)
 		}
-		if byStake.ID != u.ID {
-			t.Fatalf("GetUserByStakeAddress(%s) returned %q, want %q", addr, byStake.ID, u.ID)
+		found := false
+		for _, member := range byStake.EarningStakeAddresses() {
+			if canonicalStakeAddr(member) == canonicalStakeAddr(addr) {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("GetUserByStakeAddress(%s) returned unrelated user %q", addr, byStake.ID)
 		}
 	}
 	if _, err := store.GetUserByStakeAddress(other); !errors.Is(err, ErrNotFound) {
@@ -204,8 +210,15 @@ func TestStakeAddressLinkPrimitives(t *testing.T) {
 	if got := cleared.EarningStakeAddresses(); len(got) != 1 || got[0] != account {
 		t.Fatalf("after clearing: EarningStakeAddresses() = %v, want just the login address", got)
 	}
-	if _, err := store.GetUserByStakeAddress(stakeWallet); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("cleared link still resolves: err = %v, want ErrNotFound", err)
+	// Clearing detaches the caller; the other wallets remain a group.
+	otherUser, err := store.GetUserByAddress(stakeWallet)
+	if err != nil || !otherUser.HasLinkedStakeAddress() {
+		t.Fatalf("other wallets lost their group: %v", err)
+	}
+	for _, addr := range otherUser.EarningStakeAddresses() {
+		if canonicalStakeAddr(addr) == canonicalStakeAddr(account) {
+			t.Fatal("cleared account remains in the group")
+		}
 	}
 
 	// A malformed address must never be stored.

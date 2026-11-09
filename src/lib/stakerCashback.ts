@@ -380,25 +380,30 @@ function parseMyStake(r: any): MyStake | null {
   };
 }
 
+// A slower earlier request must not overwrite a newer link/unlink refresh.
+let latestMyStakeRequest = 0;
+
 /** The signed-in buyer's standing. Null when signed out or on a hard error. */
-export async function loadMyStake(): Promise<MyStake | null> {
+export async function loadMyStake(options: { fresh?: boolean } = {}): Promise<MyStake | null> {
   const key = myStakeKey();
   const cached = readCache<MyStake>(key, MY_STAKE_TTL_MS);
-  if (cached) return cached;
+  if (cached && !options.fresh) return cached;
+  const request = ++latestMyStakeRequest;
   try {
     const r: any = await getPoolStake();
     const mine = parseMyStake(r);
-    if (myStakeKey() !== key) return null;
+    if (myStakeKey() !== key || request !== latestMyStakeRequest) return null;
     if (mine) writeCache(key, mine);
     return mine;
   } catch {
-    return cached;
+    return myStakeKey() === key && request === latestMyStakeRequest ? cached : null;
   }
 }
 
 /** Drops the cached answer and re-asks — used right after a stake tx. */
 export async function refreshMyStake(): Promise<MyStake | null> {
   const key = myStakeKey();
+  const request = ++latestMyStakeRequest;
   try {
     sessionStorage.removeItem(key);
   } catch {
@@ -407,7 +412,7 @@ export async function refreshMyStake(): Promise<MyStake | null> {
   try {
     const r: any = await refreshPoolStake();
     const mine = parseMyStake(r);
-    if (myStakeKey() !== key) return null;
+    if (myStakeKey() !== key || request !== latestMyStakeRequest) return null;
     if (mine) writeCache(key, mine);
     return mine;
   } catch {

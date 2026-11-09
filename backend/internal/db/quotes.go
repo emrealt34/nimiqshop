@@ -393,13 +393,13 @@ func (s *Store) transitionQuote(id, to string, mutate func(*Quote, *badger.Txn) 
 	var ledgerParams stakeledger.Params
 	var buyerAddrs []string
 	if to == "fulfilled" {
-		stake = s.resolveStakerStake(id)
+		stake, buyerAddrs = s.resolveStakerStake(id)
 		ledgerParams = s.StakeLedgerParamsForTx()
-		buyerAddrs = s.quoteBuyerAddresses(id)
 	}
 
 	var q Quote
 	var oldStatus string
+	var committedStake StakerStake
 	err := s.Update(func(tx *badger.Txn) error {
 		if err := getJSON(tx, quoteKey(id), &q); err != nil {
 			return err
@@ -459,10 +459,24 @@ func (s *Store) transitionQuote(id, to string, mutate func(*Quote, *badger.Txn) 
 			}
 		}
 		if to == "fulfilled" {
+			// The network lookup ran outside the transaction. If a member was
+			// added or removed meanwhile, never pay based on the stale group;
+			// fulfill at base and schedule the normal current-group recheck.
+			txStake, txAddrs := stake, buyerAddrs
+			var user User
+			if e := getJSON(tx, userKey(q.UserID), &user); e == nil {
+				current := user.EarningStakeAddresses()
+				if !sameStakeAddressSet(current, buyerAddrs) {
+					txStake, txAddrs = StakerStake{}, current
+				}
+			} else if !errors.Is(e, ErrNotFound) {
+				return e
+			}
+			committedStake = txStake
 			if err = publishToFeed(tx, &q); err != nil {
 				return err
 			}
-			if err = enqueueCashbackOnFulfill(tx, &q, stake, ledgerParams, s.cashbackEnrich()); err != nil {
+			if err = enqueueCashbackOnFulfill(tx, &q, txStake, ledgerParams, s.cashbackEnrich()); err != nil {
 				return err
 			}
 			// The buyer was not VERIFIABLY staked at delivery time (no
@@ -472,13 +486,13 @@ func (s *Store) transitionQuote(id, to string, mutate func(*Quote, *badger.Txn) 
 			// hour and upgrades the cashback the moment the pool says
 			// "staked". Written in the SAME transaction as the delivery
 			// itself, so a crash can never lose it.
-			if !stake.Staked && len(buyerAddrs) > 0 {
+			if !txStake.Staked && len(txAddrs) > 0 {
 				now := time.Now().UTC()
 				if err = recordStakeRecheckTx(tx, StakeRecheck{
 					QuoteID:   q.ID,
 					UserID:    q.UserID,
-					Address:   buyerAddrs[0],
-					Addresses: buyerAddrs,
+					Address:   txAddrs[0],
+					Addresses: txAddrs,
 					CreatedAt: now,
 					Deadline:  now.Add(StakeRecheckWindow),
 				}); err != nil {
@@ -488,7 +502,26 @@ func (s *Store) transitionQuote(id, to string, mutate func(*Quote, *badger.Txn) 
 		}
 		return nil
 	})
+	if err == nil && to == "fulfilled" && committedStake.Staked && q.UserID != "" {
+		_, _ = s.ReconcileStakerCashbackForUser(q.UserID, committedStake, time.Now().UTC())
+	}
 	return err
+}
+
+func sameStakeAddressSet(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	seen := make(map[string]bool, len(a))
+	for _, addr := range a {
+		seen[canonicalStakeAddr(addr)] = true
+	}
+	for _, addr := range b {
+		if !seen[canonicalStakeAddr(addr)] {
+			return false
+		}
+	}
+	return true
 }
 
 // quoteBuyerAddresses loads every wallet behind a quote's buyer that earns its
@@ -525,13 +558,12 @@ func (s *Store) quoteBuyerAddresses(quoteID string) []string {
 // breaker, and the post-fulfillment stake recheck re-asks the pool every 30
 // seconds for an hour so an index-lagged staker is upgraded within minutes,
 // trust-free).
-func (s *Store) resolveStakerStake(quoteID string) StakerStake {
+func (s *Store) resolveStakerStake(quoteID string) (StakerStake, []string) {
 	if !s.HasStakerLookup() {
-		return StakerStake{}
+		return StakerStake{}, s.quoteBuyerAddresses(quoteID)
 	}
 
 	var addresses []string
-	var userID string
 	err := s.View(func(tx *badger.Txn) error {
 		var q Quote
 		if err := getJSON(tx, quoteKey(quoteID), &q); err != nil {
@@ -544,7 +576,6 @@ func (s *Store) resolveStakerStake(quoteID string) StakerStake {
 		if err := getJSON(tx, userKey(q.UserID), &u); err != nil {
 			return err
 		}
-		userID = u.ID
 		// EVERY wallet that earns this quote's cashback: the sign-in address
 		// plus each linked staking wallet. Payouts still go to the account
 		// wallet (see enqueueCashbackOnFulfill).
@@ -552,7 +583,7 @@ func (s *Store) resolveStakerStake(quoteID string) StakerStake {
 		return nil
 	})
 	if err != nil || len(addresses) == 0 {
-		return StakerStake{}
+		return StakerStake{}, nil
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), aggregateStakeTimeout)
@@ -562,12 +593,7 @@ func (s *Store) resolveStakerStake(quoteID string) StakerStake {
 	// loyalty the longest streak, each wallet's own clocks advanced.
 	resolved, report := s.AggregateStakerStake(ctx, addresses)
 	if resolved.Staked {
-		// If an earlier fulfillment happened while the pool was unreachable,
-		// upgrade its still-unpaid base row now. This is idempotent and
-		// survives a process restart because the row itself is the durable
-		// recovery queue.
-		_, _ = s.ReconcileStakerCashbackForUser(userID, resolved, now)
-		return resolved
+		return resolved, addresses
 	}
 	if report.Failed > 0 {
 		// At least one wallet could not be asked. Use the last positive local
@@ -578,13 +604,12 @@ func (s *Store) resolveStakerStake(quoteID string) StakerStake {
 		// eligible, and the normal ledger caps still apply. A later
 		// authoritative zero is what can clear it.
 		if cached := s.CachedStakeAggregate(addresses, now); cached.Staked {
-			_, _ = s.ReconcileStakerCashbackForUser(userID, cached, now)
-			return cached
+			return cached, addresses
 		}
 	}
 	// Every wallet answered "not staked" (the zeros are already recorded by
 	// the aggregate): the row honestly stays at the base rate.
-	return StakerStake{}
+	return StakerStake{}, addresses
 }
 
 // UserStakerStake resolves a buyer's pool standing directly from their user

@@ -2,6 +2,7 @@ package db
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -249,34 +250,107 @@ func readBooksInTx(tx *badger.Txn, addresses []string) ([]stakeledger.Ledger, er
 	return books, nil
 }
 
-// sharedSpendInTx loads the account's shared spend budget with any pending
-// UTC boundary applied, WITHOUT persisting it. A missing record is a fresh
-// (full) budget, not an error.
-func sharedSpendInTx(tx *badger.Txn, account string, now time.Time) (stakeledger.SharedSpend, error) {
-	var ss stakeledger.SharedSpend
-	err := getJSON(tx, sharedSpendKey(account), &ss)
-	if err != nil {
-		if err == ErrNotFound {
-			return stakeledger.NewSharedSpend(now), nil
-		}
-		return stakeledger.SharedSpend{}, err
-	}
-	ss.Rollover(now)
-	return ss, nil
+// Each shard belongs to the wallet that incurred it. Splits retain the same
+// historical shards on both sides; merges take a per-shard maximum, so neither
+// a budget reset nor double counting is possible after unlink/relink.
+type stakeSpendState struct {
+	Components map[string]stakeledger.SharedSpend `json:"components"`
 }
 
-// persistSharedSpendInTx writes the account's budget back inside the open
-// transaction. Idempotent overwrite; rolled-over boundaries ride along.
+func stakeSpendStateInTx(tx *badger.Txn, account string, now time.Time) (stakeSpendState, error) {
+	state := stakeSpendState{}
+	group, err := stakeGroupInTx(tx, account)
+	if err != nil {
+		return state, err
+	}
+	groupID := group.ID
+	key := standaloneSpendStateKey(account)
+	if groupID != "" {
+		key = stakeGroupSpendKey(groupID)
+	}
+	err = getJSON(tx, key, &state)
+	if errors.Is(err, ErrNotFound) {
+		if groupID != "" {
+			return state, errors.New("linked stake group budget missing")
+		}
+		var old stakeledger.SharedSpend
+		err = getJSON(tx, sharedSpendKey(account), &old)
+		if errors.Is(err, ErrNotFound) {
+			state.Components = map[string]stakeledger.SharedSpend{}
+			return state, nil
+		}
+		if err != nil {
+			return state, err
+		}
+		state.Components = map[string]stakeledger.SharedSpend{canonicalStakeAddr(account): old}
+	} else if err != nil {
+		return state, err
+	}
+	if state.Components == nil {
+		return state, errors.New("invalid stake group budget")
+	}
+	for key, component := range state.Components {
+		component.Rollover(now)
+		state.Components[key] = component
+	}
+	return state, nil
+}
+
+func (s stakeSpendState) total(now time.Time) stakeledger.SharedSpend {
+	total := stakeledger.NewSharedSpend(now)
+	for _, component := range s.Components {
+		component.Rollover(now)
+		total.HDay = addCents(total.HDay, component.HDay)
+		total.HMonth = addCents(total.HMonth, component.HMonth)
+	}
+	return total
+}
+
+func sharedSpendInTx(tx *badger.Txn, account string, now time.Time) (stakeledger.SharedSpend, error) {
+	state, err := stakeSpendStateInTx(tx, account, now)
+	if err != nil {
+		return stakeledger.SharedSpend{}, err
+	}
+	return state.total(now), nil
+}
+
+// Persist only the increase in the signed-in wallet's shard. Copying full
+// totals into every wallet would double-count them on a later group merge.
 func persistSharedSpendInTx(tx *badger.Txn, account string, ss stakeledger.SharedSpend) error {
 	account = canonicalStakeAddr(account)
 	if account == "" {
 		return nil
 	}
-	raw, err := marshal(ss)
+	now, err := time.Parse("2006-01-02", ss.DayKey)
 	if err != nil {
 		return err
 	}
-	return tx.Set(sharedSpendKey(account), raw)
+	state, err := stakeSpendStateInTx(tx, account, now)
+	if err != nil {
+		return err
+	}
+	old := state.total(now)
+	component := state.Components[account]
+	component.Rollover(now)
+	if ss.HDay > old.HDay {
+		component.HDay = addCents(component.HDay, ss.HDay-old.HDay)
+	}
+	if ss.HMonth > old.HMonth {
+		component.HMonth = addCents(component.HMonth, ss.HMonth-old.HMonth)
+	}
+	state.Components[account] = component
+	raw, err := marshal(state)
+	if err != nil {
+		return err
+	}
+	id, err := getString(tx, stakeGroupIndexKey(account))
+	if err == nil {
+		return tx.Set(stakeGroupSpendKey(id), raw)
+	}
+	if !errors.Is(err, ErrNotFound) {
+		return err
+	}
+	return tx.Set(standaloneSpendStateKey(account), raw)
 }
 
 // ReadSharedSpend is the buyer/admin-side accessor: the account's shared
@@ -290,20 +364,11 @@ func (s *Store) ReadSharedSpend(account string, now time.Time) (stakeledger.Shar
 	}
 	var ss stakeledger.SharedSpend
 	err := s.View(func(tx *badger.Txn) error {
-		e := getJSON(tx, sharedSpendKey(account), &ss)
-		if e == ErrNotFound {
-			return ErrNotFound
-		}
+		var e error
+		ss, e = sharedSpendInTx(tx, account, now)
 		return e
 	})
-	if err == ErrNotFound {
-		return fresh, nil
-	}
-	if err != nil {
-		return stakeledger.SharedSpend{}, err
-	}
-	ss.Rollover(now)
-	return ss, nil
+	return ss, err
 }
 
 // purchaseEarningSetInTx is the fulfillment-side half of the ledger for a

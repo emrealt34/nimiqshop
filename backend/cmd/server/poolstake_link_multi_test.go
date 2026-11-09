@@ -389,36 +389,114 @@ func TestUnlinkOneStakeWalletKeepsTheOthers(t *testing.T) {
 	}
 }
 
-// TestOneStakeWalletStillServesOneAccount keeps the uniqueness rule honest now
-// that an account may link several wallets: a wallet that already earns for
-// somebody else cannot be claimed by a second account, however many slots that
-// account has left. Without it two buyers could both collect cashback from one
-// delegation.
-func TestOneStakeWalletStillServesOneAccount(t *testing.T) {
-	s, _, stakers, auth := multiLinkStack(t, []int64{10_000_000, 15_000_000})
+// A verified signature on a member joins the two groups rather than giving
+// the same stake to two independent accounts. Every login sees the union.
+func TestSignedStakeWalletJoinsOneSharedGroup(t *testing.T) {
+	s, account, stakers, auth := multiLinkStack(t, []int64{10_000_000, 15_000_000})
 	mustLink(t, s, auth, stakers[0])
-
-	// A second buyer signs in with their own wallet and tries to claim the same
-	// staking wallet.
 	other := newLinkTestWallet(t)
 	otherAuth, _ := s.signInAs(other.pub, other.priv)
-	res := linkWallet(t, s, otherAuth, stakers[0])
-	if res.status != 409 {
-		t.Fatalf("a second account claiming a linked wallet = %d, want 409 (%s)", res.status, res.body)
-	}
-	if !strings.Contains(strings.ToLower(string(res.body)), "another account") {
-		t.Fatalf("the refusal does not say why: %s", res.body)
-	}
-
-	// The second buyer can still link a wallet nobody else claimed.
+	mustLink(t, s, otherAuth, stakers[0])
 	mustLink(t, s, otherAuth, stakers[1])
-	view := s.do(http.MethodGet, "/api/poolstake/me", nil, otherAuth).json(t)
-	if got := num(view["stake_nim"]); got != 150 {
-		t.Fatalf("the second account's stake_nim = %v, want 150 from its own single link", got)
+	stakerAuth, _ := s.signInAs(stakers[0].pub, stakers[0].priv)
+	for _, login := range []struct {
+		auth map[string]string
+		own  string
+	}{{auth, account.address}, {otherAuth, other.address}, {stakerAuth, stakers[0].address}} {
+		view := s.do(http.MethodGet, "/api/poolstake/me", nil, login.auth).json(t)
+		rows := stakeAddressRows(t, view)
+		if len(rows) != 4 || num(view["stake_nim"]) != 250 {
+			t.Fatalf("group is not shared: %v", view)
+		}
+		if canonAddress(str(view["account_address"])) != canonAddress(login.own) {
+			t.Fatalf("payout account changed: %v", view)
+		}
 	}
-	// And the first account's total is untouched by any of it.
-	first := s.do(http.MethodGet, "/api/poolstake/me", nil, auth).json(t)
-	if got := num(first["stake_nim"]); got != 100 {
-		t.Fatalf("the first account's stake_nim = %v, want 100 (its own wallet only)", got)
+	if res := s.do(http.MethodDelete, unlinkURL(stakers[1].address), nil, stakerAuth); res.status != 200 {
+		t.Fatalf("unlink: %d %s", res.status, res.body)
 	}
+	for _, login := range []map[string]string{auth, otherAuth, stakerAuth} {
+		view := s.do(http.MethodGet, "/api/poolstake/me", nil, login).json(t)
+		if len(stakeAddressRows(t, view)) != 3 || num(view["stake_nim"]) != 100 {
+			t.Fatalf("detach not shared: %v", view)
+		}
+	}
+}
+
+// Exact reported regression, exercised through real signed Hub logins and
+// HTTP endpoints: B first signs in AFTER A linked it, then B links C. The
+// session bootstrap and cashback endpoint must agree for every sign-in.
+func TestLinkedWalletGroupSurvivesSeparateLoginsAndTransitiveJoin(t *testing.T) {
+	s, a, wallets, authA := multiLinkStack(t, []int64{10_000_000, 15_000_000})
+	b, c := wallets[0], wallets[1]
+	mustLink(t, s, authA, b)
+	authB, _ := s.signInAs(b.pub, b.priv)
+	assertGroup := func(auth map[string]string, own string, want ...string) {
+		t.Helper()
+		expected := map[string]bool{}
+		for _, addr := range want {
+			expected[canonAddress(addr)] = true
+		}
+		sessionRes := s.do(http.MethodGet, "/api/auth/session", nil, auth)
+		if sessionRes.status != 200 {
+			t.Fatalf("session %d %s", sessionRes.status, sessionRes.body)
+		}
+		session := sessionRes.json(t)
+		if session["authed"] != true {
+			t.Fatalf("not signed in: %v", session)
+		}
+		raw, ok := session["stake_addresses"].([]any)
+		if !ok {
+			t.Fatalf("session lacks wallet set: %v", session)
+		}
+		found := map[string]bool{}
+		for _, item := range raw {
+			found[canonAddress(str(item))] = true
+		}
+		if len(found) != len(expected) {
+			t.Fatalf("session group %v want %v", found, expected)
+		}
+		for address := range expected {
+			if !found[address] {
+				t.Fatalf("session missing %s: %v", address, session)
+			}
+		}
+		viewRes := s.do(http.MethodGet, "/api/poolstake/me", nil, auth)
+		if viewRes.status != 200 {
+			t.Fatalf("pool view: %d %s", viewRes.status, viewRes.body)
+		}
+		view := viewRes.json(t)
+		found = map[string]bool{}
+		for _, row := range stakeAddressRows(t, view) {
+			found[canonAddress(str(row["address"]))] = true
+		}
+		if len(found) != len(expected) {
+			t.Fatalf("cashback group %v want %v", found, expected)
+		}
+		for address := range expected {
+			if !found[address] {
+				t.Fatalf("cashback missing %s: %v", address, view)
+			}
+		}
+		if canonAddress(str(view["account_address"])) != canonAddress(own) {
+			t.Fatalf("payout changed: %v", view)
+		}
+	}
+	assertGroup(authB, b.address, a.address, b.address)
+	mustLink(t, s, authB, c)
+	authC, _ := s.signInAs(c.pub, c.priv)
+	for _, login := range []struct {
+		auth map[string]string
+		own  string
+	}{{authA, a.address}, {authB, b.address}, {authC, c.address}} {
+		assertGroup(login.auth, login.own, a.address, b.address, c.address)
+	}
+	// A/B stay linked when C is removed, and C sees the removal on its own
+	// already-issued session, not just after obtaining a new token.
+	if res := s.do(http.MethodDelete, unlinkURL(c.address), nil, authB); res.status != 200 {
+		t.Fatalf("detach C: %d %s", res.status, res.body)
+	}
+	assertGroup(authA, a.address, a.address, b.address)
+	assertGroup(authB, b.address, a.address, b.address)
+	assertGroup(authC, c.address, c.address)
 }

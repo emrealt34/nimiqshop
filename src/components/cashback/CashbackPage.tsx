@@ -332,7 +332,7 @@ export function CashbackView() {
 
   const reload = useCallback(async () => {
     const owner = positionOwner;
-    const [p, m] = await Promise.all([loadStakerProgram(), authed ? loadMyStake() : Promise.resolve(null)]);
+    const [p, m] = await Promise.all([loadStakerProgram(), authed ? loadMyStake({ fresh: true }) : Promise.resolve(null)]);
     if (authed && owner !== getUid() + ':' + getAddress().replace(/\s/g, '').toUpperCase()) return;
     setProgram(p);
     mineFingerprint.current = m ? stakeFingerprint(m) : '';
@@ -442,6 +442,31 @@ export function CashbackView() {
   const poolPosition = !!position?.exists && !!validator && position.delegation === validator;
   const stakedHere = position ? poolPosition && position.active_nim > 0 : !!mine?.staked && (mine?.stake_luna || 0) > 0;
   const pending = pendingStake?.owner === positionOwner ? pendingStake : null;
+  // Another group member can link/unlink from a different device. Refresh the
+  // visible group on return and periodically; never apply a previous wallet's
+  // response after the user switches sessions.
+  useEffect(() => {
+    if (!authed) return;
+    let live = true;
+    let pending = false;
+    const owner = positionOwner;
+    const refreshGroup = async () => {
+      if (!live || pending || document.visibilityState === 'hidden') return;
+      pending = true;
+      try {
+        const fresh = await loadMyStake({ fresh: true });
+        if (live && owner === getUid() + ':' + getAddress().replace(/\s/g, '').toUpperCase()) applyMine(fresh, owner);
+      } finally { pending = false; }
+    };
+    const onVisible = () => { void refreshGroup(); };
+    window.addEventListener('focus', onVisible);
+    document.addEventListener('visibilitychange', onVisible);
+    const timer = window.setInterval(onVisible, 60_000);
+    return () => { live = false; window.removeEventListener('focus', onVisible); document.removeEventListener('visibilitychange', onVisible); window.clearInterval(timer); };
+    // applyMine compares the visible fingerprint; no state captured by this effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authed, positionOwner]);
+
   const positionKey = (p: StakePosition) => JSON.stringify([p.exists, p.delegation, p.active_nim, p.inactive_nim, p.retired_nim]);
   async function recheckPosition() {
     const fresh = await refreshPosition();

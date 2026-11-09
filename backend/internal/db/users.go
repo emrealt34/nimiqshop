@@ -1,6 +1,8 @@
 package db
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"strings"
 	"time"
@@ -23,6 +25,7 @@ const MaxLinkedStakeAddresses = 5
 // "could not link" would send the buyer to support for a rule they can act on
 // themselves (unlink a wallet they no longer use).
 var ErrTooManyStakeAddresses = errors.New("stake wallet limit reached")
+var ErrStakeLinkProofUsed = errors.New("stake link challenge already used")
 
 // LinkedStakeWallets returns the wallets this account proved control of, in
 // link order, canonicalised and deduplicated. The sign-in address is filtered
@@ -118,6 +121,19 @@ func (u User) StakeAddressLinkedAt(address string) time.Time {
 // re-link after a page refresh cannot fail the buyer. Exceeding
 // MaxLinkedStakeAddresses returns ErrTooManyStakeAddresses.
 func (s *Store) AddStakeAddress(userID, address string, now time.Time) (User, error) {
+	return s.addStakeAddress(userID, address, now, "")
+}
+
+// AddStakeAddressWithProof consumes a signed challenge in the SAME transaction
+// as the group merge, so a recorded signature cannot relink an unlinked wallet.
+func (s *Store) AddStakeAddressWithProof(userID, address string, now time.Time, nonce string) (User, error) {
+	if strings.TrimSpace(nonce) == "" {
+		return User{}, errors.New("stake link challenge required")
+	}
+	return s.addStakeAddress(userID, address, now, nonce)
+}
+
+func (s *Store) addStakeAddress(userID, address string, now time.Time, nonce string) (User, error) {
 	var user User
 	if strings.TrimSpace(userID) == "" {
 		return user, errors.New("user id required")
@@ -125,43 +141,51 @@ func (s *Store) AddStakeAddress(userID, address string, now time.Time) (User, er
 	if err := nimiq.ValidateAddress(address); err != nil {
 		return user, err
 	}
-	normalized := nimiq.NormalizeAddress(address)
-	want := canonicalStakeAddr(normalized)
-
-	err := s.Update(func(txn *badger.Txn) error {
-		if err := getJSON(txn, userKey(userID), &user); err != nil {
-			return err
-		}
-		if want == canonicalStakeAddr(user.NimiqAddress) {
-			return nil // the sign-in wallet always earns; nothing to store
-		}
-		for _, link := range user.LinkedStakeWallets() {
-			if canonicalStakeAddr(link.Address) == want {
-				return nil // already linked: idempotent
+	address = nimiq.NormalizeAddress(address)
+	err := s.Update(func(tx *badger.Txn) error {
+		if nonce != "" {
+			sum := sha256.Sum256([]byte(nonce))
+			key := []byte("stake-link-proof:" + hex.EncodeToString(sum[:]))
+			if _, err := tx.Get(key); err == nil {
+				return ErrStakeLinkProofUsed
+			} else if !errors.Is(err, badger.ErrKeyNotFound) {
+				return err
+			}
+			// Both challenge types expire after five minutes. Keep the used
+			// marker longer to allow for minor clock skew and in-flight requests.
+			if err := tx.SetEntry(badger.NewEntry(key, []byte("1")).WithTTL(20 * time.Minute)); err != nil {
+				return err
 			}
 		}
-		if len(user.LinkedStakeWallets()) >= MaxLinkedStakeAddresses {
-			return ErrTooManyStakeAddresses
+		if err := getJSON(tx, userKey(userID), &user); err != nil {
+			return err
 		}
-		user.StakeAddresses = append(user.LinkedStakeWallets(), StakeAddressLink{
-			Address:  normalized,
-			LinkedAt: now.UTC(),
-		})
-		blob, err := marshal(user)
+		if canonicalStakeAddr(user.NimiqAddress) == canonicalStakeAddr(address) {
+			return nil
+		}
+		mine, err := stakeGroupInTx(tx, user.NimiqAddress)
 		if err != nil {
 			return err
 		}
-		return txn.Set(userKey(user.ID), blob)
+		other, err := stakeGroupInTx(tx, address)
+		if err != nil {
+			return err
+		}
+		if mine.ID != "" && mine.ID == other.ID {
+			return nil
+		}
+		if err = mergeStakeGroupsInTx(tx, []string{user.NimiqAddress, address}, nil, now, true); err != nil {
+			return err
+		}
+		user = User{}
+		return getJSON(tx, userKey(userID), &user)
 	})
 	return user, err
 }
 
-// RemoveStakeAddress unlinks ONE earning wallet; the rest keep earning and the
-// sign-in wallet always does. The ledger and loyalty clocks are keyed by
-// address and are left untouched on purpose: they record what was observed for
-// that wallet, and unlinking must not rewrite history or forfeit cashback that
-// was already earned and queued. Returns ErrNotFound when the account never
-// linked that wallet, so a stale UI cannot report a success it did not cause.
+// RemoveStakeAddress detaches the named member from the WHOLE group. The
+// remaining wallets stay together; pending rewards and order histories are not
+// moved. Both resulting groups inherit the consumed spend budget.
 func (s *Store) RemoveStakeAddress(userID, address string) (User, error) {
 	var user User
 	if strings.TrimSpace(userID) == "" {
@@ -171,50 +195,96 @@ func (s *Store) RemoveStakeAddress(userID, address string) (User, error) {
 	if want == "" {
 		return user, ErrNotFound
 	}
-	err := s.Update(func(txn *badger.Txn) error {
-		if err := getJSON(txn, userKey(userID), &user); err != nil {
+	err := s.Update(func(tx *badger.Txn) error {
+		if err := getJSON(tx, userKey(userID), &user); err != nil {
 			return err
 		}
-		kept := make([]StakeAddressLink, 0, len(user.StakeAddresses))
-		removed := false
-		for _, link := range user.LinkedStakeWallets() {
-			if canonicalStakeAddr(link.Address) == want {
-				removed = true
-				continue
-			}
-			kept = append(kept, link)
-		}
-		if !removed {
+		if want == canonicalStakeAddr(user.NimiqAddress) {
 			return ErrNotFound
 		}
-		user.StakeAddresses = kept
-		blob, err := marshal(user)
+		group, err := stakeGroupInTx(tx, user.NimiqAddress)
 		if err != nil {
 			return err
 		}
-		return txn.Set(userKey(user.ID), blob)
+		if group.ID == "" {
+			return ErrNotFound
+		}
+		var remaining, detached []StakeAddressLink
+		for _, m := range group.Members {
+			if canonicalStakeAddr(m.Address) == want {
+				detached = append(detached, m)
+			} else {
+				remaining = append(remaining, m)
+			}
+		}
+		if len(detached) == 0 {
+			return ErrNotFound
+		}
+		now := time.Now().UTC()
+		spend, err := stakeSpendStateInTx(tx, user.NimiqAddress, now)
+		if err != nil {
+			return err
+		}
+		if err = removeStakeGroupInTx(tx, group); err != nil {
+			return err
+		}
+		if err = installStakeGroupInTx(tx, remaining, spend, now); err != nil {
+			return err
+		}
+		if err = installStakeGroupInTx(tx, detached, spend, now); err != nil {
+			return err
+		}
+		user = User{}
+		return getJSON(tx, userKey(userID), &user)
 	})
 	return user, err
 }
 
-// ClearStakeAddresses unlinks every wallet, putting the account back to
-// earning from the wallet it signs in with. As with RemoveStakeAddress this
-// changes future reads only — ledger entries and queued cashback stay put.
+// ClearStakeAddresses detaches the signed-in wallet itself; the other members
+// remain a group, matching the single-wallet removal semantics.
 func (s *Store) ClearStakeAddresses(userID string) (User, error) {
 	var user User
 	if strings.TrimSpace(userID) == "" {
 		return user, errors.New("user id required")
 	}
-	err := s.Update(func(txn *badger.Txn) error {
-		if err := getJSON(txn, userKey(userID), &user); err != nil {
+	err := s.Update(func(tx *badger.Txn) error {
+		if err := getJSON(tx, userKey(userID), &user); err != nil {
 			return err
 		}
-		user.StakeAddresses = nil
-		blob, err := marshal(user)
+		group, err := stakeGroupInTx(tx, user.NimiqAddress)
 		if err != nil {
 			return err
 		}
-		return txn.Set(userKey(user.ID), blob)
+		if group.ID == "" {
+			return nil
+		}
+		var remaining, detached []StakeAddressLink
+		for _, m := range group.Members {
+			if canonicalStakeAddr(m.Address) == canonicalStakeAddr(user.NimiqAddress) {
+				detached = append(detached, m)
+			} else {
+				remaining = append(remaining, m)
+			}
+		}
+		if len(detached) != 1 {
+			return errors.New("stake group is inconsistent")
+		}
+		now := time.Now().UTC()
+		spend, err := stakeSpendStateInTx(tx, user.NimiqAddress, now)
+		if err != nil {
+			return err
+		}
+		if err = removeStakeGroupInTx(tx, group); err != nil {
+			return err
+		}
+		if err = installStakeGroupInTx(tx, remaining, spend, now); err != nil {
+			return err
+		}
+		if err = installStakeGroupInTx(tx, detached, spend, now); err != nil {
+			return err
+		}
+		user = User{}
+		return getJSON(tx, userKey(userID), &user)
 	})
 	return user, err
 }

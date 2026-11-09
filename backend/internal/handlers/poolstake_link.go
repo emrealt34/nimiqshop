@@ -226,15 +226,10 @@ func (h *Handlers) completeStakeAddressLink(
 		return db.User{}, "", 0, "", false
 	}
 
-	// One wallet, one account: a stake may only feed the cashback of a single
-	// buyer, otherwise two accounts could both claim the same delegation.
-	if existing, err := h.Store.GetUserByStakeAddress(stakeAddress); err == nil && existing.ID != user.ID {
-		writeError(ctx, fasthttp.StatusConflict, "that staking wallet is already linked to another account")
-		return db.User{}, "", 0, "", false
-	} else if err != nil && !errors.Is(err, db.ErrNotFound) {
-		writeError(ctx, fasthttp.StatusInternalServerError, "could not check the staking wallet")
-		return db.User{}, "", 0, "", false
-	}
+	// The authenticated account and the signing wallet prove the two ends of
+	// a group merge. Store.AddStakeAddress merges both groups atomically and
+	// enforces the group-wide limit; a preflight scan here would race and
+	// would wrongly reject an already linked member.
 
 	// Require a real delegation to OUR validator before the rate follows this
 	// wallet. Ownership alone would let a buyer point their account at a wallet
@@ -259,8 +254,11 @@ func (h *Handlers) completeStakeAddressLink(
 	}
 
 	now := time.Now().UTC()
-	linked, err = h.Store.AddStakeAddress(user.ID, stakeAddress, now)
+	linked, err = h.Store.AddStakeAddressWithProof(user.ID, stakeAddress, now, nonce)
 	switch {
+	case errors.Is(err, db.ErrStakeLinkProofUsed):
+		writeError(ctx, fasthttp.StatusConflict, "link challenge already used; request a new signature")
+		return db.User{}, "", 0, "", false
 	case errors.Is(err, db.ErrTooManyStakeAddresses):
 		writeError(ctx, fasthttp.StatusConflict, stakeWalletLimitMessage)
 		return db.User{}, "", 0, "", false

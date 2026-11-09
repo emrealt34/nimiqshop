@@ -197,6 +197,8 @@ export function StakeInviteClaimCard({
             {t('stakeLink.claimBody', { address: pretty(info.account_address) })}
           </p>
 
+          <p className="small muted" data-testid="stake-group-notice">{t('stakeLink.groupNotice')}</p>
+
           {inPay ? (
             <button
               type="button"
