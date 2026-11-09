@@ -32,7 +32,11 @@ func TestSignedStakeLinksShareTransitivelyAndRejectReplay(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	defer s.Close()
+	defer func() {
+		if err := s.Close(); err != nil {
+			t.Errorf("close store: %v", err)
+		}
+	}()
 	a, _ := groupSigner(t, "handler-a")
 	b, bkey := groupSigner(t, "handler-b")
 	c, ckey := groupSigner(t, "handler-c")

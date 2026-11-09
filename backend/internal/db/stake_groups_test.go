@@ -38,7 +38,11 @@ func TestStakeGroupTransitiveAndDetach(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	defer s.Close()
+	defer func() {
+		if err := s.Close(); err != nil {
+			t.Errorf("close store: %v", err)
+		}
+	}()
 	a, b, c := stakeTestWallet(t, "group-a"), stakeTestWallet(t, "group-b"), stakeTestWallet(t, "group-c")
 	ua, _ := s.FindOrCreateUserByAddress(a)
 	ub, _ := s.FindOrCreateUserByAddress(b)
@@ -87,7 +91,11 @@ func TestStakeGroupBudgetMergeSplitAndRejoin(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	defer s.Close()
+	defer func() {
+		if err := s.Close(); err != nil {
+			t.Errorf("close store: %v", err)
+		}
+	}()
 	now := time.Now().UTC()
 	a, b := stakeTestWallet(t, "budget-group-a"), stakeTestWallet(t, "budget-group-b")
 	ua, _ := s.FindOrCreateUserByAddress(a)
@@ -148,7 +156,11 @@ func TestStakeGroupLimitAndConcurrentLinks(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	defer s.Close()
+	defer func() {
+		if err := s.Close(); err != nil {
+			t.Errorf("close store: %v", err)
+		}
+	}()
 	now := time.Now().UTC()
 	var wallets []string
 	var users []User
@@ -245,7 +257,11 @@ func TestStakeGroupLegacyMigrationAndRestart(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	defer s.Close()
+	defer func() {
+		if err := s.Close(); err != nil {
+			t.Errorf("close store: %v", err)
+		}
+	}()
 	for _, addr := range []string{a, b, c} {
 		assertStakeMembers(t, s, addr, a, b, c)
 		ss, e := s.ReadSharedSpend(addr, now)
@@ -260,7 +276,11 @@ func TestStakeGroupProofCannotBeReplayedAfterUnlink(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	defer s.Close()
+	defer func() {
+		if err := s.Close(); err != nil {
+			t.Errorf("close store: %v", err)
+		}
+	}()
 	now := time.Now().UTC()
 	a, b := stakeTestWallet(t, "proof-a"), stakeTestWallet(t, "proof-b")
 	ua, _ := s.FindOrCreateUserByAddress(a)
@@ -286,7 +306,11 @@ func TestStakeGroupRejectsOverLimitGroupMergeWithoutPartialChanges(t *testing.T)
 	if e != nil {
 		t.Fatal(e)
 	}
-	defer s.Close()
+	defer func() {
+		if err := s.Close(); err != nil {
+			t.Errorf("close store: %v", err)
+		}
+	}()
 	now := time.Now().UTC()
 	wallets := make([]string, 7)
 	users := make([]User, 7)

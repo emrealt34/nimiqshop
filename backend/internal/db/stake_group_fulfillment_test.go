@@ -16,7 +16,11 @@ func TestStakeGroupFulfillmentSharedBenefitsSeparateRecipients(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		if err := s.Close(); err != nil {
+			t.Errorf("close store: %v", err)
+		}
+	}()
 	now := time.Now().UTC()
 	var users []User
 	var wallets []string
@@ -78,7 +82,11 @@ func TestStakeGroupFulfillmentRejectsStaleLookupAfterDetach(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		if err := s.Close(); err != nil {
+			t.Errorf("close store: %v", err)
+		}
+	}()
 	now := time.Now().UTC()
 	a := stakeTestWallet(t, "race-fulfill-a")
 	b := stakeTestWallet(t, "race-fulfill-b")

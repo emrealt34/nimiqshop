@@ -227,10 +227,11 @@ jobs:
       #
       # So: read the marker the site stamps into every page (Base.astro writes
       # GITHUB_SHA into `meta[name=shop-build]`) and require it to BE this
-      # commit within five minutes. Pages propagates in seconds, so a mismatch
-      # after that is a real deployment problem — a project whose production
-      # branch is not `main`, a deployment stuck in "queued", or an alias that
-      # points at an older build — and the job should be red instead of green.
+      # commit within fifteen minutes. On 2026-11-09 the upload completed but
+      # the runner still saw the previous build after five minutes; the correct
+      # build later reached production. Allow for slower edge propagation but
+      # still fail if the live alias never reaches this commit — an uploaded
+      # preview or a stuck production deployment must not be reported as green.
       # EVERY page must come back with its own stylesheet, and that stylesheet
       # must be fetchable. A deploy that lands half-way (or an HTML cached from
       # an older build whose hashed CSS was pruned) shows up as a page with no
@@ -281,7 +282,7 @@ jobs:
           SITE: https://shop.nimiqbase.com/
         run: |
           set -euo pipefail
-          deadline=$((SECONDS + 300))
+          deadline=$((SECONDS + 900))
           while :; do
             got="$(curl -fsS --max-time 20 "${SITE}?build-check=${RANDOM}" 2>/dev/null \
               | grep -o 'name="shop-build" content="[0-9a-f]*' | head -1 | sed 's/.*content="//' || true)"
@@ -293,7 +294,7 @@ jobs:
               {
                 echo "### Deployment did not reach production"
                 echo
-                echo "Wrangler uploaded \`${EXPECTED:0:8}\` but ${SITE} still answers \`${got:-nothing}\` after five minutes."
+                echo "Wrangler uploaded \`${EXPECTED:0:8}\` but ${SITE} still answers \`${got:-nothing}\` after fifteen minutes."
                 echo
                 echo "Check 1 (project): Cloudflare dashboard → Workers & Pages → the Pages project →"
                 echo "Settings → Build & deployments → *Production branch* must be \`main\`. When it is"
