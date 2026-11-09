@@ -1015,6 +1015,9 @@ html.in-nimiq-pay #main.page {
 .cb-rate-value .cb-rate-chip{ font-size:.72rem; color:var(--green); padding:3px 8px }
 .cb-rate-stats{ display:flex; flex-wrap:wrap; gap:8px 18px; align-items:flex-start }
 .cb-rate-stats > div{ min-width:0 }
+/* Fixed-width digits: numbers that tick every few seconds (e.g. accrued NIM
+   refreshing in the link-invite poll) never rewrap the row. */
+.cb-rate-value, .cb-rate-stats .strong, .cb-rate-now, .cb-linked-total{ font-variant-numeric: tabular-nums }
 .cb-rate-cta{ display:flex; gap:8px; flex-wrap:wrap }
 @media (max-width:560px){ .cb-rate-strip{ padding:12px } .cb-rate-stats{ width:100%; justify-content:space-between } }
 

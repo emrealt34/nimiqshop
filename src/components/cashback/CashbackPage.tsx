@@ -84,6 +84,7 @@ import {
   loadMyStake,
   refreshMyStake,
   watchStakeDetection,
+  stakeFingerprint,
   type StakeWatch,
   fmtStakeNIM,
   pctLabel,
@@ -286,6 +287,20 @@ export function CashbackView() {
     } catch { /* Memory still blocks duplicate clicks when storage is unavailable. */ }
   }
   const watchRef = useRef<StakeWatch | null>(null);
+  // Fingerprint of the last applied MyStake (see stakeFingerprint): the 3.5s
+  // link-invite poll re-reads the pool constantly, and the pool's answer always
+  // drifts a little (profit credit accrues continuously). Without this, every
+  // poll produced a brand-new object and re-rendered the whole page — the page
+  // "jittered" every few seconds while a pairing link was open.
+  const mineFingerprint = useRef('');
+  const applyMine = (fresh: MyStake | null | undefined, owner: string) => {
+    if (!fresh) return;
+    const fp = stakeFingerprint(fresh);
+    if (fp === mineFingerprint.current) return; // nothing the buyer can see changed
+    mineFingerprint.current = fp;
+    setMineOwner(owner);
+    setMine(fresh);
+  };
   const [ledgerRaw, setLedger] = useState<MyCashback | null>(null);
   const [ledgerOwner, setLedgerOwner] = useState('');
   const [ledgerBusy, setLedgerBusy] = useState(false);
@@ -320,6 +335,7 @@ export function CashbackView() {
     const [p, m] = await Promise.all([loadStakerProgram(), authed ? loadMyStake() : Promise.resolve(null)]);
     if (authed && owner !== getUid() + ':' + getAddress().replace(/\s/g, '').toUpperCase()) return;
     setProgram(p);
+    mineFingerprint.current = m ? stakeFingerprint(m) : '';
     setMineOwner(owner);
     setMine(m);
     if (m && m.stake_nim > 0 && (!activeNIM || Number(activeNIM) === 0)) setActiveNIM(String(m.stake_nim));
@@ -438,7 +454,7 @@ export function CashbackView() {
    */
   async function refreshAfterLinkChange() {
     const fresh = await refreshMyStake();
-    if (fresh) { setMineOwner(positionOwner); setMine(fresh); }
+    if (fresh) applyMine(fresh, positionOwner);
     await recheckPosition();
   }
   // The universal base (non-stakers; 0 by default) and the pool's staker
@@ -490,7 +506,7 @@ export function CashbackView() {
       // the new rate is already locked in.
       const fresh = await refreshMyStake();
       if (getUid() !== user) return true;
-      if (fresh) { setMineOwner(positionOwner); setMine(fresh); }
+      if (fresh) applyMine(fresh, positionOwner);
       if (fresh?.staked) toast(t('cashback.toastStakerActive', { pct: pct(fresh.cashback_bps) }), 'success');
       else {
         toast(successNote || t('cashback.toastPoolPicksUp'), 'info');
@@ -500,7 +516,7 @@ export function CashbackView() {
         watchRef.current?.stop();
         watchRef.current = watchStakeDetection({
           onUpdate: (m) => {
-            if (m && getUid() === user) { setMineOwner(positionOwner); setMine(m); }
+            if (m && getUid() === user) applyMine(m, positionOwner);
           },
           onDetected: (m) => toast(t('cashback.toastStakerActive', { pct: pct(m.cashback_bps) }), 'success'),
         });

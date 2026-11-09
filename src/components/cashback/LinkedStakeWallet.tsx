@@ -38,6 +38,11 @@ export function LinkedStakeWallet({ mine, onChanged, intent, onIntentDone }: {
   const [err, setErr] = useState('');
   const [avatars, setAvatars] = useState<Record<string, string>>({});
   const account = String(mine?.account_address || mine?.address || '');
+  // onChanged arrives as a fresh arrow from the parent every render; going
+  // through a ref keeps the 3.5s pairing poll on a steady cadence instead of
+  // resetting the timer on every render.
+  const onChangedRef = useRef(onChanged);
+  useEffect(() => { onChangedRef.current = onChanged; }, [onChanged]);
   const limit = Number(mine?.linked_wallet_limit) > 0 ? Number(mine?.linked_wallet_limit) : FALLBACK_WALLET_LIMIT;
   const rows: StakeWalletRow[] = mine?.stake_addresses?.length
     ? mine.stake_addresses
@@ -90,10 +95,10 @@ export function LinkedStakeWallet({ mine, onChanged, intent, onIntentDone }: {
       if (newest?.address) toast(t('stakeLink.linked', { address: pretty(newest.address) }), 'success');
       return;
     }
-    const timer = window.setInterval(() => { onChanged(); }, 3500);
+    const timer = window.setInterval(() => { onChangedRef.current(); }, 3500);
     return () => { window.clearInterval(timer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inviteUrl, linkedRows.length, onChanged]);
+  }, [inviteUrl, linkedRows.length]);
 
   function finishIntent() {
     clearStakeLinkIntent();

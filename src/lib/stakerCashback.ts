@@ -513,6 +513,40 @@ export function fmtStakeNIM(n: number): string {
   return s || '0';
 }
 
+/**
+ * Display-stable fingerprint of a MyStake. The cross-device link invite polls
+ * the backend every 3.5s; the pool's answer drifts by fractions of a NIM every
+ * pass (profit credit accrues continuously) and carries volatile timestamps.
+ * Feeding that raw into setState re-rendered the whole cashback page on every
+ * poll — visible as the page "jittering" every few seconds. Floats are rounded
+ * to display precision and timestamps dropped, so "nothing the buyer can see
+ * changed" compares equal and callers can skip the update entirely.
+ */
+export function stakeFingerprint(m: MyStake | null | undefined): string {
+  if (!m) return '';
+  const r = (n?: number) => (typeof n === 'number' && Number.isFinite(n) ? String(Math.round(n * 100) / 100) : '');
+  const l = m.ledger;
+  return JSON.stringify({
+    address: m.address || '', account: m.account_address || '', linked: !!m.stake_address_linked,
+    staked: !!m.staked, luna: r(m.stake_luna), nim: r(m.stake_nim),
+    base: r(m.base_bps), baseSrc: m.base_source || '', boost: r(m.boost_bps),
+    bps: r(m.cashback_bps), pct: r(m.cashback_percent), boosted: !!m.boosted,
+    pool: m.pool_validator_address || '', other: m.other_validator || '', otherNim: r(m.other_stake_nim),
+    enabled: m.staker_program_enabled === false ? '0' : '1', err: m.stake_check_error || '',
+    since: m.staked_since || '', days: r(m.loyalty_days),
+    limit: m.linked_wallet_limit ?? 0,
+    links: (m.stake_addresses || []).map(a => [a.address, a.linked ? '1' : '0', a.staked ? '1' : '0', r(a.stake_nim), a.boost_bps ?? '', a.loyalty_days ?? '', a.source || '', a.other_validator || ''].join(':')).join('|'),
+    ledger: l
+      ? [
+          l.has_ledger === false ? '0' : '1', r(l.boost_bps), r(l.boost_percent),
+          r(l.available_cashback_usd), r(l.available_cashback_nim),
+          r(l.loyalty_days), r(l.loyalty_max_days), r(l.loyalty_multiplier),
+          r(l.daily_remaining_usd), r(l.monthly_remaining_usd),
+        ].join(',')
+      : '',
+  });
+}
+
 /** "$12.40" for the ledger card; "" when the price is unknown. */
 export function fmtUSD(n: number | undefined): string {
   if (!Number.isFinite(Number(n)) || !(Number(n) > 0)) return '';
