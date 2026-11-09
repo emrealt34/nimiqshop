@@ -206,19 +206,24 @@ func (h *Handlers) CreateQuoteBatch(ctx *fasthttp.RequestCtx) {
 	if len(req.Items) == 1 {
 		// Single-item cart through the batch route: run the exact single
 		// flow so every guard (duplicate, gift, point-cap) stays identical.
-		it := req.Items[0]
-		h.createQuoteInner(ctx, userID, createQuoteRequest{
-			ProductID: it.ProductID, Country: it.Country, Denomination: it.Denomination,
-			ProductValue: it.ProductValue, Quantity: it.Quantity,
-			Email: req.Email, PhoneNumber: it.PhoneNumber, CashbackCode: req.CashbackCode,
-			PaymentMethod: req.PaymentMethod, CashbackDestination: req.CashbackDestination,
-			// A cart whose lines merged into one is still a gift: hand the
-			// hoisted note over, or the buyer's message dies here.
-			GiftChannel: req.GiftChannel, GiftMessage: req.GiftMessage, GifterIdenticon: req.GifterIdenticon,
-		})
+		h.createQuoteInner(ctx, userID, singleQuoteFromBatch(req, req.Items[0]))
 		return
 	}
 	h.createQuoteBatchInner(ctx, userID, req)
+}
+
+// singleQuoteFromBatch must preserve every meaningful buyer choice when
+// duplicate cart rows collapse into the single-item purchase path.
+func singleQuoteFromBatch(req batchQuoteRequest, it batchQuoteItem) createQuoteRequest {
+	return createQuoteRequest{
+		AckActiveCheckout: req.AckActiveCheckout,
+		ProductID:         it.ProductID, Country: it.Country, Brand: it.Brand, BrandID: it.BrandID,
+		Denomination: it.Denomination, ProductValue: it.ProductValue, Quantity: it.Quantity,
+		Email: req.Email, PhoneNumber: it.PhoneNumber, CashbackCode: req.CashbackCode,
+		PaymentMethod: req.PaymentMethod, CashbackDestination: req.CashbackDestination,
+		Anonymous:   req.Anonymous,
+		GiftChannel: req.GiftChannel, GiftMessage: req.GiftMessage, GifterIdenticon: req.GifterIdenticon,
+	}
 }
 
 func (h *Handlers) createQuoteBatchInner(ctx *fasthttp.RequestCtx, userID string, req batchQuoteRequest) {

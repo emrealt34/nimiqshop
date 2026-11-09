@@ -100,8 +100,12 @@ export function rowUSD(it: CartItem): number {
   if (it.value > 0 && fx && fx[ccy]) return it.value * it.qty * Number(fx[ccy]);
   const m = sessionMarket();
   if (it.coinAmount > 0 && m) return it.coinAmount * it.qty * Number(m.usd_per_btc);
-  if (it.value > 0 && ccy === 'USD') return it.value * it.qty;
-  return (it.unitUSD || 0) * it.qty;
+  if (ccy === 'USD') return (it.value > 0 ? it.value : it.unitUSD || 0) * it.qty;
+  // Historical unitUSD entries were often stored as the raw face value, not
+  // converted USD. Without FX or a BTC quote, treat a foreign amount as
+  // unknown rather than blocking a 250 TRY top-up as if it cost 250 USD.
+  // The backend still enforces the authoritative supplier order limit.
+  return 0;
 }
 export function rowNIM(it: CartItem): number {
   const usd = rowUSD(it);

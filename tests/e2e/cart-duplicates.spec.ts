@@ -158,3 +158,36 @@ test('same label and reused ID from different brands remain distinct in the cart
   await open(page, path('/cart'));
   await expect(page.locator('.cart-row')).toHaveCount(2);
 });
+
+test('different supplier brands are visible before selecting uniquely priced top-ups', async ({ page }) => {
+  const common = { family: 'Vodafone', kind: 'mobile_recharge', category: 'mobile_credits', country_code: 'TR', is_out_of_stock: false };
+  await page.route('**/api/catalog/products/**', route => route.fulfill({ json: [
+    { ...common, brand: 'Vodafone Cyprus Credits', brand_id: 'cyprus', products: [{ product_id: 'cyprus12', delivery_type: 'by_phone', denomination: '12 TRY', amount: 12, currency_code: 'TRY' }] },
+    { ...common, brand: 'Vodafone Credits', brand_id: 'turkey', products: [{ product_id: 'turkey250', delivery_type: 'by_phone', denomination: '250 TRY', amount: 250, currency_code: 'TRY' }] },
+  ] }));
+  await open(page, path('/product?id=Vodafone&country=TR'));
+  const choices = page.locator('.pd-pkg');
+  await expect(choices).toHaveCount(2);
+  await expect(choices.nth(0)).toContainText('Vodafone Cyprus Credits');
+  await expect(choices.nth(1)).toContainText('Vodafone Credits');
+  await choices.nth(1).click();
+  await page.getByRole('button', { name: /add to cart/i }).click();
+  await expect.poll(async () => page.evaluate(() => JSON.parse(localStorage.getItem('nimshop_cart') || '[]'))).toMatchObject([{ brand_id: 'turkey', pkg: 'turkey250', value: 250 }]);
+});
+
+test('missing FX never treats a TRY face value as dollars', async ({ page }) => {
+  await page.route('**/data/market/fx.json', r => r.fulfill({ json: {} }));
+  await page.route('**/api/market/fx', r => r.fulfill({ json: {} }));
+  await page.route('**/api/catalog/limits', r => r.fulfill({ json: { supplier_order_limit: { enabled: true, face_caps: { USD: 104 } } } }));
+  await page.route('**/api/catalog/products/**', r => r.fulfill({ json: {
+    family: 'Vodafone', brand: 'Vodafone Credits', brand_id: 'turkey', kind: 'mobile_recharge', category: 'mobile_credits', country_code: 'TR',
+    products: [{ product_id: 'turkey250', delivery_type: 'by_phone', denomination: '250 TRY', amount: 250, currency_code: 'TRY' }],
+  } }));
+  await open(page, path('/product?id=Vodafone&country=TR'));
+  const add = page.getByRole('button', { name: /add to cart/i });
+  await expect(add).toBeEnabled();
+  // Allow the limits request to resolve, but never install any FX table.
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem('nim_fx'))).toBeNull();
+  await add.click();
+  await expect.poll(async () => page.evaluate(() => JSON.parse(localStorage.getItem('nimshop_cart') || '[]'))).toMatchObject([{ pkg: 'turkey250', value: 250, qty: 1 }]);
+});

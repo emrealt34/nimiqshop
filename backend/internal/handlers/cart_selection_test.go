@@ -54,3 +54,14 @@ func TestCartSelectionConflictingSameBrandIsRefused(t *testing.T) {
 		t.Fatal("conflicting deliveries must never pick the first")
 	}
 }
+
+// A multi-row batch can reconcile to one line. Converting it to the single
+// flow must not drop the supplier brand, privacy choice or duplicate override.
+func TestSingleQuoteFromMergedBatchPreservesBuyerChoices(t *testing.T) {
+	item := batchQuoteItem{ProductID: "Vodafone", Country: "TR", Brand: "Vodafone Credits", BrandID: "turkey", Denomination: "250 TRY", ProductValue: 250, Quantity: 2, PhoneNumber: "+905551234567"}
+	batch := batchQuoteRequest{Items: []batchQuoteItem{item}, Email: "buyer@example.com", CashbackCode: "PROMO", PaymentMethod: "nimiq_pay", CashbackDestination: "burn", Anonymous: true, AckActiveCheckout: true, GiftChannel: "email", GiftMessage: "hello", GifterIdenticon: "avatar"}
+	got := singleQuoteFromBatch(batch, item)
+	if got.ProductID != item.ProductID || got.Country != item.Country || got.Brand != item.Brand || got.BrandID != item.BrandID || got.Denomination != item.Denomination || got.ProductValue != item.ProductValue || got.Quantity != item.Quantity || got.PhoneNumber != item.PhoneNumber || got.Email != batch.Email || got.CashbackCode != batch.CashbackCode || got.PaymentMethod != batch.PaymentMethod || got.CashbackDestination != batch.CashbackDestination || !got.Anonymous || !got.AckActiveCheckout || got.GiftChannel != batch.GiftChannel || got.GiftMessage != batch.GiftMessage || got.GifterIdenticon != batch.GifterIdenticon {
+		t.Fatalf("single conversion lost buyer choices: %+v", got)
+	}
+}

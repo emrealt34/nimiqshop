@@ -587,7 +587,7 @@ export function ProductPage() {
     (amount: number, code?: string | null) => {
       if (!amount || amount <= 0) return 0;
       const rate = fx && code ? fx[String(code).toUpperCase()] : null;
-      if (!rate || rate <= 0) return Number(amount);
+      if (!rate || rate <= 0) return String(code || '').toUpperCase() === 'USD' ? Number(amount) : 0;
       return Number(amount) * rate;
     },
     [fx]
@@ -1025,6 +1025,11 @@ function PackageChooser({
   localToUSD: (a: number, c?: string | null) => number;
 }) {
   const { t } = useT();
+  // A family can contain different supplier brands even when every face
+  // value is unique (e.g. Vodafone Cyprus Credits and Vodafone Credits in
+  // the TR catalog). Hiding the brand in that case can sell the wrong product.
+  const multipleBrands = new Set((product.packages || [])
+    .map(p => String(p.brand_id || p.brand || '').trim().toLowerCase()).filter(Boolean)).size > 1;
   return (
     <div className="packages-grid mt-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, width: '100%', maxWidth: '100%' }}>
       {(product.packages || []).map((k) => {
@@ -1046,7 +1051,10 @@ function PackageChooser({
             }}
           >
             <div className="pd-pkg-face">{faceLabel}</div>
-            {needsVariantLabel && <div className="xs faint">{[k.brand, k.delivery_type === 'by_phone' ? t('productPage.chipCreditNumber') : k.delivery_type === 'by_email' ? t('productPage.chipCodeEmail') : ''].filter(Boolean).join(' · ')}</div>}
+            {(needsVariantLabel || (multipleBrands && k.brand)) && <div className="xs">{[
+              k.brand,
+              needsVariantLabel ? (k.delivery_type === 'by_phone' ? t('productPage.chipCreditNumber') : k.delivery_type === 'by_email' ? t('productPage.chipCodeEmail') : '') : '',
+            ].filter(Boolean).join(' · ')}</div>}
             {nimPrice ? (
               <div className="pd-pkg-nim">
                 <img src={asset("/img/nimiq-hexagon.png?v=40")} draggable={false} alt="NIM" width={12} height={12} style={{ pointerEvents: "none", borderRadius: 2, verticalAlign: 'middle' }} />

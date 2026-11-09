@@ -1425,7 +1425,7 @@ const de = {
     worksTitle: 'So funktioniert es',
     installTitle: 'So wird es installiert',
     redeemStep1: 'Bestätige die BTC-Lightning-Rechnung in deiner Lightning-Wallet und warte auf die Zahlungsbestätigung des Lieferanten.',
-    redeemStep2: 'Nach Bestätigung der Lieferung siehst du den Code in Bestellungen oder in der E-Mail des Empfängers.',
+    redeemStep2: 'Prüfe nach Bestätigung der Lieferung die E-Mail des Empfängers auf den Code.',
     redeemStep3: 'Gib den Code an der Kasse, auf der Website oder in der App der Marke ein — dort wird der volle Wert gutgeschrieben.',
     redeemNote: 'Prüfe Ablaufdatum, Land und Einlösebedingungen der Marke vor dem Kauf.',
     topupStep1: 'Gib die Handynummer des Empfängers im internationalen Format ein (+90…).',

@@ -1425,7 +1425,7 @@ const es = {
     worksTitle: 'Cómo funciona',
     installTitle: 'Cómo instalarlo',
     redeemStep1: 'Aprueba la factura Nimiq Pay en tu cartera Lightning y espera la confirmación de pago del proveedor.',
-    redeemStep2: 'Cuando el proveedor confirme la entrega, consulta el código en Pedidos o revisa el correo del destinatario.',
+    redeemStep2: 'Cuando el proveedor confirme la entrega, busca el código en el correo del destinatario.',
     redeemStep3: 'Introduce el código en el pago, la web o la app de la marca: allí se abona el valor completo.',
     redeemNote: 'Comprueba la caducidad, el país y las condiciones de canje de la marca antes de comprar.',
     topupStep1: 'Introduce el número móvil del destinatario en formato internacional (+90…).',

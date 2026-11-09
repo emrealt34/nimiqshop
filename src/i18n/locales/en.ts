@@ -1434,7 +1434,7 @@ const en = {
     worksTitle: 'How it works',
     installTitle: 'How to install',
     redeemStep1: 'Approve the Nimiq Pay invoice in the Nimiq Pay app, then wait for supplier payment confirmation.',
-    redeemStep2: 'After the supplier confirms delivery, view the code in Orders or check the recipient email.',
+    redeemStep2: 'After the supplier confirms delivery, check the recipient’s email for the code.',
     redeemStep3: 'Enter the code at the brand’s checkout, website or app — the full face value is credited there.',
     redeemNote: 'Check the brand’s expiry, country and redemption terms before buying.',
     topupStep1: 'Enter the recipient’s mobile number in international format (+90…).',

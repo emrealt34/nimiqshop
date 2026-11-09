@@ -1426,7 +1426,7 @@ const tr = {
     worksTitle: 'Nasıl çalışır',
     installTitle: 'Nasıl kurulur',
     redeemStep1: 'Nimiq Pay faturasını Nimiq Pay uygulamasında onayla, ardından tedarikçi ödeme onayını bekle.',
-    redeemStep2: 'Tedarikçi teslimatı onayladıktan sonra kodu Siparişler\'de gör veya alıcının e-postasına bak.',
+    redeemStep2: 'Tedarikçi teslimatı onayladıktan sonra kod için alıcının e-postasını kontrol et.',
     redeemStep3: 'Kodu markanın ödeme sayfasında, sitesinde veya uygulamasında gir — tam değer orada yüklenir.',
     redeemNote: 'Satın almadan önce markanın son kullanma tarihini, ülkesini ve kullanım koşullarını kontrol et.',
     topupStep1: 'Alıcının cep numarasını uluslararası formatta gir (+90…).',
