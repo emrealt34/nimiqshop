@@ -1945,6 +1945,7 @@ const tr = {
     cashbackAccrued: 'Biriken cashback',
     capLeftToday: 'Bugün kalan üst sınır',
     capLeftMonth: 'Bu ay kalan üst sınır',
+    capsShared: 'Sınırlar hesap başına ortaktır, cüzdan başına değil — tüm bağlı cüzdanlar aynı günlük/aylık bütçeyi paylaşır.',
     amountAria: 'NIM cinsinden stake tutarı',
     waitingPay: 'Nimiq Pay bekleniyor…',
     addStake: 'Stake ekle',

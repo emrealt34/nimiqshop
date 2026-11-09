@@ -49,6 +49,13 @@ const (
 	//	sl:<canonical_address>   -> stakeledger.Ledger (JSON), one per wallet
 	//	sl:watermark             -> int64, last pool-fee batch applied
 	prefixStakeLedger = "sl:"
+	// prefixEligibleSpend is the shared boost-eligible spend budget of ONE
+	// ACCOUNT (canonical sign-in address): es:<acct> -> stakeledger.SharedSpend
+	// (JSON). It exists so the daily/monthly boost caps are spent once per
+	// account no matter how many linked staking wallets earn on an order —
+	// before it, every book carried its own copy of the caps and linking N
+	// wallets multiplied the account's eligible spend N-fold.
+	prefixEligibleSpend = "es:"
 	// prefixStakeRecheck is the post-fulfillment stake re-ask window: an
 	// "sr:<quote_id>" record is written in the SAME transaction as the
 	// fulfillment's cashback row when the buyer was not verifiably staked at

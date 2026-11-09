@@ -1944,6 +1944,7 @@ const fr = {
     cashbackAccrued: 'Cashback accumulé',
     capLeftToday: 'Plafond restant aujourd’hui',
     capLeftMonth: 'Plafond restant ce mois',
+    capsShared: 'Les plafonds sont par compte, pas par portefeuille — tous les portefeuilles liés partagent le même budget quotidien/mensuel.',
     amountAria: 'Montant à staker en NIM',
     waitingPay: 'En attente de votre portefeuille Lightning…',
     addStake: 'Ajouter du staking',

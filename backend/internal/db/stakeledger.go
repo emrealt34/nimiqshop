@@ -3,6 +3,7 @@ package db
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"math"
 	"strconv"
 	"time"
@@ -198,106 +199,197 @@ func (s *Store) LedgerWatermark() (int64, error) {
 	return wm, err
 }
 
-// ApplyLedgerPurchaseInTx is the fulfillment-side half of the ledger: it
-// runs INSIDE the open fulfillment transaction so the boost debit and the
-// cashback row commit together (or not at all). It resolves
-//
-//	eligible = min(xUSD, day remaining, month remaining)
-//	rate     = min(CB_MAX, A*P/basis)     (the "next $100" rate)
-//	cbNIM    = min(A, rate*eligible/P)
-//
-// and debits the ledger by the exact whole Luna paid. Returns the boost in
-// Luna (0 when there is nothing to pay — no ledger, no price, no balance,
-// or the caps are spent) plus the rate (bps) that produced it, for the
-// audit row. Params are resolved by the caller (one stable value per
-// fulfillment, outside the txn body).
-func ApplyLedgerPurchaseInTx(tx *badger.Txn, address string, xUSD, nimUsd float64, p stakeledger.Params, now time.Time) (boostLuna int64, boostBps int, err error) {
-	if xUSD <= 0 || nimUsd <= 0 {
-		return 0, 0, nil
-	}
-	addr := canonicalStakeAddr(address)
-	if addr == "" {
-		return 0, 0, nil
-	}
-	var l stakeledger.Ledger
-	if e := getJSON(tx, stakeLedgerKey(addr), &l); e != nil {
-		if e == ErrNotFound {
-			return 0, 0, nil // no ledger → no boost, base rate stands
-		}
-		return 0, 0, e
-	}
-	bps := stakeledger.BoostBps(&l, nimUsd, p)
-	if bps <= 0 {
-		return 0, 0, nil
-	}
-	_, cbNIM := l.Purchase(xUSD, nimUsd, p, now) // debits the float from A
-	if cbNIM <= 0 {
-		return 0, 0, nil
-	}
-	luna := int64(cbNIM*100_000.0 + 0.5)
-	if luna < 1 {
-		return 0, 0, nil
-	}
-	// Purchase debited the float; correct to the exact whole Luna actually
-	// paid so the book matches what goes on-chain. Rounding down (luna <
-	// cbNIM in Luna terms) leaves the dust in the ledger — under-pay,
-	// never over.
-	l.A -= (float64(luna) - cbNIM*100_000.0) / 100_000.0
-	if l.A < 0 {
-		l.A = 0
-	}
-	raw, err := marshal(l)
-	if err != nil {
-		return 0, 0, err
-	}
-	if err := tx.Set(stakeLedgerKey(addr), raw); err != nil {
-		return 0, 0, err
-	}
-	return luna, bps, nil
+// sharedSpendKey is the account-level boost-eligible spend budget:
+// es:<canonical_signin_address>. One record per ACCOUNT, spent by every order the
+// account earns boost on, however many linked wallets earn alongside the
+// sign-in one.
+func sharedSpendKey(account string) []byte {
+	return []byte(prefixEligibleSpend + canonicalStakeAddr(account))
 }
 
-// ApplyLedgerPurchaseAllInTx debits EVERY earning wallet's own book for one
-// purchase and sums what they pay out.
-//
-// Why per wallet and not one merged book: each ledger is a stake-weighted
-// account of what one delegation earned, with its own eligible-spend cap, its
-// own dilution on increase and its own pro-rata shrink on withdrawal. Merging
-// them would let a fresh wallet spend credit its stake has not earned yet, and
-// would make unlinking a wallet retroactively rewrite a book the buyer can see.
-// Summing the results keeps every cap honest while the buyer still experiences
-// ONE rate: three wallets that each afford 40 Luna pay 120, and no wallet can
-// pay more than its own book holds.
-//
-// It runs inside the caller's fulfillment transaction, so a conflict retries
-// the whole set together — two wallets can never end up debited for different
-// attempts at the same order.
-func ApplyLedgerPurchaseAllInTx(tx *badger.Txn, addresses []string, xUSD, nimUsd float64, p stakeledger.Params, now time.Time) (boostLuna int64, boostBps int, err error) {
-	if xUSD <= 0 || nimUsd <= 0 {
-		return 0, 0, nil
+// readStakeLedgerInTx loads a book inside an open transaction. ok is false
+// when the address has no ledger yet (normal for a fresh buyer).
+func readStakeLedgerInTx(tx *badger.Txn, address string) (stakeledger.Ledger, bool, error) {
+	addr := canonicalStakeAddr(address)
+	var l stakeledger.Ledger
+	if addr == "" {
+		return l, false, nil
 	}
-	norm := stakeledger.Normalize(p)
-	remBps := norm.MaxBoostBps
+	err := getJSON(tx, stakeLedgerKey(addr), &l)
+	if err == ErrNotFound {
+		return l, false, nil
+	}
+	if err != nil {
+		return l, false, err
+	}
+	return l, true, nil
+}
+
+// readBooksInTx loads every book of an earning set, deduplicated and
+// canonicalized. Missing books are skipped (their stake contributes nothing),
+// a storage failure aborts the read.
+func readBooksInTx(tx *badger.Txn, addresses []string) ([]stakeledger.Ledger, error) {
 	seen := make(map[string]bool, len(addresses))
+	books := make([]stakeledger.Ledger, 0, len(addresses))
 	for _, address := range addresses {
-		if remBps <= 0 {
-			break
-		}
 		addr := canonicalStakeAddr(address)
 		if addr == "" || seen[addr] {
 			continue
 		}
 		seen[addr] = true
-		pw := norm
-		pw.MaxBoostBps = remBps
-		luna, bps, e := ApplyLedgerPurchaseInTx(tx, address, xUSD, nimUsd, pw, now)
-		if e != nil {
-			return 0, 0, e
+		l, ok, err := readStakeLedgerInTx(tx, addr)
+		if err != nil {
+			return nil, err
 		}
-		boostLuna += luna
-		boostBps += bps
-		remBps -= bps
+		if !ok {
+			continue
+		}
+		books = append(books, l)
 	}
-	return boostLuna, boostBps, nil
+	return books, nil
+}
+
+// sharedSpendInTx loads the account's shared spend budget with any pending
+// UTC boundary applied, WITHOUT persisting it. A missing record is a fresh
+// (full) budget, not an error.
+func sharedSpendInTx(tx *badger.Txn, account string, now time.Time) (stakeledger.SharedSpend, error) {
+	var ss stakeledger.SharedSpend
+	err := getJSON(tx, sharedSpendKey(account), &ss)
+	if err != nil {
+		if err == ErrNotFound {
+			return stakeledger.NewSharedSpend(now), nil
+		}
+		return stakeledger.SharedSpend{}, err
+	}
+	ss.Rollover(now)
+	return ss, nil
+}
+
+// persistSharedSpendInTx writes the account's budget back inside the open
+// transaction. Idempotent overwrite; rolled-over boundaries ride along.
+func persistSharedSpendInTx(tx *badger.Txn, account string, ss stakeledger.SharedSpend) error {
+	account = canonicalStakeAddr(account)
+	if account == "" {
+		return nil
+	}
+	raw, err := marshal(ss)
+	if err != nil {
+		return err
+	}
+	return tx.Set(sharedSpendKey(account), raw)
+}
+
+// ReadSharedSpend is the buyer/admin-side accessor: the account's shared
+// boost-eligible spend budget with pending boundaries applied, WITHOUT
+// persisting the rollover. A missing record reads as a fresh (full) budget.
+func (s *Store) ReadSharedSpend(account string, now time.Time) (stakeledger.SharedSpend, error) {
+	account = canonicalStakeAddr(account)
+	fresh := stakeledger.NewSharedSpend(now)
+	if account == "" {
+		return fresh, ErrNotFound
+	}
+	var ss stakeledger.SharedSpend
+	err := s.View(func(tx *badger.Txn) error {
+		e := getJSON(tx, sharedSpendKey(account), &ss)
+		if e == ErrNotFound {
+			return ErrNotFound
+		}
+		return e
+	})
+	if err == ErrNotFound {
+		return fresh, nil
+	}
+	if err != nil {
+		return stakeledger.SharedSpend{}, err
+	}
+	ss.Rollover(now)
+	return ss, nil
+}
+
+// purchaseEarningSetInTx is the fulfillment-side half of the ledger for a
+// WHOLE earning set, run INSIDE the fulfillment transaction so the boost
+// debits and the cashback row commit together (or not at all).
+//
+// ONE order spends ONE eligible-spend charge against the ACCOUNT's shared
+// budget ($500/day, $1000/month by default), however many linked wallets
+// earn on it — before this, every book carried its own copy of the caps and
+// linking N wallets multiplied the account's eligible spend N-fold. The books
+// stay separate (own stake, own loyalty age, own balance): no book can pay
+// more than its own stake earned. Only the limit is shared.
+//
+// Returns the boost in whole Luna (0 when there is nothing to pay — no
+// ledgers, no balances, no price, or the shared budget is spent) plus the
+// rate (bps) that produced it, for the audit row. Params are resolved by the
+// caller (one stable value per fulfillment, outside the txn body).
+func purchaseEarningSetInTx(tx *badger.Txn, account string, addresses []string, xUSD, nimUsd float64, p stakeledger.Params, now time.Time) (boostLuna int64, boostBps int, err error) {
+	return purchaseEarningSet(tx, account, addresses, xUSD, nimUsd, p, now, true)
+}
+
+// purchaseEarningSet is the shared implementation. persist=true writes the
+// debited books and the (possibly) charged budget; persist=false is the
+// read-only preview twin — the plan is computed on in-memory copies and
+// thrown away, so the buyer sees exactly what fulfillment would pay.
+func purchaseEarningSet(tx *badger.Txn, account string, addresses []string, xUSD, nimUsd float64, p stakeledger.Params, now time.Time, persist bool) (boostLuna int64, boostBps int, err error) {
+	if xUSD <= 0 || nimUsd <= 0 {
+		return 0, 0, nil
+	}
+	account = canonicalStakeAddr(account)
+	if account == "" {
+		return 0, 0, nil
+	}
+	norm := stakeledger.Normalize(p)
+
+	ss, err := sharedSpendInTx(tx, account, now)
+	if err != nil {
+		if !persist {
+			return 0, 0, nil
+		}
+		// Fail closed: never pay a boost we cannot meter against the shared
+		// budget. The base rate still enqueues; the row is the audit trail.
+		log.Printf("cashback: could not read shared spend budget for account %s; paying no ledger boost this order: %v", account, err)
+		return 0, 0, nil
+	}
+	books, err := readBooksInTx(tx, addresses)
+	if err != nil {
+		return 0, 0, err
+	}
+	plan := stakeledger.PlanPurchaseDebits(books, ss, xUSD, nimUsd, norm, now)
+	if !persist {
+		return plan.LunaSum, plan.BpsSum, nil
+	}
+	for i := range books {
+		// Only books that paid are written back. A rolled-over book whose
+		// buyer paid nothing this order keeps its stale boundary keys until
+		// its next real write — the lazy rollover makes that a no-op.
+		if plan.PaidNIM[i] <= 0 {
+			continue
+		}
+		raw, mErr := marshal(books[i])
+		if mErr != nil {
+			return 0, 0, mErr
+		}
+		if wErr := tx.Set(stakeLedgerKey(books[i].Address), raw); wErr != nil {
+			return 0, 0, wErr
+		}
+	}
+	if plan.SharedSpendChanged {
+		if wErr := persistSharedSpendInTx(tx, account, plan.SharedSpend); wErr != nil {
+			return 0, 0, wErr
+		}
+	}
+	return plan.LunaSum, plan.BpsSum, nil
+}
+
+// previewEarningPurchaseInTx is the READ-ONLY twin of purchaseEarningSetInTx:
+// the identical plan, computed on throwaway copies, nothing written. The
+// buyer's preview and the fulfillment payout cannot disagree about the caps,
+// the bps split, or the luna total.
+func previewEarningPurchaseInTx(tx *badger.Txn, account string, addresses []string, xUSD, nimUsd float64, p stakeledger.Params, now time.Time) (boostLuna int64, boostBps int) {
+	luna, bps, err := purchaseEarningSet(tx, account, addresses, xUSD, nimUsd, p, now, false)
+	if err != nil {
+		return 0, 0
+	}
+	return luna, bps
 }
 
 // StakeLedgerParamsForTx resolves the live normalized params. Call it

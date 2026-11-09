@@ -161,7 +161,7 @@ func (h *Handlers) CashbackMe(ctx *fasthttp.RequestCtx) {
 		// The ledger card describes the PRIMARY earning wallet; the boost that
 		// actually applies to an order is the sum over all of them, which is
 		// what ledger_boost_bps reports.
-		"ledger": h.ledgerView(user.EffectiveStakeAddress()),
+		"ledger": h.ledgerView(user.EffectiveStakeAddress(), user.NimiqAddress),
 		// Which wallets this account's cashback is earned from. Identical to
 		// the sign-in address unless staking wallets are linked; the page shows
 		// both so the buyer never has to guess.

@@ -1944,6 +1944,7 @@ const de = {
     cashbackAccrued: 'Aufgelaufener Cashback',
     capLeftToday: 'Heute noch verfügbar',
     capLeftMonth: 'Diesen Monat noch verfügbar',
+    capsShared: 'Die Limits gelten pro Konto, nicht pro Wallet — alle verknüpften Wallets teilen sich dasselbe Tages-/Monatsbudget.',
     amountAria: 'Betrag zum Staken in NIM',
     waitingPay: 'Warten auf deine Lightning-Wallet…',
     addStake: 'Stake hinzufügen',

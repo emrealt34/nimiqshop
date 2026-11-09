@@ -417,7 +417,7 @@ func (h *Handlers) AdminUserDetail(ctx *fasthttp.RequestCtx) {
 	for _, address := range earningAddrs {
 		h.syncProfitOnDemand(ctx, address)
 	}
-	ledger := h.ledgerView(earningAddr)
+	ledger := h.ledgerView(earningAddr, user.NimiqAddress)
 
 	cbs, _ := h.Store.ListCashbacksByUser(user.ID, 80)
 	cbViews := make([]map[string]any, 0, len(cbs))

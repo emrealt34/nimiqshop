@@ -389,6 +389,9 @@ export function StakerCashbackCard() {
                   <span className="small muted">{t('staker.capLeftMonth')}</span>
                   <span className="small strong">{fmtUSD(ledger.monthly_remaining_usd) || '—'}</span>
                 </div>
+                {ledger.spend_caps_shared_account && (
+                  <p className="xs faint" style={{ margin: 0 }} data-testid="staker-caps-shared-note">{t('staker.capsShared')}</p>
+                )}
               </>
             ) : (
               <div className="row between">

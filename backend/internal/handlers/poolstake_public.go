@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/valyala/fasthttp"
@@ -129,7 +130,13 @@ func (h *Handlers) syncBuyerProfitOnDemand(userID string) {
 
 // ledgerView renders a wallet's ledger for the buyer-facing endpoints.
 // Dollar-first on purpose: "you have $X available", NIM in parentheses.
-func (h *Handlers) ledgerView(addr string) map[string]any {
+//
+// When the account is passed, the eligible-spend caps shown are the ACCOUNT's
+// SHARED budget (es:<acct>) — one $500/day + $1000/month pool for every
+// earning wallet, not one per book — which is exactly what the fulfillment
+// path enforces. Without it (an admin view that knows only the address) the
+// book-level caps are shown and flagged accordingly.
+func (h *Handlers) ledgerView(addr string, account ...string) map[string]any {
 	l, ok, err := h.Store.ReadStakeLedger(addr)
 	if err != nil || !ok {
 		return map[string]any{
@@ -139,12 +146,12 @@ func (h *Handlers) ledgerView(addr string) map[string]any {
 	settings, _ := h.Store.GetAdminSettings(0)
 	p := settings.EffectiveStakeCashback()
 	nimUsd := h.bestNIMUSD()
+	now := time.Now().UTC()
 	availableUSD := 0.0
 	if nimUsd > 0 {
 		availableUSD = l.A * nimUsd
 	}
-	dayRem, monthRem := stakeledger.RemainingCaps(&l, time.Now().UTC(), p)
-	return map[string]any{
+	out := map[string]any{
 		"has_ledger":             true,
 		"boost_bps":              stakeledger.BoostBps(&l, nimUsd, p),
 		"boost_percent":          float64(stakeledger.BoostBps(&l, nimUsd, p)) / 100.0,
@@ -153,14 +160,41 @@ func (h *Handlers) ledgerView(addr string) map[string]any {
 		"loyalty_days":           l.D,
 		"loyalty_max_days":       p.TDays,
 		"loyalty_multiplier":     l.LoyaltyMultiplier,
-		"daily_remaining_usd":    dayRem,
-		"monthly_remaining_usd":  monthRem,
 		"pool_profit_month":      l.ProfitMonth,
 		"pool_profit_luna":       l.ProfitLuna,
 		"pool_profit_nim":        float64(l.ProfitLuna) / lunaPerNIM,
 		"refresh_mode":           "on_demand",
 		"updated_at":             l.UpdatedAt,
 	}
+	if acct := strings.TrimSpace(firstNonEmpty(account)); acct != "" {
+		if ss, err := h.Store.ReadSharedSpend(acct, now); err == nil {
+			dayRem, monthRem := stakeledger.SharedRemaining(ss, now, p)
+			out["daily_remaining_usd"] = dayRem
+			out["monthly_remaining_usd"] = monthRem
+			out["spend_caps_shared_account"] = true
+			out["spent_today_usd"] = float64(ss.HDay) / 100
+			out["spent_month_usd"] = float64(ss.HMonth) / 100
+		}
+	}
+	if _, ok := out["daily_remaining_usd"]; !ok {
+		// No account context (or the shared record could not be read): show
+		// the account-agnostic full budget rather than a misleading per-book
+		// one. Per-book "remaining" no longer means anything since the caps
+		// are account-level.
+		out["daily_remaining_usd"] = p.DailyCapUSD
+		out["monthly_remaining_usd"] = p.MonthlyCapUSD
+		out["spend_caps_shared_account"] = true
+	}
+	return out
+}
+
+func firstNonEmpty(values []string) string {
+	for _, v := range values {
+		if strings.TrimSpace(v) != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 // ledgerBoostBpsBestEffort returns the wallet's current ledger boost (bps)
@@ -180,8 +214,8 @@ func (h *Handlers) ledgerBoostBpsBestEffort(userID string) int {
 	}
 	// The ledger is keyed by EARNING address — that is where the fulfillment
 	// path writes it — so this sums the books of every wallet that earns for
-	// the account (ledgerBoostBpsAllInTx / ApplyLedgerPurchaseAllInTx use the
-	// same rule when they pay). Reading only the primary wallet would show a
+	// the account (purchaseEarningSetInTx uses the same rule when it pays).
+	// Reading only the primary wallet would show a
 	// buyer with three staking wallets a third of the boost they actually get.
 	settings, _ := h.Store.GetAdminSettings(0)
 	params := stakeledger.Normalize(settings.EffectiveStakeCashback())
@@ -325,7 +359,7 @@ type stakeWalletView struct {
 // It deliberately knows nothing about rates. The staker base is an account-level
 // number (counted once, however many wallets earn), so it is applied by
 // buildStakeMeView after the whole set has been resolved.
-func (h *Handlers) resolveStakeWallet(ctx *fasthttp.RequestCtx, address string) stakeWalletView {
+func (h *Handlers) resolveStakeWallet(ctx *fasthttp.RequestCtx, address string, account ...string) stakeWalletView {
 	view := stakeWalletView{Address: address}
 	if address != "" && h.Cfg.PoolAPIURL != "" && h.Pool != nil {
 		st, err := h.poolStake(ctx, address)
@@ -401,7 +435,7 @@ func (h *Handlers) resolveStakeWallet(ctx *fasthttp.RequestCtx, address string) 
 	// The page needs fresh numbers now, so refresh this address only. No
 	// background scan and no requests for unrelated stakers.
 	h.syncProfitOnDemand(ctx, address)
-	view.Ledger = h.ledgerView(address)
+	view.Ledger = h.ledgerView(address, account...)
 	if bps, ok := view.Ledger["boost_bps"].(int); ok {
 		view.BoostBps = bps
 	}
@@ -427,8 +461,10 @@ func (h *Handlers) resolveStakeWallet(ctx *fasthttp.RequestCtx, address string) 
 //   - the staker BASE is applied ONCE per account. It is a flat rate, not a
 //     per-wallet entitlement: three wallets must not triple it;
 //   - the ledger boost is summed, because each wallet's book was earned by that
-//     wallet's own stake and is capped by it (ApplyLedgerPurchaseAllInTx debits
-//     them the same way at payout, so the preview and the money agree);
+//     wallet's own stake; the spend caps and the boost cap are per ACCOUNT, so
+//     linking wallets cannot multiply what the account may earn or spend
+//     (purchaseEarningSetInTx applies the same rule at payout, so the preview
+//     and the money agree);
 //   - loyalty is the LONGEST streak and staked_since the EARLIEST, so linking a
 //     new wallet never resets the age of an old one;
 //   - payouts are unaffected: cashback goes to the sign-in wallet, always.
@@ -463,7 +499,7 @@ func (h *Handlers) buildStakeMeView(ctx *fasthttp.RequestCtx, user db.User) (map
 	primaryView := stakeWalletView{}
 
 	for _, address := range earning {
-		view := h.resolveStakeWallet(ctx, address)
+		view := h.resolveStakeWallet(ctx, address, user.NimiqAddress)
 		canonical := poolstake.CanonicalAddress(address)
 		if at, ok := linkedAt[canonical]; ok {
 			view.Linked = true
@@ -565,7 +601,8 @@ func (h *Handlers) buildStakeMeView(ctx *fasthttp.RequestCtx, user db.User) (map
 	resp["boosted"] = boostBps > 0 || stakerBaseApplied
 	// The ledger card describes the PRIMARY wallet; the per-wallet boosts that
 	// make up boost_bps are in stake_addresses. One merged book would be a
-	// different (and less honest) artefact — see ApplyLedgerPurchaseAllInTx.
+	// different (and less honest) artefact — see purchaseEarningSetInTx. The
+	// cap rows inside it are the ACCOUNT's shared budget, not this book's.
 	resp["ledger"] = primaryView.Ledger
 	if staked {
 		resp["loyalty_days"] = lockedDays

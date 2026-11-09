@@ -1953,6 +1953,7 @@ const en = {
     cashbackAccrued: 'Cashback accrued',
     capLeftToday: 'Cap left today',
     capLeftMonth: 'Cap left this month',
+    capsShared: 'Cap limits are per account, not per wallet — every linked wallet shares the same daily/monthly budget.',
     amountAria: 'Amount to stake in NIM',
     waitingPay: 'Waiting for Nimiq Pay…',
     addStake: 'Add stake',

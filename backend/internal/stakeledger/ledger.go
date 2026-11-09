@@ -1,7 +1,6 @@
 package stakeledger
 
 import (
-	"math"
 	"time"
 )
 
@@ -184,58 +183,6 @@ func (l *Ledger) OnStakeChange(newStakeNIM float64, p Params, now time.Time) {
 	}
 	l.S = newStakeNIM
 	l.UpdatedAt = now
-}
-
-// Purchase is spec item 8: the boost for a purchase of xUSD.
-//
-//	eligible = min(x, dayRemaining, monthRemaining)
-//	rate     = min(MaxBoostBps, A * P / basis)
-//	cbNIM    = min(A, rate * eligible / P)
-//
-// and debits exactly cbNIM from A plus eligible from the day/month
-// counters. Because rate is priced on the display basis (100 USD) while
-// eligible is capped below it (day cap 50 USD), cbNIM ≤ A * eligible/100 <
-// A always holds even before the explicit clamp — the ledger cannot go
-// negative, and spending can never lower the ratio for the NEXT purchase:
-// A/(remaining) is invariant under a purchase (debt and debt-base shrink
-// by the same factor).
-//
-// Returns the eligible USD and the NIM debited (the exact payout in NIM).
-func (l *Ledger) Purchase(xUSD, nimUsd float64, p Params, now time.Time) (eligible, cbNIM float64) {
-	l.Rollover(p, now)
-	if xUSD <= 0 || nimUsd <= 0 || l.A <= 0 {
-		return 0, 0
-	}
-	dayRem := p.DailyCapUSD - float64(l.HDay)/100
-	monthRem := p.MonthlyCapUSD - float64(l.HMonth)/100
-	if dayRem < 0 {
-		dayRem = 0
-	}
-	if monthRem < 0 {
-		monthRem = 0
-	}
-	eligible = math.Min(xUSD, math.Min(dayRem, monthRem))
-	if eligible <= 0 {
-		l.UpdatedAt = now
-		return 0, 0
-	}
-	rate := l.A * nimUsd / p.DisplayBasisUSD // fraction, before the cap
-	capFrac := float64(p.MaxBoostBps) / 10000
-	if rate > capFrac {
-		rate = capFrac
-	}
-	cbNIM = rate * eligible / nimUsd
-	if cbNIM > l.A {
-		cbNIM = l.A // belt-and-braces: the math above already forbids it
-	}
-	if cbNIM < 0 {
-		cbNIM = 0
-	}
-	l.A -= cbNIM
-	l.HDay += int64(math.Round(eligible * 100))
-	l.HMonth += int64(math.Round(eligible * 100))
-	l.UpdatedAt = now
-	return eligible, cbNIM
 }
 
 // Reset is the operator's "start over" for a buyer (fraud, chargeback,

@@ -279,35 +279,25 @@ func (h *Handlers) attachQuoteCashbackEstimate(resp map[string]interface{}, q db
 		if !q.HasCashbackPromotion() {
 			baseBps, _ := h.buyerBaseBps(context.Background(), q.UserID)
 			luna = cashback.AmountLuna(productNIM, baseBps)
-			// Preview on a copy of the earned ledger: actual eligible-spend
-			// caps and remaining credit can lower the boost on a large cart.
-			// The fulfillment transaction remains the only debit operation.
+			// Preview the exact plan the fulfillment transaction will debit —
+			// including the account's SHARED eligible-spend budget — on
+			// throwaway copies of the books, so the estimate can never
+			// over-promise what the buyer is about to earn. The fulfillment
+			// transaction remains the only place money moves.
 			if user, err := h.Store.GetUser(q.UserID); err == nil && q.NimUsdRate > 0 {
 				settings, _ := h.Store.GetAdminSettings(0)
 				params := stakeledger.Normalize(settings.EffectiveStakeCashback())
-				remBps := params.MaxBoostBps
-				// EVERY earning wallet's book contributes, each capped by its
-				// own eligible spend and combined up to MaxBoostBps — the same
-				// rule the fulfillment transaction applies when it really debits
-				// them (ApplyLedgerPurchaseAllInTx). Previewing one wallet of
-				// several would under-promise what the buyer is about to earn.
-				for _, address := range user.EarningStakeAddresses() {
-					if remBps <= 0 {
-						break
+				now := time.Now().UTC()
+				ss, ssErr := h.Store.ReadSharedSpend(user.NimiqAddress, now)
+				if ssErr == nil {
+					books := make([]stakeledger.Ledger, 0, 6)
+					for _, address := range user.EarningStakeAddresses() {
+						if l, ok, err := h.Store.ReadStakeLedger(address); err == nil && ok {
+							books = append(books, l)
+						}
 					}
-					ledger, ok, err := h.Store.ReadStakeLedger(address)
-					if err != nil || !ok {
-						continue
-					}
-					pw := params
-					pw.MaxBoostBps = remBps
-					bps := stakeledger.BoostBps(&ledger, q.NimUsdRate, pw)
-					if bps <= 0 {
-						continue
-					}
-					_, boost := ledger.Purchase(float64(q.ProductUSD)/1_000_000, q.NimUsdRate, pw, time.Now().UTC())
-					luna += int64(boost*100000 + 0.5)
-					remBps -= bps
+					plan := stakeledger.PlanPurchaseDebits(books, ss, float64(q.ProductUSD)/1_000_000, q.NimUsdRate, params, now)
+					luna += plan.LunaSum
 				}
 			}
 		}

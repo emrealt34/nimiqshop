@@ -22,7 +22,6 @@ package stakeledger
 
 import (
 	"math"
-	"time"
 )
 
 // Params are the operator-tunable programme parameters with safe defaults.
@@ -47,8 +46,9 @@ type Params struct {
 	// AMaxUSD is the ledger cap in USD terms; converted to NIM at the live
 	// price on every accrual (A_MAX = AMaxUSD / P).
 	AMaxUSD float64 `json:"a_max_usd"`
-	// DailyCapUSD / MonthlyCapUSD bound how much of one day / one calendar
-	// month of a buyer's spend is "cashback-eligible" for the boost.
+	// DailyCapUSD / MonthlyCapUSD bound how much of one UTC day / one
+	// calendar month of the ACCOUNT's spend is "cashback-eligible" for the
+	// boost. One budget per account, shared across its earning books.
 	DailyCapUSD   float64 `json:"daily_cap_usd"`
 	MonthlyCapUSD float64 `json:"monthly_cap_usd"`
 	// DisplayBasisUSD is the rate display basis ("the next $100"). The
@@ -177,26 +177,6 @@ func BoostBps(l *Ledger, nimUsd float64, p Params) int {
 	return int(math.Round(bps))
 }
 
-// RemainingCaps reports the buyer's remaining boost-eligible spend
-// (USD) for today and this calendar month as of now, after applying any
-// pending day/month boundary.
-func RemainingCaps(l *Ledger, now time.Time, p Params) (dayUSD, monthUSD float64) {
-	dk, mk := dayKeyOf(now), monthKeyOf(now)
-	if l.DayKey != dk {
-		dayUSD = p.DailyCapUSD
-	} else {
-		dayUSD = p.DailyCapUSD - float64(l.HDay)/100
-	}
-	if l.MonthKey != mk {
-		monthUSD = p.MonthlyCapUSD
-	} else {
-		monthUSD = p.MonthlyCapUSD - float64(l.HMonth)/100
-	}
-	if dayUSD < 0 {
-		dayUSD = 0
-	}
-	if monthUSD < 0 {
-		monthUSD = 0
-	}
-	return
-}
+// Boost-eligible spend is an ACCOUNT-level budget, shared across every
+// book that earns for the account (see spendcap.go) — deliberately NOT a
+// per-book figure. SharedRemaining reports it.

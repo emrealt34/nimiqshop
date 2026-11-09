@@ -529,7 +529,7 @@ func (s Settings) NextLoyaltyLock(lockedDays int) (StakerLoyaltyLock, bool) {
 // rate for everyone — the v1 tier ladder and locked-time loyalty bonuses are
 // gone, and the staker boost is no longer a rate the settings can express.
 // It is a WALLET-BOUND ledger balance: it is resolved separately from each
-// buyer's realized pool-fee ledger (store.ApplyLedgerPurchaseInTx on
+// buyer's realized pool-fee ledger (store.purchaseEarningSetInTx on
 // fulfillment, store.ReadStakeLedger for display) and paid from the ledger,
 // never from the base-rate wallet math.
 //

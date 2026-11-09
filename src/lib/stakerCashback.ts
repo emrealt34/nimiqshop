@@ -71,6 +71,10 @@ export type StakerLedgerCard = {
   loyalty_multiplier?: number;
   daily_remaining_usd?: number;
   monthly_remaining_usd?: number;
+  /** True when the caps above are the account's shared budget (one
+   *  $500/day + $1000/month pool for every earning wallet), not a per-wallet
+   *  leftover. The Go backend sends this on /poolstake/me; the dev mock does not. */
+  spend_caps_shared_account?: boolean;
   updated_at?: string;
 };
 
@@ -237,6 +241,7 @@ function normLedger(l: any): StakerLedgerCard | null {
     loyalty_multiplier: num(l.loyalty_multiplier),
     daily_remaining_usd: num(l.daily_remaining_usd),
     monthly_remaining_usd: num(l.monthly_remaining_usd),
+    spend_caps_shared_account: l.spend_caps_shared_account === true,
     updated_at: l.updated_at ? String(l.updated_at) : undefined,
   };
 }

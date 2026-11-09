@@ -1944,6 +1944,7 @@ const es = {
     cashbackAccrued: 'Cashback acumulado',
     capLeftToday: 'Tope restante hoy',
     capLeftMonth: 'Tope restante este mes',
+    capsShared: 'Los topes son por cuenta, no por cartera — todas las carteras vinculadas comparten el mismo presupuesto diario/mensual.',
     amountAria: 'Importe a hacer stake en NIM',
     waitingPay: 'Esperando a tu cartera Lightning…',
     addStake: 'Añadir stake',

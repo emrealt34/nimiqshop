@@ -18,48 +18,6 @@ import (
 	"nimiqshop/internal/stakeledger"
 )
 
-// ledgerBoostBpsInTx reads the wallet's current ledger boost rate (bps)
-// without mutating anything. Runs inside the caller's open transaction so
-// the rate and the later debit see one consistent snapshot. 0 when there is
-// no ledger, no price, or the book is empty — the base rate then stands.
-func ledgerBoostBpsInTx(tx *badger.Txn, address string, nimUsd float64, p stakeledger.Params) int {
-	addr := canonicalStakeAddr(address)
-	if addr == "" || nimUsd <= 0 {
-		return 0
-	}
-	var l stakeledger.Ledger
-	if err := getJSON(tx, []byte(prefixStakeLedger+addr), &l); err != nil {
-		return 0
-	}
-	return stakeledger.BoostBps(&l, nimUsd, p)
-}
-
-// ledgerBoostBpsAllInTx is the read-only twin of ApplyLedgerPurchaseAllInTx:
-// what would this purchase earn from ALL of a buyer's earning wallets, without
-// debiting any of them. Used to show the rate before the fulfillment
-// transaction opens, so the preview and the payout cannot disagree about how
-// many wallets are behind the number.
-func ledgerBoostBpsAllInTx(tx *badger.Txn, addresses []string, nimUsd float64, p stakeledger.Params) int {
-	if nimUsd <= 0 {
-		return 0
-	}
-	norm := stakeledger.Normalize(p)
-	total := 0
-	seen := make(map[string]bool, len(addresses))
-	for _, address := range addresses {
-		addr := canonicalStakeAddr(address)
-		if addr == "" || seen[addr] {
-			continue
-		}
-		seen[addr] = true
-		total += ledgerBoostBpsInTx(tx, address, nimUsd, norm)
-	}
-	if total > norm.MaxBoostBps {
-		total = norm.MaxBoostBps
-	}
-	return total
-}
-
 const (
 	CashbackQueued    = "queued"
 	CashbackSending   = "sending"
@@ -107,10 +65,13 @@ func (st StakerStake) EffectiveBaseBps(operatorBase int) int {
 //	base   — the pool's staker base while the buyer is staked (any amount),
 //	         else the operator's universal base (0 by default), paid from the
 //	         shop wallet off the product's NIM price (v1 mechanism, unchanged)
-//	boost  — the wallet's ledger rate min(CB_MAX, A*P/basis), paid from the
+//	boost  — the ledger rate min(CB_MAX, A*P/basis), paid from the
 //	         realized-fee ledger (A), debited ATOMICALLY in this same
-//	         transaction (store.ApplyLedgerPurchaseInTx). Capped by the
-//	         $50/day + $500/month eligible-spend limits.
+//	         transaction (purchaseEarningSetInTx over ALL earning books).
+//	         The eligible-spend caps are the ACCOUNT's shared budget
+//	         ($500/day + $1000/month default): linking N wallets does not
+//	         multiply it. The boost RATE cap (MaxBoostBps) is shared across
+//	         the books the same way.
 //	code   — a valid promo code is
 //	         EXCLUSIVE: its rate replaces base and no ledger boost stacks on
 //	         top. Nothing else applies to that order — the code is the only
@@ -224,7 +185,9 @@ func enqueueCashbackOnFulfill(tx *badger.Txn, q *Quote, stake StakerStake, ledge
 		// EVERY wallet that earns for this account: the one they signed in
 		// with plus each linked staking wallet. Their stakes were already
 		// summed into `stake` by AggregateStakerStake, and their ledger books
-		// are debited and summed below — one purchase, several books, one rate.
+		// are debited and summed below — one purchase, several books, ONE
+		// shared eligible-spend budget and ONE shared boost-rate cap for
+		// the account, never per wallet.
 		stakeAddrs = user.EarningStakeAddresses()
 	}
 
@@ -249,11 +212,15 @@ func enqueueCashbackOnFulfill(tx *badger.Txn, q *Quote, stake StakerStake, ledge
 		}
 	}
 
-	// The ledger boost rate for this wallet at the quote's price. 0 when
-	// there is no price, no ledger, or an empty book — the base rate then
-	// stands on its own. Never guesses: a missing P means no boost.
+	// The boost preview for the whole earning set at the quote's price:
+	// 0 when there is no price, no ledger, an empty book, or the account's
+	// SHARED eligible-spend budget is spent — the base rate then stands on
+	// its own. Never guesses: a missing P means no boost. Runs the identical
+	// plan the fulfillment path debits, on throwaway copies, so the preview
+	// and the payout cannot disagree about how many wallets are behind it.
 	nimUsd := q.NimUsdRate
-	boostBps := ledgerBoostBpsAllInTx(tx, stakeAddrs, nimUsd, ledgerParams)
+	orderUSD := float64(q.ProductUSD) / 1_000_000
+	_, boostBps := previewEarningPurchaseInTx(tx, accountAddr, stakeAddrs, orderUSD, nimUsd, ledgerParams, now)
 
 	// Resolve the payout. walletBps is the rate applied to the product's NIM
 	// price (paid from the shop wallet); the boost part is the exact ledger
@@ -266,7 +233,7 @@ func enqueueCashbackOnFulfill(tx *badger.Txn, q *Quote, stake StakerStake, ledge
 	boostLuna := int64(0)
 	debitLedger := func() (int, error) {
 		var e error
-		boostLuna, boostBps, e = ApplyLedgerPurchaseAllInTx(tx, stakeAddrs, float64(q.ProductUSD)/1_000_000, nimUsd, ledgerParams, now)
+		boostLuna, boostBps, e = purchaseEarningSetInTx(tx, accountAddr, stakeAddrs, orderUSD, nimUsd, ledgerParams, now)
 		return boostBps, e
 	}
 	switch {
