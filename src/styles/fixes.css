@@ -886,6 +886,19 @@ html.in-nimiq-pay #main.page {
 .pager { display: flex; justify-content: center; flex-wrap: wrap; align-items: center; gap: 8px; }
 .pager .btn { flex: 0 0 auto; min-height: 38px; padding: 6px 12px; }
 .pager .btn.pager-num { min-width: 38px; justify-content: center; }
+.pager .btn.pager-prev, .pager .btn.pager-next { min-width: 42px; justify-content: center; }
+.pager .pager-status { display: none; }
+/* Compact pager for the admin panels: same idea, single row — prev on the
+   left, "x / N" centred, next on the right. Grid on phones so it cannot wrap. */
+.mini-pager{ display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-top:10px; flex-wrap:wrap }
+.mini-pager-status{ font-variant-numeric:tabular-nums; white-space:nowrap }
+@media (max-width: 560px) {
+  .mini-pager{ display:grid; grid-template-columns:1fr auto 1fr; flex-wrap:nowrap }
+  .mini-pager-status{ justify-self:center }
+  .mini-pager .btn{ min-height:42px; justify-content:center }
+  .mini-pager .mini-pager-prev{ justify-self:start }
+  .mini-pager .mini-pager-next{ justify-self:end }
+}
 .pager .btn.pager-num.active { background: var(--stamp); color: var(--on-stamp); border-color: var(--stamp); box-shadow: none; cursor: default; }
 .pager .pager-gap { color: var(--ink-dim); padding: 0 2px; }
 
@@ -902,9 +915,21 @@ html.in-nimiq-pay #main.page {
 }
 @media (max-width: 480px) {
   .cb-form-row .cb-primary { width: 100%; }
-  .pager { justify-content: flex-start; }
-  .pager .btn.pager-prev, .pager .btn.pager-next { flex: 1 1 40%; justify-content: center; }
-  .pager .btn.pager-num { flex: 0 0 auto; }
+}
+/* Phone: the numbered window no longer fits next to both arrows, so it
+   collapses to a single "page / pages" pill between two compact arrows —
+   one tidy row, never wraps, never overflows. */
+@media (max-width: 560px) {
+  .pager { flex-wrap: nowrap; justify-content: space-between; gap: 8px; }
+  .pager .btn.pager-num, .pager .pager-gap { display: none; }
+  .pager .btn.pager-prev, .pager .btn.pager-next { flex: 0 0 auto; min-width: 48px; min-height: 42px; }
+  .pager .pager-status {
+    display: inline-flex; align-items: center; justify-content: center; flex: 1 1 auto;
+    min-height: 42px; padding: 0 14px;
+    border: 1.5px dashed var(--line-dash); border-radius: var(--r-m);
+    background: var(--surface-2);
+    color: var(--ink-dim); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: 0.08em;
+  }
 }
 
 /* ==========================================================================
@@ -1169,9 +1194,16 @@ html.in-nimiq-pay #main.page {
 .wal-note{ display:flex; align-items:center; gap:5px; flex-wrap:wrap; line-height:1.4 }
 
 /* ---- pager ---- */
-.pt-pager{ display:flex; align-items:center; justify-content:space-between; gap:10px;
+.pt-pager{ display:grid; grid-template-columns: 1fr auto 1fr; align-items:center; gap:10px;
   margin-top:14px; padding-top:12px; border-top:1px dashed var(--line-dash) }
 .pt-pager .btn{ min-width:0; white-space:nowrap }
+.pt-pager > .btn:first-child{ justify-self:start }
+.pt-pager > .btn:last-child{ justify-self:end }
+.pt-pager > .small{ justify-self:center; font-variant-numeric: tabular-nums }
+@media (max-width: 480px) {
+  .pt-pager{ gap:6px; padding-top:10px }
+  .pt-pager .btn{ min-height:42px; padding-left:10px; padding-right:10px }
+}
 
 /* ---- monthly payouts ---- */
 .pt-settlements{ display:grid; gap:10px; width:100% }
@@ -3579,8 +3611,6 @@ input[type="range"]:focus-visible { outline: 2px solid var(--stamp); outline-off
   .pt-leader > li { padding: 10px 6px; }
   .pt-you-badge { flex: 0 0 auto; }
   .pt-yourank { flex-wrap: wrap; }
-  .pt-pager { flex-wrap: wrap; justify-content: center; row-gap: 6px; }
-  .pt-pager .btn { flex: 1 1 auto; justify-content: center; }
   .cb-row-right { display: flex; flex-direction: row; align-items: baseline; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 }
 

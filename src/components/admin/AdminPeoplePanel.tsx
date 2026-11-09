@@ -560,15 +560,15 @@ function UserDetail({ userId }: { userId: string }) {
       </ol>
 
       {timeline.length > EV_PAGE_SIZE ? (
-        <div className="row" style={{ gap: 8, justifyContent: 'flex-end', alignItems: 'center', marginTop: 10 }}>
-          <span className="xs faint mono">
-            page {evCur + 1} / {evPages}
-          </span>
-          <button className="btn btn-ghost btn-sm" disabled={evCur === 0} onClick={() => setEvPage(evCur - 1)} aria-label="Previous events">
+        <div className="mini-pager">
+          <button className="btn btn-ghost btn-sm mini-pager-prev" disabled={evCur === 0} onClick={() => setEvPage(evCur - 1)} aria-label="Previous events">
             ‹ Prev
           </button>
+          <span className="xs faint mono mini-pager-status">
+            page {evCur + 1} / {evPages}
+          </span>
           <button
-            className="btn btn-ghost btn-sm"
+            className="btn btn-ghost btn-sm mini-pager-next"
             disabled={evCur >= evPages - 1}
             onClick={() => setEvPage(evCur + 1)}
             aria-label="Next events"

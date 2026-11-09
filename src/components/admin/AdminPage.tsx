@@ -1147,14 +1147,14 @@ function OrdersPanel() {
         <div className="xs faint mt-2">No orders yet.</div>
       )}
       {rows && rows.length > ORDERS_PAGE_SIZE ? (
-        <div className="row" style={{ gap: 8, justifyContent: 'flex-end', alignItems: 'center', marginTop: 10 }}>
-          <span className="xs faint mono">
-            page {cur + 1} / {pages}
-          </span>
-          <button className="btn btn-ghost btn-sm" disabled={cur === 0} onClick={() => setPage(cur - 1)} aria-label="Previous orders">
+        <div className="mini-pager">
+          <button className="btn btn-ghost btn-sm mini-pager-prev" disabled={cur === 0} onClick={() => setPage(cur - 1)} aria-label="Previous orders">
             ‹ Prev
           </button>
-          <button className="btn btn-ghost btn-sm" disabled={cur >= pages - 1} onClick={() => setPage(cur + 1)} aria-label="Next orders">
+          <span className="xs faint mono mini-pager-status">
+            page {cur + 1} / {pages}
+          </span>
+          <button className="btn btn-ghost btn-sm mini-pager-next" disabled={cur >= pages - 1} onClick={() => setPage(cur + 1)} aria-label="Next orders">
             Next ›
           </button>
         </div>

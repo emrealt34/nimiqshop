@@ -41,6 +41,7 @@ export function Pager({ page, pageCount, onPage }: { page: number; pageCount: nu
       >
         <Icon name="chevron-down" size={14} style={{ transform: 'rotate(90deg)' }} />
       </button>
+      <span className="pager-status" aria-hidden="true">{current + 1} / {pageCount}</span>
       {items.map((it, i) =>
         it === '…' ? (
           <span key={'gap' + i} className="pager-gap" aria-hidden="true">
