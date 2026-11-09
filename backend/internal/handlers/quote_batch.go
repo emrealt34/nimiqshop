@@ -300,6 +300,12 @@ func (h *Handlers) createQuoteBatchInner(ctx *fasthttp.RequestCtx, userID string
 			writeError(ctx, 503, "product metadata cannot be verified; no order was created")
 			return
 		}
+		scopedMeta, selectionErr := meta.scopeSelection(it.Brand, it.BrandID, it.Denomination)
+		if selectionErr != nil {
+			writeError(ctx, fasthttp.StatusConflict, selectionErr.Error())
+			return
+		}
+		meta = scopedMeta
 		// lookupFamilyMeta is best-effort: on a supplier hiccup it returns a
 		// ZERO meta, and a zero meta reads as "not a top-up" — which used to
 		// send a mobile recharge to the buyer's EMAIL as its beneficiary.

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -245,6 +246,12 @@ func (h *Handlers) createQuoteInner(ctx *fasthttp.RequestCtx, userID string, req
 		writeError(ctx, 503, "product metadata cannot be verified; no order was created")
 		return
 	}
+	scopedMeta, selectionErr := meta.scopeSelection(req.Brand, req.BrandID, req.Denomination)
+	if selectionErr != nil {
+		writeError(ctx, fasthttp.StatusConflict, selectionErr.Error())
+		return
+	}
+	meta = scopedMeta
 	// Utility-account products are the one delivery route the shop does not
 	// support at all, so they are refused before anything else is asked.
 	if meta.deliveryChannelFor(req.ProductID, req.Denomination) == "by_account" {
@@ -537,7 +544,14 @@ func (h *Handlers) nimEstimateForBTC(btcAmount string) float64 {
 
 // familyMeta is the cached supplier-side identity of a family, used for
 // both the phone-number requirement and the admin catalog-rule gate.
+type familyProductGroup struct {
+	Brand, BrandID string
+	Kind, Category string
+	Products       []cryptorefills.Product
+}
+
 type familyMeta struct {
+	ProductGroups  []familyProductGroup
 	Products       []cryptorefills.Product
 	Unavailable    bool
 	Known          bool
@@ -585,17 +599,76 @@ func (m familyMeta) deliveryChannel() string {
 	return "by_email"
 }
 
-// deliveryChannelFor resolves ONE selected SKU: product_id → denomination
-// label → range product → family default. ROOT FIX for "asked for an email
-// on a phone product" (33 live families mix both channels under one name).
+// scopeSelection verifies the brand against the supplier catalog and narrows
+// metadata before resolving price and beneficiary. Brand and denomination are
+// the supplier's delivery selector; ambiguous choices must not be charged.
+func (m familyMeta) scopeSelection(brand, brandID, denomination string) (familyMeta, error) {
+	if len(m.ProductGroups) == 0 {
+		return m, nil
+	}
+	brand, brandID = strings.TrimSpace(brand), strings.TrimSpace(brandID)
+	var groups []familyProductGroup
+	for _, g := range m.ProductGroups {
+		if brandID != "" && !strings.EqualFold(brandID, strings.TrimSpace(g.BrandID)) {
+			continue
+		}
+		if brand != "" && !strings.EqualFold(brand, strings.TrimSpace(g.Brand)) {
+			continue
+		}
+		groups = append(groups, g)
+	}
+	if len(groups) == 0 {
+		return m, errors.New("the selected product brand is no longer available; return to the cart and select it again")
+	}
+	var products []cryptorefills.Product
+	var selected *cryptorefills.Product
+	selectedBrand := ""
+	for _, g := range groups {
+		products = append(products, g.Products...)
+		for _, p := range g.Products {
+			matches := strings.EqualFold(denomination, "range") && p.Range != nil ||
+				!strings.EqualFold(denomination, "range") && p.Denomination == denomination
+			if !matches {
+				continue
+			}
+			if selected != nil {
+				av, ac := catalog.ProductMoney(*selected)
+				bv, bc := catalog.ProductMoney(p)
+				if !strings.EqualFold(selectedBrand, g.Brand) || selected.ProductID != p.ProductID ||
+					!strings.EqualFold(selected.DeliveryType, p.DeliveryType) || av != bv || !strings.EqualFold(ac, bc) ||
+					!reflect.DeepEqual(selected.Range, p.Range) {
+					return m, errors.New("this product selection is ambiguous; return to the product page and choose it again")
+				}
+			} else {
+				copy := p
+				selected = &copy
+				selectedBrand = g.Brand
+			}
+		}
+	}
+	m.Products = products
+	if selectedBrand != "" {
+		m.BrandName = selectedBrand
+		for _, g := range groups {
+			if strings.EqualFold(g.Brand, selectedBrand) {
+				if g.Kind != "" {
+					m.Kind = g.Kind
+				}
+				if g.Category != "" {
+					m.Category = g.Category
+				}
+				break
+			}
+		}
+	}
+	return m, nil
+}
+
+// Resolve the denomination before the family id: suppliers can reuse an id
+// across denominations that have different delivery channels.
 func (m familyMeta) deliveryChannelFor(productID, denomination string) string {
 	pid := strings.TrimSpace(productID)
 	den := strings.TrimSpace(denomination)
-	for _, p := range m.Products {
-		if pid != "" && p.ProductID == pid && p.DeliveryType != "" {
-			return strings.ToLower(p.DeliveryType)
-		}
-	}
 	if den != "" && !strings.EqualFold(den, "range") {
 		for _, p := range m.Products {
 			if (p.Denomination == den || p.LocalizedDenomination == den) && p.DeliveryType != "" {
@@ -608,6 +681,11 @@ func (m familyMeta) deliveryChannelFor(productID, denomination string) string {
 			if p.Range != nil && p.DeliveryType != "" {
 				return strings.ToLower(p.DeliveryType)
 			}
+		}
+	}
+	for _, p := range m.Products {
+		if pid != "" && p.ProductID == pid && p.DeliveryType != "" {
+			return strings.ToLower(p.DeliveryType)
 		}
 	}
 	return m.deliveryChannel()
@@ -769,10 +847,16 @@ func (h *Handlers) lookupFamilyMeta(ctx *fasthttp.RequestCtx, family, country st
 		// Data / Credits / Bundle each with family="Turk Telecom" but distinct brands/categories).
 		// Merge all products so validation and SKU lookup see the full 20-item catalogue, not just the first 4.
 		var allProducts []cryptorefills.Product
+		var productGroups []familyProductGroup
 		var allCategories []string
 		brandByDenom := make(map[string]string)
 		brandByPID := make(map[string]string)
 		for _, f := range fams {
+			groupBrand := f.Brand
+			if groupBrand == "" {
+				groupBrand = f.Family
+			}
+			productGroups = append(productGroups, familyProductGroup{Brand: groupBrand, BrandID: f.BrandID, Products: f.Products, Kind: f.Kind, Category: f.Category})
 			allCategories = append(allCategories, f.Category)
 			allCategories = append(allCategories, f.AdditionalCats...)
 			for _, p := range f.Products {
@@ -802,6 +886,7 @@ func (h *Handlers) lookupFamilyMeta(ctx *fasthttp.RequestCtx, family, country st
 			}
 		}
 		meta = familyMeta{
+			ProductGroups:    productGroups,
 			Products:         allProducts,
 			Known:            known,
 			BrandName:        f0.Brand,

@@ -1469,6 +1469,7 @@ const tr = {
     buyLabelMultiNoPrice: '{{qty}} × {{name}} al — Nimiq Pay ile öde + ücret',
     buyNameThisItem: 'bu ürün',
     addedToast: '{{name}} sepete eklendi',
+    cartQuantityToast: 'Bir sepet satırına en fazla {{limit}} adet eklenebilir.',
     cartLimitToast: 'Günlük sipariş sınırı {{limit}} — sepetinde zaten {{count}} ürün var, bugün daha fazla eklenemez.',
     cartCountryToast: 'Sepetinde zaten {{country}} ürünleri var — bir sepet yalnızca tek ülke alabilir. Önce sepeti boşalt.',
     cartCountryOther: 'başka bir ülke',

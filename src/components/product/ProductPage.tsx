@@ -135,6 +135,11 @@ type Pkg = {
   delivery_type?: string;
 };
 
+/** A supplier may reuse one product_id across denominations or brands. */
+function packageSelectionKey(p: Pkg): string {
+  return JSON.stringify([p.package_id, p.denomination, p.brand_id || '', p.brand || '', p.delivery_type || '', p.currency, p.value]);
+}
+
 type ProductDetail = {
   id: string;
   family: string;
@@ -217,7 +222,7 @@ function familyToProduct(family: any, fallbackId: string, countryParam: string):
         coin_amount: p.coin_amount || p.original_coin_amount || '',
         coin: p.coin || 'BTC',
         brand: p.__brand || family.brand || familyName,
-        brand_id: p.__brand_id || family.brand_id || '',
+        brand_id: p.__brand_id ?? family.brand_id ?? '',
         category: p.__category || family.category || '',
         family: family.family || familyName,
         delivery_type: p.delivery_type || family.delivery_type || '',
@@ -256,7 +261,7 @@ function familyToProduct(family: any, fallbackId: string, countryParam: string):
     delivery_type: familyDeliveryType,
     country: countryCode,
     currency,
-    packages: packages.length ? packages : null,
+    packages: packages.length ? [...new Map(packages.map(p => [packageSelectionKey(p), p])).values()] : null,
     range,
     in_stock: familyAvailability(family) === 'available',
     is_e_money: String(family.category || '').toLowerCase() === 'e-money',
@@ -369,7 +374,7 @@ export function ProductPage() {
 
   // selection state
   const hasPackages = !!(product && product.packages && product.packages.length);
-  const [pkg, setPkg] = useState('');
+  const [packageKey, setPackageKey] = useState('');
   const [value, setValue] = useState(0);
   const [qty, setQty] = useState(1);
   const [denomination, setDenomination] = useState('');
@@ -385,14 +390,17 @@ export function ProductPage() {
   // what fits either, never beyond — the cart and the quote gate say the
   // same numbers.
   const countMaxQty = cart && cart.orderLimit > 0 ? Math.max(0, cart.orderLimit - cart.count) : MAX_QTY;
-  const selPkgForQty = pkg ? (product?.packages || []).find((x: any) => x.package_id === pkg) : null;
+  const selectedPackage = product?.packages?.find(p => packageSelectionKey(p) === packageKey) || null;
+  const pkg = selectedPackage?.package_id || '';
+  const selPkgForQty = selectedPackage;
   const selFaceValue = value || selPkgForQty?.value || 0;
   const moneyMaxQty = cart && product
     ? maxQtyForRow(cart.items, {
         id: product.id, pkg: pkg || '', value: selFaceValue,
         country: String(product.country || '').toUpperCase(),
         currency: selPkgForQty?.currency || product.currency,
-        qty: 1, denomination: '', coinAmount: 0, unitUSD: selFaceValue,
+        qty: 1, denomination, coinAmount: 0, unitUSD: selFaceValue,
+        brand_id: selPkgForQty?.brand_id || '', brand: selPkgForQty?.brand || product._family?.brand || product.name, delivery_type: selPkgForQty?.delivery_type || product.delivery_type || '',
         type: '', name: product.name || product.id, image: '', bgColor: '',
       } as CartItem)
     : MAX_QTY;
@@ -409,7 +417,7 @@ export function ProductPage() {
     if (!product) return;
     if (product.packages && product.packages.length) {
       const first = product.packages[0];
-      setPkg(first.package_id);
+      setPackageKey(packageSelectionKey(first));
       setDenomination(first.denomination || `${first.value} ${first.currency || product.currency}`.trim());
       setValue(first.value);
     } else if (product.range) {
@@ -471,7 +479,7 @@ export function ProductPage() {
       // value=0 (it printed "0" instead of the range minimum on first paint).
       if (detail.packages && detail.packages.length) {
         const first = detail.packages[0];
-        setPkg(first.package_id);
+        setPackageKey(packageSelectionKey(first));
         setDenomination(first.denomination || `${first.value} ${first.currency || detail.currency}`.trim());
         setValue(first.value);
       } else if (detail.range) {
@@ -532,7 +540,7 @@ export function ProductPage() {
     let attempts = 0; // bounded transient-failure guard: never hammer forever
     const check = async () => {
       try {
-        const selectedPkg = product.packages?.find((p) => p.package_id === pkg) as any;
+        const selectedPkg = selectedPackage;
         const brandForPrice = selectedPkg?.brand || product._family?.brand || product.family || product.id;
         const price = await getProductPrice(brandForPrice, product.country, value);
         if (!alive) return;
@@ -613,7 +621,7 @@ export function ProductPage() {
 
   const currentProductNIM = useCallback(() => {
     const q = qty || 1;
-    const k = product && product.packages ? product.packages.find((x) => x.package_id === pkg) : null;
+    const k = selectedPackage;
     if (k && k.coin_amount && nimUsd && btcUsd && nimUsd > 0 && btcUsd > 0) {
       const btc = parseFloat(String(k.coin_amount)) * q;
       if (btc > 0) return (btc * btcUsd) / nimUsd;
@@ -621,7 +629,7 @@ export function ProductPage() {
     const usd = localToUSD((value || 0) * q, k ? k.currency : product?.currency);
     if (usd > 0 && nimUsd && nimUsd > 0) return usd / nimUsd;
     return 0;
-  }, [product, pkg, value, qty, nimUsd, btcUsd, localToUSD]);
+  }, [product, selectedPackage, value, qty, nimUsd, btcUsd, localToUSD]);
 
   const buyNIM = useMemo(() => {
     if (!product) return '';
@@ -630,13 +638,13 @@ export function ProductPage() {
       const estimate = nimPriceFromBTC(Number(supplierPrice.coin_amount) * q);
       if (estimate) return estimate;
     }
-    const k = product.packages ? product.packages.find((x) => x.package_id === pkg) : null;
+    const k = selectedPackage;
     if (k && k.coin_amount) {
       const t = nimPriceFromBTC(parseFloat(k.coin_amount) * q);
       if (t) return t;
     }
     return nimPriceFromUSD(localToUSD((value || 0) * q, k ? k.currency : product.currency));
-  }, [product, pkg, value, qty, nimPriceFromBTC, nimPriceFromUSD, localToUSD, supplierPrice]);
+  }, [product, selectedPackage, value, qty, nimPriceFromBTC, nimPriceFromUSD, localToUSD, supplierPrice]);
 
   const buyLabel = useMemo(() => {
     if (!product) return '';
@@ -774,8 +782,13 @@ export function ProductPage() {
         logo_url: product.logo_url,
         country: product.country,
         currency: product.currency,
-        packages: product.packages || [],
+        packages: selectedPackage ? [selectedPackage] : [],
         range: product.range,
+        delivery_type: product.delivery_type,
+        brand: product._family?.brand || product.name,
+        brand_id: product._family?.brand_id || '',
+        category: product._family?.category || '',
+        bg_color: product.bg_color,
       },
       { pkg, value, qty, denomination, coinAmount: Number(supplierPrice && Number(supplierPrice.coin_amount) > 0 ? supplierPrice.coin_amount : 0) }
     );
@@ -784,6 +797,10 @@ export function ProductPage() {
         t('productPage.cartLimitToast', { limit: cart.orderLimit, count: cart.count }),
         'error'
       );
+      return;
+    }
+    if (ok === 'quantity') {
+      toast(t('productPage.cartQuantityToast', { limit: MAX_QTY }), 'error');
       return;
     }
     if (ok === 'money') {
@@ -804,7 +821,7 @@ export function ProductPage() {
   // Effective kind follows the SELECTED package's supplier channel (mixed
   // families: e.g. DE Vodafone sells PIN vouchers by email AND direct credit
   // by phone under one name).
-  const selPkgForKind = product.packages?.find((x) => x.package_id === pkg) as any;
+  const selPkgForKind = selectedPackage;
   const selDT = String(selPkgForKind?.delivery_type || product.delivery_type || '').toLowerCase();
   const effectiveType = selDT === 'by_phone' ? 'phone_refill' : selDT === 'by_email' ? (product.type === 'esim' ? 'esim' : 'gift_card') : product.type;
   const info = REDEEM_STEPS[effectiveType] || REDEEM_STEPS.gift_card;
@@ -813,14 +830,14 @@ export function ProductPage() {
   const doBuy = async () => {
     if (blocked) return;
     if (!(await askAffordable())) return;
-    const selectedPkgForBuy = product.packages?.find((x) => x.package_id === pkg) as any;
+    const selectedPkgForBuy = selectedPackage;
     openSingleBuyFlow({
       product: {
         id: product.id,
         name: product.name,
         type: effectiveType,
         country: product.country,
-        currency: product.currency,
+        currency: selectedPackage?.currency || product.currency,
         pkg,
         value,
         qty,
@@ -890,8 +907,8 @@ export function ProductPage() {
           {hasPackages ? (
             <PackageChooser
               product={product}
-              pkg={pkg}
-              setPkg={setPkg}
+              packageKey={packageKey}
+              setPackageKey={setPackageKey}
               setValue={setValue}
               setDenomination={setDenomination}
               nimPriceFromBTC={nimPriceFromBTC}
@@ -990,8 +1007,8 @@ function prettyFace(denom: string, localized: string): string {
 
 function PackageChooser({
   product,
-  pkg,
-  setPkg,
+  packageKey,
+  setPackageKey,
   setValue,
   setDenomination,
   nimPriceFromBTC,
@@ -999,8 +1016,8 @@ function PackageChooser({
   localToUSD,
 }: {
   product: ProductDetail;
-  pkg: string;
-  setPkg: (k: string) => void;
+  packageKey: string;
+  setPackageKey: (k: string) => void;
   setValue: (v: number) => void;
   setDenomination: (d: string) => void;
   nimPriceFromBTC: (b: unknown) => string;
@@ -1011,22 +1028,25 @@ function PackageChooser({
   return (
     <div className="packages-grid mt-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, width: '100%', maxWidth: '100%' }}>
       {(product.packages || []).map((k) => {
-        const isActive = k.package_id === pkg;
+        const key = packageSelectionKey(k);
+        const isActive = key === packageKey;
+        const needsVariantLabel = (product.packages || []).filter(p => p.denomination === k.denomination).length > 1;
         const usdValue = k.value || 0;
         const nimPrice = (k.coin_amount ? nimPriceFromBTC(k.coin_amount) : '') || nimPriceFromUSD(localToUSD(usdValue, k.currency || product.currency));
         const faceLabel = productFaceLabel({ denomination: prettyFace(k.denomination, k.localized_denomination),
           product_value: k.value, product_currency: k.currency || product.currency, country: product.country }) || t('productPage.packageFallback');
         return (
           <button
-            key={k.package_id}
+            key={key}
             className={'pd-pkg' + (isActive ? ' active' : '')}
             onClick={() => {
-              setPkg(k.package_id);
+              setPackageKey(key);
               setDenomination(k.denomination || `${k.value} ${k.currency || product.currency}`.trim());
               setValue(k.value);
             }}
           >
             <div className="pd-pkg-face">{faceLabel}</div>
+            {needsVariantLabel && <div className="xs faint">{[k.brand, k.delivery_type === 'by_phone' ? t('productPage.chipCreditNumber') : k.delivery_type === 'by_email' ? t('productPage.chipCodeEmail') : ''].filter(Boolean).join(' · ')}</div>}
             {nimPrice ? (
               <div className="pd-pkg-nim">
                 <img src={asset("/img/nimiq-hexagon.png?v=40")} draggable={false} alt="NIM" width={12} height={12} style={{ pointerEvents: "none", borderRadius: 2, verticalAlign: 'middle' }} />

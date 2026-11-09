@@ -203,8 +203,14 @@ export function CartSheetContent({ close }: { close: () => void }) {
         try {
           const raw = await getProduct(bad.id, bad.country);
           const families: any[] = Array.isArray(raw) ? raw : raw && raw.products ? [raw] : [];
-          const allProducts: any[] = families.flatMap((f: any) => Array.isArray(f.products) ? f.products : []);
-          const pkg = allProducts.find((p: any) => p && p.product_id === bad.pkg) || null;
+          const candidates = families.flatMap((f: any) => {
+            if (bad.brand_id && f.brand_id !== bad.brand_id) return [];
+            if (bad.brand && String(f.brand || f.family || '').toLowerCase() !== bad.brand.toLowerCase()) return [];
+            return (Array.isArray(f.products) ? f.products : []).filter((p: any) => p && p.product_id === bad.pkg && (!bad.denomination || p.denomination === bad.denomination));
+          });
+          // A reused supplier id is not enough to identify a denomination.
+          // Never repair money from an arbitrary first variant.
+          const pkg = candidates.length === 1 ? candidates[0] : null;
           const parsed = parsePackageMoney(pkg, COUNTRY_CCY[String(bad.country || '').toUpperCase()] || '');
           if (!parsed) continue;
           const idx = next.findIndex((it) => itemKey(it) === itemKey(bad));

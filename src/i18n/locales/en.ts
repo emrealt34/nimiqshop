@@ -1477,6 +1477,7 @@ const en = {
     buyLabelMultiNoPrice: 'Buy {{qty}} × {{name}} — Pay with Nimiq Pay + fee',
     buyNameThisItem: 'this item',
     addedToast: 'Added {{name}} to cart',
+    cartQuantityToast: 'The maximum quantity for one cart row is {{limit}}.',
     cartLimitToast: 'Daily order limit is {{limit}} order(s) — your cart already holds {{count}} item(s), so nothing more can be added today.',
     cartCountryToast: 'Your cart already has {{country}} items — one cart can only hold one country. Clear the cart first.',
     cartCountryOther: 'another country',

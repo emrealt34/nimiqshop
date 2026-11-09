@@ -15,7 +15,8 @@ import { selectionPayload } from '../../lib/productMoney';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../ui/Icon';
 import { ErrorDetail } from '../ui/uiKit';
-import { useCart, itemKey, rowUSD, type CartItem } from '../../lib/cartStore';
+import { useCart, itemKey, rowUSD, saveCart, type CartItem } from '../../lib/cartStore';
+import { MAX_QTY } from '../../lib/format';
 import { useToast } from '../AppProviders';
 import { createQuote, createQuoteBatch, forgetQuote, getQuote, friendlyApiMessage, authorizePaymentLaunch, cachedNimRate, errorDetailLine } from '../../lib/api';
 import { canRenewQuote, paymentHandedOff, paymentInFlight } from '../../lib/pay';
@@ -127,7 +128,7 @@ function blockedFrom(e: any): any[] {
  */
 export function phoneFor(it: any, phones: Map<unknown, string> | undefined | null): string {
   if (!phones || !it) return '';
-  return phones.get(it) || phones.get(it.id) || phones.get(String(it.id)) || '';
+  return phones.get(it) || phones.get(itemKey(it)) || phones.get(it.id) || phones.get(String(it.id)) || '';
 }
 
 function batchReqFor(
@@ -153,7 +154,7 @@ function batchReqFor(
       product_id: it.id,
       country: it.country,
       ...selectionPayload(den, it.value),
-      quantity: Math.max(1, Math.min(10, Number(it.qty) || 1)),
+      quantity: Math.max(1, Math.min(MAX_QTY, Number(it.qty) || 1)),
       phone_number: phoneFor(it, phones),
       ...(it.brand ? { brand: it.brand } : {}),
       ...(it.brand_id ? { brand_id: it.brand_id } : {}),
@@ -832,14 +833,8 @@ export function CheckoutFlow({
       const paidItems = paidIdx.map((idx) => items[idx]);
       if (paidItems.length) {
         const kept = items.filter((_, idx) => !paidIdx.includes(idx));
-        cart.clearCart();
-        // Re-add the un-paid items (they stay in the cart)
-        for (const k of kept) {
-          cart.addToCart(
-            { id: k.id, type: k.type, name: k.name, country: k.country, currency: k.currency, packages: [{ package_id: k.pkg, value: k.value, currency: k.currency, denomination: k.denomination }] },
-            { pkg: k.pkg, value: k.value, qty: k.qty, denomination: k.denomination, force: true }
-          );
-        }
+        // Keep every original SKU and its metadata after a partial payment.
+        saveCart(kept);
         bumpAwaiting(paidItems.reduce((s, it) => s + (it.qty || 0), 0));
       }
       if (paidItems.length === items.length && items.length > 0) {

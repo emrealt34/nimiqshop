@@ -1183,7 +1183,11 @@ function QuoteContent({ q, refund, fulfillment, onChanged }: { q: any; refund?: 
           const families2: any[] = Array.isArray(raw) ? raw : raw && raw.products ? [raw] : [];
           const family = families2.length ? ({ products: families2.flatMap((f: any) => Array.isArray(f.products) ? f.products : []), family: families2[0]?.family || families2[0]?.brand || String(l.product_id), brand: families2[0]?.brand, logo_url: families2[0]?.logo_url, images: families2[0]?.images } as any) : null;
           const label = String(l.denomination || '').trim();
-          const selected = family?.products?.find((p: any) => p.denomination === label);
+          const matching = families2.flatMap((f: any) => (f.products || []).filter((p: any) => p.denomination === label).map((p: any) => ({ p, f })));
+          const selectedMatch = matching.find(({ f }: any) => (l as any).brand_id && f.brand_id === (l as any).brand_id)
+            || matching.find(({ f }: any) => (l as any).brand && f.brand === (l as any).brand)
+            || (matching.length === 1 ? matching[0] : undefined);
+          const selected = selectedMatch?.p;
           // Rebuy fixed SKUs from their current structured data, not old labels.
           if (label.toLowerCase() !== 'range' && !selected) { unmatched++; continue; }
           const parsed = productMoney(selected);
@@ -1204,7 +1208,11 @@ function QuoteContent({ q, refund, fulfillment, onChanged }: { q: any; refund?: 
             bgColor: String((family as any)?.bg_color || (family as any)?.bg || ''),
             country: String(l.country || q.product_country || q.country || '').toUpperCase(),
             currency: parsed.currency,
-            pkg: '',
+            pkg: label.toLowerCase() === 'range' ? '' : String(selected?.product_id || ''),
+            brand: String(selectedMatch?.f?.brand || (l as any).brand || ''),
+            brand_id: String(selectedMatch?.f?.brand_id || (l as any).brand_id || ''),
+            category: String(selectedMatch?.f?.category || ''),
+            delivery_type: String(selected?.delivery_type || selectedMatch?.f?.delivery_type || ''),
             value: parsed.value > 0 ? parsed.value : 0,
             denomination: label,
             coinAmount: 0,

@@ -1468,6 +1468,7 @@ const de = {
     buyLabelMultiNoPrice: '{{qty}} × {{name}} kaufen — mit Nimiq Pay zahlen + Gebühr',
     buyNameThisItem: 'diesen Artikel',
     addedToast: '{{name}} zum Warenkorb hinzugefügt',
+    cartQuantityToast: 'Pro Warenkorbzeile sind höchstens {{limit}} Stück möglich.',
     cartLimitToast: 'Das Tageslimit liegt bei {{limit}} Bestellung(en) — dein Warenkorb enthält bereits {{count}} Artikel, heute ist nichts mehr möglich.',
     cartCountryToast: 'Dein Warenkorb enthält bereits Artikel aus {{country}} — ein Warenkorb kann nur ein Land enthalten. Leere ihn zuerst.',
     cartCountryOther: 'einem anderen Land',

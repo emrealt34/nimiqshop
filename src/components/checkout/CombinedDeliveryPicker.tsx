@@ -6,7 +6,8 @@ import { needsPhone } from '../../lib/catalog';
 import { parseCountryPhone, phoneCountry } from '../../lib/phoneCountry';
 import { CountryPhoneInput } from './CountryPhoneInput';
 import { ConfirmField } from './ConfirmField';
-import type { CartItem } from '../../lib/cartStore';
+import { itemKey, cartSubtitle, type CartItem } from '../../lib/cartStore';
+import { sameCartSelection } from '../../lib/cartIdentity';
 import { identiconPngDataUrl } from '../../lib/identicon';
 import { getAddress } from '../../lib/session';
 import { CashbackCodeField } from '../cashback/CashbackCodeField';
@@ -49,7 +50,15 @@ export function CombinedDeliveryPicker({
   notice?: string;
 }) {
   // ROOT RULE: a line delivered by_phone needs a NUMBER, everything else an EMAIL.
-  const tops = items.filter((it) => needsPhone(it));
+  const phoneItems = items.filter((it) => needsPhone(it));
+  // Overflow/legacy duplicate rows still represent one destination. Distinct
+  // selections retain separate phone fields so buyers can use different numbers.
+  const ambiguous = (it: CartItem) => {
+    const matches = phoneItems.filter(other => sameCartSelection(other, it));
+    return matches.some((a, i) => matches.slice(i + 1).some(b => !sameCartSelection(a, b)));
+  };
+  const sameDestinationGroup = (a: CartItem, b: CartItem) => a === b || (!ambiguous(a) && !ambiguous(b) && sameCartSelection(a, b));
+  const tops = phoneItems.filter((it, i) => !phoneItems.slice(0, i).some(other => sameDestinationGroup(other, it)));
   const cards = items.filter((it) => !needsPhone(it));
   const hasEmail = cards.length > 0;
   const hasTopUp = tops.length > 0;
@@ -124,8 +133,10 @@ export function CombinedDeliveryPicker({
         setPhoneErr((prev) => prev.map((p, idx) => (idx === i ? (r.error || t('delivery.numberNotAccepted')) : p)));
         return;
       }
-      phoneMap.set(tops[i], r.phone || '');
-      if (tops[i].id) phoneMap.set(tops[i].id, r.phone || '');
+      for (const item of phoneItems.filter(it => sameDestinationGroup(it, tops[i]))) {
+        phoneMap.set(item, r.phone || '');
+        phoneMap.set(itemKey(item), r.phone || '');
+      }
     }
     // ---- 2) email: delivery address for emailed lines / note address for a gift ----
     let email = '';
@@ -243,7 +254,7 @@ export function CombinedDeliveryPicker({
       {tops.map((it, i) => {
         const id = `cdp-phone-${i}`;
         const label = tops.length > 1
-          ? gift ? t('delivery.cdpNumberGift', { name: it.name }) : t('delivery.cdpNumberSelf', { name: it.name })
+          ? gift ? t('delivery.cdpNumberGift', { name: `${it.name} · ${cartSubtitle(it)}` }) : t('delivery.cdpNumberSelf', { name: `${it.name} · ${cartSubtitle(it)}` })
           : gift ? t('delivery.cdpRecipientNumber') : t('delivery.cdpPhoneCredit');
         return (
           <div className="field" key={id} style={{ marginBottom: 12 }}>

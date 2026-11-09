@@ -8,6 +8,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { COUNTRY_CCY, MAX_QTY, fmtMoney, fmtNIM, countryName, productFaceLabel } from './format';
 import { cachedNimRate, cachedFX, getAccountLimits, getSupplierLimits } from './api';
 import { isAuthed } from './session';
+import { cartItemKey, reconcileCart, sameCartSelection } from './cartIdentity';
 
 export type CartItem = {
   id: string;
@@ -28,6 +29,7 @@ export type CartItem = {
   category?: string;
   /** supplier per-product delivery channel: by_phone | by_email | by_account */
   delivery_type?: string;
+  cartSlot?: number;
 };
 
 const KEY = 'nimshop_cart';
@@ -39,7 +41,7 @@ export function readCart(): CartItem[] {
     const rows: unknown = JSON.parse(localStorage.getItem(KEY) || '[]');
     if (!Array.isArray(rows)) return [];
     const finite = (value: unknown) => Number.isFinite(Number(value)) ? Math.max(0, Number(value)) : 0;
-    return rows.filter((row) => row && typeof row.id === 'string' && row.id.trim() &&
+    return reconcileCart(rows.filter((row) => row && typeof row.id === 'string' && row.id.trim() &&
       typeof row.country === 'string' && /^[A-Za-z]{2}$/.test(row.country) && finite(row.qty) >= 1)
       .slice(0, 100).map((row) => ({
         ...row, country: row.country.toUpperCase(), qty: Math.min(MAX_QTY, Math.floor(finite(row.qty))),
@@ -48,19 +50,18 @@ export function readCart(): CartItem[] {
         currency: String(row.currency || ''), pkg: String(row.pkg || ''), denomination: String(row.denomination || ''),
         value: finite(row.value), coinAmount: finite(row.coinAmount), unitUSD: finite(row.unitUSD),
         brand: String(row.brand || ''), brand_id: String(row.brand_id || ''), category: String(row.category || ''), delivery_type: String((row as any).delivery_type || ''),
-      }));
+      })), MAX_QTY);
   } catch { return memoryCart; }
 }
 
 export function saveCart(next: CartItem[]): void {
+  next = reconcileCart(next, MAX_QTY);
   memoryCart = next;
   try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* embedded/private storage */ }
   window.dispatchEvent(new CustomEvent('nimshop:cart-changed'));
 }
 
-export function itemKey(it: { id: string; pkg?: string; value?: number | string; country?: string }): string {
-  return it.id + '|' + (it.pkg ? 'pkg:' + it.pkg : 'val:' + it.value) + '|' + (it.country || '');
-}
+export const itemKey = cartItemKey;
 
 function bestImage(p: any): string {
   const i = p.images || {};
@@ -259,7 +260,9 @@ export function cartSubtitle(it: CartItem): string {
   const useful = denom && !/^package$/i.test(denom);
   const label = productFaceLabel({ ...it, denomination: useful ? denom : '' });
   const country = countryName(it.country) || it.country || '';
-  return [country || '', label || 'Package'].filter(Boolean).join(' ');
+  const brand = String(it.brand || '').trim();
+  const variant = brand && brand.toLowerCase() !== String(it.name || it.id).trim().toLowerCase() ? brand : '';
+  return [country || '', label || 'Package', variant].filter(Boolean).join(' · ');
 }
 
 type CartState = {
@@ -273,9 +276,9 @@ type CartState = {
    * one cart can only ever hold a single country's items. Returns `'limit'`
    * when the account's max-order allowance is already fully in the cart, and
    * `'money'` when the Lightning per-order face ceiling leaves no room for
-   * even one unit of this item.
+   * even one unit of this item; `'quantity'` means the row is full.
    */
-  addToCart: (p: any, opts?: { pkg?: string; value?: number; qty?: number; denomination?: string; force?: boolean; coinAmount?: number }) => boolean | 'limit' | 'money';
+  addToCart: (p: any, opts?: { pkg?: string; value?: number; qty?: number; denomination?: string; force?: boolean; coinAmount?: number }) => boolean | 'limit' | 'money' | 'quantity';
   setQty: (k: string, qty: number) => void;
   removeItem: (k: string) => void;
   clearCart: () => void;
@@ -383,17 +386,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
       // Cart TYPE follows the supplier's delivery channel, not the category.
       if (entry.delivery_type === 'by_phone' && entry.type !== 'phone_refill') entry.type = 'phone_refill';
       if (entry.delivery_type === 'by_email' && entry.type === 'phone_refill') entry.type = 'gift_card';
-      const key = itemKey(entry);
-      const existing = current.find((it) => itemKey(it) === key);
+      const matches = current.filter((it) => sameCartSelection(it, entry));
+      const existing = matches.length === 1 ? matches[0] : undefined;
+      if (existing && existing.qty >= MAX_QTY) return 'quantity';
       // The Lightning per-order face ceiling: no cart may carry more than one
       // Lightning invoice can pay. Clamped like the daily count above —
       // 'money' when not even one unit of this item still fits.
       if (!force) {
-        const room = maxQtyForRow(current, entry) - (existing ? existing.qty : 0);
+        const room = maxQtyForRow(current, existing || entry) - (existing ? existing.qty : 0);
         if (room <= 0) return 'money';
         if (addQty > room) addQty = room;
+        if (existing) addQty = Math.min(addQty, MAX_QTY - existing.qty);
       }
-      const next = existing ? current.map((it) => it === existing ? { ...it, qty: Math.min(MAX_QTY, it.qty + addQty) } : it) : [...current, entry];
+      const next = existing ? current.map((it) => it === existing ? { ...it, pkg: it.pkg || entry.pkg, denomination: it.denomination || entry.denomination, brand_id: it.brand_id || entry.brand_id, brand: it.brand || entry.brand, delivery_type: it.delivery_type || entry.delivery_type, qty: it.qty + addQty } : it) : [...current, entry];
       write(next);
       return true;
     }, [write, orderLimit]
