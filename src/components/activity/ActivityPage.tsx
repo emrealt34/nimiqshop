@@ -21,9 +21,6 @@ import { Pager } from '../ui/Pager';
 import { RecentRatingComments } from '../rating/RatingFlow';
 import { useT, t as i18nT } from '../../i18n';
 import { pagePath } from '../../lib/asset';
-import { LightningReceipt } from '../order/LightningReceipt';
-import { lightningReceiptOf } from '../../lib/lightningReceipt';
-
 /** Rows per page in the live feed (the site's default pagination). */
 const FEED_PER_PAGE = 10;
 
