@@ -9,7 +9,6 @@ import { getLightningChainProof } from '../../lib/api';
 import { explorerUrl } from '../../lib/chain';
 
 function SubmittedTransaction({ receipt }: { receipt: LightningReceiptData }) {
-  const { t } = useT();
   const hash = fundingHash(receipt.submitted_tx);
   if (!hash) return null;
   const polygon = hash.startsWith('0x');
