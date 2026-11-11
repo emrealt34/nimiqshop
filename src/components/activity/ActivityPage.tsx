@@ -446,7 +446,6 @@ function FeedItem({ it }: { it: any }) {
         <div className="feed-row-2">
           <div className="feed-amounts">
             {main ? <span className="feed-amt-main">{main}</span> : <span className="feed-amt-main muted">{t('activityPage.amountInWallet')}</span>}
-            <LightningReceipt receipt={lightningReceiptOf(it, true)} compact />
             {chips.length ? (
               <span className="feed-amt-chips">
                 {chips.map((c, i) => (
