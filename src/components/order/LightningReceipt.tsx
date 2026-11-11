@@ -15,9 +15,7 @@ function SubmittedTransaction({ receipt }: { receipt: LightningReceiptData }) {
   const polygon = hash.startsWith('0x');
   const url = polygon ? `https://polygonscan.com/tx/${hash}` : explorerUrl(hash);
   return <div data-submitted-transaction={hash}>
-    <div className="xs muted">{polygon ? 'Polygon' : 'NIM'} · {t('orderPage.nimiqPay.submitted')}</div>
     <a className="lightning-receipt-hash" href={url!} target="_blank" rel="noopener noreferrer">{hash}</a>
-    <CopyButton getText={hash} label={t('lightningReceipt.copyHash')} />
   </div>;
 }
 
