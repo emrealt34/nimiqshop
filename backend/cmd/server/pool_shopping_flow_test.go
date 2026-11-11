@@ -365,7 +365,7 @@ func TestLivePoolShoppingCashback(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		s.do("GET", "/api/poolstake/me", nil, auth)
 	}
-	final, _, _ := s.h.Store.ReadStakeLedger(f.Buyer)
+	final, _, _ := s.h.Store.ReadStakeLedger(f.Buyer, now)
 	check(final.ProfitLuna == f.Fee && final.A <= 0.00001, "consumed earnings were recredited")
 	check(math.Abs(float64(boost)/100000-initialCredit) < 0.00002, "boost does not equal consumed earned credit")
 	capture("confirmed-paid-after-restarts", 0, 3)

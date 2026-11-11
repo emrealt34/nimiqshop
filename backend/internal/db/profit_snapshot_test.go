@@ -51,7 +51,7 @@ func TestProfitSnapshotNeverCreditsRegressionsOrReplayedMonths(t *testing.T) {
 	if listErr != nil || len(rows) != 1 {
 		t.Fatalf("profit watermarks polluted ledger listing: %v %v", len(rows), listErr)
 	}
-	l, ok, err := s.ReadStakeLedger("NQ73SE1XYRRFQ8NCDQCPHLJMNR858P7V2HPD")
+	l, ok, err := s.ReadStakeLedger("NQ73SE1XYRRFQ8NCDQCPHLJMNR858P7V2HPD", now)
 	if err != nil || !ok || l.ProfitMonth != "2026-10" {
 		t.Fatalf("latest snapshot changed: %+v %v", l, err)
 	}
@@ -123,7 +123,7 @@ func TestNoRealizedFeeMeansNoBoostCredit(t *testing.T) {
 	if err != nil || got != 0 {
 		t.Fatalf("zero fee %v %v", got, err)
 	}
-	l, _, _ := s.ReadStakeLedger(addr)
+	l, _, _ := s.ReadStakeLedger(addr, now)
 	if l.A != 0 {
 		t.Fatalf("unearned boost balance %v", l.A)
 	}

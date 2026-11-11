@@ -535,7 +535,7 @@ func TestLinkedStakeWalletsEarnButTheAccountWalletIsPaid(t *testing.T) {
 	// The sign-in wallet is part of the earning set now, so it does get a book
 	// — an EMPTY one. The invariant that matters is that it contributed no
 	// credit: every Luna of the boost came from the wallets that actually stake.
-	if l, ok, err := b.store.ReadStakeLedger(b.account); err != nil {
+	if l, ok, err := b.store.ReadStakeLedger(b.account, b.now); err != nil {
 		t.Fatalf("read the sign-in wallet's ledger: %v", err)
 	} else if ok && l.A > 0 {
 		t.Fatalf("the sign-in wallet's ledger holds %v NIM of credit although it has never staked", l.A)
@@ -631,7 +631,7 @@ func TestLedgerBoostIsSummedAcrossLinkedWallets(t *testing.T) {
 	}
 	// Each book was debited, so neither wallet can pay the same credit twice.
 	for _, wallet := range both.wallets {
-		l, ok, err := both.store.ReadStakeLedger(wallet)
+		l, ok, err := both.store.ReadStakeLedger(wallet, both.now)
 		if err != nil || !ok {
 			t.Fatalf("ledger for %s: ok=%v err=%v", wallet, ok, err)
 		}
@@ -744,7 +744,7 @@ func TestMultipleSaturatedLinkedWalletsCapBoostAtCeilingAndCountBaseOnce(t *test
 		}
 	}
 
-	lBeforeSecond, ok, err := b.store.ReadStakeLedger(b.wallets[1])
+	lBeforeSecond, ok, err := b.store.ReadStakeLedger(b.wallets[1], b.now)
 	if err != nil || !ok || lBeforeSecond.A <= 0 {
 		t.Fatalf("expected funded second wallet ledger before purchase, got ok=%v A=%v err=%v", ok, lBeforeSecond.A, err)
 	}
@@ -758,7 +758,7 @@ func TestMultipleSaturatedLinkedWalletsCapBoostAtCeilingAndCountBaseOnce(t *test
 		t.Fatalf("bps = %d, want 1100 (single 100 bps base + 1000 bps max boost ceiling)", row.Bps)
 	}
 	// Wallet 1 already covered the full 1000 bps ceiling, so wallet 2's credit stays intact!
-	lAfterSecond, ok, err := b.store.ReadStakeLedger(b.wallets[1])
+	lAfterSecond, ok, err := b.store.ReadStakeLedger(b.wallets[1], b.now)
 	if err != nil || !ok {
 		t.Fatalf("read second wallet ledger after purchase: ok=%v err=%v", ok, err)
 	}

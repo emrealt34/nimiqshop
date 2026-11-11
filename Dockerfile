@@ -25,12 +25,14 @@ COPY . .
 RUN npm run build
 
 # ---------- 2. backend binary -----------------------------------------------
-# Go 1.27.4: CVE-2026-111943 (crypto/x509 accepts untrusted
-# intermediate certificates → man-in-the-middle) is a STANDARD LIBRARY advisory,
-# patched in 1.27.3 / 1.26.10. Trivy scans these two binaries inside the image,
-# so a stale toolchain here ships the CVE no dependency bump can fix — this is
-# the one place the Go patch level is chosen for the runtime artifact.
-FROM --platform=$BUILDPLATFORM golang:1.27-bookworm AS backend
+# Go 1.27.4, not 1.27.3 or 1.27.2: CVE-2026-111943 (crypto/x509 accepts
+# untrusted intermediate certificates → man-in-the-middle) is a STANDARD LIBRARY
+# advisory patched in 1.27.3 / 1.26.10, and GO-2026-6859 (net/http MaxBytesReader
+# header race) is patched in 1.27.4. Both are toolchain advisories, so Trivy and
+# govulncheck scan these two binaries inside the image — a stale toolchain here
+# ships the CVE no dependency bump can fix. This is the one place the Go patch
+# level is chosen for the runtime artifact; go.mod pins the same level.
+FROM --platform=$BUILDPLATFORM golang:1.27.4-bookworm@sha256:4fa7c968ba93f1635670522dbb01a2c78150443e1385746924566079f36570ea AS backend
 WORKDIR /src/backend
 ENV CGO_ENABLED=0 \
     GOFLAGS=-mod=readonly
