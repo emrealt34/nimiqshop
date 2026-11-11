@@ -146,7 +146,7 @@ func TestLivePoolShoppingCashback(t *testing.T) {
 	initialState := status.json(t)
 	check(initialState["staked"] == true && initialState["stake_luna"] == float64(10000000) && initialState["cashback_bps"] == float64(1100), "actual stake and earned boost were not reflected in the shop rate")
 	t.Logf("actual earned stake response: %s", status.body)
-	ledger, ok, err := s.h.Store.ReadStakeLedger(f.Buyer)
+	ledger, ok, err := s.h.Store.ReadStakeLedger(f.Buyer, now)
 	if err != nil || !ok || ledger.ProfitLuna != f.Fee || ledger.A <= 0 {
 		t.Fatalf("earned ledger %+v %v", ledger, err)
 	}
@@ -154,11 +154,11 @@ func TestLivePoolShoppingCashback(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		s.do("GET", "/api/poolstake/me", nil, auth)
 	}
-	again, _, _ := s.h.Store.ReadStakeLedger(f.Buyer)
+	again, _, _ := s.h.Store.ReadStakeLedger(f.Buyer, now)
 	check(again.A == initialCredit, "same earned profit was credited again")
 	s.h.Pool.SetFeedKey("incorrect-fixture-key")
 	s.do("GET", "/api/poolstake/me", nil, auth)
-	preserved, _, _ := s.h.Store.ReadStakeLedger(f.Buyer)
+	preserved, _, _ := s.h.Store.ReadStakeLedger(f.Buyer, now)
 	check(preserved.A == initialCredit, "pool feed authentication failure erased earned credit")
 	s.h.Pool.SetFeedKey(f.Key)
 	rpc := nimiq.NewClient(f.RPC)

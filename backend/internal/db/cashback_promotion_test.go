@@ -55,7 +55,7 @@ func TestBlankPromotionDoesNotSuppressEarnedCashback(t *testing.T) {
 			if row.CashbackSource != "ledger" || row.BoostLuna != 400000 || row.AmountLuna != 450195 || row.Bps != 900 {
 				t.Fatalf("earned cashback suppressed %+v", row)
 			}
-			ledger, ok, err := store.ReadStakeLedger(address)
+			ledger, ok, err := store.ReadStakeLedger(address, now)
 			if err != nil || !ok || math.Abs(ledger.A-4) > 1e-9 {
 				t.Fatalf("ledger debit %+v %v", ledger, err)
 			}
