@@ -107,6 +107,7 @@ func TestLivePoolShoppingCashback(t *testing.T) {
 	ratesCtx, cancelRates := context.WithCancel(t.Context())
 	defer cancelRates()
 	s.h.StartRatesRefresher(ratesCtx)
+	now := time.Now().UTC()
 	seed, err := hex.DecodeString(f.BuyerSeed)
 	if err != nil || len(seed) != 32 {
 		t.Fatal("bad fresh buyer key")

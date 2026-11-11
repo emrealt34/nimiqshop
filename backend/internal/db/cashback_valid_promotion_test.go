@@ -44,7 +44,7 @@ func TestActualPromotionRemainsExclusiveOfEarnedLedger(t *testing.T) {
 	if row := rows[0]; row.CashbackSource != "code" || row.Bps != 500 || row.BoostLuna != 0 || row.AmountLuna != 250975 {
 		t.Fatalf("promotion changed %+v", row)
 	}
-	ledger, ok, err := store.ReadStakeLedger(address)
+	ledger, ok, err := store.ReadStakeLedger(address, now)
 	if err != nil || !ok || ledger.A != 8 {
 		t.Fatalf("promotion consumed earned ledger %+v %v", ledger, err)
 	}

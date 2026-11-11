@@ -30,7 +30,7 @@ RUN npm run build
 # patched in 1.27.3 / 1.26.10. Trivy scans these two binaries inside the image,
 # so a stale toolchain here ships the CVE no dependency bump can fix — this is
 # the one place the Go patch level is chosen for the runtime artifact.
-FROM --platform=$BUILDPLATFORM golang:1.27.4-bookworm@sha256:0e4b8a5c4d4e7a8f3c2d1e9b6a7c4d5e8f2a9b3c6d7e1f2a3b4c5d6e7f8a9b0c AS backend
+FROM --platform=$BUILDPLATFORM golang:1.27-bookworm AS backend
 WORKDIR /src/backend
 ENV CGO_ENABLED=0 \
     GOFLAGS=-mod=readonly
