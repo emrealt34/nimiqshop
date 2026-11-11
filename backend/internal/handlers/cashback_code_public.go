@@ -292,7 +292,7 @@ func (h *Handlers) attachQuoteCashbackEstimate(resp map[string]interface{}, q db
 				if ssErr == nil {
 					books := make([]stakeledger.Ledger, 0, 6)
 					for _, address := range user.EarningStakeAddresses() {
-						if l, ok, err := h.Store.ReadStakeLedger(address); err == nil && ok {
+						if l, ok, err := h.Store.ReadStakeLedger(address, now); err == nil && ok {
 							books = append(books, l)
 						}
 					}

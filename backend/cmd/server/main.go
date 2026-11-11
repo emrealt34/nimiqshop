@@ -102,7 +102,7 @@ func wireStakeSources(h *handlers.Handlers, store *db.Store, cfg config.Config) 
 		if cfg.PoolFeedAPIKey != "" {
 			if q, qerr := h.Oracle.NIMUSD(ctx); qerr == nil && q.MedianUSD > 0 {
 				month := now.Format("2006-01")
-				if l, ok, _ := store.ReadStakeLedger(address); ok && l.ProfitMonth != "" && l.ProfitMonth != month {
+				if l, ok, _ := store.ReadStakeLedger(address, now); ok && l.ProfitMonth != "" && l.ProfitMonth != month {
 					if p, perr := pool.Profit(ctx, address, "last_month"); perr == nil {
 						_, _ = store.ApplyProfitSnapshot(address, now.AddDate(0, -1, 0).Format("2006-01"), p.PoolFeeLuna, q.MedianUSD, p.LoyaltyDays, p.LoyaltyMultiplier, p.StakeLuna, now)
 					}

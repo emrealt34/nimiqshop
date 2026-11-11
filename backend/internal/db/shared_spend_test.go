@@ -76,7 +76,7 @@ func TestSharedEligibleSpendBudgetIsOnePoolAcrossLinkedWallets(t *testing.T) {
 	// Books must have been debited too (real money moved), with the same
 	// eligible share each.
 	for _, address := range addrs {
-		l, ok, err := store.ReadStakeLedger(address)
+		l, ok, err := store.ReadStakeLedger(address, now)
 		if err != nil || !ok {
 			t.Fatalf("read book %s: ok=%v err=%v", address, ok, err)
 		}

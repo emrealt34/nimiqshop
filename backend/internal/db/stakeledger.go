@@ -58,8 +58,9 @@ func (s *Store) stakeLedgerParams() stakeledger.Params {
 
 // ReadStakeLedger returns a copy of the ledger with any pending day/month
 // boundary applied (NOT persisted — the next write or the sweep persists
-// it). ok is false when the address has no ledger yet.
-func (s *Store) ReadStakeLedger(address string) (stakeledger.Ledger, bool, error) {
+// it). ok is false when the address has no ledger yet. now is the UTC wall
+// clock used for pending-rollover application; callers pass time.Now().UTC().
+func (s *Store) ReadStakeLedger(address string, now time.Time) (stakeledger.Ledger, bool, error) {
 	address = canonicalStakeAddr(address)
 	var l stakeledger.Ledger
 	ok := false
@@ -77,7 +78,7 @@ func (s *Store) ReadStakeLedger(address string) (stakeledger.Ledger, bool, error
 	if err != nil || !ok {
 		return l, ok, err
 	}
-	l.Rollover(s.stakeLedgerParams(), time.Now().UTC())
+	l.Rollover(s.stakeLedgerParams(), now.UTC())
 	return l, true, nil
 }
 

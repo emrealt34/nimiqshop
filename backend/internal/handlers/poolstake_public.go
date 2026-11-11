@@ -98,7 +98,7 @@ func (h *Handlers) syncProfitOnDemand(ctx context.Context, addr string) {
 	defer cancel()
 	now := time.Now().UTC()
 	currentMonth := now.Format("2006-01")
-	l, ok, _ := h.Store.ReadStakeLedger(addr)
+	l, ok, _ := h.Store.ReadStakeLedger(addr, now)
 	// If the last snapshot belongs to an older month, close the immediately
 	// preceding month first. This catches profit settled while the buyer did
 	// not visit the shop; repeating it is harmless because totals are deltas.
@@ -137,7 +137,8 @@ func (h *Handlers) syncBuyerProfitOnDemand(userID string) {
 // path enforces. Without it (an admin view that knows only the address) the
 // book-level caps are shown and flagged accordingly.
 func (h *Handlers) ledgerView(addr string, account ...string) map[string]any {
-	l, ok, err := h.Store.ReadStakeLedger(addr)
+	now := time.Now().UTC()
+	l, ok, err := h.Store.ReadStakeLedger(addr, now)
 	if err != nil || !ok {
 		return map[string]any{
 			"has_ledger": false,
@@ -146,7 +147,6 @@ func (h *Handlers) ledgerView(addr string, account ...string) map[string]any {
 	settings, _ := h.Store.GetAdminSettings(0)
 	p := settings.EffectiveStakeCashback()
 	nimUsd := h.bestNIMUSD()
-	now := time.Now().UTC()
 	availableUSD := 0.0
 	if nimUsd > 0 {
 		availableUSD = l.A * nimUsd
@@ -219,9 +219,10 @@ func (h *Handlers) ledgerBoostBpsBestEffort(userID string) int {
 	// buyer with three staking wallets a third of the boost they actually get.
 	settings, _ := h.Store.GetAdminSettings(0)
 	params := stakeledger.Normalize(settings.EffectiveStakeCashback())
+	now := time.Now().UTC()
 	total := 0
 	for _, address := range user.EarningStakeAddresses() {
-		l, ok, err := h.Store.ReadStakeLedger(address)
+		l, ok, err := h.Store.ReadStakeLedger(address, now)
 		if err != nil || !ok {
 			continue
 		}
