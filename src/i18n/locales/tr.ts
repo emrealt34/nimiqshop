@@ -1142,6 +1142,8 @@ const tr = {
     builtOnNim: 'NIM üzerine inşa edildi. Ağı güvenli tutmaya yardımcı olmak için NIM\'ini Nimiq Pay içindeki doğrulayıcımıza stake et:',
     cta: '{{site}} üzerinden bir hediye gönder →',
     ctaSub: 'Hediye kartları, eSIM ve mobil kontör — NIM ile öde.',
+    ctaSelf: '{{site}} üzerinden yeniden alışveriş yap →',
+    giveBackSelf: 'Yeni bir hediye kartı veya kontör mü lazım? Mağazaya göz at:',
     contactSupport: 'Bir şey ulaşmadı mı? Desteğe yaz',
     disclaimer: 'Bu e-posta birisinin sana gönderdiği bir hediyeyi bildirir. Teslimatın kendisi {{site}} iş ortağı CryptoRefills tarafından ayrıca yapılır ve bu e-postaya asla dahil edilmez.',
     footerTagline: 'Hediye kartları, eSIM ve mobil kontör için Nimiq tabanlı mağaza',

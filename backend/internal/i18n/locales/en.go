@@ -31,6 +31,8 @@ var En = map[string]string{
 	"email.builtOnNim":         "Built on NIM. To help secure the network, stake NIM to our validator inside Nimiq Pay:",
 	"email.cta":                "Give a gift back at {{site}} →",
 	"email.ctaSub":             "Gift cards, eSIMs and phone top-ups — pay with NIM.",
+	"email.ctaSelf":            "Shop again at {{site}} →",
+	"email.giveBackSelf":       "Need another card or top-up? Browse the shop:",
 	"mailtext.selfLine":        "Your purchase was paid and is on its way.",
 	"mailtext.preSelf":         "Your order via {{site}}",
 	"mailtext.paidFromWallet":  "Paid from the Nimiq wallet:",

@@ -521,3 +521,82 @@ func TestItemListTilesAndAttachments(t *testing.T) {
 		t.Fatalf("oversized logo must fall back to a bag tile attachment; attachments=%d", len(bm.Attachments))
 	}
 }
+
+// The CTA speaks in the note's own voice: a GIFT note invites the recipient to
+// pass the kindness on ("give a gift back"), while a plain purchase is the
+// buyer's own receipt and there is nobody to give anything back to — it must
+// say "shop again". The Turkish copy made the bug plain: a buyer who ordered
+// for themselves was addressed as a gift SENDER ("bir hediye gönder"), which
+// reads like the wrong email arrived (owner, 2026-11-11).
+//
+// Every language is checked, because the two voices are six separate strings
+// and a missing one would silently fall back to the key name in the button.
+func TestCTAMatchesTheNotesVoice(t *testing.T) {
+	buttonOf := func(html string) string {
+		const marker = `class="cta-link"`
+		i := strings.Index(html, marker)
+		if i < 0 {
+			return ""
+		}
+		rest := html[i:]
+		open := strings.Index(rest, ">")
+		closeTag := strings.Index(rest[open:], "</a>")
+		if open < 0 || closeTag < 0 {
+			return ""
+		}
+		return rest[open+1 : open+closeTag]
+	}
+
+	for _, lang := range []string{"en", "tr", "de", "es", "fr", "pt"} {
+		base := GiftNote{Recipient: Address{Email: "buyer@example.com"}, ProductLabel: "Steam · 50 USD",
+			SiteName: "NimShop", OrderID: "Q-cta", ShopURL: "https://shop.example.com/", Lang: lang,
+			PurchasedAt: time.Date(2026, 11, 11, 12, 0, 0, 0, time.UTC)}
+
+		gift := base
+		gift.Self = false
+		gm, err := gift.Build(Config{})
+		if err != nil {
+			t.Fatalf("%s gift: %v", lang, err)
+		}
+
+		order := base
+		order.Self = true
+		om, err := order.Build(Config{})
+		if err != nil {
+			t.Fatalf("%s order: %v", lang, err)
+		}
+
+		giftButton, orderButton := buttonOf(gm.HTML), buttonOf(om.HTML)
+		if giftButton == "" || orderButton == "" {
+			t.Fatalf("%s: a CTA button is missing (gift=%q order=%q)", lang, giftButton, orderButton)
+		}
+		// The button must resolve to real copy, never to the raw key name.
+		for _, label := range []string{giftButton, orderButton} {
+			if strings.HasPrefix(label, "email.") {
+				t.Fatalf("%s: the CTA did not translate: %q", lang, label)
+			}
+		}
+		if giftButton == orderButton {
+			t.Fatalf("%s: the order CTA still uses the GIFT voice (%q) — a receipt must not tell the buyer to send a gift", lang, orderButton)
+		}
+
+		// The plain-text lead-in follows the same rule.
+		if !strings.Contains(gm.Text, "→") && !strings.Contains(gm.Text, "https://shop.example.com") {
+			t.Fatalf("%s: gift plain-text lost its shop link", lang)
+		}
+		if strings.Contains(om.Text, giftButton) {
+			t.Fatalf("%s: order plain-text carries the gift button copy", lang)
+		}
+
+		// The Turkish receipt specifically: the reported bug used the gift
+		// sender wording ("hediye gönder") on the buyer's own order.
+		if lang == "tr" {
+			if strings.Contains(orderButton, "hediye gönder") {
+				t.Fatalf("tr: the receipt still tells the buyer to send a gift: %q", orderButton)
+			}
+			if !strings.Contains(orderButton, "alışveriş yap") {
+				t.Fatalf("tr: the receipt CTA should invite another purchase, got %q", orderButton)
+			}
+		}
+	}
+}

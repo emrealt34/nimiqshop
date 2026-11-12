@@ -418,7 +418,7 @@ func (n GiftNote) textBody(site, product, message string) string {
 	b.WriteString(tl("mailtext.openSenderMail") + " " + cryptorefillsInboxURL + "\n")
 	b.WriteString(tl("mailtext.searchInbox", map[string]string{"query": "from:noreply@cryptorefills.com"}) + "\n")
 	if u := safeURL(n.ShopURL); u != "" {
-		b.WriteString("\n" + tl("email.giveBack") + "\n")
+		b.WriteString("\n" + tl(giveBackKey(n.Self)) + "\n")
 		b.WriteString("  " + u + "\n")
 	}
 	if u := safeURL(n.SupportURL); u != "" {
@@ -615,11 +615,11 @@ func (n GiftNote) htmlBody(site, product, message, subject string) string {
 	if cta != "" {
 		b.WriteString("            <tr>\n")
 		b.WriteString(`              <td class="px-card" style="padding:0 26px 20px 26px">` + "\n")
-		b.WriteString(`                <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="` + esc(cta) + `" style="height:46px;v-text-anchor:middle;width:254px;" arcsize="22%" strokecolor="` + mailStamp + `" fillcolor="` + mailStamp + `"><w:anchorlock/><center style="color:` + mailOnStamp + `;font-family:Arial,sans-serif;font-size:15px;font-weight:bold">` + esc(tl("email.cta", map[string]string{"site": site})) + `</center></v:roundrect><![endif]-->` + "\n")
+		b.WriteString(`                <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="` + esc(cta) + `" style="height:46px;v-text-anchor:middle;width:254px;" arcsize="22%" strokecolor="` + mailStamp + `" fillcolor="` + mailStamp + `"><w:anchorlock/><center style="color:` + mailOnStamp + `;font-family:Arial,sans-serif;font-size:15px;font-weight:bold">` + esc(tl(ctaKey(n.Self), map[string]string{"site": site})) + `</center></v:roundrect><![endif]-->` + "\n")
 		b.WriteString("                <!--[if !mso]><!-->\n")
 		b.WriteString(`                <table role="presentation" cellpadding="0" cellspacing="0" border="0" class="cta-table" style="width:auto">` + "\n")
 		b.WriteString(`                  <tr><td bgcolor="` + mailStamp + `" style="border-radius:10px;background:` + mailStamp + `">` + "\n")
-		b.WriteString(`                    <a href="` + esc(cta) + `" class="cta-link" style="display:inline-block;padding:14px 22px;font-size:15px;font-weight:700;color:` + mailOnStamp + `;text-decoration:none;border-radius:10px;font-family:` + font + `">` + esc(tl("email.cta", map[string]string{"site": site})) + `</a>` + "\n")
+		b.WriteString(`                    <a href="` + esc(cta) + `" class="cta-link" style="display:inline-block;padding:14px 22px;font-size:15px;font-weight:700;color:` + mailOnStamp + `;text-decoration:none;border-radius:10px;font-family:` + font + `">` + esc(tl(ctaKey(n.Self), map[string]string{"site": site})) + `</a>` + "\n")
 		b.WriteString("                  </td></tr>\n")
 		b.WriteString("                </table>\n")
 		b.WriteString("                <!--<![endif]-->\n")
@@ -729,6 +729,29 @@ func badgeKey(self bool) string {
 		return "mailtext.badgeOrder"
 	}
 	return "mailtext.badgeGift"
+}
+
+// ctaKey is the button label. ONE design, two voices: a gift note invites the
+// RECIPIENT to pass the kindness on ("give a gift back"), while a plain
+// purchase is the buyer's own receipt — there is nobody to give anything back
+// to, so it says "shop again". Sending a receipt that tells the buyer to
+// "send a gift" reads like the wrong email was mailed to them; the Turkish
+// copy made that obvious by addressing them as a gift sender ("bir hediye
+// gönder") on their own order (owner, 2026-11-11).
+func ctaKey(self bool) string {
+	if self {
+		return "email.ctaSelf"
+	}
+	return "email.cta"
+}
+
+// giveBackKey is the plain-text lead-in to the same link, and follows the same
+// rule: "give back" for a gift, "need another one?" for a receipt.
+func giveBackKey(self bool) string {
+	if self {
+		return "email.giveBackSelf"
+	}
+	return "email.giveBack"
 }
 
 func identityFootnote(tl i18n.T, self bool) string {

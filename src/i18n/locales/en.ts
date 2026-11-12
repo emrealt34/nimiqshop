@@ -1150,6 +1150,8 @@ const en = {
     builtOnNim: 'Built on NIM. To help secure the network, stake NIM to our validator inside Nimiq Pay:',
     cta: 'Give a gift back at {{site}} →',
     ctaSub: 'Gift cards, eSIMs and phone top-ups — pay with Nimiq Pay.',
+    ctaSelf: 'Shop again at {{site}} →',
+    giveBackSelf: 'Need another card or top-up? Browse the shop:',
     contactSupport: 'Something did not arrive? Contact support',
     disclaimer: 'This email tells you about a gift someone sent. The delivery itself is handled separately by {{site}}’s partner CryptoRefills and is never included in this email.',
     footerTagline: 'Nimiq-native shop for gift cards, eSIMs & top-ups',

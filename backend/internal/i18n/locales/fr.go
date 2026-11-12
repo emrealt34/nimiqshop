@@ -27,6 +27,8 @@ var Fr = map[string]string{
 	"email.builtOnNim":         "Construit sur NIM. Pour aider à sécuriser le réseau, staker vos NIM vers notre validateur dans Nimiq Pay :",
 	"email.cta":                "Renvoyez un cadeau sur {{site}} →",
 	"email.ctaSub":             "Cartes cadeaux, eSIM et recharges mobiles — payez avec NIM.",
+	"email.ctaSelf":            "Achetez à nouveau sur {{site}} →",
+	"email.giveBackSelf":       "Besoin d'une autre carte ou recharge ? Parcourez la boutique :",
 	"mailtext.selfLine":        "Votre achat a été payé et est en route.",
 	"mailtext.preSelf":         "Votre commande via {{site}}",
 	"mailtext.paidFromWallet":  "Payé depuis le portefeuille Nimiq :",

@@ -1141,6 +1141,8 @@ const fr = {
     builtOnNim: 'Construit sur NIM. Pour aider à sécuriser le réseau, stakez vos NIM vers notre validateur dans Nimiq Pay :',
     cta: 'Renvoyez un cadeau sur {{site}} →',
     ctaSub: 'Cartes cadeaux, eSIM et recharges mobiles — payez avec NIM.',
+    ctaSelf: 'Achetez à nouveau sur {{site}} →',
+    giveBackSelf: 'Besoin d\'une autre carte ou recharge ? Parcourez la boutique :',
     contactSupport: 'Quelque chose n\'est pas arrivé ? Contacter le support',
     disclaimer: 'Cet e-mail vous annonce qu\'un cadeau vous a été envoyé. La livraison elle-même est assurée séparément par CryptoRefills, partenaire de {{site}}, et n\'est jamais incluse dans cet e-mail.',
     footerTagline: 'Boutique native Nimiq pour cartes cadeaux, eSIM & recharges mobiles',
