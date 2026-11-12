@@ -76,6 +76,7 @@ const en = {
   /* ---- stakeLink: which wallet earns the cashback, and which one is paid ---- */
   /* ---- stakeLink: which wallets earn the cashback, and which one is paid ---- */
   stakeLink: {
+    "eyebrow": "{{site}} · Cashback",
     "title": "Which wallets earn your cashback",
     "summaryLinked": "Your cashback is earned by {{count}} wallets, {{total}} NIM staked in total.",
     "summarySelf": "Your cashback is earned by the wallet you signed in with, {{address}}.",

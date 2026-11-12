@@ -70,6 +70,7 @@ const fr = {
   /* ---- stakeLink: which wallet earns the cashback, and which one is paid ---- */
   /* ---- stakeLink: which wallets earn the cashback, and which one is paid ---- */
   stakeLink: {
+    "eyebrow": "{{site}} · Cashback",
     "title": "Quels portefeuilles gagnent votre cashback",
     "summaryLinked": "Votre cashback est gagné par {{count}} portefeuilles, soit {{total}} NIM en stake au total.",
     "summarySelf": "Votre cashback est gagné par le portefeuille avec lequel vous vous êtes connecté : {{address}}.",

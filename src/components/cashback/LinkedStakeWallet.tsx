@@ -12,6 +12,7 @@ import { Icon } from '../ui/Icon';
 import { QR } from '../checkout/QR';
 import { useNimiqPayInstallSheet } from '../ui/NimiqPayInstallDialog';
 import { useToast } from '../AppProviders';
+import { siteName } from '../../lib/config';
 
 const FALLBACK_WALLET_LIMIT = 5;
 
@@ -233,7 +234,7 @@ export function LinkedStakeWallet({ mine, onChanged, intent, onIntentDone }: {
     <section className="cb-linked-wallet" data-testid="linked-stake-wallet">
       <div className="cb-linked-heading">
         <div>
-          <span className="eyebrow">NimShop · Cashback</span>
+          <span className="eyebrow">{t('stakeLink.eyebrow', { site: siteName() })}</span>
           <h3>{t('stakeLink.title')}</h3>
         </div>
         {linkedRows.length > 1 && <button className="btn btn-sm btn-ghost" onClick={() => { void unlink(); }} disabled={busy} data-testid="stake-link-unlink-all"><Icon name="x" size={14} />{t('stakeLink.unlinkAll')}</button>}

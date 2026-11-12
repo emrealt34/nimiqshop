@@ -70,6 +70,7 @@ const de = {
   /* ---- stakeLink: which wallet earns the cashback, and which one is paid ---- */
   /* ---- stakeLink: which wallets earn the cashback, and which one is paid ---- */
   stakeLink: {
+    "eyebrow": "{{site}} · Cashback",
     "title": "Welche Wallets dein Cashback verdienen",
     "summaryLinked": "Dein Cashback kommt aus {{count}} Wallets mit insgesamt {{total}} NIM Stake.",
     "summarySelf": "Dein Cashback kommt aus der Wallet, mit der du dich angemeldet hast: {{address}}.",

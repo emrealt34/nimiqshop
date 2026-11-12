@@ -11,11 +11,21 @@ for (const width of [320, 1280]) {
   test.describe(`Lightning receipt ${width}px`, () => {
     test.use({ viewport: { width, height: 844 }, lang: 'en' });
 
-    test('activity opens payment details without navigating and verifies preimage locally', async ({ page, requests }) => {
-      await page.route('**/api/activity?*', route => route.fulfill({ json: { items: [{ ...purchase, lightning_receipt: receipt }], summary: {} } }));
-      await open(page, path('/activity'));
-      await page.getByRole('button', { name: /BTC Lightning/ }).click();
-      await expect(page).toHaveURL(/\/activity\/?$/);
+    // The receipt's door used to be the compact BTC Lightning chip in the
+    // activity feed. Owner (2026-11-11) had that chip REMOVED, so the feed
+    // carries no receipt controls any more; the verifier lives on the order
+    // pages and on public tracking. The invariant this test exists for —
+    // "details open in place, and the preimage is checked in the browser with
+    // no network round trip" — is unchanged, so it now runs where the door is.
+    test('tracking opens payment details without navigating and verifies preimage locally', async ({ page, requests }) => {
+      await page.route('**/api/track/lightning-test', route => route.fulfill({ json: { ...purchase, lightning_receipt: receipt } }));
+      await open(page, path('/track?order=lightning-test'));
+      // The point of the assertion is "opening the details does not navigate",
+      // not the exact spelling of the tracking URL (the static host answers
+      // /track with a directory redirect, so it ends in /track/).
+      const urlBefore = page.url();
+      await page.locator('.lightning-receipt button').click();
+      expect(page.url(), 'the details open in place, never as a navigation').toBe(urlBefore);
       const details = page.locator('.lightning-receipt-details');
       await expect(details).toBeVisible();
       await expect(details).toContainText('Payment confirmed by the supplier');
@@ -37,6 +47,27 @@ for (const width of [320, 1280]) {
       expect(requests.length).toBe(before);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
       expect(await page.locator('a a, a button').count()).toBe(0);
+    });
+
+    // Owner (2026-11-11): the compact BTC Lightning chip was REMOVED from the
+    // activity feed. A paid order therefore shows nothing about its Lightning
+    // receipt there — no chip, no details sheet, no SDK submission line. This
+    // pins the removal so a future "nice to have" cannot quietly bring the
+    // clutter back, and names the surfaces that DO carry the receipt.
+    test('the activity feed carries no Lightning receipt while order pages still do', async ({ page }) => {
+      const item = { ...purchase, status: 'awaiting_payment', lightning_funding_hint: 'ab'.repeat(32),
+        lightning_receipt: { ...receipt, confirmed: false, confirmed_at: undefined, submitted_tx: 'ab'.repeat(32) } };
+      await page.route('**/api/activity?*', route => route.fulfill({ json: { items: [item], summary: {} } }));
+      await page.route('**/api/quotes/lightning-test', route => route.fulfill({ json: { quote: item } }));
+
+      await open(page, path('/activity'));
+      await expect(page.locator('.feed-item')).toHaveCount(1);
+      await expect(page.locator('.lightning-receipt, .lightning-receipt-chip')).toHaveCount(0);
+      await expect(page.locator('[data-submitted-transaction]')).toHaveCount(0);
+      await expect(page.getByRole('button', { name: /BTC Lightning/ })).toHaveCount(0);
+
+      await open(page, path('/order?id=lightning-test&type=quote'));
+      await expect(page.locator('[data-submitted-transaction]').first()).toBeVisible();
     });
 
     for (const kind of ['order', 'track', 'orders'] as const) {
@@ -101,8 +132,11 @@ test.describe('Turkish payment status', () => {
 
 });
 
+// 'activity' used to be in this list. The compact chip that carried the SDK
+// submission there was removed (owner, 2026-11-11); the test above pins that
+// the feed shows no submission, so the loop covers the two surfaces that do.
 for (const tx of ['ab'.repeat(32), '0x' + 'cd'.repeat(32)]) {
-  for (const surface of ['order', 'orders', 'activity']) {
+  for (const surface of ['order', 'orders']) {
     test(`${surface} displays the SDK submission separately: ${tx.slice(0, 4)}`, async ({ page }) => {
       const item = { ...purchase, status: 'awaiting_payment', lightning_funding_hint: tx,
         lightning_receipt: { ...receipt, confirmed: false, confirmed_at: undefined, submitted_tx: tx } };

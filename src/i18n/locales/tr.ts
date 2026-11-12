@@ -70,6 +70,7 @@ const tr = {
   /* ---- stakeLink: which wallet earns the cashback, and which one is paid ---- */
   /* ---- stakeLink: which wallets earn the cashback, and which one is paid ---- */
   stakeLink: {
+    "eyebrow": "{{site}} · Cashback",
     "title": "Cashback'ini hangi cüzdanlar kazanıyor",
     "summaryLinked": "Cashback'ini {{count}} cüzdan kazanıyor; toplam {{total}} NIM stake.",
     "summarySelf": "Cashback'ini giriş yaptığın cüzdan kazanıyor: {{address}}.",

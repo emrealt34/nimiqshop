@@ -142,7 +142,25 @@ for (const width of [320, 768, 1280]) {
           await checkBars(page, '.loading-rows:visible .skel');
         } finally { release(); }
       });
-      test('refresh report reserves rows then clears skeleton', async ({ page }) => {
+      /**
+       * The refresh report is the ONE screen whose loading state is not a
+       * skeleton: status.astro reads `data/market/refresh.json` at BUILD time
+       * and passes it to the island as `initial`, so the real eight-row table
+       * is in the HTML before a single fetch runs. That is deliberate — the
+       * placeholder version measured 0.1116 CLS on a throttled phone (the card
+       * grew 202 px when the sheet landed, then 180 px more when the fetch
+       * resolved). The skeleton is only the fallback for a build that had no
+       * report on disk at all.
+       *
+       * So what this pins is the guarantee the change exists for, and the one
+       * a future "add a spinner here" would break: with the re-read held open,
+       * the table is ALREADY there, eight label/value pairs, and it never
+       * swaps in placeholders or collapses when the fetch finally lands.
+       * (It used to assert `.refresh-status-list .skel` — that placeholder is
+       * unreachable in a build that carries the report, so the test failed
+       * against the behaviour it was meant to protect.)
+       */
+      test('refresh report paints real rows immediately and never swaps in placeholders', async ({ page }) => {
         let release!: () => void;
         const gate = new Promise<void>(resolve => { release = resolve; });
         await page.route('**/data/market/refresh.json', async route => {
@@ -151,8 +169,14 @@ for (const width of [320, 768, 1280]) {
         });
         try {
           await openLoading(page, path('/status'));
-          await checkBars(page, '.refresh-status-list .skel');
+          const rows = page.locator('.refresh-status-list dt');
+          await expect(rows, 'the build-time report is painted from the first byte').toHaveCount(8);
+          await expect(page.locator('.refresh-status-list .skel')).toHaveCount(0);
+          expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+
           release();
+
+          await expect(rows, 'the re-read replaces values, never the row count').toHaveCount(8);
           await expect(page.locator('.refresh-status-list .skel')).toHaveCount(0);
         } finally { release(); }
       });
