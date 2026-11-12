@@ -126,8 +126,26 @@ export function LightningPayBlock({ invoice, uri, quoteId, onLaunch, hidePayButt
       toast(t('checkout.lpInvoiceCopied'), 'info');
       return;
     }
-    // 'failed' (the browser refused the clipboard) and 'empty' (no invoice on
-    // this screen — refresh the order) are both a real "nothing was copied".
+    // The synchronous strategies were refused. That is NOT the end of the
+    // road: `navigator.clipboard.writeText` still runs inside this click's
+    // activation and is the only strategy some WebViews honour — so try it
+    // before telling the buyer the copy failed (2026-11-11: the button was
+    // pressed on a real device and nothing was copied OR said).
+    if (outcome === 'failed') {
+      void Clipboard.write(invoice).then((done) => {
+        if (!done) {
+          toast(t('checkout.lpCopyIncomplete'), 'warn');
+          return;
+        }
+        toast(t('checkout.lpInvoiceCopied'), 'info');
+        // The audit stamp never gates the copy; it lands late, and its
+        // failure is swallowed exactly like on the synchronous path.
+        onLaunch?.();
+        void authorizePaymentLaunch(quoteId).catch(() => {});
+      });
+      return;
+    }
+    // 'empty': no invoice on this screen (refresh the order).
     toast(t('checkout.lpCopyIncomplete'), 'warn');
   }, [invoice, quoteId, onLaunch, toast, t]);
 

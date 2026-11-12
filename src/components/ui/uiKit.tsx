@@ -350,27 +350,49 @@ export function MiniProgress({ order }: { order: any }) {
 
 /* ---------------- Copy button ---------------- */
 
+/**
+ * Copy control. It may never be SILENT: the owner pressed this on the pay
+ * screen and "nothing happened" (2026-11-11), because a refused clipboard
+ * write produced no state change at all — an unlabelled button looked dead.
+ *
+ * Three outcomes, all visible:
+ *   idle   → the label, the copy glyph;
+ *   copied → "Kopyalandı!", a check glyph (1.8 s, after a REAL copy);
+ *   failed → the failure text (or, on icon-only buttons, the alert glyph and
+ *            a `title`), after BOTH the synchronous and the async strategy
+ *            refused — so a manual copy is the buyer's next step.
+ */
 export function CopyButton({ getText, label }: { getText: string | (() => string); label?: string }) {
   const { t } = useT();
   const labelText = label !== undefined ? label : t('ui.copy');
-  const [copied, setCopied] = useState(false);
+  const [status, setStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+  const settle = (next: 'copied' | 'failed') => {
+    setStatus(next);
+    if (timer.current) clearTimeout(timer.current);
+    // DS172411 (setTimeout): closure only, never a string — no untrusted data is evaluated.
+    timer.current = setTimeout(() => setStatus('idle'), 1800);
+  };
+  const failed = status === 'failed';
   return (
     <button
       className="copy-btn"
       type="button"
+      data-copy-state={status}
+      title={failed ? t('clipboard.copyFailed') : undefined}
       onClick={() => {
-        const text = typeof getText === 'function' ? getText() : getText;
-        // Nimiq Pay's clipboard: synchronous + boolean, so "Copied" only
-        // ever shows after a real copy.
-        if (Clipboard.copy(String(text ?? ''))) {
-          setCopied(true);
-          // DS172411 (setTimeout): closure only, never a string — no untrusted data is evaluated.
-          setTimeout(() => setCopied(false), 1400);
-        }
+        const text = String((typeof getText === 'function' ? getText() : getText) ?? '');
+        // 1. Synchronous, inside the click's user activation (execCommand).
+        if (Clipboard.copy(text)) { settle('copied'); return; }
+        // 2. The async Clipboard API still holds the gesture and succeeds in
+        //    the WebViews where execCommand is refused. Report what IT did —
+        //    never blame the buyer for our first strategy failing.
+        void Clipboard.write(text).then((done) => settle(done ? 'copied' : 'failed'));
       }}
     >
-      <Icon name="copy" size={14} />
-      <span>{copied ? t('ui.copied') : labelText}</span>
+      <Icon name={status === 'copied' ? 'check' : failed ? 'alert' : 'copy'} size={14} />
+      <span>{status === 'copied' ? t('ui.copied') : failed && label !== '' ? t('clipboard.copyFailed') : labelText}</span>
     </button>
   );
 }

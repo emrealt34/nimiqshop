@@ -97,15 +97,22 @@ export function PayNote({ children }: { children: ReactNode }) {
 }
 
 /** Copy-with-toast helper shared by both pay blocks. Uses the Nimiq Pay
- *  clipboard (Clipboard.copy) — synchronous, boolean, mobile-compatible. */
+ *  clipboard first (synchronous, boolean, mobile-compatible), then the async
+ *  Clipboard API when the synchronous strategies are refused — the same
+ *  two-step the pay button uses, so no copy control on the site can answer a
+ *  real press with silence. */
 export function useCopyField() {
   const { t } = useT();
   const { toast } = useToast();
   return useCallback(
     (label: string, text: string) => {
       if (!text) return;
-      const ok = Clipboard.copy(text);
-      toast(ok ? t('clipboard.copiedLabel', { label }) : t('clipboard.copyFailed'), ok ? 'info' : 'warn');
+      const sayCopied = () => toast(t('clipboard.copiedLabel', { label }), 'info');
+      if (Clipboard.copy(text)) { sayCopied(); return; }
+      void Clipboard.write(text).then((done) => {
+        if (done) { sayCopied(); return; }
+        toast(t('clipboard.copyFailed'), 'warn');
+      });
     },
     [t, toast],
   );
