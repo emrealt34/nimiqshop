@@ -485,18 +485,7 @@ function FeedItem({ it }: { it: any }) {
           )}
           {sub ? <span className="xs faint">{sub}</span> : null}
           {it.rating > 0 ? (
-            <span
-              className="cell-rate"
-              style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                alignItems: 'center',
-                gap: 6,
-                minWidth: 0,
-                maxWidth: '100%',
-                overflowWrap: 'anywhere',
-              }}
-            >
+            <span className="cell-rate">
               <StarsDisplay rating={it.rating} size={14} />
               {/* The rating's own on-chain transaction, public to anyone. */}
               <OnChainRating tx={it.rating_tx} />

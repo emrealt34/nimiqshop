@@ -1155,9 +1155,19 @@ html.in-nimiq-pay #main.page {
 /* The on-chain proof chip that hangs off a star rating (activity + orders):
    quiet by default so stars stay the loudest thing in the row. */
 .onchain-chip{ gap:4px; text-decoration:none; color:var(--green-600); border-color:rgba(62,107,79,.45);
-  background:var(--green-soft); font-weight:800; font-size:var(--fs-xs); white-space:nowrap }
+  background:var(--green-soft); font-weight:800; font-size:var(--fs-xs); white-space:nowrap;
+  /* 2026-11-14: `.chip` ships `flex-shrink:0`, so a long localized label
+     ("Évaluation on-chain", "Zincir üstü puan") could not give way and pushed
+     the whole rating cell past the card edge. The label may now shrink and
+     ellipsize; the stars and the link icon stay intact. */
+  flex:0 1 auto; min-width:0; max-width:100% }
 .onchain-chip:hover{ border-color:var(--green); color:var(--green-600); text-decoration:none }
 .onchain-chip svg{ flex:0 0 auto }
+.onchain-chip > span{ min-width:0; overflow:hidden; text-overflow:ellipsis }
+
+/* The stars + proof chip are one cell; when the pair cannot fit on a line it
+   wraps inside itself rather than bleeding out of the card. */
+.cell-rate{ flex-wrap:wrap; row-gap:4px; min-width:0; max-width:100% }
 
 /* ---- wallet balance strip (home / product / cart / checkout / orders) ----
    Owner (2026-10-05): the NIM the buyer holds, and what it covers, wherever a
@@ -3777,9 +3787,14 @@ input[type="range"]:focus-visible { outline: 2px solid var(--stamp); outline-off
 @media (max-width: 640px) {
   .thumb .product-img { transform: none !important; }
   .feed-thumb { align-self: center; }
-  .feed-row-3 { flex-wrap: nowrap; gap: 8px; }
+  /* 2026-11-14: this row used to be `nowrap` with a `flex: none` rating cell,
+     which is exactly what a translated label breaks — "Évaluation on-chain"
+     pushed the cell 24px past the card on a 390px phone. The row still keeps
+     one line whenever it fits; when it cannot, the stars + proof drop under the
+     wallet chip instead of hanging outside the dashed border. */
+  .feed-row-3 { flex-wrap: wrap; gap: 8px; row-gap: 6px; }
   .feed-row-3 .feed-wallet { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .feed-row-3 .cell-rate { margin-left: auto; flex: none; }
+  .feed-row-3 .cell-rate { margin-left: auto; flex: 0 1 auto; min-width: 0; max-width: 100%; }
   .feed-row-3 .feed-wallet + .xs { flex: none; }
   .tl-time .live { font-weight: 800; color: var(--stamp); }
   .tl-time .live-pulse-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--stamp); margin-right: 5px; animation: pulse-dot 1.3s ease infinite; }
