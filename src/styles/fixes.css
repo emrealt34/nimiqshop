@@ -54,8 +54,22 @@
    ========================================================================== */
 
 /* --- top bar: 5 tabs instead of 4 --------------------------------------- */
-.tabbar { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 1fr; }
-@media (max-width: 400px) { .tabbar a { font-size: .66rem; letter-spacing: 0; padding: 6px 2px; } }
+/* Cells are as wide as their label needs, not one sixth each. With equal
+   cells the longest label ("Bestellungen" needs ~73px at 10px, a phone cell
+   has ~56px) did not fit, so fitText.ts fell back to `overflow-wrap: anywhere`
+   and split the word in the middle — the trailing "n" dropped to a second line
+   (owner, 2026-11-19). Sized from content, every label stays on one line and
+   the whole rail still fits from 320px up (all six languages measured). */
+.tabbar { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: max-content; justify-content: space-between; gap: 0 4px; }
+/* The cells no longer touch each other, so the 2px of side padding each tab
+   kept as a touch target is not needed — and on a phone it is exactly what
+   pushes the widest rail (Spanish at 320px) past the bar. */
+@media (max-width: 400px) { .tabbar a { font-size: .66rem; letter-spacing: 0; padding: 6px 0; } }
+/* Narrowest phones: six one-line labels do not fit at .66rem (Spanish needs
+   ~292px of the ~297px the rail has), so the labels drop to the 10px floor of
+   fitText and the rail gives up its own side padding — what is left over goes
+   back into the gutters between the tabs. */
+@media (max-width: 360px) { .tabbar { padding-inline: 4px; column-gap: 2px; } .tabbar a { font-size: .625rem; } }
 @media (max-width: 400px) { .tabbar a svg { width: 20px; height: 20px; } }
 
 /* --- headline rate card -------------------------------------------------- */
@@ -3349,8 +3363,12 @@ body {
 }
 
 /* Tab bar: labels never go below 10px; a long label ("Plantar árvores")
-   wraps onto a second line instead of shrinking to 8px or being ellipsized. */
-.tabbar a > span:last-child { line-height: 1.08; text-overflow: clip; }
+   wraps onto a second line instead of shrinking to 8px or being ellipsized.
+   It wraps at the SPACE only — never inside a word: `overflow-wrap: anywhere`
+   (fitText's last resort) cut "Bestellungen" into "Bestellun / gen". The cells
+   are sized from content now, so a label that still does not fit is one that
+   the rail genuinely cannot hold, and that is fitText's job to shrink. */
+.tabbar a > span:last-child { line-height: 1.08; text-overflow: clip; white-space: normal; overflow-wrap: normal; word-break: normal; }
 
 /* Footer credit: wraps at ≥10px instead of shrinking to 9px + ellipsis. */
 .footer .container > span:first-child { max-width: 100%; overflow-wrap: anywhere; }

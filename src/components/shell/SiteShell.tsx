@@ -481,9 +481,10 @@ function TabBar({ activeKey, awaiting }: { activeKey: ShellKey; awaiting?: numbe
             <Icon name={n.icon} size={22} />
             {n.key === 'orders'  && (awaiting || 0) > 0 && <span className="nav-badge">{awaiting}</span>}
           </span>
-          {/* A tab cell is one sixth of a phone screen: French and German labels
-              ("Planter des arbres", "Bäume pflanzen") do not fit on one line at a
-              readable size, so they are allowed to wrap instead of being cut. */}
+          {/* A tab cell is as wide as its own label (fixes.css sizes the rail
+              from content), so the six labels stay on one line even at 320px.
+              Should a future label still be too long, it wraps at its spaces
+              instead of being cut or broken mid-word. */}
           <span data-fit="wrap" data-fit-min="10">{t(`nav.${n.labelKey}` as any)}</span>
         </a>
       ))}

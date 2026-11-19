@@ -68,6 +68,10 @@ for (const width of [320, 360, 390, 430, 768, 1024, 1199]) {
             wmSize: wm && wm.getClientRects().length ? parseFloat(getComputedStyle(wm).fontSize) : 99,
             wmText: wm?.textContent || '',
             tabSizes: tabs.map((s) => parseFloat(getComputedStyle(s).fontSize)),
+            // One rect = one line: a second rect means the label broke, and a
+            // mid-word break drops the last letter onto its own line
+            // ("Bestellun / gen" in German, owner 2026-11-19).
+            tabLines: tabs.map((s) => s.getClientRects().length),
             navShown: [...document.querySelectorAll<HTMLElement>('.topbar nav.mainnav')].some((e) => getComputedStyle(e).display !== 'none'),
             tabbarShown: [...document.querySelectorAll<HTMLElement>('.tabbar')].some((e) => getComputedStyle(e).display !== 'none'),
             tabClipped: tabs.filter((s) => s.scrollWidth > s.clientWidth + 1).map((s) => s.textContent),
@@ -79,6 +83,7 @@ for (const width of [320, 360, 390, 430, 768, 1024, 1199]) {
         expect(info.tabbarShown, 'bottom tab bar shown below 1200px').toBe(true);
         expect(info.navShown, 'desktop link row hidden below 1200px').toBe(false);
         for (const s of info.tabSizes) expect(s, 'tab label px').toBeGreaterThanOrEqual(10);
+        for (const l of info.tabLines) expect(l, 'tab label on one line').toBe(1);
         expect(info.tabClipped).toEqual([]);
         expect(info.outside, 'header controls pushed off-screen').toEqual([]);
         expect(await hasHorizontalScroll(page)).toBe(false);
