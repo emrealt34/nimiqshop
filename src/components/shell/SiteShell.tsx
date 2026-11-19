@@ -19,6 +19,7 @@ import { useSheet, useToast } from '../AppProviders';
 import { isAuthed, getAddress, signOut, subscribeSession } from '../../lib/session';
 import { formatWalletAddress, shortAddr } from '../../lib/format';
 import { applyNimiqPayChrome, inNimiqPay, initNimiqMiniApp, openInNimiqPay } from '../../lib/miniapp';
+import { watchSafeAreaInsets } from '../../lib/safeArea';
 import { NimiqPayInstallDialog } from '../ui/NimiqPayInstallDialog';
 import { loginWithHub, loginWithNimiqPay, prefetchHubLogin, initHubRedirectHandling, friendlyHubError } from '../../lib/hub';
 import { listQuotes, listOrders } from '../../lib/api';
@@ -454,9 +455,24 @@ function TabBar({ activeKey, awaiting }: { activeKey: ShellKey; awaiting?: numbe
     const bar = barRef.current;
     if (!bar || typeof ResizeObserver === 'undefined') return;
     const root = document.documentElement;
+    // The bar is pinned to the LAYOUT viewport (`bottom: calc(100% - vv-bottom)`
+    // in fixes.css lifts it when the on-screen keyboard shrinks the visual
+    // one). Both offsets come from one measurement, so the two can never
+    // disagree and leave a strip of page under the tabs.
     const apply = () => {
       const style = getComputedStyle(bar);
-      if (style.display === 'none') { root.style.removeProperty('--tabbar-h'); root.style.removeProperty('--shell-tabbar-height'); return; }
+      if (style.display === 'none') {
+        root.style.removeProperty('--tabbar-h');
+        root.style.removeProperty('--shell-tabbar-height');
+        root.style.removeProperty('--vv-bottom');
+        return;
+      }
+      const vv = typeof window !== 'undefined' ? window.visualViewport : null;
+      // Offset of the visual viewport's bottom edge inside the layout viewport
+      // — 0 while no keyboard is open, the keyboard height while it is.
+      const vvBottom = vv ? Math.max(0, Math.round(window.innerHeight - (vv.offsetTop + vv.height))) : 0;
+      const nextVv = `${vvBottom}px`;
+      if (root.style.getPropertyValue('--vv-bottom') !== nextVv) root.style.setProperty('--vv-bottom', nextVv);
       const height = Math.ceil(bar.getBoundingClientRect().height);
       // Reserve the actual bar ONCE, including its safe area. The old '- 6'
       // assumed padding that later CSS had removed and invented a bottom gap.
@@ -470,7 +486,19 @@ function TabBar({ activeKey, awaiting }: { activeKey: ShellKey; awaiting?: numbe
     const ro = new ResizeObserver(apply);
     ro.observe(bar, { box: 'border-box' });
     window.addEventListener('resize', apply);
-    return () => { ro.disconnect(); window.removeEventListener('resize', apply); root.style.removeProperty('--tabbar-h'); root.style.removeProperty('--shell-tabbar-height'); };
+    window.addEventListener('orientationchange', apply);
+    window.visualViewport?.addEventListener('resize', apply);
+    window.visualViewport?.addEventListener('scroll', apply);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', apply);
+      window.removeEventListener('orientationchange', apply);
+      window.visualViewport?.removeEventListener('resize', apply);
+      window.visualViewport?.removeEventListener('scroll', apply);
+      root.style.removeProperty('--tabbar-h');
+      root.style.removeProperty('--shell-tabbar-height');
+      root.style.removeProperty('--vv-bottom');
+    };
   }, [host]);
 
   const bar = (
@@ -602,6 +630,9 @@ export function useShellBootstrap(): void {
   const { toast } = useToast();
   useEffect(() => {
     applyNimiqPayChrome();
+    // Safe-area insets are read once per layout; rotation swaps which edges
+    // they cover, so they are re-measured on resize/orientationchange.
+    const stopSafeArea = watchSafeAreaInsets();
     initNimiqMiniApp();
     initHubRedirectHandling({
       onLogin: (address) => {
@@ -613,7 +644,10 @@ export function useShellBootstrap(): void {
       toast((detail && detail.message) || t('toast.walletFailed'), 'error');
     };
     window.addEventListener('nimshop:hub-error', onHubError);
-    return () => window.removeEventListener('nimshop:hub-error', onHubError);
+    return () => {
+      window.removeEventListener('nimshop:hub-error', onHubError);
+      stopSafeArea();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [t, toast]);
 }

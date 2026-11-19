@@ -65,11 +65,6 @@
    kept as a touch target is not needed — and on a phone it is exactly what
    pushes the widest rail (Spanish at 320px) past the bar. */
 @media (max-width: 400px) { .tabbar a { font-size: .66rem; letter-spacing: 0; padding: 6px 0; } }
-/* Narrowest phones: six one-line labels do not fit at .66rem (Spanish needs
-   ~292px of the ~297px the rail has), so the labels drop to the 10px floor of
-   fitText and the rail gives up its own side padding — what is left over goes
-   back into the gutters between the tabs. */
-@media (max-width: 360px) { .tabbar { padding-inline: 4px; column-gap: 2px; } .tabbar a { font-size: .625rem; } }
 @media (max-width: 400px) { .tabbar a svg { width: 20px; height: 20px; } }
 
 /* --- headline rate card -------------------------------------------------- */
@@ -4265,4 +4260,135 @@ body { padding-bottom: 0; }
   .cb-linked-wallet { padding: 14px; }
   .cb-linked-row { align-items: flex-start; }
   .cb-linked-remove { margin-left: auto; }
+}
+
+/* ==========================================================================
+   Safe areas (2026-11-19)
+   --------------------------------------------------------------------------
+   `viewport-fit=cover` (Base.astro) is what lets the page paint under the
+   notch and the home indicator — and it is only safe if every fixed edge
+   keeps its content out of `env(safe-area-inset-*)`. Three things did not:
+
+     · the *bottom* bar only had the bottom inset. Its padding-inline is
+       `max(--sal, 8px) / max(--sar, 8px)`, so on a phone held sideways the
+       first and last tabs sat 39px inside the notch (47px inset, 8px pad)
+       (owner report: "telefonun altında … sağda solda oralara taşıyor").
+     · a full-width bar leaves the *horizontal* insets completely uncovered
+       in landscape: the inset strips at both ends of the screen are then
+       painted with the page's paper colour instead of the bar's surface.
+     · the insets were frozen at load. Turning the phone rotates the screen
+       and swaps which edges are inset; the bar, the header, the sheets and
+       every "reserve room for the bar" padding kept portrait's values until
+       the next full reload (the safe-area vars are read once, in app.css).
+   ========================================================================== */
+
+/* Ink the inset strips with the chrome that actually sits on them. `--shell-*`
+   are the real colours of the two bars (fixes.css paints .topbar and .tabbar
+   from the same two surfaces), so the notch strip reads as part of the bar
+   rather than as a gap. Composited, so it costs nothing while scrolling. */
+html {
+  background-color: var(--bg);
+  background-image: linear-gradient(var(--shell-header-bg), var(--shell-header-bg)),
+    linear-gradient(var(--shell-tabbar-bg), var(--shell-tabbar-bg));
+  background-size: 100% var(--sat), 100% var(--sab);
+  background-position: top left, bottom left;
+  background-repeat: no-repeat;
+}
+
+/* ---- the two fixed bars ------------------------------------------------ */
+/* One padding expression per edge: insets on all four sides (the sides only
+   exist in landscape, where the notch is over the bar), plus the bar's own
+   breathing room. */
+.tabbar {
+  padding-left: max(var(--sal), 8px);
+  padding-right: max(var(--sar), 8px);
+  padding-bottom: calc(var(--sab) + 6px);
+  /* Six content-sized cells spread across the bar; on a phone that leaves big
+     gutters, so the rail is centred instead of pushed to the edges (the icons
+     follow their labels). */
+  justify-content: center;
+  column-gap: clamp(6px, 2.4vw, 28px);
+  /* The bar is fixed to the *layout* viewport; the on-screen keyboard is not
+     part of it, so on iOS the bar could end up under the keyboard. Lifting it
+     to the visual viewport keeps the tabs tappable while typing. */
+  bottom: var(--vv-bottom, 0px);
+}
+/* The inner row is the single authority: the bar's own padding plus the
+   inner row's would charge the landscape insets twice and shift the whole
+   header in by 94px. */
+.topbar-inner {
+  padding-left: max(var(--sal), 0px);
+  padding-right: max(var(--sar), 0px);
+}
+
+/* ---- toasts: stacked above the bar, never under the home indicator ----- */
+.toasts,
+.toast-stack {
+  /* The measured bar height already contains its own safe-area padding, so the
+     toasts clear the home indicator without a second guess at the inset. */
+  bottom: calc(var(--shell-tabbar-height, 60px) + 8px);
+  max-width: calc(100vw - 2 * max(var(--sal), var(--sar)) - 8px);
+}
+
+/* ---- bottom sheets and modals: rounded card, not an edge-to-edge slab in
+   landscape (the notch would cut the heading and the home indicator would
+   cover the primary button) --------------------------------------------- */
+@media (min-width: 480px) and (max-width: 1199px) {
+  .sheet-backdrop { align-items: center; padding: max(16px, var(--sat)) max(16px, var(--sar)) max(16px, var(--sab)) max(16px, var(--sal)); }
+  .sheet-backdrop > .sheet,
+  .sheet-backdrop > .sheet.sheet-wide { border-radius: var(--r-xl); border-bottom: 2px solid var(--line-strong); max-height: 100%; }
+}
+.sheet-backdrop { padding-left: max(0px, var(--sal)); padding-right: max(0px, var(--sar)); }
+.sheet-backdrop > .sheet { padding-left: max(0px, var(--sal)); padding-right: max(0px, var(--sar)); }
+
+/* ---- flow content: the page may run edge to edge, its text may not -----
+   One wrapper only: #page-content is inside #main, so padding both of them
+   charged the landscape insets twice and squeezed the content column by 94px
+   instead of 47px. Cards still paint to the edge; their text stops at the
+   notch. */
+#page-content { padding-left: max(0px, var(--sal)); padding-right: max(0px, var(--sar)); }
+#main.page { padding-bottom: calc(var(--shell-tabbar-height, 60px) + 16px) !important; }
+@media (min-width: 1200px) { #main.page { padding-bottom: 90px !important; } }
+.footer,
+.footer .container {
+  padding-left: max(0px, var(--sal));
+  padding-right: max(0px, var(--sar));
+}
+/* The footer sits under the bar below 1200px; one reservation, not two. */
+@media (max-width: 1199px) { .footer { padding-bottom: 20px !important; } }
+
+/* ---- phone rules that must not undo the insets -------------------------
+   The 400px rule that used to set `padding: 6px 2px` on every tab is gone:
+   that shorthand reset the landscape side insets, so the first and last tab
+   sat inside the notch. The rail's own gap now provides the breathing room
+   the 2px padding used to, and the bar's side padding is the inset rule
+   above — nothing below re-declares it with a smaller number. */
+@media (max-width: 560px) {
+  .topbar-inner { width: calc(100% - max(var(--sal), 12px) - max(var(--sar), 12px)); }
+}
+
+
+/* ---- narrow phone rails (after the safe-area section, so these win) ----
+   Six content-sized labels, one line each, no clipping. The rail's own side
+   padding and the gutters between the tabs are the only slack left, so they
+   are the first things to go as the screen narrows — never the label size
+   below the 10px floor fitText.ts enforces, and never the side insets, which
+   are stacked out of the bar's own padding. */
+@media (max-width: 400px) {
+  /* The rail is content-sized now, so the bar's leftover width lands in the
+     gap (spread) or in one big pair of margins (centred). A fixed cap keeps
+     the icons over their labels: 4px min, wide gaps only on wider phones. */
+  .tabbar { column-gap: clamp(4px, 1.6vw, 18px); }
+  .tabbar a { padding: 6px 0; }
+}
+@media (max-width: 360px) {
+  /* Six one-line labels do not fit at .66rem (Spanish needs ~292px of the
+     ~297px the rail has), so the labels drop to fitText's 10px floor and the
+     rail keeps the gutters it needs — the side padding is already decided by
+     the bar's own inset rule above. */
+  .tabbar { column-gap: 2px; }
+  .tabbar a { font-size: .625rem; }
+}
+@media (max-width: 340px) {
+  .tabbar { padding-inline: max(var(--sal), 2px) max(var(--sar), 2px); column-gap: 0; }
 }

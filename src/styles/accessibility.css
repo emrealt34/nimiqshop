@@ -2,8 +2,11 @@
    kraft theme; these rules cover controls/content, not decorative overflow. */
 .skip-link {
   position: fixed;
-  top: 8px;
-  left: 12px;
+  /* First thing a keyboard reaches — and it must not land under the notch in
+     landscape (viewport-fit=cover, so the top/left insets are real). */
+  top: max(8px, var(--sat, 0px));
+  left: max(12px, var(--sal, 0px));
+  right: auto;
   z-index: 10000;
   padding: 12px 18px;
   color: var(--ink);
