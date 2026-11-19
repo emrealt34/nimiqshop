@@ -60,7 +60,7 @@
    and split the word in the middle — the trailing "n" dropped to a second line
    (owner, 2026-11-19). Sized from content, every label stays on one line and
    the whole rail still fits from 320px up (all six languages measured). */
-.tabbar { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: max-content; justify-content: space-between; gap: 0 4px; }
+.tabbar { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(max-content, auto); justify-content: stretch; gap: 0 4px; }
 /* The cells no longer touch each other, so the 2px of side padding each tab
    kept as a touch target is not needed — and on a phone it is exactly what
    pushes the widest rail (Spanish at 320px) past the bar. */
@@ -4303,11 +4303,18 @@ html {
   padding-left: max(var(--sal), 8px);
   padding-right: max(var(--sar), 8px);
   padding-bottom: calc(var(--sab) + 6px);
-  /* Six content-sized cells spread across the bar; on a phone that leaves big
-     gutters, so the rail is centred instead of pushed to the edges (the icons
-     follow their labels). */
-  justify-content: center;
-  column-gap: clamp(6px, 2.4vw, 28px);
+  /* The six cells share the bar's free width evenly: the rail spans the whole
+     bar (no empty shoulders left and right) and the gutters between the tabs
+     do the spreading, so the icons stay over their labels and no two labels
+     are welded together. `center` used to dump every spare pixel into one big
+     pair of margins, which read as a cramped row floating in the middle of the
+     bar (owner: "sıkış tıkış oldu … sağı solu boş", 2026-11-19). */
+  justify-content: stretch;
+  /* The gap may never eat the room the six labels need: it grows with the
+     viewport (6→28px) but is capped by `(content - 370px) / 6`, the widest
+     language's labels plus a hair of padding. On a 320px phone that cap is 0,
+     so the tabs sit tight and nothing is cut; on a tablet it is the full 28px. */
+  column-gap: max(0px, min(clamp(6px, 2.4vw, 28px), calc((100% - 370px) / 6)));
   /* The bar is fixed to the *layout* viewport; the on-screen keyboard is not
      part of it, so on iOS the bar could end up under the keyboard. Lifting it
      to the visual viewport keeps the tabs tappable while typing. */
@@ -4375,20 +4382,25 @@ html {
    below the 10px floor fitText.ts enforces, and never the side insets, which
    are stacked out of the bar's own padding. */
 @media (max-width: 400px) {
-  /* The rail is content-sized now, so the bar's leftover width lands in the
-     gap (spread) or in one big pair of margins (centred). A fixed cap keeps
-     the icons over their labels: 4px min, wide gaps only on wider phones. */
-  .tabbar { column-gap: clamp(4px, 1.6vw, 18px); }
-  .tabbar a { padding: 6px 0; }
+  /* A 1px shoulder per tab, so two long labels never touch: the gaps in a
+     content-sized rail can legitimately reach 0px on the tightest phones. */
+  .tabbar a { padding: 6px 1px; }
 }
 @media (max-width: 360px) {
   /* Six one-line labels do not fit at .66rem (Spanish needs ~292px of the
-     ~297px the rail has), so the labels drop to fitText's 10px floor and the
-     rail keeps the gutters it needs — the side padding is already decided by
-     the bar's own inset rule above. */
-  .tabbar { column-gap: 2px; }
+     ~297px the rail has), so the labels drop to fitText's 10px floor. The gap
+     stays the base cap minus the labels' own smaller width — a fixed 2px
+     would be charged on top of it and push "Soporte" off the bar. */
   .tabbar a { font-size: .625rem; }
 }
 @media (max-width: 340px) {
-  .tabbar { padding-inline: max(var(--sal), 2px) max(var(--sar), 2px); column-gap: 0; }
+  .tabbar { padding-inline: max(var(--sal), 2px) max(var(--sar), 2px); }
+}
+/* Wide phone / tablet: the six labels sit at .72rem in a bar that is 600-1200px
+   wide, so the row read as a small cluster in a lot of empty surface. The type
+   grows with the bar (fitText still re-fits, so a language that needs the room
+   simply keeps its size) and the gutters stay the base cap. */
+@media (min-width: 560px) and (max-width: 1199px) {
+  .tabbar a { font-size: .8rem; }
+  .tabbar a svg { width: 24px; height: 24px; }
 }
